@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0.0",
+  "ticketId": "XAUUSD_260223_0930",
+  "createdAt": "2026-02-23T09:30:00.000Z",
+  "decisionMode": "CONDITIONAL",
+  "ticketType": "Zone ticket",
+  "entryType": "Limit",
+  "entryTrigger": "Pullback to zone",
+  "confirmationTF": "15m",
+  "timeInForce": "This session",
+  "maxAttempts": 2,
+  "entry": {
+    "zone": "1932.5-1934.0 demand",
+    "priceMin": 1932.5,
+    "priceMax": 1934,
+    "notes": "Wait for reclaim + bullish rejection."
+  },
+  "stop": {
+    "price": 1929.8,
+    "logic": "Below swing low / above swing high",
+    "rationale": "Invalidation below session low sweep."
+  },
+  "targets": [
+    { "label": "TP1", "price": 1937.2, "rationale": "First liquidity pocket." },
+    { "label": "TP2", "price": 1941.6, "rationale": "HTF imbalance fill." }
+  ],
+  "checklist": {
+    "htfState": "Trending",
+    "htfLocation": "At POI",
+    "ltfAlignment": "Aligned",
+    "liquidityContext": "Near obvious highs/lows",
+    "volRisk": "Normal",
+    "execQuality": "Clean",
+    "conviction": "High",
+    "edgeTag": "High-probability pullback",
+    "confluenceScore": 8
+  },
+  "gate": {
+    "status": "PROCEED",
+    "waitReasonCode": "",
+    "reentryCondition": "Re-enter only after 5m bullish close above 1934.2.",
+    "reentryTime": "Within NY session"
+  }
+}

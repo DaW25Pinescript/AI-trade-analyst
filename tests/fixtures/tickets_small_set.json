@@ -1,0 +1,50 @@
+[
+  {
+    "ticketId": "T1",
+    "checklist": {
+      "htfState": "Trending",
+      "htfLocation": "At POI",
+      "ltfAlignment": "Aligned",
+      "liquidityContext": "Near obvious highs/lows",
+      "volRisk": "Normal",
+      "execQuality": "Clean",
+      "conviction": "High",
+      "edgeTag": "High-probability pullback",
+      "confluenceScore": 9
+    },
+    "noTradeToggle": false,
+    "expectedGate": "PROCEED"
+  },
+  {
+    "ticketId": "T2",
+    "checklist": {
+      "htfState": "Ranging",
+      "htfLocation": "Mid-range",
+      "ltfAlignment": "Mixed",
+      "liquidityContext": "Equilibrium",
+      "volRisk": "Elevated",
+      "execQuality": "Messy",
+      "conviction": "Medium",
+      "edgeTag": "Other",
+      "confluenceScore": 4
+    },
+    "noTradeToggle": true,
+    "expectedGate": "WAIT"
+  },
+  {
+    "ticketId": "T3",
+    "checklist": {
+      "htfState": "Transition",
+      "htfLocation": "At extremes",
+      "ltfAlignment": "Counter-trend",
+      "liquidityContext": "None identified",
+      "volRisk": "Normal",
+      "execQuality": "Clean",
+      "conviction": "Low",
+      "edgeTag": "Range boundary",
+      "confluenceScore": 6
+    },
+    "noTradeToggle": false,
+    "expectedGate": "CAUTION"
+  }
+]
