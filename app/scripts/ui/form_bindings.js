@@ -3,7 +3,7 @@ import { evaluateGate } from './gates.js';
 
 function onAssetInput() {
   generateTicketID();
-  syncOutput();
+  window.syncOutput?.();
 }
 
 // ═══════════════════════════════════════
@@ -13,14 +13,14 @@ function onAssetInput() {
 function setAsset(val) {
   document.getElementById('asset').value = val;
   generateTicketID();
-  syncOutput();
+  window.syncOutput?.();
 }
 
 function setBias(el) {
   document.querySelectorAll('.bias-btn').forEach(b => b.classList.remove('selected'));
   el.classList.add('selected');
   state.currentBias = el.dataset.val;
-  syncOutput();
+  window.syncOutput?.();
 }
 
 // ═══════════════════════════════════════
@@ -40,6 +40,7 @@ function handleUpload(input, zoneId, labelId, key) {
     state.imgSrcs[key] = e.target.result;
     document.getElementById('prev-' + key).src = e.target.result;
   };
+  reader.onerror = () => alert(`Failed to read file: ${file.name}`);
   reader.readAsDataURL(file);
 }
 
@@ -69,13 +70,13 @@ function selectRadio(field, el) {
   el.classList.add(el.dataset.sel);
   state.ptcState[field] = el.dataset.val;
   evaluateGate();
-  syncOutput();
+  window.syncOutput?.();
 }
 
 function onSlider() {
   const v = document.getElementById('confluenceScore').value;
   document.getElementById('confVal').textContent = v;
-  syncOutput();
+  window.syncOutput?.();
 }
 
 // ═══════════════════════════════════════

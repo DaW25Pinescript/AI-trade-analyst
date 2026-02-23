@@ -6,6 +6,13 @@ function readTextInput(id, fallback = '') {
   return (el?.value || fallback).toString();
 }
 
+function deriveDecisionMode() {
+  if (readTextInput('waitReason')) return 'WAIT';
+  if (state.currentBias === 'BULLISH') return 'LONG';
+  if (state.currentBias === 'BEARISH') return 'SHORT';
+  return 'CONDITIONAL';
+}
+
 function readGateStatus() {
   const gateEl = document.getElementById('gateStatus');
   if (gateEl?.classList.contains('wait')) return 'WAIT';
@@ -22,7 +29,7 @@ function buildTicketSnapshot() {
     schemaVersion: TICKET_SCHEMA_VERSION,
     ticketId: state.ticketID || 'draft',
     createdAt: nowISO,
-    decisionMode: readTextInput('waitReason') ? 'WAIT' : 'CONDITIONAL',
+    decisionMode: deriveDecisionMode(),
     ticketType: 'Zone ticket',
     entryType: 'Limit',
     entryTrigger: 'Pullback to zone',

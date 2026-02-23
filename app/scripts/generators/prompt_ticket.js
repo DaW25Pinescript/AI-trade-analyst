@@ -15,7 +15,7 @@ function buildPrompt() {
   const priceNow    = get('priceNow') || '—';
   const regime      = get('regime') || 'Not specified';
   const biasHorizon = get('biasHorizon') || 'Not specified';
-  const noTradeOK   = document.getElementById('noTradeToggle').checked;
+  const noTradeOK   = document.getElementById('noTradeToggle')?.checked ?? false;
   const minRR       = get('minRR') || 'None specified';
   const rrException = get('rrException');
   const rrJust      = get('rrJustification');
