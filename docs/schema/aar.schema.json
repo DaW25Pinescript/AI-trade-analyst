@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-trade-analyst.local/schema/aar.schema.json",
+  "title": "AI Trade Analyst After-Action Review",
+  "description": "Post-trade AAR payload linked to a ticket.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "ticketId",
+    "reviewedAt",
+    "outcomeEnum",
+    "verdictEnum",
+    "firstTouch",
+    "wouldHaveWon",
+    "actualEntry",
+    "actualExit",
+    "rAchieved",
+    "exitReasonEnum",
+    "killSwitchTriggered",
+    "failureReasonCodes",
+    "psychologicalTag",
+    "revisedConfidence",
+    "checklistDelta",
+    "notes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "ticketId": { "type": "string", "minLength": 1 },
+    "reviewedAt": { "type": "string", "format": "date-time" },
+    "outcomeEnum": {
+      "type": "string",
+      "enum": ["WIN", "LOSS", "BREAKEVEN", "MISSED", "SCRATCH"]
+    },
+    "verdictEnum": {
+      "type": "string",
+      "enum": ["PLAN_FOLLOWED", "PLAN_VIOLATION", "PROCESS_GOOD", "PROCESS_POOR"]
+    },
+    "firstTouch": { "type": "boolean" },
+    "wouldHaveWon": { "type": "boolean" },
+    "actualEntry": { "type": "number" },
+    "actualExit": { "type": "number" },
+    "rAchieved": { "type": "number" },
+    "exitReasonEnum": {
+      "type": "string",
+      "enum": ["TP_HIT", "SL_HIT", "TIME_EXIT", "MANUAL_EXIT", "INVALIDATION", "NO_FILL"]
+    },
+    "killSwitchTriggered": { "type": "boolean" },
+    "failureReasonCodes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "LATE_ENTRY",
+          "OVERSIZED_RISK",
+          "IGNORED_GATE",
+          "MISREAD_STRUCTURE",
+          "NEWS_BLINDSPOT",
+          "EMOTIONAL_EXECUTION",
+          "NO_EDGE"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "psychologicalTag": {
+      "type": "string",
+      "enum": ["CALM", "FOMO", "HESITATION", "REVENGE", "OVERCONFIDENCE", "FATIGUE", "DISCIPLINED"]
+    },
+    "revisedConfidence": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "checklistDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["htfState", "ltfAlignment", "volRisk", "execQuality", "notes"],
+      "properties": {
+        "htfState": { "type": "string" },
+        "ltfAlignment": { "type": "string" },
+        "volRisk": { "type": "string" },
+        "execQuality": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "revisedTicket": {
+      "type": "object",
+      "description": "Optional hindsight ticket patch that follows ticket schema shape.",
+      "additionalProperties": true
+    },
+    "notes": { "type": "string", "minLength": 1 }
+  }
+}
