@@ -1,5 +1,6 @@
 import { state, generateTicketID } from '../state/model.js';
 import { evaluateGate } from './gates.js';
+import { syncOutput } from './sync_output.js';
 
 function onAssetInput() {
   generateTicketID();
@@ -39,6 +40,9 @@ function handleUpload(input, zoneId, labelId, key) {
   reader.onload = e => {
     state.imgSrcs[key] = e.target.result;
     document.getElementById('prev-' + key).src = e.target.result;
+  };
+  reader.onerror = () => {
+    alert('Failed to read image file. Please try another image.');
   };
   reader.readAsDataURL(file);
 }

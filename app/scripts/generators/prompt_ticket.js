@@ -15,7 +15,7 @@ function buildPrompt() {
   const priceNow    = get('priceNow') || '—';
   const regime      = get('regime') || 'Not specified';
   const biasHorizon = get('biasHorizon') || 'Not specified';
-  const noTradeOK   = document.getElementById('noTradeToggle').checked;
+  const noTradeOK   = document.getElementById('noTradeToggle')?.checked ?? false;
   const minRR       = get('minRR') || 'None specified';
   const rrException = get('rrException');
   const rrJust      = get('rrJustification');
@@ -32,7 +32,7 @@ function buildPrompt() {
   const news        = get('news') || 'None known';
   const position    = get('position') || 'None';
 
-  const confluence  = document.getElementById('confluenceScore').value;
+  const confluence  = document.getElementById('confluenceScore')?.value || '7';
 
   // Pre-ticket state
   const ptc = state.ptcState;
@@ -54,9 +54,9 @@ function buildPrompt() {
   const requests = checked.length > 0 ? checked.map(c => `  ☑ ${c}`).join('\n') : '  (none selected)';
 
   const gateStatus = document.getElementById('gateStatus');
-  const gateDecision = gateStatus.classList.contains('wait') ? 'WAIT (conditions poor — see below)'
-    : gateStatus.classList.contains('caution') ? 'CAUTION (risk flags present)'
-    : gateStatus.classList.contains('proceed') ? 'PROCEED'
+  const gateDecision = gateStatus?.classList.contains('wait') ? 'WAIT (conditions poor — see below)'
+    : gateStatus?.classList.contains('caution') ? 'CAUTION (risk flags present)'
+    : gateStatus?.classList.contains('proceed') ? 'PROCEED'
     : 'INCOMPLETE — not all checklist fields completed';
 
   const rrLine = minRR && minRR !== 'None specified'
