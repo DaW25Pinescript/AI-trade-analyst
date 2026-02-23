@@ -1,0 +1,13 @@
+@media print {
+  body::before,
+  .header,
+  .steps,
+  .btn-row,
+  .copy-btn,
+  .export-btn { display: none !important; }
+
+  body { background: #fff !important; color: #000 !important; }
+  .main { max-width: 100%; padding: 0; }
+  .section { display: block !important; }
+  .card { break-inside: avoid; border-color: #ccc; }
+}

@@ -1,0 +1,34 @@
+import { generateTicketID } from './state/model.js';
+import { goTo, goToChartsNext, setBuildPromptRef } from './ui/stepper.js';
+import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleCheck, selectRadio, onSlider, toggleRRJustification } from './ui/form_bindings.js';
+import { buildPrompt } from './generators/prompt_ticket.js';
+import { exportHTML } from './exports/export_html.js';
+import { exportPDF } from './exports/export_pdf_print.js';
+import { bindShortcuts } from './ui/shortcuts.js';
+
+function syncOutput() { if (document.getElementById('section-4')?.classList.contains('active')) buildPrompt(); }
+function buildAndShow() { buildPrompt(); goTo(4); }
+function copyPrompt() {
+  const text = document.getElementById('outputText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    const orig = btn.textContent;
+    btn.textContent = 'COPIED ✓';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 1800);
+  });
+}
+function resetForm(){ location.reload(); }
+
+Object.assign(window, {
+  goTo, goToChartsNext, onAssetInput, setAsset, setBias, triggerUpload, handleUpload,
+  toggleCheck, selectRadio, onSlider, toggleRRJustification, syncOutput, buildAndShow,
+  copyPrompt, exportHTML, exportPDF, resetForm
+});
+
+window.onload = () => {
+  setBuildPromptRef(buildPrompt);
+  generateTicketID();
+  bindShortcuts({ goTo, buildAndShow });
+};
