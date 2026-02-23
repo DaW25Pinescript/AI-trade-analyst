@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "ticketId": "XAUUSD_260223_0930",
+  "reviewedAt": "2026-02-23T15:45:00.000Z",
+  "outcomeEnum": "WIN",
+  "verdictEnum": "PLAN_FOLLOWED",
+  "firstTouch": true,
+  "wouldHaveWon": true,
+  "actualEntry": 1933.1,
+  "actualExit": 1937.2,
+  "rAchieved": 1.5,
+  "exitReasonEnum": "TP_HIT",
+  "killSwitchTriggered": false,
+  "failureReasonCodes": [],
+  "psychologicalTag": "DISCIPLINED",
+  "revisedConfidence": 4,
+  "checklistDelta": {
+    "htfState": "No change",
+    "ltfAlignment": "No change",
+    "volRisk": "No change",
+    "execQuality": "No change",
+    "notes": "Execution aligned with plan and gate."
+  },
+  "notes": "Good patience and clean trigger execution."
+}
