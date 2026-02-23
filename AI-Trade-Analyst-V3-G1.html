@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Trade Analyst — V3</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0e;
+    --surface: #111318;
+    --surface2: #181c24;
+    --border: #1e2430;
+    --border2: #2a3040;
+    --gold: #d4a843;
+    --gold2: #f0c060;
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --text: #e8eaf0;
+    --muted: #6b7385;
+    --accent: #3b6fff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    gap: 12px;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 16px; }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+
+  .version-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 2px;
+    background: rgba(212,168,67,0.1);
+    border: 1px solid rgba(212,168,67,0.25);
+    color: var(--gold);
+    letter-spacing: 0.1em;
+  }
+
+  .ticket-id-header {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+  .ticket-id-header span { color: var(--gold); }
+
+  /* ── MAIN ── */
+  .main { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  .page-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  h1 { font-size: 26px; font-weight: 600; margin-bottom: 4px; line-height: 1.25; }
+
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 36px; font-weight: 300; }
+
+  /* ── STEPS ── */
+  .steps {
+    display: flex;
+    margin-bottom: 36px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .step {
+    flex: 1;
+    padding: 11px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+  .step:last-child { border-right: none; }
+  .step .step-num { display: block; font-size: 15px; font-weight: 600; color: var(--border2); margin-bottom: 1px; transition: color 0.2s; }
+  .step.active { background: var(--surface2); color: var(--gold); }
+  .step.active .step-num { color: var(--gold); }
+  .step.done { color: var(--green); }
+  .step.done .step-num { color: var(--green); }
+
+  /* ── SECTIONS ── */
+  .section { display: none; animation: fadeIn 0.25s ease; }
+  .section.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 22px;
+    margin-bottom: 14px;
+  }
+
+  .card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .card-label.green { color: var(--green); }
+  .card-label.amber { color: var(--amber); }
+
+  /* gate badge */
+  .gate-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 2px;
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--red);
+    letter-spacing: 0.08em;
+    margin-left: auto;
+  }
+  .gate-badge.ok {
+    background: rgba(34,197,94,0.1);
+    border-color: rgba(34,197,94,0.3);
+    color: var(--green);
+  }
+
+  /* ── FORM ELEMENTS ── */
+  label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  select,
+  textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    padding: 9px 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 14px;
+    -webkit-appearance: none;
+  }
+  input[type="text"]:focus,
+  input[type="number"]:focus,
+  select:focus,
+  textarea:focus { border-color: var(--gold); }
+  select { cursor: pointer; }
+  select option { background: var(--surface2); }
+  textarea { resize: vertical; min-height: 72px; }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  /* ── UPLOAD ZONES ── */
+  .tf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .upload-zone {
+    border: 1px dashed var(--border2);
+    border-radius: 4px;
+    padding: 18px 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover { border-color: var(--gold); background: rgba(212,168,67,0.03); }
+  .upload-zone.has-file { border-color: var(--green); border-style: solid; background: rgba(34,197,94,0.04); }
+  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; margin: 0; padding: 0; }
+  .upload-tf-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: var(--gold); text-transform: uppercase; display: block; margin-bottom: 3px; }
+  .upload-desc { font-size: 11px; color: var(--muted); display: block; margin-bottom: 6px; }
+  .upload-icon { font-size: 22px; margin-bottom: 4px; display: block; }
+  .upload-filename { font-size: 11px; color: var(--green); font-family: 'IBM Plex Mono', monospace; word-break: break-all; display: none; }
+  .upload-zone.has-file .upload-filename { display: block; }
+  .upload-zone.has-file .upload-icon,
+  .upload-zone.has-file .upload-desc { display: none; }
+  .preview-img { width: 100%; height: 72px; object-fit: cover; border-radius: 2px; margin-bottom: 5px; display: none; }
+  .upload-zone.has-file .preview-img { display: block; }
+
+  /* upload warning */
+  .upload-warning {
+    display: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--amber);
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 3px;
+    padding: 8px 12px;
+    margin-top: 12px;
+    letter-spacing: 0.04em;
+  }
+  .upload-warning.visible { display: block; }
+
+  /* ── RADIO GROUPS (Pre-Ticket) ── */
+  .radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .radio-opt {
+    padding: 7px 13px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--muted);
+    transition: all 0.15s;
+    user-select: none;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .radio-opt:hover { border-color: var(--border2); color: var(--text); }
+
+  .radio-opt.sel-trending  { border-color: var(--green); background: rgba(34,197,94,0.08); color: var(--green); }
+  .radio-opt.sel-ranging   { border-color: var(--amber); background: rgba(245,158,11,0.08); color: var(--amber); }
+  .radio-opt.sel-transition{ border-color: var(--accent); background: rgba(59,111,255,0.08); color: var(--accent); }
+  .radio-opt.sel-poi       { border-color: var(--gold); background: rgba(212,168,67,0.08); color: var(--gold); }
+  .radio-opt.sel-midrange  { border-color: var(--muted); background: rgba(107,115,133,0.08); color: var(--text); }
+  .radio-opt.sel-extremes  { border-color: var(--red); background: rgba(239,68,68,0.08); color: var(--red); }
+  .radio-opt.sel-aligned   { border-color: var(--green); background: rgba(34,197,94,0.08); color: var(--green); }
+  .radio-opt.sel-counter   { border-color: var(--red); background: rgba(239,68,68,0.08); color: var(--red); }
+  .radio-opt.sel-mixed     { border-color: var(--amber); background: rgba(245,158,11,0.08); color: var(--amber); }
+  .radio-opt.sel-nearliq   { border-color: var(--red); background: rgba(239,68,68,0.08); color: var(--red); }
+  .radio-opt.sel-eq        { border-color: var(--muted); background: rgba(107,115,133,0.08); color: var(--text); }
+  .radio-opt.sel-none      { border-color: var(--border2); color: var(--muted); }
+  .radio-opt.sel-normal    { border-color: var(--green); background: rgba(34,197,94,0.08); color: var(--green); }
+  .radio-opt.sel-elevated  { border-color: var(--red); background: rgba(239,68,68,0.08); color: var(--red); }
+  .radio-opt.sel-clean     { border-color: var(--green); background: rgba(34,197,94,0.08); color: var(--green); }
+  .radio-opt.sel-messy     { border-color: var(--amber); background: rgba(245,158,11,0.08); color: var(--amber); }
+  .radio-opt.sel-chop      { border-color: var(--red); background: rgba(239,68,68,0.08); color: var(--red); }
+  .radio-opt.sel-veryhigh  { border-color: var(--green); background: rgba(34,197,94,0.1); color: var(--green); }
+  .radio-opt.sel-high      { border-color: var(--gold); background: rgba(212,168,67,0.08); color: var(--gold); }
+  .radio-opt.sel-medium    { border-color: var(--amber); background: rgba(245,158,11,0.08); color: var(--amber); }
+  .radio-opt.sel-low       { border-color: var(--red); background: rgba(239,68,68,0.08); color: var(--red); }
+
+  /* pre-ticket field rows */
+  .ptc-row { margin-bottom: 14px; }
+  .ptc-row label { margin-bottom: 6px; }
+
+  /* gate status bar */
+  .gate-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    transition: all 0.3s;
+  }
+  .gate-status.wait {
+    border-color: rgba(239,68,68,0.35);
+    background: rgba(239,68,68,0.05);
+    color: var(--red);
+  }
+  .gate-status.caution {
+    border-color: rgba(245,158,11,0.35);
+    background: rgba(245,158,11,0.05);
+    color: var(--amber);
+  }
+  .gate-status.proceed {
+    border-color: rgba(34,197,94,0.35);
+    background: rgba(34,197,94,0.05);
+    color: var(--green);
+  }
+  .gate-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .gate-status.wait .gate-dot { background: var(--red); }
+  .gate-status.caution .gate-dot { background: var(--amber); }
+  .gate-status.proceed .gate-dot { background: var(--green); }
+
+  /* ── BIAS BUTTONS ── */
+  .bias-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .bias-btn {
+    flex: 1; padding: 9px;
+    border-radius: 3px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.15s; text-align: center;
+  }
+  .bias-btn[data-val="BULLISH"].selected { border-color: var(--green); background: rgba(34,197,94,0.08); color: var(--green); }
+  .bias-btn[data-val="BEARISH"].selected { border-color: var(--red); background: rgba(239,68,68,0.08); color: var(--red); }
+  .bias-btn[data-val="NEUTRAL"].selected { border-color: var(--gold); background: rgba(212,168,67,0.08); color: var(--gold); }
+
+  /* ── CONFLUENCE SLIDER ── */
+  .slider-wrap { margin-bottom: 14px; }
+  .slider-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .slider-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .slider-val { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; color: var(--gold); }
+  .slider-subtext { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+    accent-color: var(--gold);
+    margin: 0;
+    padding: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  /* ── SUGGESTIONS ── */
+  .suggestions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: -6px; margin-bottom: 14px; }
+  .sug-pill {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    padding: 4px 10px; border: 1px solid var(--border2); border-radius: 2px;
+    color: var(--muted); cursor: pointer; transition: all 0.15s; letter-spacing: 0.05em;
+  }
+  .sug-pill:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* ── TOGGLE (No-Trade) ── */
+  .toggle-wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; padding: 11px 13px; border: 1px solid var(--border);
+    border-radius: 4px; background: var(--bg); margin-bottom: 14px;
+  }
+  .toggle-left { display: flex; flex-direction: column; gap: 2px; }
+  .toggle-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
+  .toggle-sub { font-size: 12px; color: var(--muted); }
+  .switch { position: relative; width: 42px; height: 22px; flex-shrink: 0; }
+  .switch input { display: none; }
+  .slider-sw {
+    position: absolute; cursor: pointer; inset: 0;
+    background: rgba(107,115,133,0.25); border: 1px solid var(--border2);
+    transition: all 0.2s; border-radius: 999px;
+  }
+  .slider-sw::before {
+    content: ''; position: absolute; height: 16px; width: 16px;
+    left: 3px; top: 50%; transform: translateY(-50%);
+    background: var(--text); transition: all 0.2s; border-radius: 50%; opacity: 0.9;
+  }
+  .switch input:checked + .slider-sw { background: rgba(34,197,94,0.18); border-color: rgba(34,197,94,0.5); }
+  .switch input:checked + .slider-sw::before { transform: translate(19px,-50%); background: var(--green); opacity: 1; }
+
+  /* ── ANALYSIS REQUESTS CHECKBOXES ── */
+  .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .checkbox-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 13px; border: 1px solid var(--border); border-radius: 3px;
+    cursor: pointer; transition: all 0.15s; background: var(--bg);
+  }
+  .checkbox-item:hover { border-color: var(--border2); }
+  .checkbox-item.checked { border-color: var(--gold); background: rgba(212,168,67,0.06); }
+  .checkbox-item input { display: none; }
+  .check-box {
+    width: 14px; height: 14px; border: 1px solid var(--border2); border-radius: 2px;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; transition: all 0.15s;
+  }
+  .checkbox-item.checked .check-box { background: var(--gold); border-color: var(--gold); color: #000; }
+  .check-text { font-size: 13px; color: var(--muted); transition: color 0.15s; }
+  .checkbox-item.checked .check-text { color: var(--text); }
+
+  /* ── BUTTONS ── */
+  .btn-row { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  .btn {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 11px 22px; border-radius: 3px; border: none;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--muted); }
+  .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+  .btn-primary { background: var(--gold); color: #000; font-weight: 600; }
+  .btn-primary:hover { background: var(--gold2); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── OUTPUT PANEL ── */
+  .output-panel {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 18px; margin-top: 20px;
+  }
+  .output-header {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: 14px;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .output-title {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    letter-spacing: 0.15em; color: var(--green); text-transform: uppercase;
+  }
+  .copy-btn {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    padding: 6px 13px; background: transparent; border: 1px solid var(--border2);
+    color: var(--muted); border-radius: 2px; cursor: pointer;
+    letter-spacing: 0.08em; text-transform: uppercase; transition: all 0.15s;
+  }
+  .copy-btn:hover { border-color: var(--green); color: var(--green); }
+  #outputText {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11.5px;
+    line-height: 1.72; color: var(--text); white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* ── EXPORT BUTTONS ── */
+  .export-btn {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    padding: 6px 13px; background: transparent; border: 1px solid var(--border2);
+    color: var(--muted); border-radius: 2px; cursor: pointer;
+    letter-spacing: 0.08em; text-transform: uppercase; transition: all 0.15s;
+  }
+  .export-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* ── WAIT PANEL ── */
+  .wait-panel {
+    display: none;
+    border: 1px solid rgba(245,158,11,0.35);
+    background: rgba(245,158,11,0.04);
+    border-radius: 4px;
+    padding: 16px;
+    margin-top: 14px;
+  }
+  .wait-panel.visible { display: block; }
+  .wait-panel label { color: var(--amber); }
+  .wait-panel select { border-color: rgba(245,158,11,0.3); }
+  .wait-panel input { border-color: rgba(245,158,11,0.3); }
+
+  /* ── DIVIDER ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+
+  /* ── HINT TEXT ── */
+  .hint { font-size: 12px; color: var(--muted); margin-top: -10px; margin-bottom: 14px; line-height: 1.5; }
+
+  /* ── STEP NOTE ── */
+  .step-note {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    line-height: 1.6;
+    padding: 10px 14px;
+    border-left: 2px solid var(--border2);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 620px) {
+    .row, .row-3 { grid-template-columns: 1fr; }
+    .tf-grid { grid-template-columns: 1fr; }
+    .checkbox-grid { grid-template-columns: 1fr; }
+    .steps { flex-direction: column; }
+    .step { border-right: none; border-bottom: 1px solid var(--border); }
+    .step:last-child { border-bottom: none; }
+    .bias-row { flex-direction: column; }
+  }
+
+  /* ── PRINT / PDF ── */
+  @media print {
+    body { background: #0a0b0e !important; color: #e8eaf0 !important; color-scheme: dark; }
+    .header { background: #111318 !important; border-color: #1e2430 !important; }
+    .card { background: #111318 !important; border-color: #1e2430 !important; }
+    .output-panel { background: #0a0b0e !important; border-color: #1e2430 !important; }
+    #outputText { color: #e8eaf0 !important; }
+    .btn-row, .steps, .sug-pill { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <div class="logo">AI Trade <span>/ Analyst</span></div>
+    <div class="version-pill">V3 · G1</div>
+  </div>
+  <div class="ticket-id-header">Ticket: <span id="ticketIdHeader">—</span></div>
+</header>
+
+<main class="main">
+  <div class="page-title">Market Analysis Request</div>
+  <h1>Build Your Analysis Brief</h1>
+  <p class="subtitle">G1 — Full structured prompt engine: Ticket ID · Pre-ticket gate · Chart narrative · Enum-enforced ticket block</p>
+
+  <div class="steps">
+    <div class="step active" onclick="goTo(0)"><span class="step-num">01</span>Setup</div>
+    <div class="step" onclick="goTo(1)"><span class="step-num">02</span>Charts</div>
+    <div class="step" onclick="goTo(2)"><span class="step-num">03</span>Context</div>
+    <div class="step" onclick="goTo(3)"><span class="step-num">04</span>Pre-Ticket</div>
+    <div class="step" onclick="goTo(4)"><span class="step-num">05</span>Output</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       STEP 1: SETUP
+  ════════════════════════════════════════ -->
+  <div class="section active" id="section-0">
+    <div class="card">
+      <div class="card-label">Asset, Session & Platform</div>
+
+      <label>Asset / Ticker</label>
+      <input type="text" id="asset" placeholder="e.g. XAUUSD, EURUSD, BTCUSDT" oninput="onAssetInput()">
+      <div class="suggestions">
+        <span class="sug-pill" onclick="setAsset('XAUUSD')">XAUUSD</span>
+        <span class="sug-pill" onclick="setAsset('EURUSD')">EURUSD</span>
+        <span class="sug-pill" onclick="setAsset('GBPUSD')">GBPUSD</span>
+        <span class="sug-pill" onclick="setAsset('BTCUSDT')">BTCUSDT</span>
+        <span class="sug-pill" onclick="setAsset('US30')">US30</span>
+        <span class="sug-pill" onclick="setAsset('NAS100')">NAS100</span>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Session</label>
+          <select id="session" onchange="syncOutput()">
+            <option value="">— Select —</option>
+            <option>London Open</option>
+            <option>London Mid</option>
+            <option>NY Open</option>
+            <option>NY AM</option>
+            <option>NY PM / Close</option>
+            <option>Asia Session</option>
+            <option>Swing / Multi-day</option>
+          </select>
+        </div>
+        <div>
+          <label>Execution Horizon</label>
+          <select id="execHorizon" onchange="syncOutput()">
+            <option value="">— Select —</option>
+            <option>Scalp</option>
+            <option>Intraday</option>
+            <option>Swing</option>
+            <option>All ideas</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Broker / Platform</label>
+          <select id="broker" onchange="syncOutput()">
+            <option>TradingView</option>
+            <option>MT5</option>
+            <option>cTrader</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label>Candle Type</label>
+          <select id="candleType" onchange="syncOutput()">
+            <option>Normal</option>
+            <option>Heikin Ashi</option>
+            <option>Renko</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Chart Timezone</label>
+          <input type="text" id="chartTimezone" placeholder="e.g. UTC+3, NY time, Server time" oninput="syncOutput()">
+        </div>
+        <div>
+          <label>Price Now (optional)</label>
+          <input type="text" id="priceNow" placeholder="e.g. 2934.65" oninput="syncOutput()">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Market Regime</label>
+          <select id="regime" onchange="syncOutput()">
+            <option value="">— Select —</option>
+            <option>Trending</option>
+            <option>Ranging</option>
+            <option>Volatile / News-driven</option>
+            <option>Unsure — please assess</option>
+          </select>
+        </div>
+        <div>
+          <label>Bias Horizon</label>
+          <select id="biasHorizon" onchange="syncOutput()">
+            <option value="">— Select —</option>
+            <option>HTF swing bias (D/4H)</option>
+            <option>Intraday bias (1H/30m)</option>
+            <option>Scalp bias (15m/5m)</option>
+            <option>Mixed / counter-trend acceptable</option>
+          </select>
+        </div>
+      </div>
+
+      <label>My Current Bias (optional)</label>
+      <div class="bias-row">
+        <div class="bias-btn" data-val="BULLISH" onclick="setBias(this)">▲ Bullish</div>
+        <div class="bias-btn" data-val="BEARISH" onclick="setBias(this)">▼ Bearish</div>
+        <div class="bias-btn" data-val="NEUTRAL" onclick="setBias(this)">— Neutral</div>
+      </div>
+
+      <div class="toggle-wrap">
+        <div class="toggle-left">
+          <div class="toggle-title">Permission to say "No Trade"</div>
+          <div class="toggle-sub">If conditions are poor, WAIT is preferred over a forced ticket.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="noTradeToggle" onchange="syncOutput()" checked>
+          <span class="slider-sw"></span>
+        </label>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Min R:R Required</label>
+          <select id="minRR" onchange="syncOutput()">
+            <option value="">— Any —</option>
+            <option value="1.5">1.5R minimum</option>
+            <option value="2">2R minimum</option>
+            <option value="2.5">2.5R minimum</option>
+            <option value="3">3R minimum</option>
+          </select>
+        </div>
+        <div>
+          <label>Allow R:R Exception?</label>
+          <select id="rrException" onchange="toggleRRJustification(); syncOutput()">
+            <option value="no">No — strict filter</option>
+            <option value="yes">Yes — if win-rate logic is strong</option>
+          </select>
+        </div>
+      </div>
+      <div id="rrJustWrap" style="display:none;">
+        <label>Exception Justification (required)</label>
+        <input type="text" id="rrJustification" placeholder="e.g. High-probability mean reversion with historical 70%+ hit rate" oninput="syncOutput()">
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Max Stop Distance (pips / $)</label>
+          <input type="text" id="maxStop" placeholder="e.g. 50 pips, $200" oninput="syncOutput()">
+        </div>
+        <div>
+          <label>Spread / Slippage Assumption</label>
+          <input type="text" id="spread" placeholder="e.g. 0.3 pips, $0.50" oninput="syncOutput()">
+        </div>
+      </div>
+
+      <label>Correlation Context (optional)</label>
+      <div class="row">
+        <div>
+          <input type="text" id="correlationNote" placeholder="e.g. DXY strengthening, SPX risk-off" oninput="syncOutput()" style="margin-bottom:0">
+        </div>
+        <div>
+          <select id="correlationConf" onchange="syncOutput()" style="margin-bottom:0">
+            <option value="">— Confidence —</option>
+            <option value="Low">Low confidence</option>
+            <option value="Med">Medium confidence</option>
+            <option value="High">High confidence</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:6px;">Used as secondary confirmation only — never primary justification.</p>
+
+      <label>Persona Override (optional)</label>
+      <select id="persona" onchange="syncOutput()">
+        <option value="">Default — ruthless prop trader</option>
+        <option value="ICT purist">ICT purist</option>
+        <option value="SMC + Volume Profile">SMC + Volume Profile</option>
+        <option value="Pure price action">Pure price action</option>
+        <option value="Wyckoff methodology">Wyckoff methodology</option>
+      </select>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="goTo(1)">Next: Charts →</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       STEP 2: CHARTS
+  ════════════════════════════════════════ -->
+  <div class="section" id="section-1">
+    <div class="card">
+      <div class="card-label">Chart Screenshots</div>
+      <p class="step-note">Upload a screenshot for each timeframe. At least HTF + Mid TF strongly recommended. Screenshots embed into the HTML export automatically.</p>
+
+      <div class="tf-grid">
+        <div class="upload-zone" id="zone-htf" onclick="triggerUpload('upload-htf')">
+          <input type="file" id="upload-htf" accept="image/*" onchange="handleUpload(this,'zone-htf','label-htf','htf')">
+          <span class="upload-icon">📈</span>
+          <span class="upload-tf-label">HTF</span>
+          <span class="upload-desc">Daily / Weekly</span>
+          <img class="preview-img" id="prev-htf">
+          <span class="upload-filename" id="label-htf"></span>
+        </div>
+        <div class="upload-zone" id="zone-mid" onclick="triggerUpload('upload-mid')">
+          <input type="file" id="upload-mid" accept="image/*" onchange="handleUpload(this,'zone-mid','label-mid','mid')">
+          <span class="upload-icon">📊</span>
+          <span class="upload-tf-label">Mid TF</span>
+          <span class="upload-desc">4H / 1H</span>
+          <img class="preview-img" id="prev-mid">
+          <span class="upload-filename" id="label-mid"></span>
+        </div>
+        <div class="upload-zone" id="zone-ltf" onclick="triggerUpload('upload-ltf')">
+          <input type="file" id="upload-ltf" accept="image/*" onchange="handleUpload(this,'zone-ltf','label-ltf','ltf')">
+          <span class="upload-icon">🔍</span>
+          <span class="upload-tf-label">LTF</span>
+          <span class="upload-desc">15m / 5m</span>
+          <img class="preview-img" id="prev-ltf">
+          <span class="upload-filename" id="label-ltf"></span>
+        </div>
+        <div class="upload-zone" id="zone-exec" onclick="triggerUpload('upload-exec')">
+          <input type="file" id="upload-exec" accept="image/*" onchange="handleUpload(this,'zone-exec','label-exec','exec')">
+          <span class="upload-icon">⚡</span>
+          <span class="upload-tf-label">Exec TF</span>
+          <span class="upload-desc">1m / 3m (optional)</span>
+          <img class="preview-img" id="prev-exec">
+          <span class="upload-filename" id="label-exec"></span>
+        </div>
+      </div>
+
+      <div class="upload-warning" id="uploadWarning">
+        ⚠ No screenshots uploaded. The AI will still analyse but quality will be limited.
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <div>
+          <label>Screenshot Cleanliness</label>
+          <select id="chartCleanliness" onchange="syncOutput()">
+            <option value="Clean">Clean — no drawings</option>
+            <option value="Light">Light drawings — some annotations</option>
+            <option value="Heavy">Heavy drawings — AI should note drawings present</option>
+          </select>
+        </div>
+        <div>
+          <label>HTF Context (price location)</label>
+          <select id="htfContextSetup" onchange="syncOutput()">
+            <option value="">— Select —</option>
+            <option>At HTF demand / support</option>
+            <option>At HTF supply / resistance</option>
+            <option>Mid-range</option>
+            <option>Extended above HTF structure</option>
+            <option>Extended below HTF structure</option>
+            <option>Breaking out of range</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(0)">← Back</button>
+      <button class="btn btn-primary" onclick="goToChartsNext()">Next: Context →</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       STEP 3: CONTEXT + ANALYSIS REQUESTS
+  ════════════════════════════════════════ -->
+  <div class="section" id="section-2">
+    <div class="card">
+      <div class="card-label">Market Context</div>
+
+      <label>Indicators on chart</label>
+      <input type="text" id="indicators" placeholder="e.g. EMA 50/200, ICT FVG, Fibonacci, SR Zones" oninput="syncOutput()">
+
+      <label>Key levels I already see</label>
+      <textarea id="levels" placeholder="e.g. Resistance at 2950 (previous swing high). Support at 2898 (HTF demand zone). Trendline from Jan lows." oninput="syncOutput()"></textarea>
+
+      <label>Upcoming news / events</label>
+      <input type="text" id="news" placeholder="e.g. CPI tomorrow 8:30 ET, FOMC next week" oninput="syncOutput()">
+
+      <label>Any open positions?</label>
+      <input type="text" id="position" placeholder="e.g. Long XAUUSD from 2880, SL at 2855" oninput="syncOutput()">
+    </div>
+
+    <div class="card">
+      <div class="card-label">Analysis Requests</div>
+      <div class="checkbox-grid" id="requests">
+        <label class="checkbox-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked><div class="check-box">✓</div>
+          <span class="check-text">Trend & key levels per TF</span>
+        </label>
+        <label class="checkbox-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked><div class="check-box">✓</div>
+          <span class="check-text">Primary trade ticket</span>
+        </label>
+        <label class="checkbox-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked><div class="check-box">✓</div>
+          <span class="check-text">No-trade conditions</span>
+        </label>
+        <label class="checkbox-item checked" onclick="toggleCheck(this)">
+          <input type="checkbox" checked><div class="check-box">✓</div>
+          <span class="check-text">Kill-switch conditions</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox"><div class="check-box"></div>
+          <span class="check-text">Conditional alternative ticket</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox"><div class="check-box"></div>
+          <span class="check-text">Liquidity analysis</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox"><div class="check-box"></div>
+          <span class="check-text">HTF/LTF confluence</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox"><div class="check-box"></div>
+          <span class="check-text">Invalidation scenarios</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(3)">Next: Pre-Ticket →</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       STEP 4: PRE-TICKET CHECKLIST (mandatory gate)
+  ════════════════════════════════════════ -->
+  <div class="section" id="section-3">
+    <div class="card">
+      <div class="card-label amber">Pre-Ticket Checklist <span class="gate-badge" id="gateBadge">INCOMPLETE</span></div>
+      <p class="step-note">Complete all 8 fields. This is your structural read before the AI commits to a ticket. The gate logic will warn you if conditions suggest WAIT.</p>
+
+      <!-- 1. HTF State -->
+      <div class="ptc-row">
+        <label>1 · HTF State</label>
+        <div class="radio-group" id="rg-htfState">
+          <div class="radio-opt" data-val="Trending" data-sel="sel-trending" onclick="selectRadio('htfState',this)">Trending</div>
+          <div class="radio-opt" data-val="Ranging" data-sel="sel-ranging" onclick="selectRadio('htfState',this)">Ranging</div>
+          <div class="radio-opt" data-val="Transition" data-sel="sel-transition" onclick="selectRadio('htfState',this)">Transition</div>
+        </div>
+      </div>
+
+      <!-- 2. HTF Location -->
+      <div class="ptc-row">
+        <label>2 · HTF Location</label>
+        <div class="radio-group" id="rg-htfLocation">
+          <div class="radio-opt" data-val="At POI" data-sel="sel-poi" onclick="selectRadio('htfLocation',this)">At POI</div>
+          <div class="radio-opt" data-val="Mid-range" data-sel="sel-midrange" onclick="selectRadio('htfLocation',this)">Mid-range</div>
+          <div class="radio-opt" data-val="At extremes" data-sel="sel-extremes" onclick="selectRadio('htfLocation',this)">At extremes</div>
+        </div>
+      </div>
+
+      <!-- 3. LTF Alignment -->
+      <div class="ptc-row">
+        <label>3 · LTF Alignment</label>
+        <div class="radio-group" id="rg-ltfAlignment">
+          <div class="radio-opt" data-val="Aligned" data-sel="sel-aligned" onclick="selectRadio('ltfAlignment',this)">Aligned with HTF</div>
+          <div class="radio-opt" data-val="Counter-trend" data-sel="sel-counter" onclick="selectRadio('ltfAlignment',this)">Counter-trend</div>
+          <div class="radio-opt" data-val="Mixed" data-sel="sel-mixed" onclick="selectRadio('ltfAlignment',this)">Mixed</div>
+        </div>
+      </div>
+
+      <!-- 4. Liquidity Context -->
+      <div class="ptc-row">
+        <label>4 · Liquidity Context</label>
+        <div class="radio-group" id="rg-liquidityContext">
+          <div class="radio-opt" data-val="Near obvious highs/lows" data-sel="sel-nearliq" onclick="selectRadio('liquidityContext',this)">Near obvious highs/lows</div>
+          <div class="radio-opt" data-val="Equilibrium" data-sel="sel-eq" onclick="selectRadio('liquidityContext',this)">Equilibrium</div>
+          <div class="radio-opt" data-val="None identified" data-sel="sel-none" onclick="selectRadio('liquidityContext',this)">None identified</div>
+        </div>
+      </div>
+
+      <!-- 5. Volatility / News Risk -->
+      <div class="ptc-row">
+        <label>5 · Volatility / News Risk</label>
+        <div class="radio-group" id="rg-volRisk">
+          <div class="radio-opt" data-val="Normal" data-sel="sel-normal" onclick="selectRadio('volRisk',this)">Normal</div>
+          <div class="radio-opt" data-val="Elevated" data-sel="sel-elevated" onclick="selectRadio('volRisk',this)">Elevated</div>
+        </div>
+      </div>
+
+      <!-- 6. Execution Quality -->
+      <div class="ptc-row">
+        <label>6 · Execution Quality</label>
+        <div class="radio-group" id="rg-execQuality">
+          <div class="radio-opt" data-val="Clean" data-sel="sel-clean" onclick="selectRadio('execQuality',this)">Clean</div>
+          <div class="radio-opt" data-val="Messy" data-sel="sel-messy" onclick="selectRadio('execQuality',this)">Messy</div>
+          <div class="radio-opt" data-val="Chop" data-sel="sel-chop" onclick="selectRadio('execQuality',this)">Chop</div>
+        </div>
+      </div>
+
+      <!-- 7. My Conviction Before AI -->
+      <div class="ptc-row">
+        <label>7 · My Conviction Level (before AI)</label>
+        <div class="radio-group" id="rg-conviction">
+          <div class="radio-opt" data-val="Very High" data-sel="sel-veryhigh" onclick="selectRadio('conviction',this)">Very High</div>
+          <div class="radio-opt" data-val="High" data-sel="sel-high" onclick="selectRadio('conviction',this)">High</div>
+          <div class="radio-opt" data-val="Medium" data-sel="sel-medium" onclick="selectRadio('conviction',this)">Medium</div>
+          <div class="radio-opt" data-val="Low" data-sel="sel-low" onclick="selectRadio('conviction',this)">Low</div>
+        </div>
+      </div>
+
+      <!-- 8. Personal Edge Tag -->
+      <div class="ptc-row">
+        <label>8 · My Personal Edge Tag on This Setup</label>
+        <div class="radio-group" id="rg-edgeTag">
+          <div class="radio-opt" data-val="High-probability pullback" data-sel="sel-aligned" onclick="selectRadio('edgeTag',this)">Pullback</div>
+          <div class="radio-opt" data-val="Liquidity grab" data-sel="sel-poi" onclick="selectRadio('edgeTag',this)">Liquidity grab</div>
+          <div class="radio-opt" data-val="FVG reclaim" data-sel="sel-trending" onclick="selectRadio('edgeTag',this)">FVG reclaim</div>
+          <div class="radio-opt" data-val="Structure BOS" data-sel="sel-transition" onclick="selectRadio('edgeTag',this)">Structure BOS</div>
+          <div class="radio-opt" data-val="Range boundary" data-sel="sel-ranging" onclick="selectRadio('edgeTag',this)">Range boundary</div>
+          <div class="radio-opt" data-val="Other" data-sel="sel-none" onclick="selectRadio('edgeTag',this)">Other</div>
+        </div>
+      </div>
+
+      <!-- Confluence Slider -->
+      <div class="slider-wrap">
+        <div class="slider-header">
+          <div class="slider-label">Confluence Score (your gut-feel, pre-AI)</div>
+          <div class="slider-val" id="confVal">7</div>
+        </div>
+        <input type="range" id="confluenceScore" min="1" max="10" value="7" oninput="onSlider()">
+        <div class="slider-subtext">1 = very weak · 5 = moderate · 10 = highest conviction. This will be tracked vs outcomes.</div>
+      </div>
+
+      <!-- Gate Status -->
+      <div class="gate-status" id="gateStatus">
+        <div class="gate-dot"></div>
+        <span id="gateText">Complete all 8 fields to see gate decision.</span>
+      </div>
+
+      <!-- WAIT Panel (shown when gate logic fires) -->
+      <div class="wait-panel" id="waitPanel">
+        <label>⚠ WAIT Reason Code</label>
+        <select id="waitReason" onchange="syncOutput()">
+          <option value="">— Select reason —</option>
+          <option>Chop / range noise</option>
+          <option>HTF-LTF conflict</option>
+          <option>No POI / poor R:R</option>
+          <option>News risk / volatility</option>
+          <option>Already moved / late trend</option>
+        </select>
+        <label>Re-entry Condition (what would change WAIT to trade?)</label>
+        <input type="text" id="reentryCondition" placeholder="e.g. Price sweeps 2890 liquidity and reclaims 2895 on 15m close" oninput="syncOutput()">
+        <label>Time horizon for re-evaluation</label>
+        <input type="text" id="reentryTime" placeholder="e.g. Re-check in 2H at NY open" oninput="syncOutput()">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
+      <button class="btn btn-primary" onclick="buildAndShow()">Generate V3 Prompt →</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       STEP 5: OUTPUT
+  ════════════════════════════════════════ -->
+  <div class="section" id="section-4">
+    <div class="card">
+      <div class="card-label green">Generated Prompt — V3</div>
+      <p class="step-note">Copy & paste into Claude. Attach your chart screenshots in the same message. Ticket ID and timestamp are embedded.</p>
+
+      <div class="output-panel">
+        <div class="output-header">
+          <span class="output-title">● PROMPT READY · <span id="outputTicketId">—</span></span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
+            <button class="export-btn" onclick="exportHTML()">Download HTML</button>
+            <button class="export-btn" onclick="exportPDF()">Print / PDF</button>
+          </div>
+        </div>
+        <div id="outputText">Fill in the form steps to generate your V3 prompt...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Charts to Attach</div>
+      <div id="attachChecklist" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);line-height:2.1;white-space:pre;"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(3)">← Edit Pre-Ticket</button>
+      <button class="btn btn-primary" onclick="resetForm()">New Ticket</button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let currentStep = 0;
+let currentBias = '';
+let ticketID = '';
+
+const uploads = { htf: null, mid: null, ltf: null, exec: null };
+const imgSrcs = { htf: '', mid: '', ltf: '', exec: '' };
+
+const ptcState = {
+  htfState: '',
+  htfLocation: '',
+  ltfAlignment: '',
+  liquidityContext: '',
+  volRisk: '',
+  execQuality: '',
+  conviction: '',
+  edgeTag: ''
+};
+
+// ═══════════════════════════════════════
+// TICKET ID
+// ═══════════════════════════════════════
+function generateTicketID() {
+  const asset = (document.getElementById('asset').value || 'XXXXXX').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+  const now = new Date();
+  const y = now.getFullYear().toString().slice(2);
+  const mo = String(now.getMonth()+1).padStart(2,'0');
+  const d = String(now.getDate()).padStart(2,'0');
+  const h = String(now.getHours()).padStart(2,'0');
+  const mi = String(now.getMinutes()).padStart(2,'0');
+  ticketID = `${asset}_${y}${mo}${d}_${h}${mi}`;
+  document.getElementById('ticketIdHeader').textContent = ticketID;
+  return ticketID;
+}
+
+function onAssetInput() {
+  generateTicketID();
+  syncOutput();
+}
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+function goTo(step) {
+  document.querySelectorAll('.section').forEach((s,i) => s.classList.toggle('active', i === step));
+  document.querySelectorAll('.step').forEach((s,i) => {
+    s.classList.remove('active','done');
+    if (i === step) s.classList.add('active');
+    if (i < step) s.classList.add('done');
+  });
+  currentStep = step;
+  if (step === 4) buildPrompt();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goToChartsNext() {
+  // Show warning if no screenshots
+  const anyUploaded = Object.values(uploads).some(v => v !== null);
+  const warn = document.getElementById('uploadWarning');
+  if (!anyUploaded) {
+    warn.classList.add('visible');
+    // Still allow proceed after 1.5s
+    setTimeout(() => { warn.classList.remove('visible'); goTo(2); }, 2200);
+  } else {
+    goTo(2);
+  }
+}
+
+// ═══════════════════════════════════════
+// ASSET / BIAS
+// ═══════════════════════════════════════
+function setAsset(val) {
+  document.getElementById('asset').value = val;
+  generateTicketID();
+  syncOutput();
+}
+
+function setBias(el) {
+  document.querySelectorAll('.bias-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  currentBias = el.dataset.val;
+  syncOutput();
+}
+
+// ═══════════════════════════════════════
+// FILE UPLOAD
+// ═══════════════════════════════════════
+function triggerUpload(id) { document.getElementById(id).click(); }
+
+function handleUpload(input, zoneId, labelId, key) {
+  const file = input.files[0];
+  if (!file) return;
+  uploads[key] = file.name;
+  document.getElementById(zoneId).classList.add('has-file');
+  document.getElementById(labelId).textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgSrcs[key] = e.target.result;
+    document.getElementById('prev-' + key).src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════
+// CHECKBOXES
+// ═══════════════════════════════════════
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  el.querySelector('.check-box').textContent = el.classList.contains('checked') ? '✓' : '';
+}
+
+function getChecked() {
+  return Array.from(document.querySelectorAll('#requests .checkbox-item.checked .check-text'))
+              .map(i => i.textContent);
+}
+
+// ═══════════════════════════════════════
+// PRE-TICKET RADIO LOGIC
+// ═══════════════════════════════════════
+function selectRadio(field, el) {
+  const group = document.getElementById('rg-' + field);
+  group.querySelectorAll('.radio-opt').forEach(o => {
+    o.className = 'radio-opt'; // reset
+  });
+  el.classList.add(el.dataset.sel);
+  ptcState[field] = el.dataset.val;
+  evaluateGate();
+  syncOutput();
+}
+
+function ptcComplete() {
+  return Object.values(ptcState).every(v => v !== '');
+}
+
+function evaluateGate() {
+  const badge = document.getElementById('gateBadge');
+  const gateEl = document.getElementById('gateStatus');
+  const gateText = document.getElementById('gateText');
+  const waitPanel = document.getElementById('waitPanel');
+
+  const complete = ptcComplete();
+  badge.textContent = complete ? 'READY' : 'INCOMPLETE';
+  badge.className = complete ? 'gate-badge ok' : 'gate-badge';
+
+  if (!complete) {
+    gateEl.className = 'gate-status';
+    gateText.textContent = 'Complete all 8 fields to see gate decision.';
+    waitPanel.classList.remove('visible');
+    return;
+  }
+
+  const eq = ptcState.execQuality;
+  const ltf = ptcState.ltfAlignment;
+  const vol = ptcState.volRisk;
+  const noTradeOK = document.getElementById('noTradeToggle').checked;
+
+  const isChopOrMessy = (eq === 'Chop' || eq === 'Messy');
+  const isConflict = (ltf === 'Counter-trend' || ltf === 'Mixed');
+  const isElevatedVol = (vol === 'Elevated');
+
+  if (isChopOrMessy && noTradeOK) {
+    gateEl.className = 'gate-status wait';
+    gateText.textContent = 'GATE → DEFAULT WAIT. Execution quality is poor. Proceed only with a specific conditional trigger.';
+    waitPanel.classList.add('visible');
+  } else if (isConflict && isElevatedVol) {
+    gateEl.className = 'gate-status caution';
+    gateText.textContent = 'GATE → CAUTION. HTF/LTF conflict + elevated volatility. Lower confidence — consider sizing down or conditional entry only.';
+    waitPanel.classList.remove('visible');
+  } else if (isConflict || isElevatedVol) {
+    gateEl.className = 'gate-status caution';
+    gateText.textContent = 'GATE → CAUTION. One risk flag present. Ensure entry trigger is tight and kill-switch is defined.';
+    waitPanel.classList.remove('visible');
+  } else {
+    gateEl.className = 'gate-status proceed';
+    gateText.textContent = 'GATE → PROCEED. Conditions acceptable. Generate ticket.';
+    waitPanel.classList.remove('visible');
+  }
+}
+
+// ═══════════════════════════════════════
+// SLIDER
+// ═══════════════════════════════════════
+function onSlider() {
+  const v = document.getElementById('confluenceScore').value;
+  document.getElementById('confVal').textContent = v;
+  syncOutput();
+}
+
+// ═══════════════════════════════════════
+// R:R EXCEPTION TOGGLE
+// ═══════════════════════════════════════
+function toggleRRJustification() {
+  const show = document.getElementById('rrException').value === 'yes';
+  document.getElementById('rrJustWrap').style.display = show ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════
+// BUILD PROMPT
+// ═══════════════════════════════════════
+function buildPrompt() {
+  generateTicketID();
+
+  const get = id => (document.getElementById(id) ? document.getElementById(id).value : '') || '';
+
+  const asset       = get('asset') || '[ASSET NOT SET]';
+  const session     = get('session') || 'Not specified';
+  const execHorizon = get('execHorizon') || 'All ideas';
+  const broker      = get('broker') || 'TradingView';
+  const candleType  = get('candleType') || 'Normal';
+  const chartTZ     = get('chartTimezone') || 'Not specified';
+  const priceNow    = get('priceNow') || '—';
+  const regime      = get('regime') || 'Not specified';
+  const biasHorizon = get('biasHorizon') || 'Not specified';
+  const noTradeOK   = document.getElementById('noTradeToggle').checked;
+  const minRR       = get('minRR') || 'None specified';
+  const rrException = get('rrException');
+  const rrJust      = get('rrJustification');
+  const maxStop     = get('maxStop') || 'Not specified';
+  const spread      = get('spread') || 'Not specified';
+  const corrNote    = get('correlationNote');
+  const corrConf    = get('correlationConf');
+  const htfCtx      = get('htfContextSetup') || 'Not specified';
+  const cleanliness = get('chartCleanliness') || 'Clean';
+  const persona     = get('persona') || 'Default — ruthless prop trader';
+
+  const indicators  = get('indicators') || 'None specified';
+  const levels      = get('levels') || 'None — identify from charts';
+  const news        = get('news') || 'None known';
+  const position    = get('position') || 'None';
+
+  const confluence  = document.getElementById('confluenceScore').value;
+
+  // Pre-ticket state
+  const ptc = ptcState;
+  const waitReason    = get('waitReason');
+  const reentry       = get('reentryCondition');
+  const reentryTime   = get('reentryTime');
+
+  const checked = getChecked();
+
+  const now = new Date().toISOString().replace('T',' ').slice(0,19) + 'Z';
+
+  const tfLines = [
+    `  • HTF  (Daily/Weekly)  — ${uploads.htf  ? '✓ screenshot attached: ' + uploads.htf  : '⚠  NO SCREENSHOT'}`,
+    `  • Mid  (4H/1H)         — ${uploads.mid  ? '✓ screenshot attached: ' + uploads.mid  : '⚠  NO SCREENSHOT'}`,
+    `  • LTF  (15m/5m)        — ${uploads.ltf  ? '✓ screenshot attached: ' + uploads.ltf  : '⚠  NO SCREENSHOT'}`,
+    `  • Exec (1m/3m)         — ${uploads.exec ? '✓ screenshot attached: ' + uploads.exec : '—  optional / not uploaded'}`,
+  ].join('\n');
+
+  const requests = checked.length > 0 ? checked.map(c => `  ☑ ${c}`).join('\n') : '  (none selected)';
+
+  const gateStatus = document.getElementById('gateStatus');
+  const gateDecision = gateStatus.classList.contains('wait') ? 'WAIT (conditions poor — see below)'
+    : gateStatus.classList.contains('caution') ? 'CAUTION (risk flags present)'
+    : gateStatus.classList.contains('proceed') ? 'PROCEED'
+    : 'INCOMPLETE — not all checklist fields completed';
+
+  const rrLine = minRR && minRR !== 'None specified'
+    ? `Min R:R:         ${minRR}R${rrException === 'yes' ? ` (exception allowed: ${rrJust || 'justification not entered'})` : ' — strict'}`
+    : 'Min R:R:         None specified';
+
+  const corrLine = corrNote
+    ? `Correlation:     ${corrNote}${corrConf ? ` [confidence: ${corrConf}]` : ''} — secondary confirmation only`
+    : 'Correlation:     None noted';
+
+  const waitBlock = (waitReason || reentry)
+    ? `\nWAIT Reason:     ${waitReason || '—'}\nRe-entry if:     ${reentry || '—'}\nRe-check at:     ${reentryTime || '—'}`
+    : '';
+
+  const personaInstruction = persona && persona !== 'Default — ruthless prop trader'
+    ? `You operate as a ${persona} analyst. Apply that methodology's framework strictly throughout.`
+    : '';
+
+  const prompt = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 AI TRADE ANALYSIS REQUEST — V3
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ticket ID:       ${ticketID}
+Generated:       ${now}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── ASSET & SESSION ───────────────────────
+Asset:           ${asset}
+Session:         ${session}
+Market Regime:   ${regime}
+Exec Horizon:    ${execHorizon}
+Bias Horizon:    ${biasHorizon}${currentBias ? '\nMy Bias:         ' + currentBias + ' (my current read — do not anchor on this)' : ''}
+No-Trade OK?:    ${noTradeOK ? 'YES — you may and should recommend WAIT if conditions are poor' : 'NO — always provide a scenario even if low quality'}
+
+─── PLATFORM ──────────────────────────────
+Broker:          ${broker}
+Candle Type:     ${candleType}
+Chart Timezone:  ${chartTZ}
+Price Now:       ${priceNow}
+HTF Context:     ${htfCtx}
+Chart Cleanliness: ${cleanliness}
+
+─── RISK PARAMETERS ───────────────────────
+${rrLine}
+Max Stop:        ${maxStop}
+Spread/Slippage: ${spread}
+${corrLine}
+
+─── CHARTS PROVIDED ───────────────────────
+${tfLines}
+(All screenshots attached to this message)
+
+─── INDICATORS ON CHART ───────────────────
+${indicators}
+
+─── KEY LEVELS I ALREADY SEE ──────────────
+${levels}
+
+─── NEWS / EVENTS ─────────────────────────
+${news}
+
+─── OPEN POSITIONS ────────────────────────
+${position}
+
+─── PRE-TICKET CHECKLIST (user read) ──────
+HTF State:           ${ptc.htfState || '⚠ not set'}
+HTF Location:        ${ptc.htfLocation || '⚠ not set'}
+LTF Alignment:       ${ptc.ltfAlignment || '⚠ not set'}
+Liquidity Context:   ${ptc.liquidityContext || '⚠ not set'}
+Volatility Risk:     ${ptc.volRisk || '⚠ not set'}
+Execution Quality:   ${ptc.execQuality || '⚠ not set'}
+My Conviction:       ${ptc.conviction || '⚠ not set'}
+My Edge Tag:         ${ptc.edgeTag || '⚠ not set'}
+Confluence Score:    ${confluence}/10 (pre-AI gut feel — will be tracked vs outcome)
+Gate Decision:       ${gateDecision}${waitBlock}
+
+─── ANALYSIS REQUESTED ────────────────────
+${requests}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SYSTEM PERSONA (obey strictly):
+
+You are a ruthless, zero-ego 20-year prop trader and analyst.
+You would rather say WAIT than force a low-quality ticket.
+Never sugar-coat. Precision over comfort.
+R:R is always calculated after applying the spread/slippage assumption above.
+Confidence 5/5 = you would bet your own prop capital on this exact setup today.
+${personaInstruction}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — CHART NARRATIVE (mandatory grounding):
+
+Describe EXACTLY what you see on each chart. No assumptions. No inference yet.
+This section is your audit trail — what did the chart actually show at time of analysis?
+
+HTF:  [describe trend, key swing highs/lows, dominant structure, notable levels]
+Mid:  [describe]
+LTF:  [describe]
+Exec: [describe if provided]
+
+Overall raw bias from charts only (before user bias injected):
+→ [Bullish / Bearish / Neutral / Range]
+
+Note any discrepancy between user's stated bias (${currentBias || 'none stated'}) and chart read.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — TIMEFRAME ANALYSIS (systematic):
+
+For each timeframe:
+1. Trend state: Bullish / Bearish / Range / Transition
+2. Market structure: HH/HL or LH/LL, MSS/BOS if present
+3. Key demand/supply zones and high-impact levels
+4. Risk notes: choppy / extended / late-trend / news-sensitive
+
+Then cross-reference: HTF ↔ Mid ↔ LTF for alignment.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 — TRADE TICKET [${ticketID}]:
+
+Provide ONE primary ticket. A second conditional ticket ONLY if materially different.
+
+Decision:          LONG / SHORT / WAIT / CONDITIONAL
+Setup Type:        Pullback / Breakout / Reversal / Range trade / Other
+Entry:             [zone, not a single price — specify range]
+Entry Trigger:     [Close above/below level | Break + retest | Sweep + reclaim | Pullback to zone | Momentum shift MSS/BOS]
+Confirmation TF:   [1m | 5m | 15m | 1H]
+Stop:              [exact level]
+Stop Logic:        [Below swing low/above swing high | Below zone | ATR-based | Structure + buffer] — state WHY that level
+TP1:               [level] — rationale
+TP2:               [level] — rationale
+R:R (TP1/TP2):    [calculated after spread assumption]
+Time Validity:     [this session | 24H | custom — after which the setup is invalid]
+Kill-switch:       [what cancels this setup BEFORE entry triggers — be specific]
+Confidence:        [1–5] — provide 2–3 explicit reasons
+What changes mind: [2 concrete, observable conditions that would invalidate the thesis]
+Missing info:      [declare any gaps in available data that limit precision]
+WAIT reason:       [enum only if Decision = WAIT]
+Re-entry if:       [only if WAIT — what must happen]
+
+Always include what would prove the idea wrong.
+Always respect the minimum R:R parameter above.
+If Decision = WAIT and no trade is recommended, explain clearly what would change that.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+  document.getElementById('outputText').textContent = prompt;
+  document.getElementById('outputTicketId').textContent = ticketID;
+
+  // Attach checklist
+  const attachEl = document.getElementById('attachChecklist');
+  attachEl.textContent = ['htf','mid','ltf','exec'].map(k => {
+    const name = uploads[k];
+    return `${name ? '✓' : '○'}  ${k.toUpperCase().padEnd(4)} — ${name || '(not uploaded)'}`;
+  }).join('\n');
+}
+
+function syncOutput() {
+  if (currentStep === 4) buildPrompt();
+}
+
+function buildAndShow() {
+  buildPrompt();
+  goTo(4);
+}
+
+// ═══════════════════════════════════════
+// COPY
+// ═══════════════════════════════════════
+function copyPrompt() {
+  const text = document.getElementById('outputText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    const orig = btn.textContent;
+    btn.textContent = 'COPIED ✓';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }, 1800);
+  });
+}
+
+// ═══════════════════════════════════════
+// EXPORT HTML (self-contained with images)
+// ═══════════════════════════════════════
+function _safeText(s) {
+  return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function _buildReportHTML() {
+  const prompt = document.getElementById('outputText').textContent || '';
+  const asset = document.getElementById('asset').value || 'ASSET';
+  const now = new Date().toISOString().replace('T',' ').slice(0,19) + 'Z';
+
+  const imgs = [
+    { key:'htf',  title:'HTF (Daily/Weekly)',   name: uploads.htf,  src: imgSrcs.htf  },
+    { key:'mid',  title:'Mid TF (4H/1H)',        name: uploads.mid,  src: imgSrcs.mid  },
+    { key:'ltf',  title:'LTF (15m/5m)',          name: uploads.ltf,  src: imgSrcs.ltf  },
+    { key:'exec', title:'Execution TF (1m/3m)',  name: uploads.exec, src: imgSrcs.exec },
+  ].filter(x => x.name && x.src);
+
+  const imgBlocks = imgs.length
+    ? imgs.map(x => `
+        <div class="ic">
+          <div class="ih"><span class="it">${_safeText(x.title)}</span><span class="im">${_safeText(x.name)}</span></div>
+          <img src="${x.src}" alt="${_safeText(x.title)}" style="width:100%;display:block;">
+        </div>`).join('')
+    : `<p style="color:#6b7385;font-size:13px;">No screenshots embedded.</p>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Trade Analysis — ${_safeText(ticketID)}</title>
+<style>
+  body{margin:0;background:#0a0b0e;color:#e8eaf0;font-family:system-ui,sans-serif;}
+  .w{max-width:900px;margin:0 auto;padding:24px 16px 48px;}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+  .brand{font-size:11px;letter-spacing:.15em;color:#d4a843;text-transform:uppercase;font-weight:700;margin-bottom:4px;}
+  h1{font-size:20px;margin:0 0 4px;}
+  .meta{font-size:12px;color:#6b7385;}
+  .stamp{font-size:11px;color:#6b7385;font-family:monospace;}
+  .card{background:#111318;border:1px solid #1e2430;border-radius:6px;padding:16px;margin-bottom:12px;}
+  pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:ui-monospace,Menlo,Monaco,monospace;font-size:11.5px;line-height:1.7;color:#e8eaf0;}
+  .ic{background:#0b0c10;border:1px solid #1e2430;border-radius:5px;overflow:hidden;margin-bottom:10px;}
+  .ih{padding:10px 12px 7px;border-bottom:1px solid #1e2430;display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .it{font-weight:600;font-size:13px;}
+  .im{color:#6b7385;font-size:11px;}
+  @media print{body{background:#0a0b0e!important;color:#e8eaf0!important;color-scheme:dark;}}
+</style>
+</head>
+<body>
+<div class="w">
+  <div class="hdr">
+    <div>
+      <div class="brand">AI Trade / Analyst — V3</div>
+      <h1>Analysis Brief — ${_safeText(document.getElementById('asset').value || 'ASSET')}</h1>
+      <div class="meta">Ticket: ${_safeText(ticketID)} · ${_safeText(now)}</div>
+    </div>
+    <div class="stamp">${_safeText(now)}</div>
+  </div>
+  <div class="card">
+    <div class="meta" style="margin-bottom:10px;"><strong style="color:#e8eaf0;">Generated Prompt</strong></div>
+    <pre>${_safeText(prompt)}</pre>
+  </div>
+  <div class="card">
+    <div class="meta" style="margin-bottom:10px;"><strong style="color:#e8eaf0;">Embedded Screenshots</strong></div>
+    ${imgBlocks}
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+function exportHTML() {
+  buildPrompt();
+  const report = _buildReportHTML();
+  const asset = (document.getElementById('asset').value || 'ASSET').replace(/[^a-z0-9_\-]/gi,'_');
+  const blob = new Blob([report], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `AI_Trade_Brief_${ticketID || asset}.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportPDF() {
+  buildPrompt();
+  const report = _buildReportHTML();
+  const w = window.open('', '_blank');
+  if (!w) { alert('Popup blocked — please allow popups and try again.'); return; }
+  w.document.open();
+  w.document.write(report);
+  w.document.close();
+  w.onload = () => setTimeout(() => { w.focus(); w.print(); }, 300);
+}
+
+// ═══════════════════════════════════════
+// RESET
+// ═══════════════════════════════════════
+function resetForm() {
+  location.reload();
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+window.onload = () => {
+  generateTicketID();
+};
+</script>
+</body>
+</html>
