@@ -24,7 +24,7 @@ export function evaluateGate() {
   const eq = state.ptcState.execQuality;
   const ltf = state.ptcState.ltfAlignment;
   const vol = state.ptcState.volRisk;
-  const noTradeOK = document.getElementById('noTradeToggle').checked;
+  const noTradeOK = document.getElementById('noTradeToggle')?.checked ?? false;
 
   const isChopOrMessy = eq === 'Chop' || eq === 'Messy';
   const isConflict = ltf === 'Counter-trend' || ltf === 'Mixed';

@@ -9,5 +9,5 @@ export function exportPDF() {
   w.document.open();
   w.document.write(report);
   w.document.close();
-  w.onload = () => setTimeout(() => { w.focus(); w.print(); }, 300);
+  w.onload = () => { w.focus(); w.print(); };
 }

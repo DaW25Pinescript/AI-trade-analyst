@@ -5,8 +5,9 @@ import { buildPrompt } from './generators/prompt_ticket.js';
 import { exportHTML } from './exports/export_html.js';
 import { exportPDF } from './exports/export_pdf_print.js';
 import { bindShortcuts } from './ui/shortcuts.js';
+import { setSyncOutputHandler, syncOutput } from './ui/sync_output.js';
 
-function syncOutput() { if (document.getElementById('section-4')?.classList.contains('active')) buildPrompt(); }
+function syncOutputImpl() { if (document.getElementById('section-4')?.classList.contains('active')) buildPrompt(); }
 function buildAndShow() { buildPrompt(); goTo(4); }
 function copyPrompt() {
   const text = document.getElementById('outputText').textContent;
@@ -28,6 +29,7 @@ Object.assign(window, {
 });
 
 window.onload = () => {
+  setSyncOutputHandler(syncOutputImpl);
   setBuildPromptRef(buildPrompt);
   generateTicketID();
   bindShortcuts({ goTo, buildAndShow });
