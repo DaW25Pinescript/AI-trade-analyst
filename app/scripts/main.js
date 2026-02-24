@@ -4,6 +4,11 @@ import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleChe
 import { buildPrompt } from './generators/prompt_ticket.js';
 import { exportHTML } from './exports/export_html.js';
 import { exportPDF } from './exports/export_pdf_print.js';
+import { exportJSONBackup } from './exports/export_json_backup.js';
+import { importJSONBackup } from './exports/import_json_backup.js';
+import { exportCSV } from './exports/export_csv.js';
+import { buildAARPrompt } from './generators/prompt_aar.js';
+import { buildWeeklyPrompt } from './generators/prompt_weekly.js';
 import { bindShortcuts } from './ui/shortcuts.js';
 import { setSyncOutputHandler, syncOutput } from './ui/sync_output.js';
 
@@ -25,7 +30,8 @@ function resetForm(){ location.reload(); }
 Object.assign(window, {
   goTo, goToChartsNext, onAssetInput, setAsset, setBias, triggerUpload, handleUpload,
   toggleCheck, selectRadio, onSlider, toggleRRJustification, syncOutput, buildAndShow,
-  copyPrompt, exportHTML, exportPDF, resetForm
+  copyPrompt, exportHTML, exportPDF, exportJSONBackup, importJSONBackup,
+  exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm
 });
 
 window.onload = () => {
