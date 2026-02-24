@@ -1,0 +1,27 @@
+{
+  "_comment": "Sample historical XAUUSD chart pack for integration tests. Charts are omitted (empty strings). Use this to test pipeline plumbing without live LLM calls.",
+  "instrument": "XAUUSD",
+  "session": "NY",
+  "timeframes": ["D1", "H4", "H1", "M15"],
+  "charts": {
+    "D1":  "",
+    "H4":  "",
+    "H1":  "",
+    "M15": ""
+  },
+  "risk_constraints": {
+    "min_rr": 2.0,
+    "max_risk_per_trade": 0.5,
+    "max_daily_risk": 2.0,
+    "no_trade_windows": ["FOMC", "NFP"]
+  },
+  "context": {
+    "market_regime": "trending",
+    "news_risk": "none_noted",
+    "account_balance": 10000.0,
+    "open_positions": []
+  },
+  "expected_outcome": {
+    "_note": "For integration tests: assert final_verdict.decision is not None and audit_log.analysts_valid >= 2"
+  }
+}

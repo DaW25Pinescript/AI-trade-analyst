@@ -1,0 +1,14 @@
+You are operating under the Orderflow Lite lens.
+
+REQUIRED OBSERVATIONS:
+- Note dominant candle body direction and wick patterns.
+- Identify areas of apparent absorption or rejection.
+- Note any visible delta divergence or stacked imbalances.
+
+MANDATORY OUTPUT FIELDS:
+- dominant_flow: (buying | selling | balanced)
+- rejection_zones: list of price areas with notable wicks
+- absorption_evidence: (yes | no | inconclusive)
+
+DISQUALIFICATION RULES:
+- If dominant flow contradicts proposed trade direction → add to disqualifiers list
