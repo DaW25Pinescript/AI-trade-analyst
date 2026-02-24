@@ -1,6 +1,6 @@
 import { generateTicketID } from './state/model.js';
 import { goTo, goToChartsNext, setBuildPromptRef } from './ui/stepper.js';
-import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleCheck, selectRadio, onSlider, toggleRRJustification } from './ui/form_bindings.js';
+import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange } from './ui/form_bindings.js';
 import { buildPrompt } from './generators/prompt_ticket.js';
 import { exportHTML } from './exports/export_html.js';
 import { exportPDF } from './exports/export_pdf_print.js';
@@ -12,8 +12,8 @@ import { buildWeeklyPrompt } from './generators/prompt_weekly.js';
 import { bindShortcuts } from './ui/shortcuts.js';
 import { setSyncOutputHandler, syncOutput } from './ui/sync_output.js';
 
-function syncOutputImpl() { if (document.getElementById('section-4')?.classList.contains('active')) buildPrompt(); }
-function buildAndShow() { buildPrompt(); goTo(4); }
+function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
+function buildAndShow() { buildPrompt(); goTo(5); }
 function copyPrompt() {
   const text = document.getElementById('outputText').textContent;
   navigator.clipboard.writeText(text).then(() => {
@@ -29,9 +29,9 @@ function resetForm(){ location.reload(); }
 
 Object.assign(window, {
   goTo, goToChartsNext, onAssetInput, setAsset, setBias, triggerUpload, handleUpload,
-  toggleCheck, selectRadio, onSlider, toggleRRJustification, syncOutput, buildAndShow,
-  copyPrompt, exportHTML, exportPDF, exportJSONBackup, importJSONBackup,
-  exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm
+  toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange,
+  syncOutput, buildAndShow, copyPrompt, exportHTML, exportPDF, exportJSONBackup,
+  importJSONBackup, exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm
 });
 
 window.onload = () => {

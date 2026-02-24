@@ -14,21 +14,29 @@ function readGateStatus() {
   return 'INCOMPLETE';
 }
 
+function readSelectInput(id, fallback = '') {
+  const el = document.getElementById(id);
+  return el?.value || fallback;
+}
+
 function buildTicketSnapshot() {
   const nowISO = new Date().toISOString();
   const minPrice = Number.parseFloat(readTextInput('priceNow', '0')) || 0;
+
+  const decisionModeEl = document.getElementById('decisionMode');
+  const decisionMode = decisionModeEl?.value || (readTextInput('waitReason') ? 'WAIT' : 'CONDITIONAL');
 
   return {
     schemaVersion: TICKET_SCHEMA_VERSION,
     ticketId: state.ticketID || 'draft',
     createdAt: nowISO,
-    decisionMode: readTextInput('waitReason') ? 'WAIT' : 'CONDITIONAL',
-    ticketType: 'Zone ticket',
-    entryType: 'Limit',
-    entryTrigger: 'Pullback to zone',
-    confirmationTF: '15m',
-    timeInForce: 'This session',
-    maxAttempts: 2,
+    decisionMode,
+    ticketType: readSelectInput('ticketType', 'Zone ticket'),
+    entryType: readSelectInput('entryType', 'Limit'),
+    entryTrigger: readSelectInput('entryTrigger', 'Pullback to zone'),
+    confirmationTF: readSelectInput('confTF', '15m'),
+    timeInForce: readSelectInput('timeInForce', 'This session'),
+    maxAttempts: Number.parseInt(readSelectInput('maxAttempts', '2'), 10) || 2,
     entry: {
       zone: readTextInput('levels', 'User-defined zone'),
       priceMin: minPrice,
@@ -37,7 +45,7 @@ function buildTicketSnapshot() {
     },
     stop: {
       price: minPrice,
-      logic: 'Below swing low / above swing high',
+      logic: readSelectInput('stopLogic', 'Below swing low / above swing high'),
       rationale: readTextInput('maxStop', 'User-defined stop constraint')
     },
     targets: [

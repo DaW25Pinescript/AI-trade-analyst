@@ -14,7 +14,7 @@ export function goTo(step) {
     if (i < step) s.classList.add('done');
   });
   state.currentStep = step;
-  if (step === 4 && typeof buildPromptRef === 'function') buildPromptRef();
+  if (step === 5 && typeof buildPromptRef === 'function') buildPromptRef();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

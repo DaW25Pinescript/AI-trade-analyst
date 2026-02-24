@@ -71,6 +71,18 @@ function buildPrompt() {
     ? `\nWAIT Reason:     ${waitReason || '—'}\nRe-entry if:     ${reentry || '—'}\nRe-check at:     ${reentryTime || '—'}`
     : '';
 
+  // G2 Test Mode fields
+  const decisionMode   = get('decisionMode') || 'WAIT';
+  const ticketType     = get('ticketType') || 'Zone ticket';
+  const entryType      = get('entryType') || 'Limit';
+  const entryTrigger   = get('entryTrigger') || 'Pullback to zone';
+  const confTF         = get('confTF') || '1H';
+  const stopLogic      = get('stopLogic') || 'Below swing low / above swing high';
+  const timeInForce    = get('timeInForce') || 'This session';
+  const maxAttempts    = get('maxAttempts') || '2';
+  const askMissing     = document.getElementById('askMissing')?.checked ?? true;
+  const conditionalTxt = get('conditionalText');
+
   const personaInstruction = persona && persona !== 'Default — ruthless prop trader'
     ? `You operate as a ${persona} analyst. Apply that methodology's framework strictly throughout.`
     : '';
@@ -134,6 +146,17 @@ Gate Decision:       ${gateDecision}${waitBlock}
 
 ─── ANALYSIS REQUESTED ────────────────────
 ${requests}
+
+─── MY PREDICTION (Test / Prediction Mode) ──
+Decision Mode:   ${decisionMode}
+Ticket Type:     ${ticketType}
+Entry Type:      ${entryType}
+Entry Trigger:   ${entryTrigger}
+Confirm TF:      ${confTF}
+Stop Logic:      ${stopLogic}
+Time-in-Force:   ${timeInForce}
+Max Attempts:    ${maxAttempts}
+Ask for gaps:    ${askMissing ? 'YES — request missing info before committing ticket' : 'NO — proceed with available data'}${conditionalTxt ? '\nConditional:     ' + conditionalTxt : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SYSTEM PERSONA (obey strictly):
