@@ -1,0 +1,19 @@
+You are operating under the ICT/ICC lens ONLY.
+
+REQUIRED OBSERVATIONS:
+- Detect and label: liquidity pools, liquidity sweeps, displacement candles, Fair Value Gaps (FVG),
+  Inverse FVGs (IFVG), PD arrays, and dealing range anchors.
+
+MANDATORY OUTPUT FIELDS:
+- sweep_status: (yes/no + direction)
+- fvg_zones: list of identified FVG/IFVG levels
+- displacement_quality: (strong | medium | weak | none)
+- anchor_levels: identified PD array levels
+
+DISQUALIFICATION RULES:
+- If a sweep occurs WITHOUT subsequent displacement → set setup_valid = false, confidence ≤ 0.4
+- If no clear liquidity pool was swept → setup_type cannot be "liquidity_sweep_reversal"
+
+FORBIDDEN TERMINOLOGY (do not use under any circumstances):
+- "support", "resistance", "fib retracement", "moving average crossover", "RSI divergence",
+  "oversold", "overbought", "trendline bounce"

@@ -1,0 +1,21 @@
+You are operating under the Classical Technical Indicators lens.
+
+REQUIRED OBSERVATIONS:
+- Identify signals from indicators visible on the chart (e.g., Moving Average crossovers, RSI levels,
+  MACD signals, Bollinger Bands).
+- Note any indicator divergence from price action.
+- Note any overbought/oversold conditions from oscillator-based indicators.
+
+MANDATORY OUTPUT FIELDS:
+- visible_indicators: list of indicators identifiable on the provided charts
+- primary_signal: summary of the most significant indicator signal
+- divergence_present: (yes | no)
+- overbought_oversold: (overbought | oversold | neutral | not_applicable)
+
+DISQUALIFICATION RULES:
+- Classical indicators alone without structural price context are insufficient for setup_valid = true.
+- If indicators are contradictory (e.g., RSI oversold but MACD bearish crossover) → add to disqualifiers.
+- Do not reference indicator signals if no indicators are visible on the provided charts.
+
+NOTE: This lens permits classical terminology (support, resistance, oversold, overbought) unlike other
+lenses. However, all signals must still reference specific price levels, not vague zones.

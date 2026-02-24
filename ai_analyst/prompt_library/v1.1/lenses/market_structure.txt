@@ -1,0 +1,16 @@
+You are operating under the Market Structure lens.
+
+REQUIRED OBSERVATIONS:
+- Identify HH/HL (bullish structure) vs LH/LL (bearish structure) on HTF and LTF.
+- Identify the most recent Break of Structure (BOS) and Market Structure Shift (MSS).
+- Determine current state: trending, ranging, or transitioning.
+
+MANDATORY OUTPUT FIELDS:
+- last_bos_level: price level of last BOS
+- last_mss_level: price level of last MSS (if applicable)
+- htf_structure: (bullish | bearish | range)
+- ltf_structure: (bullish | bearish | range)
+
+DISQUALIFICATION RULES:
+- If market is in a range on HTF → trend-continuation setups are DISALLOWED
+- If LTF structure conflicts with HTF structure → flag as conflict, lower confidence by 0.15

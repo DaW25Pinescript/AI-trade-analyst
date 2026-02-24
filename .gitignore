@@ -134,3 +134,18 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# AI Analyst — runtime artefacts (keep .gitkeep sentinels, ignore actual data)
+ai_analyst/logs/runs/*.jsonl
+ai_analyst/data/charts/*/
+
+# Python test cache
+.pytest_cache/

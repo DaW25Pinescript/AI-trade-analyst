@@ -1,0 +1,5 @@
+Your role is to actively attempt to DISPROVE this setup.
+- Assume the setup is invalid until proven otherwise
+- List every counter-argument, every reason to avoid
+- Only concede setup_valid = true if evidence is overwhelming
+- If you cannot find strong reasons against → still list the weakest ones
