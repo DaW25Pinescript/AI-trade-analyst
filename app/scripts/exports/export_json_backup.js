@@ -6,6 +6,11 @@ function readTextInput(id, fallback = '') {
   return (el?.value || fallback).toString();
 }
 
+function readNumberInput(id, fallback = 0) {
+  const el = document.getElementById(id);
+  return Number.parseFloat(el?.value || '') || fallback;
+}
+
 function readGateStatus() {
   const gateEl = document.getElementById('gateStatus');
   if (gateEl?.classList.contains('wait')) return 'WAIT';
@@ -21,16 +26,12 @@ function readSelectInput(id, fallback = '') {
 
 function buildTicketSnapshot() {
   const nowISO = new Date().toISOString();
-  const minPrice = Number.parseFloat(readTextInput('priceNow', '0')) || 0;
-
-  const decisionModeEl = document.getElementById('decisionMode');
-  const decisionMode = decisionModeEl?.value || (readTextInput('waitReason') ? 'WAIT' : 'CONDITIONAL');
 
   return {
     schemaVersion: TICKET_SCHEMA_VERSION,
     ticketId: state.ticketID || 'draft',
     createdAt: nowISO,
-    decisionMode,
+    decisionMode: readSelectInput('decisionMode', 'WAIT'),
     ticketType: readSelectInput('ticketType', 'Zone ticket'),
     entryType: readSelectInput('entryType', 'Limit'),
     entryTrigger: readSelectInput('entryTrigger', 'Pullback to zone'),
@@ -39,18 +40,18 @@ function buildTicketSnapshot() {
     maxAttempts: Number.parseInt(readSelectInput('maxAttempts', '2'), 10) || 2,
     entry: {
       zone: readTextInput('levels', 'User-defined zone'),
-      priceMin: minPrice,
-      priceMax: minPrice,
-      notes: readTextInput('position')
+      priceMin: readNumberInput('entryPriceMin'),
+      priceMax: readNumberInput('entryPriceMax'),
+      notes: readTextInput('entryNotes')
     },
     stop: {
-      price: minPrice,
+      price: readNumberInput('stopPrice'),
       logic: readSelectInput('stopLogic', 'Below swing low / above swing high'),
-      rationale: readTextInput('maxStop', 'User-defined stop constraint')
+      rationale: readTextInput('stopRationale', 'User-defined stop')
     },
     targets: [
-      { label: 'TP1', price: minPrice, rationale: 'Primary reaction level' },
-      { label: 'TP2', price: minPrice, rationale: 'Extended move objective' }
+      { label: 'TP1', price: readNumberInput('tp1Price'), rationale: readTextInput('tp1Rationale', 'Primary reaction level') },
+      { label: 'TP2', price: readNumberInput('tp2Price'), rationale: readTextInput('tp2Rationale', 'Extended move objective') }
     ],
     checklist: {
       htfState: state.ptcState.htfState || 'Transition',

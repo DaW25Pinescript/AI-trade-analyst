@@ -581,6 +581,56 @@
         </div>
       </div>
 
+      <div class="divider"></div>
+      <div class="card-label" style="font-size:11px;margin-bottom:10px;">Price Levels — Your Prediction</div>
+
+      <div class="row">
+        <div>
+          <label>Entry Zone Low</label>
+          <input type="number" id="entryPriceMin" placeholder="e.g. 2895.00" oninput="syncOutput()" step="any">
+        </div>
+        <div>
+          <label>Entry Zone High</label>
+          <input type="number" id="entryPriceMax" placeholder="e.g. 2905.00" oninput="syncOutput()" step="any">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Stop Price</label>
+          <input type="number" id="stopPrice" placeholder="e.g. 2875.00" oninput="syncOutput()" step="any">
+        </div>
+        <div>
+          <label>Stop Rationale</label>
+          <input type="text" id="stopRationale" placeholder="e.g. Below swing low at 2870" oninput="syncOutput()">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>TP1 Price</label>
+          <input type="number" id="tp1Price" placeholder="e.g. 2935.00" oninput="syncOutput()" step="any">
+        </div>
+        <div>
+          <label>TP1 Rationale</label>
+          <input type="text" id="tp1Rationale" placeholder="e.g. Previous swing high / supply zone" oninput="syncOutput()">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>TP2 Price (optional)</label>
+          <input type="number" id="tp2Price" placeholder="e.g. 2960.00" oninput="syncOutput()" step="any">
+        </div>
+        <div>
+          <label>TP2 Rationale (optional)</label>
+          <input type="text" id="tp2Rationale" placeholder="e.g. HTF supply / weekly target" oninput="syncOutput()">
+        </div>
+      </div>
+
+      <label>Entry Notes (optional)</label>
+      <input type="text" id="entryNotes" placeholder="e.g. Wait for 15m engulfing candle before entry" oninput="syncOutput()">
+
       <div class="toggle-wrap">
         <div class="toggle-left">
           <div class="toggle-title">Ask AI for missing info before committing a trade</div>

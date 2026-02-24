@@ -83,6 +83,30 @@ function buildPrompt() {
   const askMissing     = document.getElementById('askMissing')?.checked ?? true;
   const conditionalTxt = get('conditionalText');
 
+  // Price level predictions
+  const entryPriceMin  = get('entryPriceMin');
+  const entryPriceMax  = get('entryPriceMax');
+  const stopPrice      = get('stopPrice');
+  const stopRationale  = get('stopRationale');
+  const tp1Price       = get('tp1Price');
+  const tp1Rationale   = get('tp1Rationale');
+  const tp2Price       = get('tp2Price');
+  const tp2Rationale   = get('tp2Rationale');
+  const entryNotes     = get('entryNotes');
+
+  const entryZoneLine = (entryPriceMin || entryPriceMax)
+    ? `Entry Zone:      ${entryPriceMin || '—'} – ${entryPriceMax || '—'}${entryNotes ? '\nEntry Notes:     ' + entryNotes : ''}`
+    : `Entry Zone:      Not specified${entryNotes ? '\nEntry Notes:     ' + entryNotes : ''}`;
+  const stopLine = stopPrice
+    ? `Stop Price:      ${stopPrice}${stopRationale ? '  (' + stopRationale + ')' : ''}`
+    : `Stop Price:      Not specified`;
+  const tp1Line = tp1Price
+    ? `TP1:             ${tp1Price}${tp1Rationale ? '  — ' + tp1Rationale : ''}`
+    : `TP1:             Not specified`;
+  const tp2Line = tp2Price
+    ? `TP2:             ${tp2Price}${tp2Rationale ? '  — ' + tp2Rationale : ''}`
+    : `TP2:             Not specified`;
+
   const personaInstruction = persona && persona !== 'Default — ruthless prop trader'
     ? `You operate as a ${persona} analyst. Apply that methodology's framework strictly throughout.`
     : '';
@@ -157,6 +181,10 @@ Stop Logic:      ${stopLogic}
 Time-in-Force:   ${timeInForce}
 Max Attempts:    ${maxAttempts}
 Ask for gaps:    ${askMissing ? 'YES — request missing info before committing ticket' : 'NO — proceed with available data'}${conditionalTxt ? '\nConditional:     ' + conditionalTxt : ''}
+${entryZoneLine}
+${stopLine}
+${tp1Line}
+${tp2Line}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SYSTEM PERSONA (obey strictly):

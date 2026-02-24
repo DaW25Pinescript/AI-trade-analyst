@@ -4,7 +4,7 @@ export function bindShortcuts({ goTo, buildAndShow }) {
       event.preventDefault();
       buildAndShow();
     }
-    if (event.altKey && ['1','2','3','4','5'].includes(event.key)) {
+    if (event.altKey && ['1','2','3','4','5','6'].includes(event.key)) {
       event.preventDefault();
       goTo(Number(event.key) - 1);
     }
