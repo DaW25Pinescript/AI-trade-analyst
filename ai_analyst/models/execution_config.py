@@ -3,6 +3,8 @@ from enum import Enum
 from typing import Optional
 from datetime import datetime
 
+from .persona import PersonaType  # no circular dependency — persona.py imports nothing from here
+
 
 class AnalystDelivery(Enum):
     API = "api"       # automated via LiteLLM
@@ -11,7 +13,7 @@ class AnalystDelivery(Enum):
 
 class AnalystConfig(BaseModel):
     analyst_id: str
-    persona: "PersonaType"           # imported at use-site to avoid circular import
+    persona: PersonaType
     delivery: AnalystDelivery
     model: Optional[str] = None      # required if delivery == API
     api_key_env_var: Optional[str] = None  # e.g. "OPENAI_API_KEY"

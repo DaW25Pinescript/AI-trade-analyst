@@ -330,7 +330,6 @@ def arbiter(
     from .models.ground_truth import RiskConstraints, MarketContext
     rc = gt_dict.get("risk_constraints", {})
     ctx = gt_dict.get("context", {})
-    import uuid
     ground_truth = GroundTruthPacket(
         run_id=run_id,
         instrument=gt_dict["instrument"],
