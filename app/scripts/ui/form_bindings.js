@@ -92,7 +92,13 @@ function toggleRRJustification() {
 }
 
 // ═══════════════════════════════════════
-// BUILD PROMPT
+// G2: DECISION MODE TOGGLE
 // ═══════════════════════════════════════
 
-export { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleCheck, getChecked, selectRadio, onSlider, toggleRRJustification };
+function onDecisionModeChange(el) {
+  const wrap = document.getElementById('conditionalWrap');
+  if (wrap) wrap.style.display = el.value === 'CONDITIONAL' ? 'block' : 'none';
+  syncOutput();
+}
+
+export { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleCheck, getChecked, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange };

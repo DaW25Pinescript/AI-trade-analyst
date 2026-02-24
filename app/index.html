@@ -13,7 +13,7 @@
 <header class="header">
   <div class="header-left">
     <div class="logo">AI Trade <span>/ Analyst</span></div>
-    <div class="version-pill">V3 · G1</div>
+    <div class="version-pill">V3 · G2</div>
   </div>
   <div class="ticket-id-header">Ticket: <span id="ticketIdHeader">—</span></div>
 </header>
@@ -21,14 +21,15 @@
 <main class="main">
   <div class="page-title">Market Analysis Request</div>
   <h1>Build Your Analysis Brief</h1>
-  <p class="subtitle">G1 — Full structured prompt engine: Ticket ID · Pre-ticket gate · Chart narrative · Enum-enforced ticket block</p>
+  <p class="subtitle">G2 — Test / Prediction Mode: record your call before AI analysis · Enum-driven ticket fields · Full audit trail</p>
 
   <div class="steps">
     <div class="step active" onclick="goTo(0)"><span class="step-num">01</span>Setup</div>
     <div class="step" onclick="goTo(1)"><span class="step-num">02</span>Charts</div>
     <div class="step" onclick="goTo(2)"><span class="step-num">03</span>Context</div>
     <div class="step" onclick="goTo(3)"><span class="step-num">04</span>Pre-Ticket</div>
-    <div class="step" onclick="goTo(4)"><span class="step-num">05</span>Output</div>
+    <div class="step" onclick="goTo(4)"><span class="step-num">05</span>Test Mode</div>
+    <div class="step" onclick="goTo(5)"><span class="step-num">06</span>Output</div>
   </div>
 
   <!-- ════════════════════════════════════════
@@ -483,14 +484,125 @@
 
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(4)">Next: Test Mode →</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       STEP 5: TEST / PREDICTION MODE
+  ════════════════════════════════════════ -->
+  <div class="section" id="section-4">
+    <div class="card">
+      <div class="card-label amber">Test / Prediction Mode — Your Call Before AI</div>
+      <p class="step-note">Record your prediction before seeing AI analysis. These values pre-fill the structured TRADE TICKET block in the generated prompt and are saved in JSON exports.</p>
+
+      <div class="row">
+        <div>
+          <label>Decision Mode</label>
+          <select id="decisionMode" onchange="onDecisionModeChange(this)">
+            <option value="LONG">LONG</option>
+            <option value="SHORT">SHORT</option>
+            <option value="WAIT" selected>WAIT</option>
+            <option value="CONDITIONAL">CONDITIONAL</option>
+          </select>
+        </div>
+        <div>
+          <label>Ticket Type</label>
+          <select id="ticketType" onchange="syncOutput()">
+            <option value="Zone ticket">Zone ticket (default)</option>
+            <option value="Exact ticket">Exact ticket</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="conditionalWrap" style="display:none;">
+        <label>Conditional Alternative (if Decision = CONDITIONAL)</label>
+        <textarea id="conditionalText" placeholder="Describe the alternative scenario or trigger that would change the direction..." oninput="syncOutput()"></textarea>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Entry Type</label>
+          <select id="entryType" onchange="syncOutput()">
+            <option value="Market">Market</option>
+            <option value="Limit" selected>Limit</option>
+            <option value="Stop">Stop</option>
+          </select>
+        </div>
+        <div>
+          <label>Entry Trigger Type</label>
+          <select id="entryTrigger" onchange="syncOutput()">
+            <option value="Pullback to zone">Pullback to zone</option>
+            <option value="Break + retest">Break + retest</option>
+            <option value="Sweep + reclaim">Sweep + reclaim</option>
+            <option value="Close above/below level">Close above/below level</option>
+            <option value="Momentum shift (MSS/BOS)">Momentum shift (MSS/BOS)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Confirmation Timeframe</label>
+          <select id="confTF" onchange="syncOutput()">
+            <option value="1m">1m</option>
+            <option value="5m">5m</option>
+            <option value="15m">15m</option>
+            <option value="1H" selected>1H</option>
+          </select>
+        </div>
+        <div>
+          <label>Stop Logic</label>
+          <select id="stopLogic" onchange="syncOutput()">
+            <option value="Below swing low / above swing high">Below swing low / above swing high</option>
+            <option value="Below zone">Below zone</option>
+            <option value="ATR-based">ATR-based</option>
+            <option value="Structure-based + buffer">Structure-based + buffer</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Time-in-Force</label>
+          <select id="timeInForce" onchange="syncOutput()">
+            <option value="This session">This session</option>
+            <option value="Next 1H">Next 1H</option>
+            <option value="24H">24H</option>
+            <option value="Custom">Custom</option>
+          </select>
+        </div>
+        <div>
+          <label>Max Entry Attempts</label>
+          <select id="maxAttempts" onchange="syncOutput()">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="toggle-wrap">
+        <div class="toggle-left">
+          <div class="toggle-title">Ask AI for missing info before committing a trade</div>
+          <div class="toggle-sub">AI will request any data gaps before producing a ticket.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="askMissing" onchange="syncOutput()" checked>
+          <span class="slider-sw"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(3)">← Back to Pre-Ticket</button>
       <button class="btn btn-primary" onclick="buildAndShow()">Generate V3 Prompt →</button>
     </div>
   </div>
 
   <!-- ════════════════════════════════════════
-       STEP 5: OUTPUT
+       STEP 6: OUTPUT
   ════════════════════════════════════════ -->
-  <div class="section" id="section-4">
+  <div class="section" id="section-5">
     <div class="card">
       <div class="card-label green">Generated Prompt — V3</div>
       <p class="step-note">Copy & paste into Claude. Attach your chart screenshots in the same message. Ticket ID and timestamp are embedded.</p>
@@ -514,7 +626,7 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-ghost" onclick="goTo(3)">← Edit Pre-Ticket</button>
+      <button class="btn btn-ghost" onclick="goTo(4)">← Edit Test Mode</button>
       <button class="btn btn-primary" onclick="resetForm()">New Ticket</button>
     </div>
   </div>
