@@ -146,6 +146,8 @@ venv/
 # AI Analyst — runtime artefacts (keep .gitkeep sentinels, ignore actual data)
 ai_analyst/logs/runs/*.jsonl
 ai_analyst/data/charts/*/
+ai_analyst/output/runs/*/
+ai_analyst/.env
 
 # Python test cache
 .pytest_cache/
