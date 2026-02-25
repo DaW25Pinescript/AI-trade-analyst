@@ -1,6 +1,6 @@
 import { generateTicketID } from './state/model.js';
 import { goTo, goToChartsNext, setBuildPromptRef } from './ui/stepper.js';
-import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange } from './ui/form_bindings.js';
+import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange } from './ui/form_bindings.js';
 import { buildPrompt } from './generators/prompt_ticket.js';
 import { exportHTML } from './exports/export_html.js';
 import { exportPDF } from './exports/export_pdf_print.js';
@@ -29,7 +29,7 @@ function resetForm(){ location.reload(); }
 
 Object.assign(window, {
   goTo, goToChartsNext, onAssetInput, setAsset, setBias, triggerUpload, handleUpload,
-  toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange,
+  toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange,
   syncOutput, buildAndShow, copyPrompt, exportHTML, exportPDF, exportJSONBackup,
   importJSONBackup, exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm
 });

@@ -45,10 +45,13 @@ function buildPrompt() {
   const now = new Date().toISOString().replace('T',' ').slice(0,19) + 'Z';
 
   const tfLines = [
-    `  • HTF  (Daily/Weekly)  — ${state.uploads.htf  ? '✓ screenshot attached: ' + state.uploads.htf  : '⚠  NO SCREENSHOT'}`,
-    `  • Mid  (4H/1H)         — ${state.uploads.mid  ? '✓ screenshot attached: ' + state.uploads.mid  : '⚠  NO SCREENSHOT'}`,
-    `  • LTF  (15m/5m)        — ${state.uploads.ltf  ? '✓ screenshot attached: ' + state.uploads.ltf  : '⚠  NO SCREENSHOT'}`,
-    `  • Exec (1m/3m)         — ${state.uploads.exec ? '✓ screenshot attached: ' + state.uploads.exec : '—  optional / not uploaded'}`,
+    `  • 4H/1H clean price      — ${state.uploads.htf ? '✓ screenshot attached: ' + state.uploads.htf : '⚠  NO SCREENSHOT'}`,
+    `  • 15M clean price        — ${state.uploads.m15 ? '✓ screenshot attached: ' + state.uploads.m15 : '⚠  NO SCREENSHOT'}`,
+    `  • 5M clean price         — ${state.uploads.m5 ? '✓ screenshot attached: ' + state.uploads.m5 : '⚠  NO SCREENSHOT'}`,
+    `  • 15M ICT overlay        — ${state.uploads.m15overlay ? '✓ screenshot attached: ' + state.uploads.m15overlay : '—  optional / not uploaded'}`,
+    `  • 15M structure overlay  — ${state.uploads.m15structure ? '✓ screenshot attached: ' + state.uploads.m15structure : '—  optional / not uploaded'}`,
+    `  • 15M trendline overlay  — ${state.uploads.m15trendline ? '✓ screenshot attached: ' + state.uploads.m15trendline : '—  optional / not uploaded'}`,
+    `  • Custom overlay         — ${state.uploads.customoverlay ? '✓ screenshot attached: ' + state.uploads.customoverlay : '—  optional / not uploaded'}`,
   ].join('\n');
 
   const requests = checked.length > 0 ? checked.map(c => `  ☑ ${c}`).join('\n') : '  (none selected)';
@@ -202,10 +205,10 @@ STEP 1 — CHART NARRATIVE (mandatory grounding):
 Describe EXACTLY what you see on each chart. No assumptions. No inference yet.
 This section is your audit trail — what did the chart actually show at time of analysis?
 
-HTF:  [describe trend, key swing highs/lows, dominant structure, notable levels]
-Mid:  [describe]
-LTF:  [describe]
-Exec: [describe if provided]
+4H/1H clean: [describe trend, key swing highs/lows, dominant structure, notable levels]
+15M clean:   [describe structure and setup quality]
+5M clean:    [describe entry context]
+Overlays:    [describe each uploaded overlay separately, then compare vs clean-price baseline]
 
 Overall raw bias from charts only (before user bias injected):
 → [Bullish / Bearish / Neutral / Range]
@@ -257,9 +260,17 @@ If Decision = WAIT and no trade is recommended, explain clearly what would chang
 
   // Attach checklist
   const attachEl = document.getElementById('attachChecklist');
-  attachEl.textContent = ['htf','mid','ltf','exec'].map(k => {
-    const name = state.uploads[k];
-    return `${name ? '✓' : '○'}  ${k.toUpperCase().padEnd(4)} — ${name || '(not uploaded)'}`;
+  attachEl.textContent = [
+    ['htf', '4H/1H CLEAN'],
+    ['m15', '15M CLEAN'],
+    ['m5', '5M CLEAN'],
+    ['m15overlay', '15M ICT OVERLAY'],
+    ['m15structure', '15M STRUCTURE OVERLAY'],
+    ['m15trendline', '15M TRENDLINE OVERLAY'],
+    ['customoverlay', 'CUSTOM OVERLAY'],
+  ].map(([key, label]) => {
+    const name = state.uploads[key];
+    return `${name ? '✓' : '○'}  ${label.padEnd(22)} — ${name || '(not uploaded)'}`;
   }).join('\n');
 }
 

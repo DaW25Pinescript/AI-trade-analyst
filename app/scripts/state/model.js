@@ -7,8 +7,11 @@ export const state = {
   //   m15        — 15M clean price chart (market structure)
   //   m5         — 5M clean price chart (entry context)
   //   m15overlay — 15M ICT overlay (optional, secondary evidence)
-  uploads: { htf: null, m15: null, m5: null, m15overlay: null },
-  imgSrcs: { htf: '', m15: '', m5: '', m15overlay: '' },
+  //   m15structure — 15M market structure overlay
+  //   m15trendline — 15M trendline overlay
+  //   customoverlay — custom indicator overlay (any timeframe)
+  uploads: { htf: null, m15: null, m5: null, m15overlay: null, m15structure: null, m15trendline: null, customoverlay: null },
+  imgSrcs: { htf: '', m15: '', m5: '', m15overlay: '', m15structure: '', m15trendline: '', customoverlay: '' },
   overlayEnabled: false,
   ptcState: {
     htfState: '', htfLocation: '', ltfAlignment: '', liquidityContext: '',
