@@ -48,6 +48,31 @@ function handleUpload(input, zoneId, labelId, key) {
 }
 
 // ═══════════════════════════════════════
+// 15M ICT OVERLAY TOGGLE
+// Progressive disclosure: the overlay slot is hidden by default and
+// revealed when the trader opts in. The overlay is optional — the system
+// produces a complete analysis from clean price charts alone.
+// ═══════════════════════════════════════
+
+function toggleOverlaySlot(enabled) {
+  state.overlayEnabled = enabled;
+  const wrap = document.getElementById('overlaySlotWrap');
+  if (wrap) wrap.style.display = enabled ? 'block' : 'none';
+  // Clear overlay state when disabled so it is not included in the output
+  if (!enabled) {
+    state.uploads.m15overlay = null;
+    state.imgSrcs.m15overlay = '';
+    const zone = document.getElementById('zone-m15overlay');
+    if (zone) zone.classList.remove('has-file');
+    const label = document.getElementById('label-m15overlay');
+    if (label) label.textContent = '';
+    const preview = document.getElementById('prev-m15overlay');
+    if (preview) preview.src = '';
+  }
+  syncOutput();
+}
+
+// ═══════════════════════════════════════
 // CHECKBOXES
 // ═══════════════════════════════════════
 
@@ -101,4 +126,4 @@ function onDecisionModeChange(el) {
   syncOutput();
 }
 
-export { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleCheck, getChecked, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange };
+export { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, getChecked, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange };

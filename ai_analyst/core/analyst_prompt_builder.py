@@ -1,13 +1,20 @@
 """
-Assembles the three-part prompt for each analyst:
-  1. system  — lens contracts + output schema enforcement
-  2. developer — persona rules
-  3. user    — Ground Truth Packet JSON + chart images
+Assembles the prompts for each analysis phase:
+
+Phase 1 (mandatory):  clean price analysis
+  build_analyst_prompt() → system + developer + user + images (clean charts only)
+
+Phase 2 (conditional): overlay delta analysis — only when 15M ICT overlay is provided
+  build_overlay_delta_prompt() → system + user + overlay image
+
+The two phases use SEPARATE API calls with ISOLATED context to prevent the model
+from anchoring on indicator data during the clean price analysis phase.
 """
 import json
 from ..models.ground_truth import GroundTruthPacket
 from ..models.lens_config import LensConfig
 from ..models.persona import PersonaType
+from ..models.analyst_output import AnalystOutput
 from .lens_loader import load_active_lens_contracts, load_persona_prompt
 
 OUTPUT_SCHEMA = """{
@@ -29,8 +36,15 @@ OUTPUT_SCHEMA = """{
   "displacement_quality": "strong | medium | weak | none",
   "confidence": <0.0-1.0>,
   "rr_estimate": <float>,
-  "notes": "<max 200 chars>",
+  "notes": "<max 200 chars — include explicit uncertainty statements about what cannot be determined from price alone>",
   "recommended_action": "WAIT | LONG | SHORT | NO_TRADE"
+}"""
+
+OVERLAY_DELTA_SCHEMA = """{
+  "confirms": ["array of items where the overlay confirms the clean-price reading"],
+  "refines": ["array of items where the overlay refines without contradicting"],
+  "contradicts": ["array of items where the overlay contradicts the clean-price reading"],
+  "indicator_only_claims": ["array of constructs visible only in the overlay, not in price"]
 }"""
 
 
@@ -40,14 +54,27 @@ def build_analyst_prompt(
     persona: PersonaType,
 ) -> dict:
     """
+    Phase 1 — Clean Price Analysis.
+
     Returns a dict with keys: system, developer, user, images.
-    The 'images' key holds the charts dict (timeframe -> base64) for vision attachment.
+    The 'images' key holds the CLEAN charts only (no overlay).
+    This is the only phase that runs when no overlay is provided.
+
+    Critical: this prompt must never reference or anticipate indicator overlays.
+    The overlay delta is handled by build_overlay_delta_prompt() in a separate call.
     """
     active_lenses = load_active_lens_contracts(lens_config)
     persona_prompt = load_persona_prompt(persona)
 
     system_prompt = f"""You are a professional trading analyst.
 You MUST follow all lens contracts below and output ONLY valid JSON. No prose. No markdown. Raw JSON only.
+
+=== PHASE 1 — CLEAN PRICE ANALYSIS ONLY ===
+Analyse ONLY the clean price charts provided. These are bare price charts with no indicator overlays.
+Your analysis must be based EXCLUSIVELY on raw price action.
+Do NOT reference, anticipate, or infer any indicator overlays — they are not present.
+In your notes field, explicitly state what CANNOT be determined from price alone.
+This baseline is used as ground truth before any indicator input is considered.
 
 === ACTIVE LENS CONTRACTS ===
 {active_lenses}
@@ -64,23 +91,102 @@ HARD RULE: If setup_valid == false OR confidence < 0.45 OR disqualifiers list is
         "system": system_prompt,
         "developer": persona_prompt,
         "user": build_user_message(ground_truth),
-        "images": ground_truth.charts,
+        "images": ground_truth.charts,  # clean charts only — never includes overlay
+    }
+
+
+def build_overlay_delta_prompt(
+    ground_truth: GroundTruthPacket,
+    clean_analysis: AnalystOutput,
+) -> dict:
+    """
+    Phase 2 — Overlay Delta Analysis (15M only, conditional).
+
+    Only called when ground_truth.m15_overlay is provided.
+    Receives the analyst's Phase 1 clean analysis as context.
+    Returns a structured delta report comparing overlay interpretation
+    against the clean-price baseline.
+
+    Returns a dict with keys: system, user, images.
+    The 'images' key contains ONLY the 15M overlay image.
+    """
+    if not ground_truth.m15_overlay:
+        raise ValueError(
+            "build_overlay_delta_prompt called but ground_truth.m15_overlay is None. "
+            "This function must only be called when an overlay is provided."
+        )
+
+    overlay_meta = ground_truth.m15_overlay_metadata
+    claims_str = ", ".join(overlay_meta.indicator_claims) if overlay_meta and overlay_meta.indicator_claims else "unspecified"
+    source_str = overlay_meta.indicator_source if overlay_meta and overlay_meta.indicator_source else "unspecified"
+
+    clean_analysis_json = json.dumps(clean_analysis.model_dump(), indent=2)
+
+    system_prompt = f"""You are a professional trading analyst performing an overlay delta analysis.
+
+=== PHASE 2 — OVERLAY DELTA ANALYSIS ===
+You have already completed a clean price analysis (Phase 1 baseline).
+You are now examining a 15M ICT indicator overlay screenshot.
+
+OVERLAY DETAILS:
+- Timeframe: 15M (15-minute)
+- Lens: ICT
+- Indicator constructs claimed: {claims_str}
+- Source: {source_str}
+
+YOUR TASK:
+Compare the overlay interpretation against your Phase 1 clean-price baseline.
+Produce a structured delta report. Silent merging is FORBIDDEN.
+
+EVIDENCE HIERARCHY (non-negotiable):
+- Clean price is GROUND TRUTH (primary authority).
+- The overlay is an INTERPRETIVE AID (secondary authority).
+- When the overlay contradicts price, report it in "contradicts" — never silently resolve it.
+- Setups visible ONLY in the overlay (not in price) must be reported in "indicator_only_claims".
+
+=== OUTPUT SCHEMA ===
+Return ONLY valid JSON. No prose. No markdown.
+
+{OVERLAY_DELTA_SCHEMA}
+
+All four fields are REQUIRED. Empty arrays are valid. Omitted fields are not."""
+
+    phase1_summary = f"""=== PHASE 1 CLEAN-PRICE BASELINE ===
+{clean_analysis_json}
+
+=== OVERLAY IMAGE ===
+The 15M ICT overlay screenshot is attached. Compare it against the baseline above.
+Return ONLY valid JSON matching the delta report schema."""
+
+    return {
+        "system": system_prompt,
+        "developer": None,
+        "user": phase1_summary,
+        "images": {"M15_overlay": ground_truth.m15_overlay},  # only the overlay
     }
 
 
 def build_user_message(ground_truth: GroundTruthPacket) -> str:
     """Serialise the Ground Truth Packet as JSON (charts excluded — passed as vision attachments)."""
-    gt_dict = ground_truth.model_dump(exclude={"charts"})
+    gt_dict = ground_truth.model_dump(exclude={"charts", "m15_overlay"})
     # datetime objects are not JSON-serialisable by default
     gt_json = json.dumps(gt_dict, indent=2, default=str)
     chart_list = ", ".join(ground_truth.charts.keys()) if ground_truth.charts else "none"
+
+    overlay_note = ""
+    if ground_truth.m15_overlay:
+        overlay_note = (
+            "\nNOTE: A 15M ICT overlay exists but is NOT provided here. "
+            "It will be analysed separately in Phase 2. "
+            "Do not anticipate or reference it in this analysis."
+        )
 
     return f"""=== GROUND TRUTH PACKET ===
 {gt_json}
 
 === CHART IMAGES ===
-{len(ground_truth.charts)} chart(s) attached: {chart_list}
-
+{len(ground_truth.charts)} clean price chart(s) attached: {chart_list}
+{overlay_note}
 Analyse ONLY the data provided in this packet and the attached chart images.
 Do not infer or add information not present in the input.
 Return ONLY valid JSON matching the specified output schema."""

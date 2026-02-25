@@ -47,3 +47,23 @@ class AnalystOutput(BaseModel):
                 f"Got '{self.recommended_action}' instead."
             )
         return self
+
+
+class OverlayDeltaReport(BaseModel):
+    """
+    Structured delta report comparing the 15M ICT overlay interpretation
+    against the clean-price baseline produced in Phase 1.
+
+    This report is ONLY produced when the 15M overlay screenshot is provided.
+    Silent merging of clean and indicator interpretations is forbidden.
+    All four fields are required; empty lists are valid but omitted fields are not.
+
+    Evidence hierarchy:
+    - Clean price is ground truth (primary authority).
+    - The overlay is an interpretive aid (secondary authority).
+    - Contradictions must surface here, never be resolved silently.
+    """
+    confirms: list[str]               # overlay confirms the clean-price reading
+    refines: list[str]                # overlay refines without contradiction
+    contradicts: list[str]            # overlay contradicts clean-price reading
+    indicator_only_claims: list[str]  # constructs visible only in overlay, not price

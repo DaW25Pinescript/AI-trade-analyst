@@ -7,7 +7,7 @@ Usage:
 POST /analyse
     - Accepts chart images as multipart file uploads
     - Accepts market parameters as form fields
-    - Runs the full LangGraph pipeline
+    - Runs the full LangGraph pipeline (two-phase when 15M overlay is provided)
     - Returns the FinalVerdict as JSON
 
 GET /health
@@ -20,7 +20,16 @@ from typing import Optional
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from ..models.ground_truth import GroundTruthPacket, RiskConstraints, MarketContext
+from ..models.ground_truth import (
+    GroundTruthPacket,
+    RiskConstraints,
+    MarketContext,
+    ScreenshotMetadata,
+    ALLOWED_CLEAN_TIMEFRAMES,
+    OVERLAY_TIMEFRAME,
+    OVERLAY_LENS,
+    MAX_SCREENSHOTS,
+)
 from ..models.lens_config import LensConfig
 from ..models.arbiter_output import FinalVerdict
 from ..graph.pipeline import build_analysis_graph
@@ -28,10 +37,12 @@ from ..graph.state import GraphState
 
 app = FastAPI(
     title="AI Trade Analyst — Multi-Model Pipeline",
-    version="1.1.0",
+    version="1.2.0",
     description=(
         "Deterministic, auditable multi-AI trade analysis. "
-        "Multiple independent analyst models feed a single Arbiter verdict."
+        "Multiple independent analyst models feed a single Arbiter verdict. "
+        "Supports lens-aware screenshot handling: 3 clean price charts + "
+        "optional 15M ICT overlay with isolated two-phase analysis."
     ),
 )
 
@@ -40,7 +51,7 @@ _graph = build_analysis_graph()
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "1.1.0"}
+    return {"status": "ok", "version": "1.2.0"}
 
 
 @app.post("/analyse", response_model=FinalVerdict)
@@ -48,7 +59,7 @@ async def analyse(
     # Market identity
     instrument: str = Form(..., description="e.g. XAUUSD"),
     session: str = Form(..., description="e.g. NY, London, Asia"),
-    timeframes: str = Form(..., description="JSON array, e.g. [\"D1\",\"H4\",\"H1\",\"M15\"]"),
+    timeframes: str = Form(..., description="JSON array, e.g. [\"H4\",\"M15\",\"M5\"]"),
 
     # Account / risk
     account_balance: float = Form(...),
@@ -72,57 +83,131 @@ async def analyse(
     lens_smt: bool = Form(False),
     lens_volume_profile: bool = Form(False),
 
-    # Chart images — keyed by timeframe label
-    chart_d1: Optional[UploadFile] = File(None),
-    chart_h4: Optional[UploadFile] = File(None),
-    chart_h1: Optional[UploadFile] = File(None),
-    chart_m15: Optional[UploadFile] = File(None),
-    chart_m5: Optional[UploadFile] = File(None),
+    # ─── Clean price chart images (architecture: 3 slots, all price_only) ───
+    # At least one is required. For best results provide all three.
+    chart_h4: Optional[UploadFile] = File(None, description="4H clean price chart"),
+    chart_h1: Optional[UploadFile] = File(None, description="1H clean price chart"),
+    chart_m15: Optional[UploadFile] = File(None, description="15M clean price chart (mandatory for overlay)"),
+    chart_m5: Optional[UploadFile] = File(None, description="5M clean price chart"),
+
+    # ─── 15M ICT overlay (optional, bound to M15 only) ──────────────────────
+    # When provided triggers two-phase analysis: clean baseline then delta.
+    chart_m15_overlay: Optional[UploadFile] = File(
+        None,
+        description="15M ICT indicator overlay screenshot (optional). "
+                    "Triggers isolated overlay delta analysis phase.",
+    ),
+    overlay_indicator_source: str = Form(
+        "TradingView",
+        description="Platform/script providing the ICT overlay (e.g. TradingView)",
+    ),
+    overlay_settings_locked: bool = Form(
+        True,
+        description="Confirms indicator settings are locked and consistent across sessions.",
+    ),
+    overlay_indicator_claims: str = Form(
+        '["FVG","OrderBlock","SessionLiquidity"]',
+        description="JSON array of construct types the overlay claims to identify.",
+    ),
 ):
-    # Parse JSON fields
+    # ── Parse JSON fields ────────────────────────────────────────────────────
     try:
         tf_list: list[str] = json.loads(timeframes)
         no_trade_list: list[str] = json.loads(no_trade_windows)
         open_pos_list: list = json.loads(open_positions)
+        overlay_claims_list: list[str] = json.loads(overlay_indicator_claims)
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=422, detail=f"JSON parse error in form field: {e}")
 
-    # Build chart base64 map from uploaded files
-    chart_uploads = {
-        "D1": chart_d1,
+    # ── Build clean chart base64 map ─────────────────────────────────────────
+    clean_chart_uploads: dict[str, Optional[UploadFile]] = {
         "H4": chart_h4,
         "H1": chart_h1,
         "M15": chart_m15,
-        "M5": chart_m5,
+        "M5":  chart_m5,
     }
     charts: dict[str, str] = {}
-    for label, upload in chart_uploads.items():
+    screenshot_metadata: list[ScreenshotMetadata] = []
+
+    for tf_label, upload in clean_chart_uploads.items():
         if upload is not None:
             raw_bytes = await upload.read()
-            charts[label] = base64.b64encode(raw_bytes).decode("utf-8")
+            charts[tf_label] = base64.b64encode(raw_bytes).decode("utf-8")
+            screenshot_metadata.append(
+                ScreenshotMetadata(
+                    timeframe=tf_label,
+                    lens="NONE",
+                    evidence_type="price_only",
+                )
+            )
 
     if not charts:
-        raise HTTPException(status_code=422, detail="At least one chart image must be provided.")
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "At least one clean price chart must be provided. "
+                "Submit chart_h4, chart_h1, chart_m15, or chart_m5."
+            ),
+        )
 
-    # Assemble Ground Truth Packet (immutable after creation)
-    ground_truth = GroundTruthPacket(
-        instrument=instrument,
-        session=session,
-        timeframes=tf_list,
-        charts=charts,
-        risk_constraints=RiskConstraints(
-            min_rr=min_rr,
-            max_risk_per_trade=max_risk_per_trade,
-            max_daily_risk=max_daily_risk,
-            no_trade_windows=no_trade_list,
-        ),
-        context=MarketContext(
-            market_regime=market_regime,
-            news_risk=news_risk,
-            account_balance=account_balance,
-            open_positions=open_pos_list,
-        ),
-    )
+    # ── Build overlay base64 and metadata ───────────────────────────────────
+    m15_overlay_b64: Optional[str] = None
+    m15_overlay_meta: Optional[ScreenshotMetadata] = None
+
+    if chart_m15_overlay is not None:
+        # Validate overlay claims list is not empty
+        if not overlay_claims_list:
+            raise HTTPException(
+                status_code=422,
+                detail="overlay_indicator_claims must not be empty when overlay is provided.",
+            )
+        raw_bytes = await chart_m15_overlay.read()
+        m15_overlay_b64 = base64.b64encode(raw_bytes).decode("utf-8")
+        m15_overlay_meta = ScreenshotMetadata(
+            timeframe=OVERLAY_TIMEFRAME,
+            lens=OVERLAY_LENS,
+            evidence_type="indicator_overlay",
+            indicator_claims=overlay_claims_list,
+            indicator_source=overlay_indicator_source,
+            settings_locked=overlay_settings_locked,
+        )
+
+    # ── Enforce 4-screenshot hard cap ───────────────────────────────────────
+    total_screenshots = len(charts) + (1 if m15_overlay_b64 else 0)
+    if total_screenshots > MAX_SCREENSHOTS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Maximum {MAX_SCREENSHOTS} screenshots per run "
+                f"(3 clean + 1 overlay). Got {total_screenshots}."
+            ),
+        )
+
+    # ── Assemble Ground Truth Packet (immutable after creation) ─────────────
+    try:
+        ground_truth = GroundTruthPacket(
+            instrument=instrument,
+            session=session,
+            timeframes=tf_list,
+            charts=charts,
+            screenshot_metadata=screenshot_metadata,
+            m15_overlay=m15_overlay_b64,
+            m15_overlay_metadata=m15_overlay_meta,
+            risk_constraints=RiskConstraints(
+                min_rr=min_rr,
+                max_risk_per_trade=max_risk_per_trade,
+                max_daily_risk=max_daily_risk,
+                no_trade_windows=no_trade_list,
+            ),
+            context=MarketContext(
+                market_regime=market_regime,
+                news_risk=news_risk,
+                account_balance=account_balance,
+                open_positions=open_pos_list,
+            ),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Ground Truth Packet validation failed: {e}")
 
     lens_config = LensConfig(
         ICT_ICC=lens_ict_icc,
@@ -139,6 +224,7 @@ async def analyse(
         "ground_truth": ground_truth,
         "lens_config": lens_config,
         "analyst_outputs": [],
+        "overlay_delta_reports": [],
         "final_verdict": None,
         "error": None,
     }

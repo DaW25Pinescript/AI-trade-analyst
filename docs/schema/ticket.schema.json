@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ai-trade-analyst.local/schema/ticket.schema.json",
   "title": "AI Trade Analyst Ticket",
-  "description": "Canonical trade ticket payload for export/import and persistence.",
+  "description": "Canonical trade ticket payload for export/import and persistence. v1.1.0 adds lens-aware screenshot metadata.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,12 +20,13 @@
     "stop",
     "targets",
     "checklist",
-    "gate"
+    "gate",
+    "screenshots"
   ],
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "1.0.0"
+      "const": "1.1.0"
     },
     "ticketId": { "type": "string", "minLength": 1 },
     "createdAt": { "type": "string", "format": "date-time" },
@@ -148,6 +149,80 @@
         },
         "reentryCondition": { "type": "string" },
         "reentryTime": { "type": "string" }
+      }
+    },
+    "screenshots": {
+      "type": "object",
+      "description": "Typed evidence metadata for all screenshots submitted with this ticket. Architecture: max 3 clean price charts + 1 optional 15M ICT overlay (4 total hard cap).",
+      "additionalProperties": false,
+      "required": ["cleanCharts"],
+      "properties": {
+        "cleanCharts": {
+          "type": "array",
+          "description": "Metadata for each clean price chart. Maximum 3 (H4/H1 for HTF bias, M15 for structure, M5 for entry context).",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["timeframe", "lens", "evidenceType"],
+            "properties": {
+              "timeframe": {
+                "type": "string",
+                "enum": ["H4", "H1", "M15", "M5"],
+                "description": "Timeframe of this clean price chart."
+              },
+              "lens": {
+                "type": "string",
+                "const": "NONE",
+                "description": "Clean price charts must have lens=NONE."
+              },
+              "evidenceType": {
+                "type": "string",
+                "const": "price_only",
+                "description": "Clean price charts must have evidenceType=price_only."
+              }
+            }
+          }
+        },
+        "m15Overlay": {
+          "type": ["object", "null"],
+          "description": "Metadata for the optional 15M ICT indicator overlay screenshot. Null when not provided. Triggers two-phase isolated analysis when present.",
+          "additionalProperties": false,
+          "required": ["timeframe", "lens", "evidenceType", "indicatorClaims", "indicatorSource", "settingsLocked"],
+          "properties": {
+            "timeframe": {
+              "type": "string",
+              "const": "M15",
+              "description": "Overlay is bound to M15 only. No other timeframe may carry an overlay."
+            },
+            "lens": {
+              "type": "string",
+              "const": "ICT",
+              "description": "The single overlay slot uses the ICT lens."
+            },
+            "evidenceType": {
+              "type": "string",
+              "const": "indicator_overlay",
+              "description": "The overlay slot must have evidenceType=indicator_overlay."
+            },
+            "indicatorClaims": {
+              "type": "array",
+              "description": "Construct types the overlay claims to identify (e.g. FVG, OrderBlock, SessionLiquidity).",
+              "minItems": 1,
+              "items": { "type": "string" }
+            },
+            "indicatorSource": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Platform or script providing the ICT overlay (e.g. TradingView)."
+            },
+            "settingsLocked": {
+              "type": "boolean",
+              "description": "Confirms indicator settings are locked and consistent across sessions. Must be true for comparability of delta reports."
+            }
+          }
+        }
       }
     }
   }
