@@ -216,13 +216,13 @@
 
   <!-- ════════════════════════════════════════
        STEP 2: CHARTS
-       Lens-aware architecture: 3 clean price charts + optional 15M ICT overlay
-       Hard cap: 4 screenshots maximum per run.
+       Lens-aware architecture: 3 clean price charts + optional indicator overlays
+       Hard cap: 7 screenshots maximum per run.
   ════════════════════════════════════════ -->
   <div class="section" id="section-1">
     <div class="card">
       <div class="card-label">Chart Screenshots — Clean Price</div>
-      <p class="step-note">Upload a <strong>clean price chart</strong> (no indicator overlays) for each timeframe. All three slots are required for the best analysis. The optional ICT overlay is revealed below.</p>
+      <p class="step-note">Upload a <strong>clean price chart</strong> (no indicator overlays) for each timeframe. All three slots are required for the best analysis. Optional indicator overlays are revealed below.</p>
 
       <div class="tf-grid">
         <div class="upload-zone" id="zone-htf" onclick="triggerUpload('upload-htf')">
@@ -254,11 +254,11 @@
 
       <div class="divider"></div>
 
-      <!-- 15M ICT Overlay — optional, progressive disclosure -->
+      <!-- Indicator Overlays — optional, progressive disclosure -->
       <div class="toggle-wrap" id="overlayToggleWrap">
         <div class="toggle-left">
-          <div class="toggle-title">Include 15M ICT indicator overlay</div>
-          <div class="toggle-sub">Optional. Enables a second isolated analysis phase comparing the ICT overlay against the clean-price baseline. Indicator settings must be locked and consistent.</div>
+          <div class="toggle-title">Include indicator overlays</div>
+          <div class="toggle-sub">Optional. Enables isolated analysis comparisons against the clean-price baseline. Keep each overlay type consistent and clearly labeled.</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="overlayToggle" onchange="toggleOverlaySlot(this.checked)">
@@ -267,14 +267,35 @@
       </div>
 
       <div id="overlaySlotWrap" style="display:none;">
-        <p class="hint" style="margin-top:0; margin-bottom:8px;">Upload the 15M chart with your ICT indicator overlay active. This slot only accepts 15M screenshots. The overlay image is never mixed with the clean-price analysis context.</p>
-        <div class="tf-grid" style="grid-template-columns: 1fr;">
+        <p class="hint" style="margin-top:0; margin-bottom:8px;">Upload any optional overlay screenshots you want the model to compare separately from clean price. 15M is preferred for ICT / structure / trendline overlays. Custom can be any timeframe if clearly annotated.</p>
+        <div class="tf-grid">
           <div class="upload-zone upload-zone-overlay" id="zone-m15overlay" onclick="triggerUpload('upload-m15overlay')">
             <input type="file" id="upload-m15overlay" accept="image/*" onchange="handleUpload(this,'zone-m15overlay','label-m15overlay','m15overlay')">
             <span class="upload-tf-label">15M — ICT Overlay</span>
             <span class="upload-desc">Indicator overlay · secondary evidence · 15M only</span>
             <img class="preview-img" id="prev-m15overlay">
             <span class="upload-filename" id="label-m15overlay"></span>
+          </div>
+          <div class="upload-zone upload-zone-overlay" id="zone-m15structure" onclick="triggerUpload('upload-m15structure')">
+            <input type="file" id="upload-m15structure" accept="image/*" onchange="handleUpload(this,'zone-m15structure','label-m15structure','m15structure')">
+            <span class="upload-tf-label">15M — Market Structure Overlay</span>
+            <span class="upload-desc">Structure marks (BOS/MSS/HH-HL/LH-LL) · comparison lens</span>
+            <img class="preview-img" id="prev-m15structure">
+            <span class="upload-filename" id="label-m15structure"></span>
+          </div>
+          <div class="upload-zone upload-zone-overlay" id="zone-m15trendline" onclick="triggerUpload('upload-m15trendline')">
+            <input type="file" id="upload-m15trendline" accept="image/*" onchange="handleUpload(this,'zone-m15trendline','label-m15trendline','m15trendline')">
+            <span class="upload-tf-label">15M — Trendline Overlay</span>
+            <span class="upload-desc">Trendline / channel annotations · comparison lens</span>
+            <img class="preview-img" id="prev-m15trendline">
+            <span class="upload-filename" id="label-m15trendline"></span>
+          </div>
+          <div class="upload-zone upload-zone-overlay" id="zone-customoverlay" onclick="triggerUpload('upload-customoverlay')">
+            <input type="file" id="upload-customoverlay" accept="image/*" onchange="handleUpload(this,'zone-customoverlay','label-customoverlay','customoverlay')">
+            <span class="upload-tf-label">Custom Overlay</span>
+            <span class="upload-desc">Any custom indicator/drawing set · label in context notes</span>
+            <img class="preview-img" id="prev-customoverlay">
+            <span class="upload-filename" id="label-customoverlay"></span>
           </div>
         </div>
       </div>

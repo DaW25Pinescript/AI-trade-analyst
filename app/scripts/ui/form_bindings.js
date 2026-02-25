@@ -58,17 +58,24 @@ function toggleOverlaySlot(enabled) {
   state.overlayEnabled = enabled;
   const wrap = document.getElementById('overlaySlotWrap');
   if (wrap) wrap.style.display = enabled ? 'block' : 'none';
+
   // Clear overlay state when disabled so it is not included in the output
   if (!enabled) {
-    state.uploads.m15overlay = null;
-    state.imgSrcs.m15overlay = '';
-    const zone = document.getElementById('zone-m15overlay');
-    if (zone) zone.classList.remove('has-file');
-    const label = document.getElementById('label-m15overlay');
-    if (label) label.textContent = '';
-    const preview = document.getElementById('prev-m15overlay');
-    if (preview) preview.src = '';
+    const overlayKeys = ['m15overlay', 'm15structure', 'm15trendline', 'customoverlay'];
+    overlayKeys.forEach(key => {
+      state.uploads[key] = null;
+      state.imgSrcs[key] = '';
+      const zone = document.getElementById('zone-' + key);
+      if (zone) zone.classList.remove('has-file');
+      const label = document.getElementById('label-' + key);
+      if (label) label.textContent = '';
+      const preview = document.getElementById('prev-' + key);
+      if (preview) preview.src = '';
+      const input = document.getElementById('upload-' + key);
+      if (input) input.value = '';
+    });
   }
+
   syncOutput();
 }
 

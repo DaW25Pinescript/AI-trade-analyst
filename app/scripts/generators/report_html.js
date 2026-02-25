@@ -10,10 +10,13 @@ function _buildReportHTML() {
   const now = new Date().toISOString().replace('T',' ').slice(0,19) + 'Z';
 
   const imgs = [
-    { key:'htf',  title:'HTF (Daily/Weekly)',   name: state.uploads.htf,  src: state.imgSrcs.htf  },
-    { key:'mid',  title:'Mid TF (4H/1H)',        name: state.uploads.mid,  src: state.imgSrcs.mid  },
-    { key:'ltf',  title:'LTF (15m/5m)',          name: state.uploads.ltf,  src: state.imgSrcs.ltf  },
-    { key:'exec', title:'Execution TF (1m/3m)',  name: state.uploads.exec, src: state.imgSrcs.exec },
+    { key:'htf',          title:'4H/1H Clean Price',          name: state.uploads.htf,          src: state.imgSrcs.htf },
+    { key:'m15',          title:'15M Clean Price',            name: state.uploads.m15,          src: state.imgSrcs.m15 },
+    { key:'m5',           title:'5M Clean Price',             name: state.uploads.m5,           src: state.imgSrcs.m5 },
+    { key:'m15overlay',   title:'15M ICT Overlay',            name: state.uploads.m15overlay,   src: state.imgSrcs.m15overlay },
+    { key:'m15structure', title:'15M Market Structure Overlay', name: state.uploads.m15structure, src: state.imgSrcs.m15structure },
+    { key:'m15trendline', title:'15M Trendline Overlay',      name: state.uploads.m15trendline, src: state.imgSrcs.m15trendline },
+    { key:'customoverlay',title:'Custom Overlay',             name: state.uploads.customoverlay,src: state.imgSrcs.customoverlay },
   ].filter(x => x.name && x.src);
 
   const imgBlocks = imgs.length
