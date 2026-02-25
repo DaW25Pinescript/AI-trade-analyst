@@ -511,6 +511,25 @@
     border-left: 2px solid var(--border2);
   }
 
+  /* ── G3: EDGE SCORE DISPLAY ── */
+  .edge-score-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 42px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .edge-score-display.edge-high { color: var(--green); border-color: var(--green); }
+  .edge-score-display.edge-mid  { color: var(--amber); border-color: var(--amber); }
+  .edge-score-display.edge-low  { color: var(--red);   border-color: var(--red);   }
+
   /* ── RESPONSIVE ── */
   @media (max-width: 620px) {
     .row, .row-3 { grid-template-columns: 1fr; }

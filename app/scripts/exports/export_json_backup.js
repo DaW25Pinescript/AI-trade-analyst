@@ -78,38 +78,60 @@ function buildTicketSnapshot() {
   };
 }
 
-function buildAARStub(ticketId) {
+function readAARSelect(id, fallback) {
+  return document.getElementById(id)?.value || fallback;
+}
+
+function readAARNumber(id) {
+  return Number.parseFloat(document.getElementById(id)?.value || '') || 0;
+}
+
+function readAARBool(stateVal, fallback = false) {
+  if (stateVal === null || stateVal === undefined) return fallback;
+  return stateVal === 'true' || stateVal === true;
+}
+
+function readAARFailureCodes() {
+  const container = document.getElementById('aarFailureCodes');
+  if (!container) return [];
+  return Array.from(container.querySelectorAll('.checkbox-item.checked input[data-code]'))
+    .map(el => el.dataset.code)
+    .filter(Boolean);
+}
+
+function buildAARPayload(ticketId) {
+  const notes = document.getElementById('aarNotes')?.value || '';
   return {
     schemaVersion: AAR_SCHEMA_VERSION,
     ticketId,
     reviewedAt: new Date().toISOString(),
-    outcomeEnum: 'MISSED',
-    verdictEnum: 'PROCESS_GOOD',
-    firstTouch: false,
-    wouldHaveWon: false,
-    actualEntry: 0,
-    actualExit: 0,
-    rAchieved: 0,
-    exitReasonEnum: 'NO_FILL',
-    killSwitchTriggered: false,
-    failureReasonCodes: [],
-    psychologicalTag: 'CALM',
-    revisedConfidence: 3,
+    outcomeEnum: readAARSelect('aarOutcome', 'MISSED'),
+    verdictEnum: readAARSelect('aarVerdict', 'PROCESS_GOOD'),
+    firstTouch: readAARBool(state.aarState.firstTouch, false),
+    wouldHaveWon: readAARBool(state.aarState.wouldHaveWon, false),
+    actualEntry: readAARNumber('aarActualEntry'),
+    actualExit: readAARNumber('aarActualExit'),
+    rAchieved: readAARNumber('aarRachieved'),
+    exitReasonEnum: readAARSelect('aarExitReason', 'NO_FILL'),
+    killSwitchTriggered: readAARBool(state.aarState.killSwitch, false),
+    failureReasonCodes: readAARFailureCodes(),
+    psychologicalTag: readAARSelect('aarPsychTag', 'CALM'),
+    revisedConfidence: Number.parseInt(document.getElementById('aarConfidence')?.value || '3', 10) || 3,
     checklistDelta: {
-      htfState: '',
-      ltfAlignment: '',
-      volRisk: '',
-      execQuality: '',
-      notes: ''
+      htfState: document.getElementById('aarDeltaHtfState')?.value || '',
+      ltfAlignment: document.getElementById('aarDeltaLtfAlignment')?.value || '',
+      volRisk: document.getElementById('aarDeltaVolRisk')?.value || '',
+      execQuality: document.getElementById('aarDeltaExecQuality')?.value || '',
+      notes: document.getElementById('aarDeltaNotes')?.value || ''
     },
     revisedTicket: {},
-    notes: 'AAR not completed yet.'
+    notes: notes.trim().length > 0 ? notes : 'AAR not completed yet.'
   };
 }
 
 export function exportJSONBackup() {
   const ticket = buildTicketSnapshot();
-  const aar = buildAARStub(ticket.ticketId);
+  const aar = buildAARPayload(ticket.ticketId);
   const ticketValidation = validateTicketPayload(ticket);
   const aarValidation = validateAARPayload(aar);
 

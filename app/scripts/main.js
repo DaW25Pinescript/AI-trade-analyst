@@ -1,6 +1,6 @@
 import { generateTicketID } from './state/model.js';
 import { goTo, goToChartsNext, setBuildPromptRef } from './ui/stepper.js';
-import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange } from './ui/form_bindings.js';
+import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange, selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload } from './ui/form_bindings.js';
 import { buildPrompt } from './generators/prompt_ticket.js';
 import { exportHTML } from './exports/export_html.js';
 import { exportPDF } from './exports/export_pdf_print.js';
@@ -27,11 +27,35 @@ function copyPrompt() {
 }
 function resetForm(){ location.reload(); }
 
+function showAARPrompt() {
+  const prompt = buildAARPrompt();
+  const out = document.getElementById('aarOutputText');
+  const wrap = document.getElementById('aarOutputWrap');
+  if (out) out.textContent = prompt;
+  if (wrap) wrap.style.display = 'block';
+}
+
+function copyAARPrompt() {
+  const text = document.getElementById('aarOutputText')?.textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.aar-copy-btn');
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = 'COPIED ✓';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 1800);
+  });
+}
+
 Object.assign(window, {
   goTo, goToChartsNext, onAssetInput, setAsset, setBias, triggerUpload, handleUpload,
   toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange,
+  selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload,
   syncOutput, buildAndShow, copyPrompt, exportHTML, exportPDF, exportJSONBackup,
-  importJSONBackup, exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm
+  importJSONBackup, exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm,
+  showAARPrompt, copyAARPrompt
 });
 
 window.onload = () => {

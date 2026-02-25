@@ -12,7 +12,7 @@ two-track architecture:
 
 | Track | Directory | Runtime | Current Version |
 |-------|-----------|---------|-----------------|
-| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G2 complete, G3 next |
+| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G3 in progress |
 | **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v1.2 complete, v1.3 next |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
@@ -63,12 +63,24 @@ Tasks:
 
 **Debt carried from PR #11:** Resolved in current `work` branch; G2 checklist items are now implemented and covered by tests.
 
-### G3 — After-Action Review (AAR)
-- Dedicated AAR card linked to each ticket by `ticketId`
-- Fields: `actualEntry`, `actualExit`, `pnlR`, `verdictEnum` (TP1/TP2/TP3/SL/Breakeven/Scratch)
-- `edgeScore` auto-calculated from verdict × original AI confidence
-- `psychologicalTag` multi-select (Revenge / FOMO / Hesitated / Oversize / Tilted / Clean)
-- "Trade Journal Photo" upload with canvas watermarking (Ticket ID + timestamp)
+### G3 — After-Action Review (AAR) — IN PROGRESS
+**Goal:** Close the feedback loop with a structured post-trade review step.
+
+Tasks:
+- [x] Add step 07 (AAR) to the 7-step form nav in `app/index.html`
+- [x] AAR card with all schema v1.0.0 fields: `outcomeEnum`, `verdictEnum`, `actualEntry`, `actualExit`,
+      `rAchieved`, `exitReasonEnum`, `firstTouch`, `wouldHaveWon`, `killSwitchTriggered`,
+      `failureReasonCodes` (multi-select), `psychologicalTag`, `revisedConfidence`, `checklistDelta`, `notes`
+- [x] `edgeScore` display: auto-calculated from `revisedConfidence × verdictMultiplier`
+      (PLAN_FOLLOWED=1.0 / PROCESS_GOOD=0.8 / PROCESS_POOR=0.5 / PLAN_VIOLATION=0.2)
+- [x] Conditional "Would Have Won" field (shown only for MISSED / SCRATCH outcomes)
+- [x] Trade Journal Photo upload with canvas watermarking (Ticket ID + timestamp)
+- [x] AAR prompt generator updated to auto-populate from DOM fields (`prompt_aar.js`)
+- [x] `export_json_backup.js` reads actual AAR DOM values instead of hardcoded stub
+- [x] "Export Full JSON (with AAR)" button in AAR step
+- [x] "Export JSON" quick-export button added to Output step (section-5)
+- [x] "After-Action Review →" navigation button in Output step
+- [x] `aarState` added to `state/model.js` for radio button values (firstTouch, wouldHaveWon, killSwitch)
 
 ### G4 — Counter-Trend + Conviction Inputs (A1 + A4)
 - Add "Allow counter-trend ideas?" toggle: Strict HTF-only / Mixed / Full OK
@@ -306,10 +318,10 @@ All Claude-assisted development occurs on session branches and is merged via PR.
 
 ## Next Immediate Steps (Priority Order)
 
-1. **G2 (Track A)** — Wire G2 Test/Prediction Mode card into `app/index.html` and fix
-   `export_json_backup.js` hardcoded fields
-2. **v1.3 (Track B)** — Write integration tests for CLI end-to-end flow with real chart images
-3. **Track A debt** — Wire `exportJSONBackup`/`importJSONBackup` to `window`, add
-   `schemaVersion` check in `migrations.js`
+1. **G3 (Track A)** — Complete remaining G3 polish: persist AAR state to IndexedDB,
+   add `edgeScore` to JSON schema in G6, add integration test for full AAR flow
+2. **G4 (Track A)** — Counter-trend toggle, conviction level, "price now" live field,
+   conditional decision mini-ticket block
+3. **v1.3 (Track B)** — Write integration tests for CLI end-to-end flow with real chart images
 4. **Track B debt** — Add timeout/retry wrapper around individual analyst LiteLLM calls
 5. **Docs** — Write `docs/api_key_setup.md` guide for Track B configuration

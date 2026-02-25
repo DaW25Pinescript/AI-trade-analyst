@@ -16,6 +16,12 @@ export const state = {
   ptcState: {
     htfState: '', htfLocation: '', ltfAlignment: '', liquidityContext: '',
     volRisk: '', execQuality: '', conviction: '', edgeTag: ''
+  },
+  aarState: {
+    firstTouch: null,
+    wouldHaveWon: null,
+    killSwitch: null,
+    photoDataUrl: ''
   }
 };
 

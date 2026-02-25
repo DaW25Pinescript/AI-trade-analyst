@@ -13,7 +13,7 @@
 <header class="header">
   <div class="header-left">
     <div class="logo">AI Trade <span>/ Analyst</span></div>
-    <div class="version-pill">V3 · G2</div>
+    <div class="version-pill">V3 · G3</div>
   </div>
   <div class="ticket-id-header">Ticket: <span id="ticketIdHeader">—</span></div>
 </header>
@@ -21,7 +21,7 @@
 <main class="main">
   <div class="page-title">Market Analysis Request</div>
   <h1>Build Your Analysis Brief</h1>
-  <p class="subtitle">G2 — Test / Prediction Mode: record your call before AI analysis · Enum-driven ticket fields · Full audit trail</p>
+  <p class="subtitle">G3 — After-Action Review: close the loop with post-trade scoring, edge calibration, and journal photo watermarking</p>
 
   <div class="steps">
     <div class="step active" onclick="goTo(0)"><span class="step-num">01</span>Setup</div>
@@ -30,6 +30,7 @@
     <div class="step" onclick="goTo(3)"><span class="step-num">04</span>Pre-Ticket</div>
     <div class="step" onclick="goTo(4)"><span class="step-num">05</span>Test Mode</div>
     <div class="step" onclick="goTo(5)"><span class="step-num">06</span>Output</div>
+    <div class="step" onclick="goTo(6)"><span class="step-num">07</span>AAR</div>
   </div>
 
   <!-- ════════════════════════════════════════
@@ -703,6 +704,7 @@
             <button class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
             <button class="export-btn" onclick="exportHTML()">Download HTML</button>
             <button class="export-btn" onclick="exportPDF()">Print / PDF</button>
+            <button class="export-btn" onclick="exportJSONBackup()">Export JSON</button>
           </div>
         </div>
         <div id="outputText">Fill in the form steps to generate your V3 prompt...</div>
@@ -716,7 +718,218 @@
 
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="goTo(4)">← Edit Test Mode</button>
+      <button class="btn btn-ghost" onclick="goTo(6)">After-Action Review →</button>
       <button class="btn btn-primary" onclick="resetForm()">New Ticket</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       STEP 7: AFTER-ACTION REVIEW (AAR)
+       G3 — Post-trade review linked to ticket by ticketId
+  ════════════════════════════════════════ -->
+  <div class="section" id="section-6">
+    <div class="card">
+      <div class="card-label amber">After-Action Review — <span id="aarTicketIdLabel">—</span></div>
+      <p class="step-note">Complete after the trade is closed. Honest scoring only — this feeds your edge calibration over time.</p>
+
+      <div class="row">
+        <div>
+          <label>Outcome</label>
+          <select id="aarOutcome" onchange="onAAROutcomeChange(this)">
+            <option value="MISSED">MISSED (no fill)</option>
+            <option value="WIN">WIN</option>
+            <option value="LOSS">LOSS</option>
+            <option value="BREAKEVEN">BREAKEVEN</option>
+            <option value="SCRATCH">SCRATCH</option>
+          </select>
+        </div>
+        <div>
+          <label>Process Verdict</label>
+          <select id="aarVerdict" onchange="updateEdgeScore()">
+            <option value="PLAN_FOLLOWED">Plan Followed</option>
+            <option value="PROCESS_GOOD">Process Good</option>
+            <option value="PROCESS_POOR">Process Poor</option>
+            <option value="PLAN_VIOLATION">Plan Violation</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Actual Entry Price</label>
+          <input type="number" id="aarActualEntry" placeholder="e.g. 2902.50" step="any">
+        </div>
+        <div>
+          <label>Actual Exit Price</label>
+          <input type="number" id="aarActualExit" placeholder="e.g. 2935.00" step="any">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>R Achieved</label>
+          <input type="number" id="aarRachieved" placeholder="e.g. 1.5 or -1.0" step="0.1">
+        </div>
+        <div>
+          <label>Exit Reason</label>
+          <select id="aarExitReason">
+            <option value="NO_FILL">No Fill</option>
+            <option value="TP_HIT">TP Hit</option>
+            <option value="SL_HIT">SL Hit</option>
+            <option value="TIME_EXIT">Time Exit</option>
+            <option value="MANUAL_EXIT">Manual Exit</option>
+            <option value="INVALIDATION">Invalidation</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ptc-row">
+        <label>First Touch? (did price touch entry zone on first approach?)</label>
+        <div class="radio-group" id="rg-aar-firstTouch">
+          <div class="radio-opt" data-val="false" data-sel="sel-counter" onclick="selectAARRadio('firstTouch',this)">No</div>
+          <div class="radio-opt" data-val="true" data-sel="sel-aligned" onclick="selectAARRadio('firstTouch',this)">Yes</div>
+        </div>
+      </div>
+
+      <div class="ptc-row" id="wouldHaveWonWrap" style="display:none;">
+        <label>Would Have Won? (only if MISSED or SCRATCH)</label>
+        <div class="radio-group" id="rg-aar-wouldHaveWon">
+          <div class="radio-opt" data-val="false" data-sel="sel-counter" onclick="selectAARRadio('wouldHaveWon',this)">No</div>
+          <div class="radio-opt" data-val="true" data-sel="sel-aligned" onclick="selectAARRadio('wouldHaveWon',this)">Yes</div>
+        </div>
+      </div>
+
+      <div class="ptc-row">
+        <label>Kill Switch Triggered?</label>
+        <div class="radio-group" id="rg-aar-killSwitch">
+          <div class="radio-opt sel-aligned" data-val="false" data-sel="sel-aligned" onclick="selectAARRadio('killSwitch',this)">No</div>
+          <div class="radio-opt" data-val="true" data-sel="sel-counter" onclick="selectAARRadio('killSwitch',this)">Yes</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <label>Failure Reason Codes (all that apply)</label>
+      <div class="checkbox-grid" id="aarFailureCodes">
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox" data-code="LATE_ENTRY"><div class="check-box"></div>
+          <span class="check-text">Late Entry</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox" data-code="OVERSIZED_RISK"><div class="check-box"></div>
+          <span class="check-text">Oversized Risk</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox" data-code="IGNORED_GATE"><div class="check-box"></div>
+          <span class="check-text">Ignored Gate</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox" data-code="MISREAD_STRUCTURE"><div class="check-box"></div>
+          <span class="check-text">Misread Structure</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox" data-code="NEWS_BLINDSPOT"><div class="check-box"></div>
+          <span class="check-text">News Blindspot</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox" data-code="EMOTIONAL_EXECUTION"><div class="check-box"></div>
+          <span class="check-text">Emotional Execution</span>
+        </label>
+        <label class="checkbox-item" onclick="toggleCheck(this)">
+          <input type="checkbox" data-code="NO_EDGE"><div class="check-box"></div>
+          <span class="check-text">No Edge</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Psychological Tag</label>
+          <select id="aarPsychTag">
+            <option value="CALM">Calm</option>
+            <option value="DISCIPLINED">Disciplined</option>
+            <option value="FOMO">FOMO</option>
+            <option value="HESITATION">Hesitation</option>
+            <option value="REVENGE">Revenge</option>
+            <option value="OVERCONFIDENCE">Overconfidence</option>
+            <option value="FATIGUE">Fatigue</option>
+          </select>
+        </div>
+        <div>
+          <label>Edge Score (auto-calculated)</label>
+          <div class="edge-score-display" id="edgeScoreDisplay">—</div>
+        </div>
+      </div>
+
+      <div class="slider-wrap">
+        <div class="slider-header">
+          <div class="slider-label">Post-Trade Confidence (was this the right process?)</div>
+          <div class="slider-val" id="aarConfVal">3</div>
+        </div>
+        <input type="range" id="aarConfidence" min="1" max="5" value="3" oninput="onAARSlider()">
+        <div class="slider-subtext">1 = wrong process · 3 = neutral · 5 = right process even if loss</div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="card-label" style="font-size:11px;margin-bottom:10px;">Checklist Delta — What Changed vs Pre-Trade Read?</div>
+
+      <div class="row">
+        <div>
+          <label>HTF State (actual)</label>
+          <input type="text" id="aarDeltaHtfState" placeholder="e.g. Switched to Ranging after entry">
+        </div>
+        <div>
+          <label>LTF Alignment (actual)</label>
+          <input type="text" id="aarDeltaLtfAlignment" placeholder="e.g. Counter-trend signal missed">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Vol Risk (actual)</label>
+          <input type="text" id="aarDeltaVolRisk" placeholder="e.g. Elevated — news hit mid-trade">
+        </div>
+        <div>
+          <label>Exec Quality (actual)</label>
+          <input type="text" id="aarDeltaExecQuality" placeholder="e.g. Slipped 3 pips on entry">
+        </div>
+      </div>
+      <label>Checklist Delta Notes</label>
+      <textarea id="aarDeltaNotes" placeholder="What would you have changed in your pre-trade read with hindsight?"></textarea>
+
+      <div class="divider"></div>
+      <div class="card-label" style="font-size:11px;margin-bottom:10px;">Trade Journal Photo (optional)</div>
+      <p class="hint">Upload an outcome screenshot. Ticket ID and timestamp will be watermarked onto the image automatically.</p>
+
+      <div class="upload-zone" id="zone-aarPhoto" onclick="triggerUpload('upload-aarPhoto')" style="max-width:320px;">
+        <input type="file" id="upload-aarPhoto" accept="image/*" onchange="handleAARPhotoUpload(this)">
+        <span class="upload-tf-label">Journal Photo</span>
+        <span class="upload-desc">Outcome screenshot — auto-watermarked</span>
+        <img class="preview-img" id="prev-aarPhoto" style="display:none;">
+        <span class="upload-filename" id="label-aarPhoto"></span>
+      </div>
+      <canvas id="aarPhotoCanvas" style="display:none;"></canvas>
+
+      <div class="divider"></div>
+      <label>AAR Notes <span style="color:var(--red);">*</span></label>
+      <textarea id="aarNotes" placeholder="What happened? Was the plan correct? What would you do differently next time?" style="min-height:80px;"></textarea>
+    </div>
+
+    <div id="aarOutputWrap" style="display:none;margin-top:16px;">
+      <div class="card">
+        <div class="card-label green">AAR Prompt — Ready to Paste</div>
+        <div class="output-panel">
+          <div class="output-header">
+            <span class="output-title">● AAR PROMPT READY</span>
+            <button class="copy-btn aar-copy-btn" onclick="copyAARPrompt()">Copy AAR Prompt</button>
+          </div>
+          <div id="aarOutputText" style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(5)">← Back to Output</button>
+      <button class="btn btn-ghost" onclick="showAARPrompt()">Generate AAR Prompt</button>
+      <button class="btn btn-primary" onclick="exportJSONBackup()">Export Full JSON (with AAR)</button>
     </div>
   </div>
 

@@ -133,4 +133,104 @@ function onDecisionModeChange(el) {
   syncOutput();
 }
 
-export { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, getChecked, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange };
+// ═══════════════════════════════════════
+// G3: AFTER-ACTION REVIEW (AAR)
+// ═══════════════════════════════════════
+
+function selectAARRadio(field, el) {
+  const group = document.getElementById('rg-aar-' + field);
+  if (group) group.querySelectorAll('.radio-opt').forEach(o => { o.className = 'radio-opt'; });
+  el.classList.add(el.dataset.sel);
+  state.aarState[field] = el.dataset.val;
+  updateEdgeScore();
+}
+
+function onAAROutcomeChange(el) {
+  const showWouldHaveWon = el.value === 'MISSED' || el.value === 'SCRATCH';
+  const wrap = document.getElementById('wouldHaveWonWrap');
+  if (wrap) wrap.style.display = showWouldHaveWon ? 'block' : 'none';
+  updateEdgeScore();
+}
+
+function onAARSlider() {
+  const v = document.getElementById('aarConfidence').value;
+  const display = document.getElementById('aarConfVal');
+  if (display) display.textContent = v;
+  updateEdgeScore();
+}
+
+const VERDICT_MULTIPLIER = {
+  PLAN_FOLLOWED: 1.0,
+  PROCESS_GOOD: 0.8,
+  PROCESS_POOR: 0.5,
+  PLAN_VIOLATION: 0.2
+};
+
+function updateEdgeScore() {
+  const conf = Number.parseInt(document.getElementById('aarConfidence')?.value || '3', 10);
+  const verdict = document.getElementById('aarVerdict')?.value || '';
+  const multiplier = VERDICT_MULTIPLIER[verdict] ?? 0.5;
+  const score = (conf * multiplier).toFixed(1);
+
+  const display = document.getElementById('edgeScoreDisplay');
+  if (!display) return;
+
+  display.textContent = score;
+  display.className = 'edge-score-display';
+  if (score >= 4.0) display.classList.add('edge-high');
+  else if (score >= 2.5) display.classList.add('edge-mid');
+  else display.classList.add('edge-low');
+}
+
+function handleAARPhotoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.getElementById('aarPhotoCanvas');
+      if (!canvas) return;
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      // Watermark: semi-transparent banner at bottom
+      const ticketId = state.ticketID || 'UNKNOWN';
+      const ts = new Date().toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+      const label = `${ticketId} · ${ts}`;
+      const fontSize = Math.max(14, Math.floor(img.height * 0.025));
+      ctx.font = `${fontSize}px IBM Plex Mono, monospace`;
+
+      const padding = fontSize * 0.6;
+      const bannerH = fontSize + padding * 2;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(0, img.height - bannerH, img.width, bannerH);
+
+      ctx.fillStyle = '#d4a843';
+      ctx.fillText(label, padding, img.height - padding);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      state.aarState.photoDataUrl = dataUrl;
+
+      const preview = document.getElementById('prev-aarPhoto');
+      if (preview) { preview.src = dataUrl; preview.style.display = 'block'; }
+
+      const labelEl = document.getElementById('label-aarPhoto');
+      if (labelEl) labelEl.textContent = file.name + ' (watermarked)';
+
+      const zone = document.getElementById('zone-aarPhoto');
+      if (zone) zone.classList.add('has-file');
+    };
+    img.onerror = () => alert('Failed to load image for watermarking.');
+    img.src = e.target.result;
+  };
+  reader.onerror = () => alert('Failed to read image file.');
+  reader.readAsDataURL(file);
+}
+
+export { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, getChecked, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange, selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload };
