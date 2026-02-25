@@ -15,6 +15,10 @@ export function goTo(step) {
   });
   state.currentStep = step;
   if (step === 5 && typeof buildPromptRef === 'function') buildPromptRef();
+  if (step === 6) {
+    const label = document.getElementById('aarTicketIdLabel');
+    if (label) label.textContent = state.ticketID || '—';
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

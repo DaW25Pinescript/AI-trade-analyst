@@ -22,8 +22,34 @@ export function buildAARPrompt() {
   const asset         = get('asset') || '—';
   const now           = new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z';
 
+  // G3: read actual AAR values from DOM when available
+  const aarOutcome    = get('aarOutcome') || '[WIN / LOSS / BREAKEVEN / MISSED / SCRATCH]';
+  const aarVerdict    = get('aarVerdict') || '[PLAN_FOLLOWED / PLAN_VIOLATION / PROCESS_GOOD / PROCESS_POOR]';
+  const aarEntry      = get('aarActualEntry') || '[price or N/A]';
+  const aarExit       = get('aarActualExit') || '[price or N/A]';
+  const aarR          = get('aarRachieved') || '[e.g. +1.5R, -1R, 0R]';
+  const aarExitReason = get('aarExitReason') || '[TP_HIT / SL_HIT / TIME_EXIT / MANUAL_EXIT / INVALIDATION / NO_FILL]';
+  const aarFirstTouch = state.aarState.firstTouch !== null
+    ? (state.aarState.firstTouch === 'true' ? 'YES' : 'NO')
+    : '[YES / NO]';
+  const aarWouldWin   = state.aarState.wouldHaveWon !== null
+    ? (state.aarState.wouldHaveWon === 'true' ? 'YES' : 'NO')
+    : '[YES / NO — only if MISSED or NO_FILL]';
+  const aarKillSwitch = state.aarState.killSwitch !== null
+    ? (state.aarState.killSwitch === 'true' ? 'YES' : 'NO')
+    : '[YES / NO]';
+  const aarPsych      = get('aarPsychTag') || '[CALM / FOMO / HESITATION / REVENGE / OVERCONFIDENCE / FATIGUE / DISCIPLINED]';
+  const aarConf       = document.getElementById('aarConfidence')?.value || '[1–5]';
+  const aarNotes      = document.getElementById('aarNotes')?.value || '[brief description of what happened]';
+
+  // Failure codes from multi-select checkboxes
+  const failureCodes  = Array.from(
+    document.querySelectorAll('#aarFailureCodes .checkbox-item.checked input[data-code]')
+  ).map(el => el.dataset.code);
+  const aarFailure = failureCodes.length > 0 ? failureCodes.join(' | ') : '[NONE or list codes]';
+
   return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 AFTER ACTION REVIEW (AAR) — V3
+📋 AFTER ACTION REVIEW (AAR) — V3 · G3
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Ticket ID:       ${ticketId}
 Asset:           ${asset}
@@ -50,22 +76,20 @@ Exec Quality:    ${ptc.execQuality || '⚠ not set'}
 Conviction:      ${ptc.conviction || '⚠ not set'}
 Edge Tag:        ${ptc.edgeTag || '⚠ not set'}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ACTUAL OUTCOME — fill in before pasting
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Outcome:         [WIN / LOSS / BREAKEVEN / MISSED / SCRATCH]
-Verdict:         [PLAN_FOLLOWED / PLAN_VIOLATION / PROCESS_GOOD / PROCESS_POOR]
-Actual Entry:    [price or N/A]
-Actual Exit:     [price or N/A]
-R Achieved:      [e.g. +1.5R, -1R, 0R]
-Exit Reason:     [TP_HIT / SL_HIT / TIME_EXIT / MANUAL_EXIT / INVALIDATION / NO_FILL]
-First Touch:     [YES / NO — did price touch entry zone on first approach?]
-Would Have Won:  [YES / NO — only if MISSED or NO_FILL]
-Kill Switch:     [YES / NO — was the kill-switch condition triggered before entry?]
-Failure codes:   [LATE_ENTRY | OVERSIZED_RISK | IGNORED_GATE | MISREAD_STRUCTURE | NEWS_BLINDSPOT | EMOTIONAL_EXECUTION | NO_EDGE — all that apply, or NONE]
-Psych tag:       [CALM / FOMO / HESITATION / REVENGE / OVERCONFIDENCE / FATIGUE / DISCIPLINED]
-Post-trade conf: [1–5 — how confident are you NOW that this was the right process?]
-Notes:           [brief description of what happened]
+─── ACTUAL OUTCOME ────────────────────────
+Outcome:         ${aarOutcome}
+Verdict:         ${aarVerdict}
+Actual Entry:    ${aarEntry}
+Actual Exit:     ${aarExit}
+R Achieved:      ${aarR}
+Exit Reason:     ${aarExitReason}
+First Touch:     ${aarFirstTouch}
+Would Have Won:  ${aarWouldWin}
+Kill Switch:     ${aarKillSwitch}
+Failure codes:   ${aarFailure}
+Psych tag:       ${aarPsych}
+Post-trade conf: ${aarConf}/5
+Notes:           ${aarNotes}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SYSTEM PERSONA (AAR review mode — obey strictly):
