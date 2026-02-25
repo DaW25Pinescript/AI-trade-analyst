@@ -216,62 +216,72 @@
 
   <!-- ════════════════════════════════════════
        STEP 2: CHARTS
+       Lens-aware architecture: 3 clean price charts + optional 15M ICT overlay
+       Hard cap: 4 screenshots maximum per run.
   ════════════════════════════════════════ -->
   <div class="section" id="section-1">
     <div class="card">
-      <div class="card-label">Chart Screenshots</div>
-      <p class="step-note">Upload a screenshot for each timeframe. At least HTF + Mid TF strongly recommended. Screenshots embed into the HTML export automatically.</p>
+      <div class="card-label">Chart Screenshots — Clean Price</div>
+      <p class="step-note">Upload a <strong>clean price chart</strong> (no indicator overlays) for each timeframe. All three slots are required for the best analysis. The optional ICT overlay is revealed below.</p>
 
       <div class="tf-grid">
         <div class="upload-zone" id="zone-htf" onclick="triggerUpload('upload-htf')">
           <input type="file" id="upload-htf" accept="image/*" onchange="handleUpload(this,'zone-htf','label-htf','htf')">
-          <span class="upload-icon">📈</span>
-          <span class="upload-tf-label">HTF</span>
-          <span class="upload-desc">Daily / Weekly</span>
+          <span class="upload-tf-label">4H / 1H</span>
+          <span class="upload-desc">Clean price — HTF bias</span>
           <img class="preview-img" id="prev-htf">
           <span class="upload-filename" id="label-htf"></span>
         </div>
-        <div class="upload-zone" id="zone-mid" onclick="triggerUpload('upload-mid')">
-          <input type="file" id="upload-mid" accept="image/*" onchange="handleUpload(this,'zone-mid','label-mid','mid')">
-          <span class="upload-icon">📊</span>
-          <span class="upload-tf-label">Mid TF</span>
-          <span class="upload-desc">4H / 1H</span>
-          <img class="preview-img" id="prev-mid">
-          <span class="upload-filename" id="label-mid"></span>
+        <div class="upload-zone" id="zone-m15" onclick="triggerUpload('upload-m15')">
+          <input type="file" id="upload-m15" accept="image/*" onchange="handleUpload(this,'zone-m15','label-m15','m15')">
+          <span class="upload-tf-label">15M</span>
+          <span class="upload-desc">Clean price — structure</span>
+          <img class="preview-img" id="prev-m15">
+          <span class="upload-filename" id="label-m15"></span>
         </div>
-        <div class="upload-zone" id="zone-ltf" onclick="triggerUpload('upload-ltf')">
-          <input type="file" id="upload-ltf" accept="image/*" onchange="handleUpload(this,'zone-ltf','label-ltf','ltf')">
-          <span class="upload-icon">🔍</span>
-          <span class="upload-tf-label">LTF</span>
-          <span class="upload-desc">15m / 5m</span>
-          <img class="preview-img" id="prev-ltf">
-          <span class="upload-filename" id="label-ltf"></span>
-        </div>
-        <div class="upload-zone" id="zone-exec" onclick="triggerUpload('upload-exec')">
-          <input type="file" id="upload-exec" accept="image/*" onchange="handleUpload(this,'zone-exec','label-exec','exec')">
-          <span class="upload-icon">⚡</span>
-          <span class="upload-tf-label">Exec TF</span>
-          <span class="upload-desc">1m / 3m (optional)</span>
-          <img class="preview-img" id="prev-exec">
-          <span class="upload-filename" id="label-exec"></span>
+        <div class="upload-zone" id="zone-m5" onclick="triggerUpload('upload-m5')">
+          <input type="file" id="upload-m5" accept="image/*" onchange="handleUpload(this,'zone-m5','label-m5','m5')">
+          <span class="upload-tf-label">5M</span>
+          <span class="upload-desc">Clean price — entry context</span>
+          <img class="preview-img" id="prev-m5">
+          <span class="upload-filename" id="label-m5"></span>
         </div>
       </div>
 
       <div class="upload-warning" id="uploadWarning">
-        ⚠ No screenshots uploaded. The AI will still analyse but quality will be limited.
+        No screenshots uploaded. The AI will still analyse but quality will be limited.
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 15M ICT Overlay — optional, progressive disclosure -->
+      <div class="toggle-wrap" id="overlayToggleWrap">
+        <div class="toggle-left">
+          <div class="toggle-title">Include 15M ICT indicator overlay</div>
+          <div class="toggle-sub">Optional. Enables a second isolated analysis phase comparing the ICT overlay against the clean-price baseline. Indicator settings must be locked and consistent.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="overlayToggle" onchange="toggleOverlaySlot(this.checked)">
+          <span class="slider-sw"></span>
+        </label>
+      </div>
+
+      <div id="overlaySlotWrap" style="display:none;">
+        <p class="hint" style="margin-top:0; margin-bottom:8px;">Upload the 15M chart with your ICT indicator overlay active. This slot only accepts 15M screenshots. The overlay image is never mixed with the clean-price analysis context.</p>
+        <div class="tf-grid" style="grid-template-columns: 1fr;">
+          <div class="upload-zone upload-zone-overlay" id="zone-m15overlay" onclick="triggerUpload('upload-m15overlay')">
+            <input type="file" id="upload-m15overlay" accept="image/*" onchange="handleUpload(this,'zone-m15overlay','label-m15overlay','m15overlay')">
+            <span class="upload-tf-label">15M — ICT Overlay</span>
+            <span class="upload-desc">Indicator overlay · secondary evidence · 15M only</span>
+            <img class="preview-img" id="prev-m15overlay">
+            <span class="upload-filename" id="label-m15overlay"></span>
+          </div>
+        </div>
       </div>
 
       <div class="divider"></div>
 
       <div class="row">
-        <div>
-          <label>Screenshot Cleanliness</label>
-          <select id="chartCleanliness" onchange="syncOutput()">
-            <option value="Clean">Clean — no drawings</option>
-            <option value="Light">Light drawings — some annotations</option>
-            <option value="Heavy">Heavy drawings — AI should note drawings present</option>
-          </select>
-        </div>
         <div>
           <label>HTF Context (price location)</label>
           <select id="htfContextSetup" onchange="syncOutput()">
@@ -282,6 +292,14 @@
             <option>Extended above HTF structure</option>
             <option>Extended below HTF structure</option>
             <option>Breaking out of range</option>
+          </select>
+        </div>
+        <div>
+          <label>Chart Cleanliness (clean slots)</label>
+          <select id="chartCleanliness" onchange="syncOutput()">
+            <option value="Clean">Clean — no drawings</option>
+            <option value="Light">Light drawings — some annotations</option>
+            <option value="Heavy">Heavy drawings — AI should note drawings present</option>
           </select>
         </div>
       </div>

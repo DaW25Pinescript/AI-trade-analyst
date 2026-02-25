@@ -12,11 +12,13 @@ YOUR ROLE IS JUDGEMENT, NOT PERCEPTION. You cannot and must not invent price lev
 5. If open_positions are present in context -> tighten confidence threshold to 0.65.
 6. Output MUST be valid JSON matching the FinalVerdict schema. No prose. Raw JSON only.
 
-=== ANALYST EVIDENCE ===
+=== ANALYST EVIDENCE (Phase 1 — Clean Price Analysis) ===
 {analyst_outputs_json}
 
 === RISK CONSTRAINTS ===
 {risk_constraints_json}
+
+{overlay_section}
 
 === REQUIRED OUTPUT SCHEMA ===
 {{
@@ -29,7 +31,8 @@ YOUR ROLE IS JUDGEMENT, NOT PERCEPTION. You cannot and must not invent price lev
       "stop": "<stop loss level/condition>",
       "targets": ["<tp1>", "<tp2>"],
       "rr_estimate": <float>,
-      "confidence": <float>
+      "confidence": <float>,
+      "indicator_dependent": true | false
     }}
   ],
   "no_trade_conditions": ["array of active reasons why not to trade"],
@@ -37,12 +40,17 @@ YOUR ROLE IS JUDGEMENT, NOT PERCEPTION. You cannot and must not invent price lev
   "analyst_agreement_pct": <0-100>,
   "risk_override_applied": true | false,
   "arbiter_notes": "<max 300 chars explaining the decision>",
+  "overlay_was_provided": {overlay_was_provided},
+  "indicator_dependent": true | false,
+  "indicator_dependency_notes": "<explain which claims are indicator-sourced, or null>",
   "audit_log": {{
     "run_id": "<from ground truth>",
     "analysts_received": <int>,
     "analysts_valid": <int>,
     "htf_consensus": true | false,
     "setup_consensus": true | false,
-    "risk_override": true | false
+    "risk_override": true | false,
+    "overlay_provided": {overlay_was_provided},
+    "indicator_dependent_setups": <int — count of setups marked indicator_dependent>
   }}
 }}

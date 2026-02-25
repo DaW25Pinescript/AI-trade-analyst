@@ -9,6 +9,7 @@ class ApprovedSetup(BaseModel):
     targets: list[str]
     rr_estimate: float
     confidence: float
+    indicator_dependent: bool = False  # True if setup relies primarily on indicator claims
 
 
 class AuditLog(BaseModel):
@@ -18,6 +19,8 @@ class AuditLog(BaseModel):
     htf_consensus: bool
     setup_consensus: bool
     risk_override: bool
+    overlay_provided: bool = False          # was the 15M ICT overlay submitted?
+    indicator_dependent_setups: int = 0    # count of setups that primarily rely on indicator claims
 
 
 class FinalVerdict(BaseModel):
@@ -30,3 +33,6 @@ class FinalVerdict(BaseModel):
     risk_override_applied: bool
     arbiter_notes: str
     audit_log: AuditLog
+    overlay_was_provided: bool = False          # was the 15M ICT overlay submitted?
+    indicator_dependent: bool = False           # does the verdict primarily rely on indicator claims?
+    indicator_dependency_notes: Optional[str] = None  # which claims are indicator-sourced

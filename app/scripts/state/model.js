@@ -2,8 +2,14 @@ export const state = {
   currentStep: 0,
   currentBias: '',
   ticketID: '',
-  uploads: { htf: null, mid: null, ltf: null, exec: null },
-  imgSrcs: { htf: '', mid: '', ltf: '', exec: '' },
+  // Lens-aware screenshot slots:
+  //   htf        — 4H/1H clean price chart (HTF bias)
+  //   m15        — 15M clean price chart (market structure)
+  //   m5         — 5M clean price chart (entry context)
+  //   m15overlay — 15M ICT overlay (optional, secondary evidence)
+  uploads: { htf: null, m15: null, m5: null, m15overlay: null },
+  imgSrcs: { htf: '', m15: '', m5: '', m15overlay: '' },
+  overlayEnabled: false,
   ptcState: {
     htfState: '', htfLocation: '', ltfAlignment: '', liquidityContext: '',
     volRisk: '', execQuality: '', conviction: '', edgeTag: ''
