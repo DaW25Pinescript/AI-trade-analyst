@@ -1,14 +1,18 @@
 {
-  "_comment": "Sample historical XAUUSD chart pack for integration tests. Charts are omitted (empty strings). Use this to test pipeline plumbing without live LLM calls.",
+  "_comment": "Sample historical XAUUSD chart pack for integration tests. Charts are empty strings (no image data). Use this to test pipeline plumbing without live LLM calls. Updated to align with the lens-aware screenshot architecture: D1 removed (not an allowed clean-chart timeframe); screenshot_metadata added (required by GroundTruthPacket v1.2).",
   "instrument": "XAUUSD",
   "session": "NY",
-  "timeframes": ["D1", "H4", "H1", "M15"],
+  "timeframes": ["H4", "M15", "M5"],
   "charts": {
-    "D1":  "",
     "H4":  "",
-    "H1":  "",
-    "M15": ""
+    "M15": "",
+    "M5":  ""
   },
+  "screenshot_metadata": [
+    {"timeframe": "H4",  "lens": "NONE", "evidence_type": "price_only"},
+    {"timeframe": "M15", "lens": "NONE", "evidence_type": "price_only"},
+    {"timeframe": "M5",  "lens": "NONE", "evidence_type": "price_only"}
+  ],
   "risk_constraints": {
     "min_rr": 2.0,
     "max_risk_per_trade": 0.5,

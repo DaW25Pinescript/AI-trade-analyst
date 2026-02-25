@@ -20,7 +20,7 @@ import json
 import pytest
 from ..core.arbiter_prompt_builder import build_arbiter_prompt
 from ..core.lens_loader import load_arbiter_template
-from ..models.analyst_output import AnalystOutput
+from ..models.analyst_output import AnalystOutput, OverlayDeltaReport
 from ..models.ground_truth import RiskConstraints
 
 
@@ -141,3 +141,141 @@ class TestMinimumAnalystQuorum:
         assert MINIMUM_VALID_ANALYSTS == 2, (
             "Design rule #6 requires minimum 2 valid analyst responses."
         )
+
+
+# ---------------------------------------------------------------------------
+# Overlay section injection tests
+# Tests that the arbiter prompt correctly injects delta reports and
+# weighting rules when a 15M ICT overlay was provided.
+# ---------------------------------------------------------------------------
+
+class TestArbiterOverlaySection:
+    """
+    Tests for the overlay section injected into the arbiter prompt.
+
+    The spec defines 6 non-negotiable weighting rules that must be present
+    in the arbiter prompt whenever an overlay was submitted. This class
+    verifies that:
+    1. The overlay section correctly declares overlay_was_provided.
+    2. Delta report content is embedded verbatim in the prompt.
+    3. All 6 weighting rules are present.
+    4. The no-overlay fallback is correct when no overlay was submitted.
+    5. The adversarial contradiction case is surfaced to the arbiter —
+       this is the failure mode the spec explicitly warns against.
+    """
+
+    def _build_with_overlay(
+        self,
+        analysts: list[AnalystOutput],
+        delta_reports: list[OverlayDeltaReport],
+        min_rr: float = 2.0,
+    ) -> str:
+        return build_arbiter_prompt(
+            analyst_outputs=analysts,
+            risk_constraints=RiskConstraints(min_rr=min_rr),
+            run_id="test-overlay-run-001",
+            overlay_delta_reports=delta_reports,
+            overlay_was_provided=True,
+        )
+
+    def _build_without_overlay(self, analysts: list[AnalystOutput]) -> str:
+        return build_arbiter_prompt(
+            analyst_outputs=analysts,
+            risk_constraints=RiskConstraints(),
+            run_id="test-no-overlay-run",
+        )
+
+    def test_overlay_section_declares_provided_true(self):
+        """Prompt must state overlay_was_provided: true when overlay is provided."""
+        delta = [OverlayDeltaReport(
+            confirms=["FVG aligns with displacement"], refines=[], contradicts=[], indicator_only_claims=[],
+        )]
+        prompt = self._build_with_overlay([_make_analyst("SHORT", 0.7)], delta)
+        assert "overlay_was_provided: true" in prompt
+
+    def test_delta_content_embedded_in_prompt(self):
+        """Delta report content (confirms, refines, indicator_only_claims) must be visible."""
+        delta = [OverlayDeltaReport(
+            confirms=["discount FVG aligns with price impulse"],
+            refines=["order block boundary narrower than estimate"],
+            contradicts=[],
+            indicator_only_claims=["minor OB not visible in price"],
+        )]
+        prompt = self._build_with_overlay([_make_analyst("SHORT", 0.7)], delta)
+        assert "discount FVG aligns with price impulse" in prompt
+        assert "order block boundary narrower" in prompt
+        assert "minor OB not visible in price" in prompt
+
+    def test_all_six_weighting_rules_present(self):
+        """All 6 overlay weighting rules must appear in the prompt when overlay is provided."""
+        delta = [OverlayDeltaReport(confirms=[], refines=[], contradicts=[], indicator_only_claims=[])]
+        prompt = self._build_with_overlay([_make_analyst("SHORT", 0.7)], delta)
+        assert "AGREEMENT RULE" in prompt
+        assert "REFINEMENT RULE" in prompt
+        assert "CONTRADICTION RULE" in prompt
+        assert "INDICATOR-ONLY RULE" in prompt
+        assert "RISK OVERRIDE" in prompt
+        assert "NO-TRADE PRIORITY" in prompt
+
+    def test_delta_report_count_reported(self):
+        """The prompt must report the number of delta reports received."""
+        delta = [
+            OverlayDeltaReport(confirms=["x"], refines=[], contradicts=[], indicator_only_claims=[]),
+            OverlayDeltaReport(confirms=[], refines=["y"], contradicts=[], indicator_only_claims=[]),
+        ]
+        prompt = self._build_with_overlay(
+            [_make_analyst("SHORT", 0.7), _make_analyst("WAIT", 0.55)], delta
+        )
+        assert "delta_reports_received: 2" in prompt
+
+    def test_no_overlay_section_declares_provided_false(self):
+        """When no overlay is provided, prompt must state overlay_was_provided: false."""
+        prompt = self._build_without_overlay([_make_analyst("SHORT", 0.7)])
+        assert "overlay_was_provided: false" in prompt
+
+    def test_no_overlay_section_states_clean_price_only(self):
+        """No-overlay prompt must tell the arbiter to rely on clean price only."""
+        prompt = self._build_without_overlay([_make_analyst("SHORT", 0.7)])
+        assert "No overlay was provided" in prompt
+
+    def test_weighting_rules_absent_when_no_overlay(self):
+        """Weighting rules must not appear in the prompt when there is no overlay."""
+        prompt = self._build_without_overlay([_make_analyst("SHORT", 0.7)])
+        assert "AGREEMENT RULE" not in prompt
+        assert "CONTRADICTION RULE" not in prompt
+
+    def test_adversarial_contradiction_case(self):
+        """
+        Adversarial case from the spec: indicator overlay strongly suggests a trade
+        that clean price analysis contradicts.
+
+        This is the failure mode the spec explicitly warns against — the system
+        must never silently resolve the contradiction in favour of the indicator.
+
+        Verifies that the arbiter prompt receives:
+        - The clean price NO_TRADE verdict (from the analyst Phase 1 output)
+        - The explicit contradiction from the overlay delta report
+        - The CONTRADICTION RULE that mandates downgrading, not silent acceptance
+        - The INDICATOR-ONLY RULE for setups not visible in price
+        """
+        # Clean price analysis: NO_TRADE (high-confidence, triggers Rule 2)
+        clean_analyst = _make_analyst("NO_TRADE", 0.65, htf_bias="bearish")
+
+        # Overlay delta: indicator contradicts clean price
+        adversarial_delta = OverlayDeltaReport(
+            confirms=[],
+            refines=[],
+            contradicts=["overlay marks bullish FVG but price shows no displacement above trigger level"],
+            indicator_only_claims=["bullish order block visible only in overlay — not supported by price structure"],
+        )
+
+        prompt = self._build_with_overlay([clean_analyst], [adversarial_delta])
+
+        # Clean price NO_TRADE evidence must be visible to the arbiter
+        assert "NO_TRADE" in prompt
+        # Overlay contradiction must be in the prompt (not silently dropped)
+        assert "overlay marks bullish FVG" in prompt
+        assert "bullish order block visible only in overlay" in prompt
+        # Both the contradiction and indicator-only rules must be present
+        assert "CONTRADICTION RULE" in prompt
+        assert "INDICATOR-ONLY RULE" in prompt
