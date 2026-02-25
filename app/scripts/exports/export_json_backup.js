@@ -24,6 +24,11 @@ function readSelectInput(id, fallback = '') {
   return el?.value || fallback;
 }
 
+function readIntSelectInput(id) {
+  const value = Number.parseInt(readSelectInput(id), 10);
+  return Number.isInteger(value) ? value : NaN;
+}
+
 function buildTicketSnapshot() {
   const nowISO = new Date().toISOString();
 
@@ -31,13 +36,13 @@ function buildTicketSnapshot() {
     schemaVersion: TICKET_SCHEMA_VERSION,
     ticketId: state.ticketID || 'draft',
     createdAt: nowISO,
-    decisionMode: readSelectInput('decisionMode', 'WAIT'),
-    ticketType: readSelectInput('ticketType', 'Zone ticket'),
-    entryType: readSelectInput('entryType', 'Limit'),
-    entryTrigger: readSelectInput('entryTrigger', 'Pullback to zone'),
-    confirmationTF: readSelectInput('confTF', '15m'),
-    timeInForce: readSelectInput('timeInForce', 'This session'),
-    maxAttempts: Number.parseInt(readSelectInput('maxAttempts', '2'), 10) || 2,
+    decisionMode: readSelectInput('decisionMode'),
+    ticketType: readSelectInput('ticketType'),
+    entryType: readSelectInput('entryType'),
+    entryTrigger: readSelectInput('entryTrigger'),
+    confirmationTF: readSelectInput('confTF'),
+    timeInForce: readSelectInput('timeInForce'),
+    maxAttempts: readIntSelectInput('maxAttempts'),
     entry: {
       zone: readTextInput('levels', 'User-defined zone'),
       priceMin: readNumberInput('entryPriceMin'),
@@ -46,7 +51,7 @@ function buildTicketSnapshot() {
     },
     stop: {
       price: readNumberInput('stopPrice'),
-      logic: readSelectInput('stopLogic', 'Below swing low / above swing high'),
+      logic: readSelectInput('stopLogic'),
       rationale: readTextInput('stopRationale', 'User-defined stop')
     },
     targets: [

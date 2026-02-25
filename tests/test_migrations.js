@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { migrateState } from '../app/scripts/state/migrations.js';
+import { TICKET_SCHEMA_VERSION, AAR_SCHEMA_VERSION } from '../app/scripts/schema/backup_validation.js';
 
 test('migrateState returns null for non-object payloads', () => {
   assert.equal(migrateState(null), null);
@@ -11,8 +12,8 @@ test('migrateState returns null for non-object payloads', () => {
 
 test('migrateState returns payload unchanged for current schema versions', () => {
   const payload = {
-    ticket: { schemaVersion: '1.0.0' },
-    aar: { schemaVersion: '1.0.0' }
+    ticket: { schemaVersion: TICKET_SCHEMA_VERSION },
+    aar: { schemaVersion: AAR_SCHEMA_VERSION }
   };
 
   assert.equal(migrateState(payload), payload);

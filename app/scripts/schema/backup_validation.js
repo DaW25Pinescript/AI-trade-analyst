@@ -1,4 +1,4 @@
-const TICKET_SCHEMA_VERSION = '1.0.0';
+const TICKET_SCHEMA_VERSION = '1.1.0';
 const AAR_SCHEMA_VERSION = '1.0.0';
 
 const enums = {

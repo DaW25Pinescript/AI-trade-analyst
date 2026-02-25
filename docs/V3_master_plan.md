@@ -12,7 +12,7 @@ two-track architecture:
 
 | Track | Directory | Runtime | Current Version |
 |-------|-----------|---------|-----------------|
-| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G1 complete, G2 in progress |
+| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G2 complete, G3 next |
 | **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v1.2 complete, v1.3 next |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
@@ -49,19 +49,19 @@ G1 → G2 → G3 → G4 (A1+A4) → G5 → G6 → G7 → G8 → G9 → G10 → G
 - Ticket schema v1.0.0 (`docs/schema/ticket.schema.json`)
 - Modular script loading in `app/index.html`
 
-### G2 — Test/Prediction Mode Card (IN PROGRESS)
+### G2 — Test/Prediction Mode Card (COMPLETE)
 **Goal:** Add structured pre-trade prediction capture as a dedicated step.
 
 Tasks:
-- [ ] Integrate G2 Test/Prediction Mode card into `app/index.html` (Step 6 insertion)
-- [ ] Add new ticket fields: `decisionMode`, `entryType`, `entryTrigger`, `confirmationTF`,
+- [x] Integrate G2 Test/Prediction Mode card into `app/index.html` (Step 6 insertion)
+- [x] Add new ticket fields: `decisionMode`, `entryType`, `entryTrigger`, `confirmationTF`,
       `timeInForce`, `maxAttempts`, `checklist` (8 items), gate fields
-- [ ] Update `export_json_backup.js` — remove hardcoded G2 field stubs; read from live DOM
-- [ ] Wire `exportJSONBackup` / `importJSONBackup` to `window` in `main.js`
-- [ ] Add `schemaVersion` check in `migrations.js` (currently no version guard)
-- [ ] Add enum cross-check test for all select/radio values vs schema
+- [x] Update `export_json_backup.js` — remove hardcoded G2 field stubs; read from live DOM
+- [x] Wire `exportJSONBackup` / `importJSONBackup` to `window` in `main.js`
+- [x] Add `schemaVersion` check in `migrations.js` (currently no version guard)
+- [x] Add enum cross-check test for all select/radio values vs schema
 
-**Debt carried from PR #11:** The five items above are known gaps from the 2026-02-24 audit.
+**Debt carried from PR #11:** Resolved in current `work` branch; G2 checklist items are now implemented and covered by tests.
 
 ### G3 — After-Action Review (AAR)
 - Dedicated AAR card linked to each ticket by `ticketId`
