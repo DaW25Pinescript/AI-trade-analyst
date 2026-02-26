@@ -95,11 +95,11 @@ Tasks:
 - [x] `TICKET_SCHEMA_VERSION` bumped to `1.2.0`; migration patch added for `1.1.0 → 1.2.0`
 
 ### G6 — Data Model v2 + Persistence Hardening
-- Add fields to ticket schema: `psychologicalLeakR`, `edgeScore` (rawAIReadBias already in schema v1.2.0)
-- Auto-save timestamped JSON backup to Downloads on every ticket generation:
+- [x] Add fields to ticket schema: `psychologicalLeakR`, `edgeScore` (rawAIReadBias already in schema v1.2.0)
+- [x] Auto-save timestamped JSON backup to Downloads on every ticket generation:
   `AI_Trade_Journal_Backup_YYYYMMDD_HHMM.json`
-- Embed chart screenshots as base64 in self-contained HTML/PDF export
-- Implement `migrations.js` version gate with upgrade path for all prior schema versions
+- [x] Embed chart screenshots as base64 in self-contained HTML/PDF export
+- [x] Implement `migrations.js` version gate with upgrade path for all prior schema versions
 
 **Integration point:** From G6, the ticket schema is stable enough to serve as the
 canonical data contract between Track A and Track B.
@@ -174,16 +174,16 @@ v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v2.0 → v2.1 → v2.x
 - `execution_router.py`: Fixed `..core.xxx` double-hop imports → `.xxx`
 - `cli.py`: Removed stray unused `import uuid` inside `arbiter` command
 
-### v1.3 — Integration Tests + Real Chart Packs (NEXT)
+### v1.3 — Integration Tests + Real Chart Packs (IN PROGRESS)
 **Goal:** Validate the full pipeline end-to-end with real chart images.
 
 Tasks:
-- [ ] Integration test: `run` CLI with 4 real chart PNGs in manual mode → verify prompt pack structure
-- [ ] Integration test: `arbiter` CLI with pre-filled stub responses → verify FinalVerdict structure
+- [x] Integration test: `run` CLI with 4 real chart PNGs in manual mode → verify prompt pack structure
+- [x] Integration test: `arbiter` CLI with pre-filled stub responses → verify FinalVerdict structure
 - [ ] API key setup guide (`docs/api_key_setup.md`)
-- [ ] Test that `replay` command re-runs Arbiter correctly on saved outputs
+- [x] Test that `replay` command re-runs Arbiter correctly on saved outputs
 - [ ] Add `pytest-asyncio` integration test fixtures for LangGraph pipeline
-- [ ] Verify `json_extractor.py` handles all known AI response wrapper patterns
+- [x] Verify `json_extractor.py` handles known AI response wrapper patterns
 
 ### v1.4 — Prompt Library v1.2 + Lens Tuning
 **Goal:** Iterate on prompt quality from real-run feedback.
@@ -322,9 +322,11 @@ All Claude-assisted development occurs on session branches and is merged via PR.
 1. **G6 (Track A)** — Data Model v2 hardening: IndexedDB AAR persistence, auto-save JSON backup
    on ticket generation, `edgeScore` and `psychologicalLeakR` fields in schema v2.0, base64
    chart screenshot embed in HTML export
-2. **v1.3 (Track B)** — Write integration tests for CLI end-to-end flow with real chart images
+2. **v1.3 (Track B)** — Run end-to-end integration tests in parallel (real chart pack run,
+   arbiter verification, replay coverage, extractor robustness)
 3. **Track B debt** — Add timeout/retry wrapper around individual analyst LiteLLM calls
 4. **Docs** — Write `docs/api_key_setup.md` guide for Track B configuration
 5. **G7 (Track A)** — Mini Dashboard: win rate, avg R, expectancy, heatmap, Psychological Leakage R
+   (start after G6 persisted-data reliability hardening)
 
 **Completed in prior sessions:** G1, G2, G3, G4, G5
