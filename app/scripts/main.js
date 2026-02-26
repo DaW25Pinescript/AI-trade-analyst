@@ -16,7 +16,22 @@ import { generateAnalystPromptTemplate } from './generators/promptGenerator.js';
 import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbiterPanel.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
-function buildAndShow() { buildPrompt(); goTo(5); }
+function buildAndShow() {
+  buildPrompt();
+  goTo(5);
+
+  const now = new Date();
+  const stamp = [
+    now.getFullYear().toString(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')
+  ].join('') + '_' + [
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0')
+  ].join('');
+
+  exportJSONBackup({ silent: true, filenamePrefix: `AI_Trade_Journal_Backup_${stamp}` });
+}
 function copyPrompt() {
   const text = document.getElementById('outputText').textContent;
   navigator.clipboard.writeText(text).then(() => {

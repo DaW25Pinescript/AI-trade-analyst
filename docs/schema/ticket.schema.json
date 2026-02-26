@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ai-trade-analyst.local/schema/ticket.schema.json",
   "title": "AI Trade Analyst Ticket",
-  "description": "Canonical trade ticket payload for export/import and persistence. v1.2.0 adds G4 counter-trend mode and G5 rawAIReadBias.",
+  "description": "Canonical trade ticket payload for export/import and persistence. v2.0.0 adds G6 persistence and review metrics (edgeScore, psychologicalLeakR, screenshot metadata).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -22,12 +22,14 @@
     "targets",
     "checklist",
     "gate",
+    "edgeScore",
+    "psychologicalLeakR",
     "screenshots"
   ],
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "1.2.0"
+      "const": "2.0.0"
     },
     "counterTrendMode": {
       "type": "string",
@@ -161,6 +163,14 @@
         "reentryCondition": { "type": "string" },
         "reentryTime": { "type": "string" }
       }
+    },
+    "edgeScore": {
+      "type": "number",
+      "description": "Computed process edge score. In G6 this is persisted from AAR score display for analytics stability."
+    },
+    "psychologicalLeakR": {
+      "type": "number",
+      "description": "Absolute R leaked due to psychology-linked execution mistakes. 0 when not detected."
     },
     "screenshots": {
       "type": "object",

@@ -1,15 +1,24 @@
 import { TICKET_SCHEMA_VERSION, AAR_SCHEMA_VERSION } from '../schema/backup_validation.js';
 
-/**
- * Upgrade a v1.1.0 ticket to v1.2.0.
- * Adds G4 counterTrendMode (default: 'Mixed') and G5 rawAIReadBias (default: '').
- */
 function migrateTicket_1_1_to_1_2(ticket) {
   return {
     ...ticket,
     schemaVersion: '1.2.0',
     counterTrendMode: ticket.counterTrendMode ?? 'Mixed',
-    rawAIReadBias: ticket.rawAIReadBias ?? '',
+    rawAIReadBias: ticket.rawAIReadBias ?? ''
+  };
+}
+
+function migrateTicket_1_2_to_2_0(ticket) {
+  return {
+    ...ticket,
+    schemaVersion: '2.0.0',
+    edgeScore: Number.isFinite(ticket.edgeScore) ? ticket.edgeScore : 0,
+    psychologicalLeakR: Number.isFinite(ticket.psychologicalLeakR) ? ticket.psychologicalLeakR : 0,
+    screenshots: ticket.screenshots ?? {
+      cleanCharts: [{ timeframe: 'H4', lens: 'NONE', evidenceType: 'price_only' }],
+      m15Overlay: null
+    }
   };
 }
 
@@ -25,6 +34,12 @@ export function migrateState(payload) {
     ticket = migrateTicket_1_1_to_1_2(ticket);
     ticketMigrated = true;
     console.info('[migrateState] Migrated ticket from 1.1.0 → 1.2.0.');
+  }
+
+  if (ticket?.schemaVersion === '1.2.0') {
+    ticket = migrateTicket_1_2_to_2_0(ticket);
+    ticketMigrated = true;
+    console.info('[migrateState] Migrated ticket from 1.2.0 → 2.0.0.');
   }
 
   if (typeof ticket?.schemaVersion === 'string' && ticket.schemaVersion !== TICKET_SCHEMA_VERSION) {

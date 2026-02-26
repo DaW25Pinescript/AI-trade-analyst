@@ -31,6 +31,23 @@ function readIntSelectInput(id) {
 
 function buildTicketSnapshot() {
   const nowISO = new Date().toISOString();
+  const edgeScore = readNumberInput('edgeScoreDisplay', 0);
+
+  const cleanCharts = [
+    { key: 'htf', timeframe: 'H4' },
+    { key: 'm15', timeframe: 'M15' },
+    { key: 'm5', timeframe: 'M5' }
+  ]
+    .filter(({ key }) => Boolean(state.uploads[key] && state.imgSrcs[key]))
+    .map(({ timeframe }) => ({
+      timeframe,
+      lens: 'NONE',
+      evidenceType: 'price_only'
+    }));
+
+  if (cleanCharts.length === 0) {
+    cleanCharts.push({ timeframe: 'H4', lens: 'NONE', evidenceType: 'price_only' });
+  }
 
   return {
     schemaVersion: TICKET_SCHEMA_VERSION,
@@ -76,6 +93,12 @@ function buildTicketSnapshot() {
       waitReasonCode: readTextInput('waitReason'),
       reentryCondition: readTextInput('reentryCondition'),
       reentryTime: readTextInput('reentryTime')
+    },
+    edgeScore,
+    psychologicalLeakR: 0,
+    screenshots: {
+      cleanCharts,
+      m15Overlay: null
     }
   };
 }
@@ -131,30 +154,53 @@ function buildAARPayload(ticketId) {
   };
 }
 
-export function exportJSONBackup() {
+function buildBackupPayload() {
   const ticket = buildTicketSnapshot();
   const aar = buildAARPayload(ticket.ticketId);
+
+  // Psychological leak is measured only after outcome data exists.
+  if (aar.psychologicalTag !== 'CALM' && aar.psychologicalTag !== 'DISCIPLINED' && aar.rAchieved < 0) {
+    ticket.psychologicalLeakR = Math.abs(aar.rAchieved);
+  }
+
   const ticketValidation = validateTicketPayload(ticket);
   const aarValidation = validateAARPayload(aar);
 
   if (!ticketValidation.ok || !aarValidation.ok) {
-    const message = [...ticketValidation.errors, ...aarValidation.errors].join('\n');
-    alert(`Backup export blocked by schema validation:\n${message}`);
-    return;
+    return {
+      ok: false,
+      errors: [...ticketValidation.errors, ...aarValidation.errors]
+    };
   }
 
-  const payload = {
+  return {
+    ok: true,
+    payload: {
     exportVersion: 1,
     exportedAt: new Date().toISOString(),
     ticket,
     aar
+    }
   };
+}
+
+export function exportJSONBackup({ silent = false, filenamePrefix = 'AI_Trade_Backup' } = {}) {
+  const result = buildBackupPayload();
+  if (!result.ok) {
+    const message = result.errors.join('\n');
+    if (!silent) alert(`Backup export blocked by schema validation:\n${message}`);
+    return null;
+  }
+
+  const payload = result.payload;
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `AI_Trade_Backup_${state.ticketID || 'draft'}.json`;
+  a.download = `${filenamePrefix}_${state.ticketID || 'draft'}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  return payload;
 }

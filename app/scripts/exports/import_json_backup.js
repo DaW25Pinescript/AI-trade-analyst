@@ -15,18 +15,18 @@ export async function importJSONBackup(file) {
     return null;
   }
 
-  const ticketValidation = validateTicketPayload(parsed?.ticket);
-  const aarValidation = validateAARPayload(parsed?.aar);
+  const migrated = migrateState(parsed);
+  if (!migrated) {
+    alert('Backup import failed: payload migration returned null.');
+    return null;
+  }
+
+  const ticketValidation = validateTicketPayload(migrated?.ticket);
+  const aarValidation = validateAARPayload(migrated?.aar);
 
   if (!ticketValidation.ok || !aarValidation.ok) {
     const message = [...ticketValidation.errors, ...aarValidation.errors].join('\n');
     alert(`Backup import blocked by schema validation:\n${message}`);
-    return null;
-  }
-
-  const migrated = migrateState(parsed);
-  if (!migrated) {
-    alert('Backup import failed: payload migration returned null.');
     return null;
   }
 
