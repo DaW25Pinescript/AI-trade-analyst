@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { buildCalibrationInputs } from '../app/scripts/metrics/calibrations.js';
 
 const tickets = JSON.parse(fs.readFileSync(new URL('./fixtures/tickets_small_set.json', import.meta.url), 'utf8'));
 const aars = JSON.parse(fs.readFileSync(new URL('./fixtures/aars_small_set.json', import.meta.url), 'utf8'));
@@ -19,19 +20,6 @@ function computeCoreMetrics(aarRows) {
   const expectancy = (winRate * avgWin) - (lossRate * avgLossMagnitude);
 
   return { winRate, expectancy };
-}
-
-function buildCalibrationInputs(ticketRows, aarRows) {
-  const ticketById = new Map(ticketRows.map((row) => [row.ticketId, row]));
-  return aarRows
-    .filter((row) => ['WIN', 'LOSS', 'BREAKEVEN'].includes(row.outcomeEnum))
-    .map((row) => ({
-      ticketId: row.ticketId,
-      confluenceScore: ticketById.get(row.ticketId)?.checklist?.confluenceScore ?? null,
-      revisedConfidence: row.revisedConfidence,
-      outcomeEnum: row.outcomeEnum,
-      rAchieved: row.rAchieved
-    }));
 }
 
 test('core metrics return expected win rate and expectancy', () => {

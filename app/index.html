@@ -963,6 +963,7 @@
 
       <label>Load JSON Backups</label>
       <input type="file" id="dashboardJsonFiles" accept="application/json" multiple>
+      <p id="dashboardStatus" class="hint" style="margin-top:6px;"></p>
 
       <div class="row-3">
         <div class="dashboard-stat"><span>Total Trades</span><strong id="dashTrades">0</strong></div>
@@ -982,6 +983,20 @@
       <div class="divider"></div>
       <label>Setup Type × Session Heatmap</label>
       <div id="dashboardHeatmap"></div>
+
+      <div class="divider"></div>
+      <label>Weekly Review</label>
+      <p class="hint">Generate a structured AI prompt aggregating your week's trades for performance coaching.</p>
+      <button class="btn btn-ghost" onclick="showWeeklyPrompt()" style="margin-bottom:8px;">Generate Weekly Review Prompt</button>
+      <div id="weeklyOutputWrap" style="display:none;margin-top:8px;">
+        <div class="output-panel">
+          <div class="output-header">
+            <span class="output-title">● WEEKLY REVIEW PROMPT READY</span>
+            <button class="copy-btn weekly-copy-btn" onclick="copyWeeklyPrompt()">Copy Prompt</button>
+          </div>
+          <div id="weeklyOutputText" style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);"></div>
+        </div>
+      </div>
     </div>
 
     <div class="btn-row">

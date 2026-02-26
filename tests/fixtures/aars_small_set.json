@@ -3,18 +3,21 @@
     "ticketId": "T1",
     "outcomeEnum": "WIN",
     "rAchieved": 1.5,
-    "revisedConfidence": 4
+    "revisedConfidence": 4,
+    "psychologicalTag": "CALM"
   },
   {
     "ticketId": "T2",
     "outcomeEnum": "LOSS",
     "rAchieved": -1,
-    "revisedConfidence": 2
+    "revisedConfidence": 2,
+    "psychologicalTag": "FOMO"
   },
   {
     "ticketId": "T3",
     "outcomeEnum": "BREAKEVEN",
     "rAchieved": 0,
-    "revisedConfidence": 3
+    "revisedConfidence": 3,
+    "psychologicalTag": "CALM"
   }
 ]

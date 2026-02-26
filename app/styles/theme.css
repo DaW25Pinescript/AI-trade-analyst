@@ -573,6 +573,9 @@
   font-family: 'IBM Plex Mono', monospace;
   color: var(--green);
 }
+.dashboard-stat strong.stat-negative {
+  color: var(--red);
+}
 
 .heatmap-table {
   width: 100%;

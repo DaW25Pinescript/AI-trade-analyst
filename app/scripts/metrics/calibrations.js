@@ -1,15 +1,17 @@
 // Calibration helper functions.
 
-export function buildCalibrationInputs(closedTickets = [], aars = []) {
-  const aarByTicket = new Map(aars.map((aar) => [aar.ticketId, aar]));
+const CLOSED_OUTCOMES = new Set(['WIN', 'LOSS', 'BREAKEVEN', 'SCRATCH']);
 
-  return closedTickets.map((ticket) => {
-    const aar = aarByTicket.get(ticket.ticketId);
-    return {
-      ticketId: ticket.ticketId,
-      confluenceScore: ticket.confluenceScore ?? null,
-      revisedConfidence: aar?.revisedConfidence ?? null,
-      resultR: ticket.resultR ?? null,
-    };
-  });
+export function buildCalibrationInputs(tickets = [], aars = []) {
+  const ticketById = new Map(tickets.map((t) => [t.ticketId, t]));
+
+  return aars
+    .filter((aar) => CLOSED_OUTCOMES.has(aar?.outcomeEnum))
+    .map((aar) => ({
+      ticketId: aar.ticketId,
+      confluenceScore: ticketById.get(aar.ticketId)?.checklist?.confluenceScore ?? null,
+      revisedConfidence: aar.revisedConfidence ?? null,
+      outcomeEnum: aar.outcomeEnum,
+      rAchieved: aar.rAchieved ?? null,
+    }));
 }
