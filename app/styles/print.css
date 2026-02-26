@@ -1,4 +1,6 @@
 @media print {
+  :root { color-scheme: dark !important; }
+
   body::before,
   .header,
   .steps,
@@ -9,5 +11,11 @@
   body { background: #fff !important; color: #000 !important; }
   .main { max-width: 100%; padding: 0; }
   .section { display: block !important; }
-  .card { break-inside: avoid; border-color: #ccc; }
+  .card {
+    break-inside: avoid;
+    border-color: #ccc !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .card * { color: #000 !important; }
 }
