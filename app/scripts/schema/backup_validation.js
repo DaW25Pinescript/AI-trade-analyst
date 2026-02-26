@@ -1,4 +1,4 @@
-const TICKET_SCHEMA_VERSION = '1.2.0';
+const TICKET_SCHEMA_VERSION = '2.0.0';
 const AAR_SCHEMA_VERSION = '1.0.0';
 
 const enums = {
@@ -37,6 +37,10 @@ function isObject(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+function isDateTimeString(v) {
+  return typeof v === 'string' && !Number.isNaN(Date.parse(v));
+}
+
 function expectEnum(errors, path, value, allowed) {
   if (!allowed.includes(value)) errors.push(`${path} must be one of: ${allowed.join(', ')}`);
 }
@@ -60,7 +64,7 @@ export function validateTicketPayload(payload) {
   expectString(errors, 'ticket.schemaVersion', payload.schemaVersion, 1);
   if (payload.schemaVersion !== TICKET_SCHEMA_VERSION) errors.push(`ticket.schemaVersion must equal ${TICKET_SCHEMA_VERSION}`);
   expectString(errors, 'ticket.ticketId', payload.ticketId, 1);
-  expectString(errors, 'ticket.createdAt', payload.createdAt, 1);
+  if (!isDateTimeString(payload.createdAt)) errors.push('ticket.createdAt must be a valid date-time string');
   expectEnum(errors, 'ticket.counterTrendMode', payload.counterTrendMode, enums.counterTrendMode);
   // rawAIReadBias is optional — only validate if present
   if (payload.rawAIReadBias !== undefined) {
@@ -123,6 +127,31 @@ export function validateTicketPayload(payload) {
     expectEnum(errors, 'ticket.gate.waitReasonCode', g.waitReasonCode, enums.waitReasonCode);
     expectString(errors, 'ticket.gate.reentryCondition', g.reentryCondition);
     expectString(errors, 'ticket.gate.reentryTime', g.reentryTime);
+  }
+
+  if (!isFiniteNumber(payload.edgeScore)) errors.push('ticket.edgeScore must be a number');
+  if (!isFiniteNumber(payload.psychologicalLeakR)) errors.push('ticket.psychologicalLeakR must be a number');
+
+  const screenshots = payload.screenshots;
+  if (!isObject(screenshots)) errors.push('ticket.screenshots must be an object');
+  else {
+    if (!Array.isArray(screenshots.cleanCharts) || screenshots.cleanCharts.length < 1 || screenshots.cleanCharts.length > 3) {
+      errors.push('ticket.screenshots.cleanCharts must contain 1-3 entries');
+    } else {
+      screenshots.cleanCharts.forEach((chart, idx) => {
+        if (!isObject(chart)) {
+          errors.push(`ticket.screenshots.cleanCharts[${idx}] must be an object`);
+          return;
+        }
+        expectEnum(errors, `ticket.screenshots.cleanCharts[${idx}].timeframe`, chart.timeframe, ['H4', 'H1', 'M15', 'M5']);
+        if (chart.lens !== 'NONE') errors.push(`ticket.screenshots.cleanCharts[${idx}].lens must equal NONE`);
+        if (chart.evidenceType !== 'price_only') errors.push(`ticket.screenshots.cleanCharts[${idx}].evidenceType must equal price_only`);
+      });
+    }
+
+    if (screenshots.m15Overlay !== undefined && screenshots.m15Overlay !== null) {
+      errors.push('ticket.screenshots.m15Overlay must be null until typed overlay metadata is captured in UI');
+    }
   }
 
   return { ok: errors.length === 0, errors };
