@@ -14,6 +14,7 @@ import { setSyncOutputHandler, syncOutput } from './ui/sync_output.js';
 import { runSenateArbiter } from './generators/senateArbiter.js';
 import { generateAnalystPromptTemplate } from './generators/promptGenerator.js';
 import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbiterPanel.js';
+import { initDashboard } from './ui/dashboard.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
 function buildAndShow() {
@@ -121,4 +122,5 @@ window.onload = () => {
   generateTicketID();
   bindShortcuts({ goTo, buildAndShow });
   initSenatePanel();
+  initDashboard();
 };
