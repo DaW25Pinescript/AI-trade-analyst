@@ -17,28 +17,33 @@ function formatNum(n) {
 }
 
 function renderHeatmap(metrics) {
-  const table = document.getElementById('dashboardHeatmap');
-  if (!table) return;
+  const container = document.getElementById('dashboardHeatmap');
+  if (!container) return;
   if (!metrics.heatmap.length) {
-    table.innerHTML = '<p class="hint">No trade data loaded yet.</p>';
+    container.innerHTML = '<p class="hint">No trade data loaded yet.</p>';
     return;
   }
 
   const maxCount = Math.max(1, ...metrics.heatmap.flat().map((cell) => cell.count));
-  const header = `<tr><th>Setup \ Session</th>${metrics.heatmapSessions.map((s) => `<th>${s}</th>`).join('')}</tr>`;
+  const header = `<tr><th>Setup \u00d7 Session</th>${metrics.heatmapSessions.map((s) => `<th>${s}</th>`).join('')}</tr>`;
   const rows = metrics.heatmap.map((row, rowIndex) => {
     const setup = metrics.heatmapSetups[rowIndex] || 'Other';
     const cells = row.map((cell) => {
       const alpha = 0.15 + (cell.count / maxCount) * 0.5;
-      return `<td style="background: rgba(34,197,94,${alpha.toFixed(3)});">${cell.count}</td>`;
+      return `<td style="background: rgba(34,197,94,${alpha.toFixed(3)});">${cell.count || '—'}</td>`;
     }).join('');
     return `<tr><th>${setup}</th>${cells}</tr>`;
   }).join('');
 
-  table.innerHTML = `<table class="heatmap-table">${header}${rows}</table>`;
+  container.innerHTML = `<table class="heatmap-table">${header}${rows}</table>`;
 }
 
 function renderStats(metrics) {
+  const numericMapping = {
+    dashAvgR: metrics.avgR,
+    dashExpectancy: metrics.expectancy,
+  };
+
   const mapping = {
     dashTrades: metrics.tradeCount,
     dashClosedTrades: metrics.closedCount,
@@ -51,8 +56,20 @@ function renderStats(metrics) {
 
   Object.entries(mapping).forEach(([id, value]) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = String(value);
+    if (!el) return;
+    el.textContent = String(value);
+    const raw = numericMapping[id];
+    if (raw !== undefined) {
+      el.classList.toggle('stat-negative', Number.isFinite(raw) && raw < 0);
+    }
   });
+
+  const statusEl = document.getElementById('dashboardStatus');
+  if (statusEl) {
+    statusEl.textContent = metrics.tradeCount > 0
+      ? `${metrics.tradeCount} trade(s) loaded — ${metrics.closedCount} closed with AAR.`
+      : 'No trade data loaded yet.';
+  }
 
   renderHeatmap(metrics);
 }
@@ -64,6 +81,7 @@ export function initDashboard() {
   input.addEventListener('change', async (event) => {
     const files = Array.from(event.target.files || []);
     const allEntries = [];
+    let skipped = 0;
 
     for (const file of files) {
       const raw = await file.text();
@@ -71,8 +89,13 @@ export function initDashboard() {
         const entries = parseUploadedPayload(raw);
         allEntries.push(...entries);
       } catch {
-        // Skip malformed files silently; dashboard is best-effort.
+        skipped += 1;
       }
+    }
+
+    if (skipped > 0) {
+      const statusEl = document.getElementById('dashboardStatus');
+      if (statusEl) statusEl.textContent = `${skipped} file(s) skipped — invalid JSON.`;
     }
 
     const normalized = parseBackupEntries(allEntries);

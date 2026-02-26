@@ -46,6 +46,28 @@ function copyPrompt() {
 }
 function resetForm(){ location.reload(); }
 
+function showWeeklyPrompt() {
+  const prompt = buildWeeklyPrompt();
+  const out = document.getElementById('weeklyOutputText');
+  const wrap = document.getElementById('weeklyOutputWrap');
+  if (out) out.textContent = prompt;
+  if (wrap) wrap.style.display = 'block';
+}
+
+function copyWeeklyPrompt() {
+  const text = document.getElementById('weeklyOutputText')?.textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.weekly-copy-btn');
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = 'COPIED ✓';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 1800);
+  });
+}
+
 function showAARPrompt() {
   const prompt = buildAARPrompt();
   const out = document.getElementById('aarOutputText');
@@ -111,7 +133,7 @@ Object.assign(window, {
   selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload,
   syncOutput, buildAndShow, copyPrompt, exportHTML, exportPDF, exportJSONBackup,
   importJSONBackup, exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm,
-  showAARPrompt, copyAARPrompt,
+  showAARPrompt, copyAARPrompt, showWeeklyPrompt, copyWeeklyPrompt,
   runSenateArb, clearSenateArb,
   runSenateArbiter, generateAnalystPromptTemplate, renderSenatePanel
 });

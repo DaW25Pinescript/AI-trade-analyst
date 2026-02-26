@@ -80,6 +80,9 @@ export function computeMetrics(tickets = [], aars = []) {
     heatmap,
     heatmapSetups: topSetups,
     heatmapSessions: topSessions,
-    calibration: buildCalibrationInputs(tickets, aars),
+    calibration: buildCalibrationInputs(
+      combined.map(({ ticket }) => ticket),
+      combined.map(({ aar }) => aar)
+    ),
   };
 }
