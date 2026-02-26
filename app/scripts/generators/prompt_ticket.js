@@ -12,9 +12,10 @@ function buildPrompt() {
   const broker      = get('broker') || 'TradingView';
   const candleType  = get('candleType') || 'Normal';
   const chartTZ     = get('chartTimezone') || 'Not specified';
-  const priceNow    = get('priceNow') || '—';
-  const regime      = get('regime') || 'Not specified';
-  const biasHorizon = get('biasHorizon') || 'Not specified';
+  const priceNow        = get('priceNow') || '—';
+  const regime          = get('regime') || 'Not specified';
+  const biasHorizon     = get('biasHorizon') || 'Not specified';
+  const counterTrend    = get('counterTrendMode') || 'Mixed';
   const noTradeOK   = document.getElementById('noTradeToggle')?.checked ?? false;
   const minRR       = get('minRR') || 'None specified';
   const rrException = get('rrException');
@@ -127,6 +128,7 @@ Session:         ${session}
 Market Regime:   ${regime}
 Exec Horizon:    ${execHorizon}
 Bias Horizon:    ${biasHorizon}${state.currentBias ? '\nMy Bias:         ' + state.currentBias + ' (my current read — do not anchor on this)' : ''}
+Counter-Trend:   ${counterTrend}
 No-Trade OK?:    ${noTradeOK ? 'YES — you may and should recommend WAIT if conditions are poor' : 'NO — always provide a scenario even if low quality'}
 
 ─── PLATFORM ──────────────────────────────
@@ -195,9 +197,29 @@ SYSTEM PERSONA (obey strictly):
 You are a ruthless, zero-ego 20-year prop trader and analyst.
 You would rather say WAIT than force a low-quality ticket.
 Never sugar-coat. Precision over comfort.
-R:R is always calculated after applying the spread/slippage assumption above.
-Confidence 5/5 = you would bet your own prop capital on this exact setup today.
 ${personaInstruction}
+
+SCORING RULES (apply to every output):
+
+R:R: Always calculated after deducting spread and slippage listed above.
+  • If R:R < minimum specified, you MUST either (a) reject the trade or (b) explicitly justify the exception.
+  • Never inflate R:R by cherry-picking entry; use the realistic zone midpoint.
+
+Confidence scale (mandatory — provide score AND 2–3 explicit reasons):
+  5/5 — Maximum conviction. All timeframes aligned, entry zone unambiguous, no conflicting signals.
+        Would commit prop capital to this setup today without hesitation.
+  4/5 — High conviction. Minor uncertainty in one dimension (e.g. LTF entry timing unclear).
+        Valid trade — proceed with standard sizing.
+  3/5 — Moderate. Structural case exists but one key element is missing or in conflict.
+        Reduce size or wait for a confirmation trigger before entry.
+  2/5 — Low conviction. Multiple conditions need to improve. Marginal setup.
+        Lean toward WAIT unless a very tight stop is possible.
+  1/5 — Very low. Conditions are poor across the board. WAIT is strongly preferred.
+        Only trade if user has explicitly overridden no-trade flag.
+
+Counter-trend guidance: ${counterTrend === 'Strict HTF-only' ? 'NO counter-trend ideas. All tickets must align with HTF bias. Reject CT setups.' : counterTrend === 'Mixed' ? 'Counter-trend ideas ONLY if strongly justified by structure (e.g. confirmed reversal, liquidity sweep complete). Flag clearly as CT.' : 'Any direction acceptable — let the chart dictate. No HTF bias restriction.'}
+
+NO_TRADE rule: If no setup meets the minimum standards, WAIT is the correct output. Forcing a ticket when conditions are marginal is a failure of process.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 1 — CHART NARRATIVE (mandatory grounding):

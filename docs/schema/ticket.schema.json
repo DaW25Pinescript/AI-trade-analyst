@@ -2,13 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ai-trade-analyst.local/schema/ticket.schema.json",
   "title": "AI Trade Analyst Ticket",
-  "description": "Canonical trade ticket payload for export/import and persistence. v1.1.0 adds lens-aware screenshot metadata.",
+  "description": "Canonical trade ticket payload for export/import and persistence. v1.2.0 adds G4 counter-trend mode and G5 rawAIReadBias.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
     "ticketId",
     "createdAt",
+    "counterTrendMode",
     "decisionMode",
     "ticketType",
     "entryType",
@@ -26,7 +27,17 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "1.1.0"
+      "const": "1.2.0"
+    },
+    "counterTrendMode": {
+      "type": "string",
+      "enum": ["Strict HTF-only", "Mixed", "Full OK"],
+      "description": "Whether the analyst may propose counter-trend ideas. Strict HTF-only = no counter-trend; Mixed = allowed if strongly justified; Full OK = any direction."
+    },
+    "rawAIReadBias": {
+      "type": "string",
+      "enum": ["", "Bullish", "Bearish", "Neutral", "Range"],
+      "description": "The AI's raw bias verdict from its chart narrative (filled by user after reading AI response). Empty string = not yet recorded."
     },
     "ticketId": { "type": "string", "minLength": 1 },
     "createdAt": { "type": "string", "format": "date-time" },

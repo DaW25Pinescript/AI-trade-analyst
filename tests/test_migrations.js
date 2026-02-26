@@ -40,3 +40,33 @@ test('migrateState warns for unsupported schema versions but still returns paylo
   assert.match(warnings[0], /Unsupported ticket schema version/);
   assert.match(warnings[1], /Unsupported AAR schema version/);
 });
+
+test('migrateState upgrades ticket from 1.1.0 to 1.2.0 with defaults', () => {
+  const payload = {
+    ticket: { schemaVersion: '1.1.0', decisionMode: 'LONG' },
+    aar: { schemaVersion: AAR_SCHEMA_VERSION }
+  };
+
+  const result = migrateState(payload);
+
+  assert.notEqual(result, payload);
+  assert.equal(result.ticket.schemaVersion, '1.2.0');
+  assert.equal(result.ticket.counterTrendMode, 'Mixed');
+  assert.equal(result.ticket.rawAIReadBias, '');
+  assert.equal(result.ticket.decisionMode, 'LONG');
+});
+
+test('migrateState preserves existing counterTrendMode/rawAIReadBias when upgrading 1.1.0', () => {
+  const payload = {
+    ticket: {
+      schemaVersion: '1.1.0',
+      counterTrendMode: 'Strict HTF-only',
+      rawAIReadBias: 'Bullish'
+    },
+    aar: { schemaVersion: AAR_SCHEMA_VERSION }
+  };
+
+  const result = migrateState(payload);
+  assert.equal(result.ticket.counterTrendMode, 'Strict HTF-only');
+  assert.equal(result.ticket.rawAIReadBias, 'Bullish');
+});
