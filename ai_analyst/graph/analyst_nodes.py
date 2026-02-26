@@ -12,7 +12,6 @@ Phase 2 — overlay_delta_node (conditional, only when 15M overlay provided):
   Uses SEPARATE API calls with ISOLATED context — prevents anchoring.
 """
 import asyncio
-from litellm import acompletion
 from pydantic import ValidationError
 
 from ..models.persona import PersonaType
@@ -41,6 +40,7 @@ async def run_analyst(config: dict, prompt: dict) -> AnalystOutput:
     Phase 1: Call one analyst model and validate the response against the AnalystOutput schema.
     Raises on model error or schema validation failure — caller handles exceptions.
     """
+    from litellm import acompletion  # lazy import — litellm is optional for non-API paths
     response = await acompletion(
         model=config["model"],
         messages=build_messages(prompt),
@@ -62,6 +62,7 @@ async def run_overlay_delta(
     Validates response against OverlayDeltaReport schema.
     Raises on model error or schema validation failure.
     """
+    from litellm import acompletion  # lazy import — litellm is optional for non-API paths
     response = await acompletion(
         model=config["model"],
         messages=build_messages(prompt),
