@@ -13,7 +13,7 @@
 <header class="header">
   <div class="header-left">
     <div class="logo">AI Trade <span>/ Analyst</span></div>
-    <div class="version-pill">V3 · G3</div>
+    <div class="version-pill">V3 · G5</div>
   </div>
   <div class="ticket-id-header">Ticket: <span id="ticketIdHeader">—</span></div>
 </header>
@@ -21,7 +21,7 @@
 <main class="main">
   <div class="page-title">Market Analysis Request</div>
   <h1>Build Your Analysis Brief</h1>
-  <p class="subtitle">G3 — After-Action Review: close the loop with post-trade scoring, edge calibration, and journal photo watermarking</p>
+  <p class="subtitle">G5 — Prompt Enhancements: counter-trend mode, scoring rules, and AI bias tracking for edge calibration</p>
 
   <div class="steps">
     <div class="step active" onclick="goTo(0)"><span class="step-num">01</span>Setup</div>
@@ -127,6 +127,18 @@
             <option>Intraday bias (1H/30m)</option>
             <option>Scalp bias (15m/5m)</option>
             <option>Mixed / counter-trend acceptable</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- G4: Counter-trend toggle -->
+      <div class="row">
+        <div>
+          <label>Allow Counter-Trend Ideas?</label>
+          <select id="counterTrendMode" onchange="syncOutput()">
+            <option value="Strict HTF-only">Strict HTF-only (no CT ideas)</option>
+            <option value="Mixed" selected>Mixed (CT if strongly justified)</option>
+            <option value="Full OK">Full OK (any direction)</option>
           </select>
         </div>
       </div>
@@ -714,6 +726,24 @@
     <div class="card">
       <div class="card-label">Charts to Attach</div>
       <div id="attachChecklist" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);line-height:2.1;white-space:pre;"></div>
+    </div>
+
+    <!-- G5: Record AI's raw bias verdict after reading the AI response -->
+    <div class="card">
+      <div class="card-label">G5 — AI Response Record</div>
+      <p class="step-note">Fill in after reading the AI response. This is stored in your ticket for AAR comparison — did the AI's raw chart read match yours?</p>
+      <div class="row">
+        <div>
+          <label>AI's Raw Bias Verdict (from chart narrative)</label>
+          <select id="rawAIReadBias" onchange="syncOutput()">
+            <option value="">— Not yet recorded —</option>
+            <option value="Bullish">Bullish</option>
+            <option value="Bearish">Bearish</option>
+            <option value="Neutral">Neutral</option>
+            <option value="Range">Range</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <div class="btn-row">

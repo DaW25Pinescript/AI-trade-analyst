@@ -82,19 +82,20 @@ Tasks:
 - [x] "After-Action Review →" navigation button in Output step
 - [x] `aarState` added to `state/model.js` for radio button values (firstTouch, wouldHaveWon, killSwitch)
 
-### G4 — Counter-Trend + Conviction Inputs (A1 + A4)
-- Add "Allow counter-trend ideas?" toggle: Strict HTF-only / Mixed / Full OK
-- Add "Conviction level before AI": Very High / High / Medium / Low
-- Add "Price now" live-updating field (can pre-fill from screenshot filename metadata)
-- When "Conditional" decision selected → reveal secondary mini-ticket block
+### G4 — Counter-Trend + Conviction Inputs (A1 + A4) — COMPLETE
+- [x] Add "Allow counter-trend ideas?" toggle: Strict HTF-only / Mixed / Full OK (`counterTrendMode` select in Setup)
+- [x] Add "Conviction level before AI": Very High / High / Medium / Low (Pre-Ticket step 7)
+- [x] Add "Price now" live-updating field (`priceNow` in Setup)
+- [x] When "Conditional" decision selected → reveal secondary mini-ticket block (`conditionalWrap`)
 
-### G5 — Prompt Generation Enhancements
-- Append to Chart Narrative: `Overall bias from charts only (before any user bias injected)`
-- Add Scoring Rules paragraph to system prompt persona (R:R assumptions, confidence scale)
-- Store `rawAIReadBias` to ticket for AAR comparison
+### G5 — Prompt Generation Enhancements — COMPLETE
+- [x] Append to Chart Narrative: `Overall bias from charts only (before any user bias injected)` (STEP 1 of prompt)
+- [x] Add Scoring Rules paragraph to system prompt persona (R:R assumptions, full confidence scale 1–5, counter-trend enforcement)
+- [x] Store `rawAIReadBias` to ticket for AAR comparison (select in Output step, exported in JSON)
+- [x] `TICKET_SCHEMA_VERSION` bumped to `1.2.0`; migration patch added for `1.1.0 → 1.2.0`
 
 ### G6 — Data Model v2 + Persistence Hardening
-- Add fields to ticket schema: `rawAIReadBias`, `psychologicalLeakR`, `edgeScore`
+- Add fields to ticket schema: `psychologicalLeakR`, `edgeScore` (rawAIReadBias already in schema v1.2.0)
 - Auto-save timestamped JSON backup to Downloads on every ticket generation:
   `AI_Trade_Journal_Backup_YYYYMMDD_HHMM.json`
 - Embed chart screenshots as base64 in self-contained HTML/PDF export
@@ -318,10 +319,12 @@ All Claude-assisted development occurs on session branches and is merged via PR.
 
 ## Next Immediate Steps (Priority Order)
 
-1. **G3 (Track A)** — Complete remaining G3 polish: persist AAR state to IndexedDB,
-   add `edgeScore` to JSON schema in G6, add integration test for full AAR flow
-2. **G4 (Track A)** — Counter-trend toggle, conviction level, "price now" live field,
-   conditional decision mini-ticket block
-3. **v1.3 (Track B)** — Write integration tests for CLI end-to-end flow with real chart images
-4. **Track B debt** — Add timeout/retry wrapper around individual analyst LiteLLM calls
-5. **Docs** — Write `docs/api_key_setup.md` guide for Track B configuration
+1. **G6 (Track A)** — Data Model v2 hardening: IndexedDB AAR persistence, auto-save JSON backup
+   on ticket generation, `edgeScore` and `psychologicalLeakR` fields in schema v2.0, base64
+   chart screenshot embed in HTML export
+2. **v1.3 (Track B)** — Write integration tests for CLI end-to-end flow with real chart images
+3. **Track B debt** — Add timeout/retry wrapper around individual analyst LiteLLM calls
+4. **Docs** — Write `docs/api_key_setup.md` guide for Track B configuration
+5. **G7 (Track A)** — Mini Dashboard: win rate, avg R, expectancy, heatmap, Psychological Leakage R
+
+**Completed in prior sessions:** G1, G2, G3, G4, G5

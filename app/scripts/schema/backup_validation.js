@@ -1,7 +1,9 @@
-const TICKET_SCHEMA_VERSION = '1.1.0';
+const TICKET_SCHEMA_VERSION = '1.2.0';
 const AAR_SCHEMA_VERSION = '1.0.0';
 
 const enums = {
+  counterTrendMode: ['Strict HTF-only', 'Mixed', 'Full OK'],
+  rawAIReadBias: ['', 'Bullish', 'Bearish', 'Neutral', 'Range'],
   decisionMode: ['LONG', 'SHORT', 'WAIT', 'CONDITIONAL'],
   ticketType: ['Zone ticket', 'Exact ticket'],
   entryType: ['Market', 'Limit', 'Stop'],
@@ -59,6 +61,11 @@ export function validateTicketPayload(payload) {
   if (payload.schemaVersion !== TICKET_SCHEMA_VERSION) errors.push(`ticket.schemaVersion must equal ${TICKET_SCHEMA_VERSION}`);
   expectString(errors, 'ticket.ticketId', payload.ticketId, 1);
   expectString(errors, 'ticket.createdAt', payload.createdAt, 1);
+  expectEnum(errors, 'ticket.counterTrendMode', payload.counterTrendMode, enums.counterTrendMode);
+  // rawAIReadBias is optional — only validate if present
+  if (payload.rawAIReadBias !== undefined) {
+    expectEnum(errors, 'ticket.rawAIReadBias', payload.rawAIReadBias, enums.rawAIReadBias);
+  }
   expectEnum(errors, 'ticket.decisionMode', payload.decisionMode, enums.decisionMode);
   expectEnum(errors, 'ticket.ticketType', payload.ticketType, enums.ticketType);
   expectEnum(errors, 'ticket.entryType', payload.entryType, enums.entryType);

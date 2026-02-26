@@ -6,6 +6,8 @@ const ticketSchema = JSON.parse(fs.readFileSync(new URL('../docs/schema/ticket.s
 const aarSchema = JSON.parse(fs.readFileSync(new URL('../docs/schema/aar.schema.json', import.meta.url), 'utf8'));
 
 const expectedTicketEnums = {
+  counterTrendMode: ['Strict HTF-only', 'Mixed', 'Full OK'],
+  rawAIReadBias: ['', 'Bullish', 'Bearish', 'Neutral', 'Range'],
   decisionMode: ['LONG', 'SHORT', 'WAIT', 'CONDITIONAL'],
   ticketType: ['Zone ticket', 'Exact ticket'],
   entryType: ['Market', 'Limit', 'Stop'],
@@ -27,6 +29,8 @@ const expectedAarEnums = {
 };
 
 test('ticket schema enum sets remain unchanged', () => {
+  assert.deepEqual(ticketSchema.properties.counterTrendMode.enum, expectedTicketEnums.counterTrendMode);
+  assert.deepEqual(ticketSchema.properties.rawAIReadBias.enum, expectedTicketEnums.rawAIReadBias);
   assert.deepEqual(ticketSchema.properties.decisionMode.enum, expectedTicketEnums.decisionMode);
   assert.deepEqual(ticketSchema.properties.ticketType.enum, expectedTicketEnums.ticketType);
   assert.deepEqual(ticketSchema.properties.entryType.enum, expectedTicketEnums.entryType);

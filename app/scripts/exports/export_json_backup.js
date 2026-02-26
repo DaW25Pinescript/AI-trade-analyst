@@ -36,6 +36,8 @@ function buildTicketSnapshot() {
     schemaVersion: TICKET_SCHEMA_VERSION,
     ticketId: state.ticketID || 'draft',
     createdAt: nowISO,
+    counterTrendMode: readSelectInput('counterTrendMode', 'Mixed'),
+    rawAIReadBias: readSelectInput('rawAIReadBias', ''),
     decisionMode: readSelectInput('decisionMode'),
     ticketType: readSelectInput('ticketType'),
     entryType: readSelectInput('entryType'),
