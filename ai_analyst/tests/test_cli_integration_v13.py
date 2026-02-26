@@ -29,7 +29,8 @@ def _extract_run_id(stdout: str) -> str:
 
 
 def _run_dir(run_id: str) -> Path:
-    return Path("ai_analyst/output/runs") / run_id
+    package_root = Path(__file__).resolve().parents[1]
+    return package_root / "output" / "runs" / run_id
 
 
 def _stub_litellm(monkeypatch, decision: str = "NO_TRADE"):
