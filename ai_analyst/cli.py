@@ -122,7 +122,13 @@ def run(
     lens_smt:   bool  = typer.Option(False, "--lens-smt/--no-smt",            help="SMT Divergence lens"),
 ):
     """Start a new analysis run."""
-    from .models.ground_truth import GroundTruthPacket, RiskConstraints, MarketContext
+    from .models.ground_truth import (
+        GroundTruthPacket,
+        RiskConstraints,
+        MarketContext,
+        ScreenshotMetadata,
+        ALLOWED_CLEAN_TIMEFRAMES,
+    )
     from .models.lens_config import LensConfig
     from .models.persona import PersonaType
     from .models.execution_config import RunState, RunStatus
@@ -152,13 +158,27 @@ def run(
         typer.echo("[ERROR] At least one chart image must be provided.")
         raise typer.Exit(1)
 
+    unsupported = [tf for tf in charts if tf not in ALLOWED_CLEAN_TIMEFRAMES]
+    for tf in unsupported:
+        typer.echo(f"[WARN] Timeframe '{tf}' is not supported by GroundTruth schema and will be skipped.")
+
+    charts = {tf: b64 for tf, b64 in charts.items() if tf in ALLOWED_CLEAN_TIMEFRAMES}
+    if not charts:
+        typer.echo("[ERROR] No supported clean-chart timeframes were provided (H4/H1/M15/M5).")
+        raise typer.Exit(1)
+
     timeframes = list(charts.keys())
+    screenshot_metadata = [
+        ScreenshotMetadata(timeframe=tf, lens="NONE", evidence_type="price_only")
+        for tf in timeframes
+    ]
 
     ground_truth = GroundTruthPacket(
         instrument=instrument,
         session=session,
         timeframes=timeframes,
         charts=charts,
+        screenshot_metadata=screenshot_metadata,
         risk_constraints=RiskConstraints(
             min_rr=min_rr,
             max_risk_per_trade=max_risk,
@@ -336,6 +356,7 @@ def arbiter(
         session=gt_dict["session"],
         timeframes=gt_dict.get("timeframes", []),
         charts={},  # not needed for arbiter
+        screenshot_metadata=[],
         risk_constraints=RiskConstraints(**rc),
         context=MarketContext(**ctx),
         generated_by=gt_dict.get("generated_by", "api"),
@@ -459,6 +480,7 @@ def replay(
         session=gt_dict["session"],
         timeframes=gt_dict.get("timeframes", []),
         charts={},
+        screenshot_metadata=[],
         risk_constraints=RiskConstraints(**rc),
         context=MarketContext(**ctx),
     )
