@@ -13,7 +13,7 @@
 <header class="header">
   <div class="header-left">
     <div class="logo">AI Trade <span>/ Analyst</span></div>
-    <div class="version-pill">V3 · G5</div>
+    <div class="version-pill">V3 · G7</div>
   </div>
   <div class="ticket-id-header">Ticket: <span id="ticketIdHeader">—</span></div>
 </header>
@@ -21,7 +21,7 @@
 <main class="main">
   <div class="page-title">Market Analysis Request</div>
   <h1>Build Your Analysis Brief</h1>
-  <p class="subtitle">G5 — Prompt Enhancements: counter-trend mode, scoring rules, and AI bias tracking for edge calibration</p>
+  <p class="subtitle">G7 — Mini dashboard: win rate, expectancy, trade frequency, heatmap, and psychological leakage tracking</p>
 
   <div class="steps">
     <div class="step active" onclick="goTo(0)"><span class="step-num">01</span>Setup</div>
@@ -954,6 +954,34 @@
           <div id="aarOutputText" style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);"></div>
         </div>
       </div>
+    </div>
+
+
+    <div class="card">
+      <div class="card-label green">G7 Mini Dashboard</div>
+      <p class="hint">Upload one or more exported JSON backup files to compute journal stats across tickets.</p>
+
+      <label>Load JSON Backups</label>
+      <input type="file" id="dashboardJsonFiles" accept="application/json" multiple>
+
+      <div class="row-3">
+        <div class="dashboard-stat"><span>Total Trades</span><strong id="dashTrades">0</strong></div>
+        <div class="dashboard-stat"><span>Closed Trades</span><strong id="dashClosedTrades">0</strong></div>
+        <div class="dashboard-stat"><span>Win Rate</span><strong id="dashWinRate">0.0%</strong></div>
+      </div>
+      <div class="row-3">
+        <div class="dashboard-stat"><span>Avg R</span><strong id="dashAvgR">0.00</strong></div>
+        <div class="dashboard-stat"><span>Expectancy</span><strong id="dashExpectancy">0.00</strong></div>
+        <div class="dashboard-stat"><span>Trades / Active Day</span><strong id="dashTradeFreq">0.00</strong></div>
+      </div>
+      <div class="row">
+        <div class="dashboard-stat"><span>Psychological Leakage R</span><strong id="dashPsychLeak">0.00</strong></div>
+        <div></div>
+      </div>
+
+      <div class="divider"></div>
+      <label>Setup Type × Session Heatmap</label>
+      <div id="dashboardHeatmap"></div>
     </div>
 
     <div class="btn-row">
