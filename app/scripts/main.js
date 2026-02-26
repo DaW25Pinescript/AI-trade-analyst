@@ -11,6 +11,9 @@ import { buildAARPrompt } from './generators/prompt_aar.js';
 import { buildWeeklyPrompt } from './generators/prompt_weekly.js';
 import { bindShortcuts } from './ui/shortcuts.js';
 import { setSyncOutputHandler, syncOutput } from './ui/sync_output.js';
+import { runSenateArbiter } from './generators/senateArbiter.js';
+import { generateAnalystPromptTemplate } from './generators/promptGenerator.js';
+import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbiterPanel.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
 function buildAndShow() { buildPrompt(); goTo(5); }
@@ -49,13 +52,52 @@ function copyAARPrompt() {
   });
 }
 
+function runSenateArb() {
+  const textarea = document.getElementById('senateAnalystInput');
+  if (!textarea) return;
+  let analystOutputs;
+  try {
+    analystOutputs = JSON.parse(textarea.value.trim());
+  } catch (e) {
+    alert('Invalid JSON in analyst input. Please check formatting.\n\n' + e.message);
+    return;
+  }
+  if (!Array.isArray(analystOutputs)) {
+    alert('Analyst input must be a JSON array of analyst objects.');
+    return;
+  }
+
+  // Derive userSettings from current form state where available
+  const get = id => (document.getElementById(id) ? document.getElementById(id).value : '') || '';
+  const userSettings = {
+    minRR:                  parseFloat(get('minRR')) || 2.0,
+    maxRiskPercent:         parseFloat(get('maxStop')) || 1.0,
+    sessionVolatilityState: get('volRisk') || 'Normal',
+    regime:                 get('regime')  || 'Trending',
+    instrument:             get('asset')   || 'Unknown',
+    timestamp:              new Date().toISOString(),
+    newsEventImminent:      false
+  };
+
+  const decision = runSenateArbiter(analystOutputs, userSettings);
+  renderSenatePanel(decision);
+}
+
+function clearSenateArb() {
+  clearSenatePanel();
+  const textarea = document.getElementById('senateAnalystInput');
+  if (textarea) textarea.value = '';
+}
+
 Object.assign(window, {
   goTo, goToChartsNext, onAssetInput, setAsset, setBias, triggerUpload, handleUpload,
   toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange,
   selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload,
   syncOutput, buildAndShow, copyPrompt, exportHTML, exportPDF, exportJSONBackup,
   importJSONBackup, exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm,
-  showAARPrompt, copyAARPrompt
+  showAARPrompt, copyAARPrompt,
+  runSenateArb, clearSenateArb,
+  runSenateArbiter, generateAnalystPromptTemplate, renderSenatePanel
 });
 
 window.onload = () => {
@@ -63,4 +105,5 @@ window.onload = () => {
   setBuildPromptRef(buildPrompt);
   generateTicketID();
   bindShortcuts({ goTo, buildAndShow });
+  initSenatePanel();
 };

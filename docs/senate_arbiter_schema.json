@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-trade-analyst.local/schema/senate_arbiter_schema.json",
+  "title": "AI Trade Analyst — Senate Decision",
+  "description": "Canonical output schema for the Trade Senate Protocol deliberation engine. Produced by runSenateArbiter() in senateArbiter.js.",
+  "schemaVersion": "1.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ruling",
+    "confidence",
+    "senateRecord",
+    "order",
+    "dissent",
+    "vetoReason",
+    "conditionalTrigger"
+  ],
+  "properties": {
+    "ruling": {
+      "type": "string",
+      "enum": ["TRADE", "CONDITIONAL", "NO_TRADE", "PROCEDURAL_FAIL"],
+      "description": "The senate's final ruling on the trade opportunity."
+    },
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Deterministic confidence score (0–100). Null only on PROCEDURAL_FAIL before score computation."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Human-readable reason for a non-TRADE ruling. Optional field — present on NO_TRADE and PROCEDURAL_FAIL."
+    },
+    "senateRecord": {
+      "type": ["object", "null"],
+      "description": "Full structured record of the senate deliberation. Null on PROCEDURAL_FAIL.",
+      "additionalProperties": false,
+      "required": ["docket", "motions", "pointsOfAgreement", "contestedPoints", "evidenceLedger"],
+      "properties": {
+        "docket": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["instrument", "timestamp", "regime", "volatilityState"],
+          "description": "Session metadata for this deliberation.",
+          "properties": {
+            "instrument":      { "type": "string", "description": "The traded instrument (e.g. XAUUSD)" },
+            "timestamp":       { "type": "string", "description": "ISO 8601 timestamp of the deliberation" },
+            "regime":          { "type": "string", "description": "Market regime at time of deliberation" },
+            "volatilityState": {
+              "type": "string",
+              "enum": ["Normal", "High", "Low", "Abnormal"],
+              "description": "Session volatility classification"
+            }
+          }
+        },
+        "motions": {
+          "type": "array",
+          "description": "One motion (vote) per analyst.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["agentId", "direction", "confidence"],
+            "properties": {
+              "agentId":    { "type": "string", "description": "Identifier of the analyst agent" },
+              "direction":  { "type": "string", "enum": ["Long", "Short", "Wait"], "description": "The analyst's directional vote" },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 100, "description": "Analyst's own confidence in their call" }
+            }
+          }
+        },
+        "pointsOfAgreement": {
+          "type": "array",
+          "description": "Evidence tags or claims shared by 2 or more analysts.",
+          "items": { "type": "string" }
+        },
+        "contestedPoints": {
+          "type": "array",
+          "description": "Explicit directional disagreements between analysts with descriptions.",
+          "items": { "type": "string" }
+        },
+        "evidenceLedger": {
+          "type": "array",
+          "description": "Top-ranked evidence items with applied weighting rules.",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["evidence", "weight", "sources", "decidingRule"],
+            "properties": {
+              "evidence":     { "type": "string", "description": "Evidence tag or label" },
+              "weight":       { "type": "number", "description": "Total computed weight" },
+              "sources":      { "type": "array", "items": { "type": "string" }, "description": "Analyst agent IDs that cited this evidence" },
+              "decidingRule": { "type": "string", "description": "Pipe-separated list of weighting rules applied" }
+            }
+          }
+        },
+        "ruling": {
+          "type": ["string", "null"],
+          "enum": ["TRADE", "CONDITIONAL", "NO_TRADE", "PROCEDURAL_FAIL", null],
+          "description": "Denormalised ruling stored in the record for convenience."
+        },
+        "order": { "type": ["object", "null"], "description": "Denormalised order reference (same as top-level order)." },
+        "dissent": { "type": ["object", "null"], "description": "Denormalised dissent reference (same as top-level dissent)." }
+      }
+    },
+    "order": {
+      "type": ["object", "null"],
+      "description": "Structured trade orders. Present only when ruling is TRADE or CONDITIONAL. Null otherwise.",
+      "additionalProperties": false,
+      "required": ["planA", "planB"],
+      "properties": {
+        "planA": {
+          "type": "object",
+          "description": "Primary trade plan — always present when order is non-null.",
+          "additionalProperties": false,
+          "required": ["entryModel", "invalidation", "takeProfitLogic", "managementRule", "riskInstruction", "doNotTradeIf"],
+          "properties": {
+            "entryModel":      { "type": "string", "description": "Entry method: Market | Limit | Trigger: [condition]" },
+            "invalidation":    { "type": "string", "description": "Price + condition that invalidates the plan" },
+            "takeProfitLogic": { "type": "string", "description": "TP1/TP2 description or trailing rule" },
+            "managementRule":  { "type": "string", "description": "Breakeven rule, partial exits, time stop" },
+            "riskInstruction": { "type": "string", "description": "Position sizing instruction (e.g. Risk 1% of account)" },
+            "doNotTradeIf":    { "type": "array", "items": { "type": "string" }, "description": "Conditions that cancel this plan" }
+          }
+        },
+        "planB": {
+          "type": ["object", "null"],
+          "description": "Conditional backup plan. Only present when ruling is CONDITIONAL; null otherwise.",
+          "additionalProperties": false,
+          "required": ["trigger", "entryModel", "invalidation", "takeProfitLogic", "managementRule", "riskInstruction", "doNotTradeIf"],
+          "properties": {
+            "trigger":         { "type": "string", "description": "The condition that activates Plan B" },
+            "entryModel":      { "type": "string" },
+            "invalidation":    { "type": "string" },
+            "takeProfitLogic": { "type": "string" },
+            "managementRule":  { "type": "string" },
+            "riskInstruction": { "type": "string" },
+            "doNotTradeIf":    { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "dissent": {
+      "type": ["object", "null"],
+      "description": "Mandatory minority report — always present on any ruling except PROCEDURAL_FAIL.",
+      "additionalProperties": false,
+      "required": ["strongestOpposingCase", "whatWouldFailFast"],
+      "properties": {
+        "strongestOpposingCase": {
+          "type": "string",
+          "description": "The best articulation of the opposing or risk case."
+        },
+        "whatWouldFailFast": {
+          "type": "string",
+          "description": "The single most likely fast-failure scenario for the approved trade."
+        }
+      }
+    },
+    "vetoReason": {
+      "type": ["string", "null"],
+      "description": "Which hard gate fired and why. Null when no gate was triggered."
+    },
+    "conditionalTrigger": {
+      "type": ["string", "null"],
+      "description": "The specific condition required before a CONDITIONAL trade may be entered. Null on TRADE and NO_TRADE rulings."
+    }
+  },
+  "examples": [
+    {
+      "ruling": "TRADE",
+      "confidence": 80,
+      "senateRecord": {
+        "docket": {
+          "instrument": "XAUUSD",
+          "timestamp": "2026-02-26T09:00:00Z",
+          "regime": "Trending",
+          "volatilityState": "Normal"
+        },
+        "motions": [
+          { "agentId": "TechnicalAnalyst",    "direction": "Long", "confidence": 80 },
+          { "agentId": "MacroContextAnalyst", "direction": "Long", "confidence": 70 },
+          { "agentId": "RiskAnalyst",         "direction": "Long", "confidence": 75 }
+        ],
+        "pointsOfAgreement": ["H4-demand-zone", "D1-HTF-bullish-close", "M15-BOS-confirmed"],
+        "contestedPoints": [],
+        "evidenceLedger": [
+          {
+            "evidence": "D1-HTF-bullish-close",
+            "weight": 7,
+            "sources": ["TechnicalAnalyst", "MacroContextAnalyst", "RiskAnalyst"],
+            "decidingRule": "HTF bias (D/H4/H1) > LTF: +3 | Close-based confirmation > wick-based: +2 | Confluence ×3 analysts: +4 | Freshness baseline: +1"
+          }
+        ],
+        "ruling": "TRADE",
+        "order": null,
+        "dissent": null
+      },
+      "order": {
+        "planA": {
+          "entryModel": "Limit at 2620.00000 POI zone",
+          "invalidation": "2605.00000 — close below invalidates setup",
+          "takeProfitLogic": "TP1 at 2650.00000 (50% exit), TP2 at 2680.00000 (trail remainder to full exit)",
+          "managementRule": "Move to breakeven at TP1. Partial close 50% at TP1. Trail remainder to TP2.",
+          "riskInstruction": "Risk 1% of account",
+          "doNotTradeIf": ["Abnormal volatility", "News event imminent"]
+        },
+        "planB": null
+      },
+      "dissent": {
+        "strongestOpposingCase": "Counter-case from uncertainty: LTF structure has not confirmed continuation — early entry risks stop sweep.",
+        "whatWouldFailFast": "This fails fast if: price closes below 2605 on any timeframe before TP1 is reached"
+      },
+      "vetoReason": null,
+      "conditionalTrigger": null
+    }
+  ]
+}
