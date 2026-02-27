@@ -22,7 +22,9 @@ export const state = {
     wouldHaveWon: null,
     killSwitch: null,
     photoDataUrl: ''
-  }
+  },
+  // G8: tracks the parent ticket ID when this is a revision
+  revisedFromId: null
 };
 
 export function generateTicketID() {

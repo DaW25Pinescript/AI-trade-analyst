@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ai-trade-analyst.local/schema/ticket.schema.json",
   "title": "AI Trade Analyst Ticket",
-  "description": "Canonical trade ticket payload for export/import and persistence. v2.0.0 adds G6 persistence and review metrics (edgeScore, psychologicalLeakR, screenshot metadata).",
+  "description": "Canonical trade ticket payload for export/import and persistence. v3.0.0 adds G8 fields: aiEdgeScore (AI predicted confidence from response) and revisedFromId (parent ticket linkage).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,7 +29,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "2.0.0"
+      "const": "3.0.0"
     },
     "counterTrendMode": {
       "type": "string",
@@ -171,6 +171,17 @@
     "psychologicalLeakR": {
       "type": "number",
       "description": "Absolute R leaked due to psychology-linked execution mistakes. 0 when not detected."
+    },
+    "aiEdgeScore": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "G8: AI's predicted confidence/edge score recorded from the AI response (0.0–1.0). Optional — omitted if not recorded."
+    },
+    "revisedFromId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "G8: Ticket ID of the parent ticket this revision is based on. Optional — present only on revised tickets."
     },
     "screenshots": {
       "type": "object",

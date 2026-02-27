@@ -33,6 +33,12 @@ function buildTicketSnapshot() {
   const nowISO = new Date().toISOString();
   const edgeScore = readNumberInput('edgeScoreDisplay', 0);
 
+  // G8: AI edge score (optional — only include if the user recorded a valid 0–1 value)
+  const aiEdgeScoreEl = document.getElementById('aiEdgeScore');
+  const aiEdgeScoreRaw = Number.parseFloat(aiEdgeScoreEl?.value || '');
+  const aiEdgeScore = Number.isFinite(aiEdgeScoreRaw) && aiEdgeScoreRaw >= 0 && aiEdgeScoreRaw <= 1
+    ? aiEdgeScoreRaw : undefined;
+
   const cleanCharts = [
     { key: 'htf', timeframe: 'H4' },
     { key: 'm15', timeframe: 'M15' },
@@ -99,7 +105,10 @@ function buildTicketSnapshot() {
     screenshots: {
       cleanCharts,
       m15Overlay: null
-    }
+    },
+    // G8 optional fields — only included when set
+    ...(aiEdgeScore !== undefined ? { aiEdgeScore } : {}),
+    ...(state.revisedFromId ? { revisedFromId: state.revisedFromId } : {})
   };
 }
 
