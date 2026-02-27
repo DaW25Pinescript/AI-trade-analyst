@@ -11,6 +11,7 @@ test('buildAnalyticsReportHTML includes key analytics values and sections', () =
     ['dashAvgR', { textContent: '0.45' }],
     ['dashExpectancy', { textContent: '0.22' }],
     ['dashTradeFreq', { textContent: '1.50' }],
+    ['dashPsychLeak', { textContent: '0.37' }],
     ['dashboardHeatmap', { innerHTML: '<table><tr><td>heat</td></tr></table>' }],
     ['dashboardEquityCurve', { innerHTML: '<svg><polyline></polyline></svg>' }],
     ['dashboardMonthlyBreakdown', { innerHTML: '<table><tr><td>Jan</td></tr></table>' }],
@@ -27,6 +28,7 @@ test('buildAnalyticsReportHTML includes key analytics values and sections', () =
   assert.match(html, /Performance Analytics/);
   assert.match(html, /Total Trades<\/span><strong>12<\/strong>/);
   assert.match(html, /Closed Trades<\/span><strong>10<\/strong>/);
+  assert.match(html, /Psychological Leakage R<\/span><strong>0\.37<\/strong>/);
   assert.match(html, /<h2>Equity Curve \(R-Based\)<\/h2>/);
   assert.match(html, /<td>Q1<\/td>/);
 });

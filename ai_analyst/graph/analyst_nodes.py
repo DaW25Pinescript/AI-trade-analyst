@@ -21,6 +21,7 @@ from ..core.analyst_prompt_builder import (
     build_overlay_delta_prompt,
     build_messages,
 )
+from ..core.llm_client import acompletion_with_retry
 from .state import GraphState
 
 # Analyst roster — model names routed through LiteLLM.
@@ -41,7 +42,8 @@ async def run_analyst(config: dict, prompt: dict) -> AnalystOutput:
     Raises on model error or schema validation failure — caller handles exceptions.
     """
     from litellm import acompletion  # lazy import — litellm is optional for non-API paths
-    response = await acompletion(
+    response = await acompletion_with_retry(
+        acompletion,
         model=config["model"],
         messages=build_messages(prompt),
         response_format={"type": "json_object"},
@@ -63,7 +65,8 @@ async def run_overlay_delta(
     Raises on model error or schema validation failure.
     """
     from litellm import acompletion  # lazy import — litellm is optional for non-API paths
-    response = await acompletion(
+    response = await acompletion_with_retry(
+        acompletion,
         model=config["model"],
         messages=build_messages(prompt),
         response_format={"type": "json_object"},

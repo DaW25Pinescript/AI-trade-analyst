@@ -12,8 +12,8 @@ two-track architecture:
 
 | Track | Directory | Runtime | Current Version |
 |-------|-----------|---------|-----------------|
-| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G3 in progress |
-| **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v1.2 complete, v1.3 next |
+| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G11 in progress |
+| **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v1.3 complete, v1.4 next |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
@@ -120,12 +120,12 @@ canonical data contract between Track A and Track B.
 - [x] Zero capital risk flow: user records outcome price manually with target/stop hit inference
 - [x] Schema + migration support (`3.0.0 → 4.0.0`) with dedicated validation and tests
 
-### G10 — Performance Analytics v2 (IN PROGRESS)
+### G10 — Performance Analytics v2 (COMPLETE)
 - [x] Equity curve simulation based on closed trade history + R values
 - [x] Monthly/quarterly breakdown tables (trades, win rate, avg R, net R)
-- [ ] Export analytics as PDF report
+- [x] Export analytics as PDF report
 
-### G11 — API Bridge (Track A → Track B)
+### G11 — API Bridge (Track A → Track B) — IN PROGRESS
 - "Run AI Analysis" button in the app POSTs `GroundTruthPacket`-equivalent payload to
   `ai_analyst` FastAPI endpoint
 - Response populates a new "AI Multi-Model Verdict" card in the UI
@@ -174,15 +174,15 @@ v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v2.0 → v2.1 → v2.x
 - `execution_router.py`: Fixed `..core.xxx` double-hop imports → `.xxx`
 - `cli.py`: Removed stray unused `import uuid` inside `arbiter` command
 
-### v1.3 — Integration Tests + Real Chart Packs (IN PROGRESS)
+### v1.3 — Integration Tests + Real Chart Packs (COMPLETE)
 **Goal:** Validate the full pipeline end-to-end with real chart images.
 
 Tasks:
 - [x] Integration test: `run` CLI with 4 real chart PNGs in manual mode → verify prompt pack structure
 - [x] Integration test: `arbiter` CLI with pre-filled stub responses → verify FinalVerdict structure
-- [ ] API key setup guide (`docs/api_key_setup.md`)
+- [x] API key setup guide (`docs/api_key_setup.md`)
 - [x] Test that `replay` command re-runs Arbiter correctly on saved outputs
-- [ ] Add `pytest-asyncio` integration test fixtures for LangGraph pipeline
+- [x] Add `pytest-asyncio` integration test fixtures for LangGraph pipeline
 - [x] Verify `json_extractor.py` handles known AI response wrapper patterns
 
 ### v1.4 — Prompt Library v1.2 + Lens Tuning
@@ -271,7 +271,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | `replay` command not covered by tests | Medium | v1.3 |
 | `harmonic.txt` / `volume_profile.txt` lenses are stubs | Medium | v1.4 |
 | Arbiter model hardcoded to `claude-haiku-4-5-20251001` | Low | v2.0 |
-| No timeout/retry on individual analyst API calls | Medium | v1.3 |
+| No timeout/retry on individual analyst API calls | ~~Medium~~ Resolved | v1.3 |
 
 ---
 
@@ -319,14 +319,14 @@ All Claude-assisted development occurs on session branches and is merged via PR.
 
 ## Next Immediate Steps (Priority Order)
 
-1. **G6 (Track A)** — Data Model v2 hardening: IndexedDB AAR persistence, auto-save JSON backup
-   on ticket generation, `edgeScore` and `psychologicalLeakR` fields in schema v2.0, base64
-   chart screenshot embed in HTML export
-2. **v1.3 (Track B)** — Run end-to-end integration tests in parallel (real chart pack run,
-   arbiter verification, replay coverage, extractor robustness)
-3. **Track B debt** — Add timeout/retry wrapper around individual analyst LiteLLM calls
-4. **Docs** — Write `docs/api_key_setup.md` guide for Track B configuration
-5. **G7 (Track A)** — Mini Dashboard: win rate, avg R, expectancy, heatmap, Psychological Leakage R
-   (start after G6 persisted-data reliability hardening)
+1. **G11 + Track C1/C3 (Bridge foundation)** — Stabilise app → pipeline handshake:
+   GroundTruthPacket payload parity, verdict card rendering, and graceful offline fallback.
+2. **Track C2 (Local developer experience)** — Add `docker-compose.yml` (FastAPI + static app)
+   and app-side health-check UX so bridge availability is explicit.
+3. **v1.4 (Track B)** — Prompt library v1.2 iteration: lens contract audits, forbidden-terminology
+   tightening, examples, and minimum confidence metadata.
+4. **v2.0 (Track B + C)** — Emit `ticket_draft` from `/analyse`, add `source_ticket_id`, and
+   publish OpenAPI spec in `docs/`.
+5. **G12 (Track A)** — Accessibility + print polish + release packaging once G11/Track C are stable.
 
 **Completed in prior sessions:** G1, G2, G3, G4, G5

@@ -26,6 +26,7 @@ svg{border:1px solid #ddd;min-height:140px}
   <div class="stat"><span>Avg R</span><strong>${getText('dashAvgR')}</strong></div>
   <div class="stat"><span>Expectancy</span><strong>${getText('dashExpectancy')}</strong></div>
   <div class="stat"><span>Trades / Active Day</span><strong>${getText('dashTradeFreq')}</strong></div>
+  <div class="stat"><span>Psychological Leakage R</span><strong>${getText('dashPsychLeak')}</strong></div>
 </div>
 
 <h2>Setup Type × Session Heatmap</h2>
