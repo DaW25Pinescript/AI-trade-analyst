@@ -4,6 +4,55 @@ import { computeMetrics, parseBackupEntries } from '../metrics/metrics_engine.js
 let _loadedEntries = [];
 export function getLoadedEntries() { return _loadedEntries; }
 
+export function buildAnalyticsReportHTML(doc = document) {
+  const getHTML = (id) => doc.getElementById(id)?.innerHTML || '<p>No data.</p>';
+  const getText = (id, fallback = '0') => doc.getElementById(id)?.textContent?.trim() || fallback;
+
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Analytics Export</title>
+<style>
+body{font-family:Arial,sans-serif;padding:20px;color:#111}h1{margin:0 0 12px}h2{margin:22px 0 8px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 18px}
+.stat{border:1px solid #ddd;padding:10px}.stat strong{display:block;font-size:18px;margin-top:4px}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}
+svg{border:1px solid #ddd;min-height:140px}
+</style></head><body>
+<h1>AI Trade Analyst — Performance Analytics</h1>
+<p>Exported: ${new Date().toISOString()}</p>
+<div class="grid">
+  <div class="stat"><span>Total Trades</span><strong>${getText('dashTrades')}</strong></div>
+  <div class="stat"><span>Closed Trades</span><strong>${getText('dashClosedTrades')}</strong></div>
+  <div class="stat"><span>Win Rate</span><strong>${getText('dashWinRate')}</strong></div>
+  <div class="stat"><span>Avg R</span><strong>${getText('dashAvgR')}</strong></div>
+  <div class="stat"><span>Expectancy</span><strong>${getText('dashExpectancy')}</strong></div>
+  <div class="stat"><span>Trades / Active Day</span><strong>${getText('dashTradeFreq')}</strong></div>
+</div>
+
+<h2>Setup Type × Session Heatmap</h2>
+${getHTML('dashboardHeatmap')}
+
+<h2>Equity Curve (R-Based)</h2>
+${getHTML('dashboardEquityCurve')}
+
+<h2>Monthly Breakdown</h2>
+${getHTML('dashboardMonthlyBreakdown')}
+
+<h2>Quarterly Breakdown</h2>
+${getHTML('dashboardQuarterlyBreakdown')}
+
+</body></html>`;
+}
+
+export function exportAnalyticsPDF() {
+  const report = buildAnalyticsReportHTML();
+  const w = window.open('', '_blank');
+  if (!w) { alert('Popup blocked — please allow popups and try again.'); return; }
+  w.document.open();
+  w.document.write(report);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+
 function parseUploadedPayload(raw) {
   const parsed = JSON.parse(raw);
   if (Array.isArray(parsed)) return parsed;
