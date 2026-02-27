@@ -22,6 +22,64 @@ function average(nums) {
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
 }
 
+function toIsoDate(value) {
+  const d = new Date(value || '');
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function periodKey(date, kind) {
+  const year = date.getUTCFullYear();
+  if (kind === 'monthly') {
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }
+  const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
+  return `${year}-Q${quarter}`;
+}
+
+function buildPeriodBreakdown(closed, kind) {
+  const buckets = new Map();
+  closed.forEach((entry) => {
+    const created = toIsoDate(entry.ticket?.createdAt);
+    if (!created) return;
+    const key = periodKey(created, kind);
+    const r = Number(entry.aar?.rAchieved ?? 0);
+    const bucket = buckets.get(key) || { period: key, trades: 0, wins: 0, netR: 0 };
+    bucket.trades += 1;
+    bucket.wins += r > 0 ? 1 : 0;
+    bucket.netR += r;
+    buckets.set(key, bucket);
+  });
+
+  return [...buckets.values()]
+    .sort((a, b) => a.period.localeCompare(b.period))
+    .map((bucket) => ({
+      ...bucket,
+      winRate: bucket.trades ? bucket.wins / bucket.trades : 0,
+      avgR: bucket.trades ? bucket.netR / bucket.trades : 0,
+    }));
+}
+
+function buildEquityCurve(closed) {
+  let cumulativeR = 0;
+  return [...closed]
+    .sort((a, b) => {
+      const left = toIsoDate(a.ticket?.createdAt)?.getTime() ?? 0;
+      const right = toIsoDate(b.ticket?.createdAt)?.getTime() ?? 0;
+      return left - right;
+    })
+    .map((entry) => {
+      const r = Number(entry.aar?.rAchieved ?? 0);
+      cumulativeR += r;
+      return {
+        ticketId: entry.ticket?.ticketId || 'UNKNOWN',
+        timestamp: entry.ticket?.createdAt || null,
+        r,
+        cumulativeR,
+      };
+    });
+}
+
 export function parseBackupEntries(rawEntries = []) {
   return rawEntries
     .map((entry) => ({ ticket: entry?.ticket || null, aar: entry?.aar || null }))
@@ -80,6 +138,9 @@ export function computeMetrics(tickets = [], aars = []) {
     heatmap,
     heatmapSetups: topSetups,
     heatmapSessions: topSessions,
+    equityCurve: buildEquityCurve(closed),
+    monthlyBreakdown: buildPeriodBreakdown(closed, 'monthly'),
+    quarterlyBreakdown: buildPeriodBreakdown(closed, 'quarterly'),
     calibration: buildCalibrationInputs(
       combined.map(({ ticket }) => ticket),
       combined.map(({ aar }) => aar)

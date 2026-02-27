@@ -197,3 +197,36 @@ test('computeMetrics: calibration contains closed trades with correct fields', (
   assert.deepEqual(m.calibration[0], { ticketId: 'T1', confluenceScore: 9, revisedConfidence: 4, outcomeEnum: 'WIN', rAchieved: 1.5 });
   assert.deepEqual(m.calibration[1], { ticketId: 'T2', confluenceScore: 5, revisedConfidence: 2, outcomeEnum: 'LOSS', rAchieved: -1 });
 });
+
+
+test('computeMetrics: equityCurve tracks cumulative R in chronological order', () => {
+  const entries = [
+    makeBackup({ ticketId: 'T2', createdAt: '2026-02-24T12:00:00.000Z' }, { outcomeEnum: 'LOSS', rAchieved: -1 }),
+    makeBackup({ ticketId: 'T1', createdAt: '2026-02-24T09:00:00.000Z' }, { outcomeEnum: 'WIN', rAchieved: 2 }),
+    makeBackup({ ticketId: 'T3', createdAt: '2026-02-25T09:00:00.000Z' }, { outcomeEnum: 'WIN', rAchieved: 1.5 }),
+  ];
+  const m = computeMetrics(entries.map((e) => e.ticket), entries.map((e) => e.aar));
+
+  assert.equal(m.equityCurve.length, 3);
+  assert.deepEqual(m.equityCurve.map((p) => p.ticketId), ['T1', 'T2', 'T3']);
+  assert.deepEqual(m.equityCurve.map((p) => p.cumulativeR), [2, 1, 2.5]);
+});
+
+test('computeMetrics: monthly and quarterly breakdown aggregate closed outcomes', () => {
+  const entries = [
+    makeBackup({ ticketId: 'JAN1', createdAt: '2026-01-05T10:00:00.000Z' }, { outcomeEnum: 'WIN', rAchieved: 1 }),
+    makeBackup({ ticketId: 'JAN2', createdAt: '2026-01-18T10:00:00.000Z' }, { outcomeEnum: 'LOSS', rAchieved: -0.5 }),
+    makeBackup({ ticketId: 'APR1', createdAt: '2026-04-03T10:00:00.000Z' }, { outcomeEnum: 'WIN', rAchieved: 2 }),
+  ];
+  const m = computeMetrics(entries.map((e) => e.ticket), entries.map((e) => e.aar));
+
+  assert.deepEqual(m.monthlyBreakdown, [
+    { period: '2026-01', trades: 2, wins: 1, netR: 0.5, winRate: 0.5, avgR: 0.25 },
+    { period: '2026-04', trades: 1, wins: 1, netR: 2, winRate: 1, avgR: 2 },
+  ]);
+
+  assert.deepEqual(m.quarterlyBreakdown, [
+    { period: '2026-Q1', trades: 2, wins: 1, netR: 0.5, winRate: 0.5, avgR: 0.25 },
+    { period: '2026-Q2', trades: 1, wins: 1, netR: 2, winRate: 1, avgR: 2 },
+  ]);
+});
