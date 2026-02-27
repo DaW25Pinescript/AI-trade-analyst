@@ -108,7 +108,10 @@ function buildTicketSnapshot() {
     },
     // G8 optional fields — only included when set
     ...(aiEdgeScore !== undefined ? { aiEdgeScore } : {}),
-    ...(state.revisedFromId ? { revisedFromId: state.revisedFromId } : {})
+    ...(state.revisedFromId ? { revisedFromId: state.revisedFromId } : {}),
+    // G9: shadow mode — always include when active; shadowOutcome only when recorded
+    ...(state.shadowMode ? { shadowMode: true } : {}),
+    ...(state.shadowOutcome ? { shadowOutcome: state.shadowOutcome } : {})
   };
 }
 

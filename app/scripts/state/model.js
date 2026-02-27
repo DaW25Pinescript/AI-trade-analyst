@@ -24,7 +24,10 @@ export const state = {
     photoDataUrl: ''
   },
   // G8: tracks the parent ticket ID when this is a revision
-  revisedFromId: null
+  revisedFromId: null,
+  // G9: shadow mode state
+  shadowMode: false,
+  shadowOutcome: null
 };
 
 export function generateTicketID() {

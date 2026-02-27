@@ -1,4 +1,4 @@
-const TICKET_SCHEMA_VERSION = '3.0.0';
+const TICKET_SCHEMA_VERSION = '4.0.0';
 const AAR_SCHEMA_VERSION = '1.0.0';
 
 const enums = {
@@ -140,6 +140,36 @@ export function validateTicketPayload(payload) {
   }
   if (payload.revisedFromId !== undefined) {
     expectString(errors, 'ticket.revisedFromId', payload.revisedFromId, 1);
+  }
+
+  // G9 optional fields
+  if (payload.shadowMode !== undefined) {
+    expectBoolean(errors, 'ticket.shadowMode', payload.shadowMode);
+  }
+  if (payload.shadowOutcome !== undefined && payload.shadowOutcome !== null) {
+    if (!isObject(payload.shadowOutcome)) {
+      errors.push('ticket.shadowOutcome must be an object or null');
+    } else {
+      const so = payload.shadowOutcome;
+      if (so.captureWindowHours !== 24 && so.captureWindowHours !== 48) {
+        errors.push('ticket.shadowOutcome.captureWindowHours must be 24 or 48');
+      }
+      if (so.outcomePrice !== null && !isFiniteNumber(so.outcomePrice)) {
+        errors.push('ticket.shadowOutcome.outcomePrice must be a finite number or null');
+      }
+      if (so.outcomeCapturedAt !== null && !isDateTimeString(so.outcomeCapturedAt)) {
+        errors.push('ticket.shadowOutcome.outcomeCapturedAt must be a date-time string or null');
+      }
+      if (so.hitTarget !== null && typeof so.hitTarget !== 'boolean') {
+        errors.push('ticket.shadowOutcome.hitTarget must be a boolean or null');
+      }
+      if (so.hitStop !== null && typeof so.hitStop !== 'boolean') {
+        errors.push('ticket.shadowOutcome.hitStop must be a boolean or null');
+      }
+      if (so.pnlR !== null && !isFiniteNumber(so.pnlR)) {
+        errors.push('ticket.shadowOutcome.pnlR must be a finite number or null');
+      }
+    }
   }
 
   const screenshots = payload.screenshots;

@@ -27,6 +27,16 @@ function migrateTicket_2_0_to_3_0(ticket) {
   return { ...ticket, schemaVersion: '3.0.0' };
 }
 
+function migrateTicket_3_0_to_4_0(ticket) {
+  // G9: shadowMode defaults to false; shadowOutcome defaults to null.
+  return {
+    ...ticket,
+    schemaVersion: '4.0.0',
+    shadowMode: ticket.shadowMode ?? false,
+    shadowOutcome: ticket.shadowOutcome ?? null
+  };
+}
+
 export function migrateState(payload) {
   if (!payload || typeof payload !== 'object') return null;
 
@@ -51,6 +61,12 @@ export function migrateState(payload) {
     ticket = migrateTicket_2_0_to_3_0(ticket);
     ticketMigrated = true;
     console.info('[migrateState] Migrated ticket from 2.0.0 → 3.0.0.');
+  }
+
+  if (ticket?.schemaVersion === '3.0.0') {
+    ticket = migrateTicket_3_0_to_4_0(ticket);
+    ticketMigrated = true;
+    console.info('[migrateState] Migrated ticket from 3.0.0 → 4.0.0.');
   }
 
   if (typeof ticket?.schemaVersion === 'string' && ticket.schemaVersion !== TICKET_SCHEMA_VERSION) {
