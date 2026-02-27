@@ -28,6 +28,7 @@ from .prompt_pack_generator import PromptPackGenerator
 from .json_extractor import extract_json
 from .run_state_manager import transition, save_run_state
 from .logger import log_run
+from .llm_client import acompletion_with_retry
 
 OUTPUT_BASE = Path(__file__).parent.parent / "output" / "runs"
 
@@ -212,7 +213,8 @@ class ExecutionRouter:
 
         self.run_state = transition(self.run_state, RunStatus.ARBITER_COMPLETE)
 
-        response = await acompletion(
+        response = await acompletion_with_retry(
+            acompletion,
             model=ARBITER_MODEL,
             messages=[{"role": "user", "content": arbiter_prompt}],
             response_format={"type": "json_object"},
