@@ -11,15 +11,15 @@ import { TICKET_SCHEMA_VERSION, validateTicketPayload } from '../app/scripts/sch
 
 // ── Schema version ────────────────────────────────────────────────────────────
 
-test('TICKET_SCHEMA_VERSION is 3.0.0 for G8', () => {
-  assert.equal(TICKET_SCHEMA_VERSION, '3.0.0');
+test('TICKET_SCHEMA_VERSION is 4.0.0 (G8 features remain in current schema)', () => {
+  assert.equal(TICKET_SCHEMA_VERSION, '4.0.0');
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeMinimalTicket(overrides = {}) {
   return {
-    schemaVersion: '3.0.0',
+    schemaVersion: '4.0.0',
     ticketId: 'XAUUSD_260224_0930',
     createdAt: '2026-02-24T09:30:00.000Z',
     counterTrendMode: 'Mixed',

@@ -1,6 +1,6 @@
 import { generateTicketID, state } from './state/model.js';
 import { goTo, goToChartsNext, setBuildPromptRef } from './ui/stepper.js';
-import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange, selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload } from './ui/form_bindings.js';
+import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange, selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload, onShadowModeChange, onShadowCaptureWindowChange, onShadowOutcomeInput, saveShadowOutcome } from './ui/form_bindings.js';
 import { buildPrompt } from './generators/prompt_ticket.js';
 import { exportHTML } from './exports/export_html.js';
 import { exportPDF } from './exports/export_pdf_print.js';
@@ -147,7 +147,9 @@ Object.assign(window, {
   showAARPrompt, copyAARPrompt, showWeeklyPrompt, copyWeeklyPrompt,
   runSenateArb, clearSenateArb,
   runSenateArbiter, generateAnalystPromptTemplate, renderSenatePanel,
-  reviseTicket
+  reviseTicket,
+  // G9: Shadow Mode
+  onShadowModeChange, onShadowCaptureWindowChange, onShadowOutcomeInput, saveShadowOutcome
 });
 
 window.onload = () => {

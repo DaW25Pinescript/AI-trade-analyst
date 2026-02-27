@@ -233,4 +233,140 @@ function handleAARPhotoUpload(input) {
   reader.readAsDataURL(file);
 }
 
-export { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, getChecked, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange, selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload };
+// ═══════════════════════════════════════
+// G9: SHADOW MODE
+// ═══════════════════════════════════════
+
+function onShadowModeChange() {
+  const toggle = document.getElementById('shadowModeToggle');
+  state.shadowMode = toggle?.checked ?? false;
+
+  const badge = document.getElementById('shadowBadge');
+  if (badge) badge.style.display = state.shadowMode ? 'inline-block' : 'none';
+
+  const card = document.getElementById('shadowOutcomeCard');
+  if (card) card.style.display = state.shadowMode ? 'block' : 'none';
+
+  if (state.shadowMode) {
+    _updateShadowDeadline();
+  } else {
+    // Clear shadow outcome when toggled off
+    state.shadowOutcome = null;
+  }
+
+  syncOutput();
+}
+
+function _updateShadowDeadline() {
+  const windowEl = document.getElementById('shadowCaptureWindow');
+  const hours = Number.parseInt(windowEl?.value || '24', 10);
+  const deadline = new Date(Date.now() + hours * 60 * 60 * 1000);
+  const display = document.getElementById('shadowDeadlineDisplay');
+  if (display) {
+    display.textContent = deadline.toISOString().replace('T', ' ').slice(0, 16) + 'Z';
+  }
+}
+
+function onShadowCaptureWindowChange() {
+  _updateShadowDeadline();
+}
+
+function onShadowOutcomeInput() {
+  const priceEl = document.getElementById('shadowOutcomePrice');
+  const outcomePrice = Number.parseFloat(priceEl?.value || '');
+  if (!Number.isFinite(outcomePrice)) {
+    document.getElementById('shadowPnlDisplay').textContent = '—';
+    document.getElementById('shadowPnlDisplay').style.color = 'var(--muted)';
+    const hitRow = document.getElementById('shadowHitRow');
+    if (hitRow) hitRow.style.display = 'none';
+    return;
+  }
+
+  // Read ticket price levels from the Pre-Ticket form
+  const stopPrice = Number.parseFloat(document.getElementById('stopPrice')?.value || '');
+  const tp1Price  = Number.parseFloat(document.getElementById('tp1Price')?.value || '');
+  const entryMin  = Number.parseFloat(document.getElementById('entryPriceMin')?.value || '');
+  const entryMax  = Number.parseFloat(document.getElementById('entryPriceMax')?.value || '');
+  const decisionMode = document.getElementById('decisionMode')?.value || '';
+
+  const entryMid = Number.isFinite(entryMin) && Number.isFinite(entryMax) ? (entryMin + entryMax) / 2 : NaN;
+
+  let pnlR = null;
+  let hitTarget = null;
+  let hitStop = null;
+
+  if (Number.isFinite(entryMid) && Number.isFinite(stopPrice) && Number.isFinite(tp1Price)) {
+    const riskR = Math.abs(entryMid - stopPrice);
+    if (riskR > 0) {
+      if (decisionMode === 'LONG') {
+        pnlR = (outcomePrice - entryMid) / riskR;
+        hitTarget = tp1Price > entryMid ? outcomePrice >= tp1Price : false;
+        hitStop   = stopPrice < entryMid ? outcomePrice <= stopPrice : false;
+      } else if (decisionMode === 'SHORT') {
+        pnlR = (entryMid - outcomePrice) / riskR;
+        hitTarget = tp1Price < entryMid ? outcomePrice <= tp1Price : false;
+        hitStop   = stopPrice > entryMid ? outcomePrice >= stopPrice : false;
+      }
+    }
+  }
+
+  const pnlDisplay = document.getElementById('shadowPnlDisplay');
+  if (pnlDisplay) {
+    if (pnlR !== null) {
+      pnlDisplay.textContent = (pnlR >= 0 ? '+' : '') + pnlR.toFixed(2) + 'R';
+      pnlDisplay.style.color = pnlR >= 0 ? 'var(--green)' : 'var(--red)';
+    } else {
+      pnlDisplay.textContent = '— (set entry/stop/TP1)';
+      pnlDisplay.style.color = 'var(--muted)';
+    }
+  }
+
+  const hitRow = document.getElementById('shadowHitRow');
+  if (hitRow) hitRow.style.display = (hitTarget !== null || hitStop !== null) ? 'grid' : 'none';
+
+  const hitTargetEl = document.getElementById('shadowHitTarget');
+  if (hitTargetEl) {
+    hitTargetEl.textContent = hitTarget === null ? '—' : (hitTarget ? '✓ YES' : '✗ NO');
+    hitTargetEl.style.color = hitTarget ? 'var(--green)' : (hitTarget === false ? 'var(--red)' : 'var(--muted)');
+  }
+
+  const hitStopEl = document.getElementById('shadowHitStop');
+  if (hitStopEl) {
+    hitStopEl.textContent = hitStop === null ? '—' : (hitStop ? '✓ YES' : '✗ NO');
+    hitStopEl.style.color = hitStop ? 'var(--red)' : (hitStop === false ? 'var(--green)' : 'var(--muted)');
+  }
+
+  // Cache interim values for saveShadowOutcome
+  state._shadowOutcomeBuffer = { outcomePrice, pnlR, hitTarget, hitStop };
+}
+
+function saveShadowOutcome() {
+  const buf = state._shadowOutcomeBuffer;
+  if (!buf || !Number.isFinite(buf.outcomePrice)) {
+    alert('Enter an actual price before saving the shadow outcome.');
+    return;
+  }
+
+  const windowEl = document.getElementById('shadowCaptureWindow');
+  const captureWindowHours = Number.parseInt(windowEl?.value || '24', 10) === 48 ? 48 : 24;
+
+  state.shadowOutcome = {
+    captureWindowHours,
+    outcomePrice: buf.outcomePrice,
+    outcomeCapturedAt: new Date().toISOString(),
+    hitTarget: buf.hitTarget,
+    hitStop: buf.hitStop,
+    pnlR: buf.pnlR
+  };
+
+  const btn = document.querySelector('.shadow-save-btn');
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = 'SAVED ✓';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
+  }
+}
+
+export { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, getChecked, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange, selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload, onShadowModeChange, onShadowCaptureWindowChange, onShadowOutcomeInput, saveShadowOutcome };
