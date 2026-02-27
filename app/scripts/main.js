@@ -15,6 +15,9 @@ import { runSenateArbiter } from './generators/senateArbiter.js';
 import { generateAnalystPromptTemplate } from './generators/promptGenerator.js';
 import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbiterPanel.js';
 import { initDashboard, getLoadedEntries } from './ui/dashboard.js';
+import { exportAnalyticsPDF } from './ui/dashboard.js';
+import { analyseViaBridge } from './api_bridge.js';
+import { mountFinalVerdict } from './verdict_card.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
 function buildAndShow() {
@@ -138,6 +141,20 @@ function clearSenateArb() {
   if (textarea) textarea.value = '';
 }
 
+async function runBridgeAnalyse() {
+  const serverUrl = document.getElementById('analysisServerUrl')?.value || '';
+  const statusEl = document.getElementById('analysisBridgeStatus');
+  const resultEl = document.getElementById('analysisVerdictCard');
+  try {
+    if (statusEl) statusEl.textContent = 'Running /analyse ...';
+    const verdict = await analyseViaBridge(serverUrl);
+    mountFinalVerdict(resultEl, verdict);
+    if (statusEl) statusEl.textContent = 'Analysis complete.';
+  } catch (error) {
+    if (statusEl) statusEl.textContent = `Error: ${error.message}`;
+  }
+}
+
 Object.assign(window, {
   goTo, goToChartsNext, onAssetInput, setAsset, setBias, triggerUpload, handleUpload,
   toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange,
@@ -148,6 +165,8 @@ Object.assign(window, {
   runSenateArb, clearSenateArb,
   runSenateArbiter, generateAnalystPromptTemplate, renderSenatePanel,
   reviseTicket,
+  exportAnalyticsPDF,
+  runBridgeAnalyse,
   // G9: Shadow Mode
   onShadowModeChange, onShadowCaptureWindowChange, onShadowOutcomeInput, saveShadowOutcome
 });

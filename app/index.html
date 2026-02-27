@@ -730,6 +730,7 @@
             <button class="export-btn" onclick="exportHTML()">Download HTML</button>
             <button class="export-btn" onclick="exportPDF()">Print / PDF</button>
             <button class="export-btn" onclick="exportJSONBackup()">Export JSON</button>
+            <button class="export-btn" onclick="exportAnalyticsPDF()">Export Analytics PDF</button>
           </div>
         </div>
         <div id="outputText">Fill in the form steps to generate your V3 prompt...</div>
@@ -762,6 +763,18 @@
           <p class="hint" style="margin-top:4px;">Record the AI's overall confidence/edge score if provided. Used in AAR comparison.</p>
         </div>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label green">G11 — API Bridge (POST /analyse)</div>
+      <p class="step-note">Send current form + chart uploads to AI Analyst API and render returned <code>FinalVerdict</code>.</p>
+      <label>Analysis Server URL</label>
+      <input type="text" id="analysisServerUrl" placeholder="http://localhost:8000" value="http://localhost:8000">
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-primary" onclick="runBridgeAnalyse()">Run API Analysis</button>
+      </div>
+      <p id="analysisBridgeStatus" class="hint" style="margin-top:8px;">Idle.</p>
+      <div id="analysisVerdictCard" style="margin-top:10px;"></div>
     </div>
 
     <!-- G9: Shadow Outcome — visible only when Shadow Mode is active -->
