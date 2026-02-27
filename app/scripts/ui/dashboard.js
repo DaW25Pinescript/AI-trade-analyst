@@ -1,5 +1,9 @@
 import { computeMetrics, parseBackupEntries } from '../metrics/metrics_engine.js';
 
+// G8: module-level store so the weekly prompt generator can access loaded entries
+let _loadedEntries = [];
+export function getLoadedEntries() { return _loadedEntries; }
+
 function parseUploadedPayload(raw) {
   const parsed = JSON.parse(raw);
   if (Array.isArray(parsed)) return parsed;
@@ -99,6 +103,7 @@ export function initDashboard() {
     }
 
     const normalized = parseBackupEntries(allEntries);
+    _loadedEntries = normalized; // G8: expose for weekly prompt generator
     const tickets = normalized.map(({ ticket }) => ticket);
     const aars = normalized.map(({ aar }) => aar);
     const metrics = computeMetrics(tickets, aars);

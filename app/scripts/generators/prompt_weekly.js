@@ -1,30 +1,77 @@
-export function buildWeeklyPrompt() {
-  const now    = new Date().toISOString().replace('T', ' ').slice(0, 10);
-  const asset  = document.getElementById('asset')?.value || 'Portfolio';
+const CLOSED_OUTCOMES = new Set(['WIN', 'LOSS', 'BREAKEVEN', 'SCRATCH']);
+
+function _fmtR(r) {
+  const n = Number(r);
+  if (!Number.isFinite(n)) return '—';
+  return n >= 0 ? `+${n.toFixed(2)}` : n.toFixed(2);
+}
+
+function _buildTradeRows(entries) {
+  if (!entries.length) return '[No trade data loaded — paste trade rows manually]';
+  return entries.map(({ ticket, aar }) => {
+    const id        = ticket?.ticketId || '—';
+    const asset     = (ticket?.ticketId || '').split('_')[0] || '—';
+    const decision  = ticket?.decisionMode || '—';
+    const outcome   = aar?.outcomeEnum || '—';
+    const r         = _fmtR(aar?.rAchieved);
+    const confPre   = ticket?.checklist?.confluenceScore ?? '—';
+    const confPost  = aar?.revisedConfidence ?? '—';
+    const edgeTag   = ticket?.checklist?.edgeTag || '—';
+    const gate      = ticket?.gate?.status || '—';
+    const notes     = (aar?.notes || '').replace(/\n/g, ' ').slice(0, 60) || '—';
+    return `  ${id} | ${asset} | ${decision} | ${outcome} | ${r}R | ${confPre} | ${confPost} | ${edgeTag} | ${gate} | ${notes}`;
+  }).join('\n');
+}
+
+function _buildQuickStats(entries) {
+  const closed  = entries.filter(({ aar }) => CLOSED_OUTCOMES.has(aar?.outcomeEnum));
+  if (!closed.length) return '';
+  const closedR = closed.map(({ aar }) => Number(aar?.rAchieved ?? 0));
+  const wins    = closed.filter(({ aar }) => Number(aar?.rAchieved ?? 0) > 0);
+  const winRate = (wins.length / closed.length * 100).toFixed(1);
+  const avgR    = (closedR.reduce((a, b) => a + b, 0) / closedR.length).toFixed(2);
+  const netR    = closedR.reduce((a, b) => a + b, 0).toFixed(2);
+  const sign    = (n) => Number(n) >= 0 ? `+${n}` : `${n}`;
+  return `Closed: ${closed.length} | Win rate: ${winRate}% | Avg R: ${sign(avgR)} | Net R: ${sign(netR)}`;
+}
+
+/**
+ * G8: Build the weekly review prompt.
+ * @param {Array<{ticket: object, aar: object}>} entries - loaded journal entries (from dashboard)
+ */
+export function buildWeeklyPrompt(entries = []) {
+  const now     = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const nowStr  = now.toISOString().replace('T', ' ').slice(0, 10);
+  const asset   = document.getElementById('asset')?.value || 'Portfolio';
+
+  // Filter to last 7 days; entries without a date are included
+  const weekEntries = entries.filter(({ ticket }) => {
+    const d = ticket?.createdAt ? new Date(ticket.createdAt) : null;
+    return !d || d >= weekAgo;
+  });
+
+  const tradeRows  = _buildTradeRows(weekEntries);
+  const quickStats = _buildQuickStats(weekEntries);
+  const countLine  = weekEntries.length > 0
+    ? `Trades loaded:   ${weekEntries.length} (last 7 days)`
+    : 'Trades loaded:   0 — paste rows manually below';
+
+  const statsBlock = quickStats
+    ? `─── PRE-COMPUTED STATS ────────────────────\n${quickStats}\n\n`
+    : '';
 
   return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📅 WEEKLY REVIEW PROMPT — V3
+📅 WEEKLY REVIEW PROMPT — V3 · G8
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Week ending:     ${now}
+Week ending:     ${nowStr}
 Focus asset:     ${asset || 'All assets'}
+${countLine}
 
-─── HOW TO USE ────────────────────────────
-1. Export each closed ticket from this session using "Save JSON Backup".
-2. Fill in the TRADE LOG rows below with data from those exports.
-3. Paste this entire block into Claude for AI-assisted weekly review.
+${statsBlock}─── TRADE LOG ─────────────────────────────
+Format: TicketID | Asset | Decision | Outcome | R | ConfPre(1-10) | ConfPost(1-5) | EdgeTag | GateStatus | Notes
 
-─── TRADE LOG ─────────────────────────────
-One row per closed ticket. Use data from your JSON backup exports.
-
-Format:
-  TicketID | Asset | Decision | Outcome | R | ConfPre(1-10) | ConfPost(1-5) | EdgeTag | GateStatus | Notes
-
-Example:
-  XAUUSD_260224_0930 | XAUUSD | LONG | WIN | +1.5R | 8 | 4 | Liquidity grab | PROCEED | Clean entry, TP1 hit
-  XAUUSD_260224_1430 | XAUUSD | SHORT | LOSS | -1R | 5 | 2 | Pullback | CAUTION | Entered early, SL taken
-  EURUSD_260225_1000 | EURUSD | WAIT | MISSED | 0R | 6 | 3 | FVG reclaim | WAIT | Gate fired, skipped — setup triggered without me
-
-[PASTE YOUR TRADE ROWS HERE]
+${tradeRows}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SYSTEM PERSONA (weekly review mode — obey strictly):

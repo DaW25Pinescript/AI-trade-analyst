@@ -22,6 +22,9 @@ export function buildAARPrompt() {
   const asset         = get('asset') || '—';
   const now           = new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z';
 
+  // G8: AI Edge Score recorded from AI response
+  const aiEdgeScore   = get('aiEdgeScore') || '—';
+
   // G3: read actual AAR values from DOM when available
   const aarOutcome    = get('aarOutcome') || '[WIN / LOSS / BREAKEVEN / MISSED / SCRATCH]';
   const aarVerdict    = get('aarVerdict') || '[PLAN_FOLLOWED / PLAN_VIOLATION / PROCESS_GOOD / PROCESS_POOR]';
@@ -55,6 +58,7 @@ Ticket ID:       ${ticketId}
 Asset:           ${asset}
 Generated:       ${now}
 Pre-AI Score:    ${confluence}/10
+AI Edge Score:   ${aiEdgeScore !== '—' ? aiEdgeScore + ' (AI predicted confidence)' : '—'}
 
 ─── ORIGINAL TICKET PARAMETERS ───────────
 Decision Made:   ${decisionMode}

@@ -1,4 +1,4 @@
-import { generateTicketID } from './state/model.js';
+import { generateTicketID, state } from './state/model.js';
 import { goTo, goToChartsNext, setBuildPromptRef } from './ui/stepper.js';
 import { onAssetInput, setAsset, setBias, triggerUpload, handleUpload, toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange, selectAARRadio, onAAROutcomeChange, onAARSlider, updateEdgeScore, handleAARPhotoUpload } from './ui/form_bindings.js';
 import { buildPrompt } from './generators/prompt_ticket.js';
@@ -14,7 +14,7 @@ import { setSyncOutputHandler, syncOutput } from './ui/sync_output.js';
 import { runSenateArbiter } from './generators/senateArbiter.js';
 import { generateAnalystPromptTemplate } from './generators/promptGenerator.js';
 import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbiterPanel.js';
-import { initDashboard } from './ui/dashboard.js';
+import { initDashboard, getLoadedEntries } from './ui/dashboard.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
 function buildAndShow() {
@@ -47,11 +47,22 @@ function copyPrompt() {
 function resetForm(){ location.reload(); }
 
 function showWeeklyPrompt() {
-  const prompt = buildWeeklyPrompt();
+  const prompt = buildWeeklyPrompt(getLoadedEntries());
   const out = document.getElementById('weeklyOutputText');
   const wrap = document.getElementById('weeklyOutputWrap');
   if (out) out.textContent = prompt;
   if (wrap) wrap.style.display = 'block';
+}
+
+// G8: Revised Ticket — store current ticket ID, reload to create a linked child ticket
+function reviseTicket() {
+  const parentId = state.ticketID;
+  if (!parentId || parentId === 'draft') {
+    alert('No ticket ID found. Generate a prompt first to get a ticket ID.');
+    return;
+  }
+  localStorage.setItem('pendingRevisedFromId', parentId);
+  location.reload();
 }
 
 function copyWeeklyPrompt() {
@@ -135,7 +146,8 @@ Object.assign(window, {
   importJSONBackup, exportCSV, buildAARPrompt, buildWeeklyPrompt, resetForm,
   showAARPrompt, copyAARPrompt, showWeeklyPrompt, copyWeeklyPrompt,
   runSenateArb, clearSenateArb,
-  runSenateArbiter, generateAnalystPromptTemplate, renderSenatePanel
+  runSenateArbiter, generateAnalystPromptTemplate, renderSenatePanel,
+  reviseTicket
 });
 
 window.onload = () => {
@@ -145,4 +157,15 @@ window.onload = () => {
   bindShortcuts({ goTo, buildAndShow });
   initSenatePanel();
   initDashboard();
+
+  // G8: restore revision linkage if user clicked "Revise This Ticket"
+  const pendingRevision = localStorage.getItem('pendingRevisedFromId');
+  if (pendingRevision) {
+    state.revisedFromId = pendingRevision;
+    localStorage.removeItem('pendingRevisedFromId');
+    const banner = document.getElementById('revisionBanner');
+    const label  = document.getElementById('revisionSourceId');
+    if (banner) banner.style.display = 'block';
+    if (label)  label.textContent = pendingRevision;
+  }
 };

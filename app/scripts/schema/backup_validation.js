@@ -1,4 +1,4 @@
-const TICKET_SCHEMA_VERSION = '2.0.0';
+const TICKET_SCHEMA_VERSION = '3.0.0';
 const AAR_SCHEMA_VERSION = '1.0.0';
 
 const enums = {
@@ -131,6 +131,16 @@ export function validateTicketPayload(payload) {
 
   if (!isFiniteNumber(payload.edgeScore)) errors.push('ticket.edgeScore must be a number');
   if (!isFiniteNumber(payload.psychologicalLeakR)) errors.push('ticket.psychologicalLeakR must be a number');
+
+  // G8 optional fields
+  if (payload.aiEdgeScore !== undefined) {
+    if (!isFiniteNumber(payload.aiEdgeScore) || payload.aiEdgeScore < 0 || payload.aiEdgeScore > 1) {
+      errors.push('ticket.aiEdgeScore must be a number between 0 and 1');
+    }
+  }
+  if (payload.revisedFromId !== undefined) {
+    expectString(errors, 'ticket.revisedFromId', payload.revisedFromId, 1);
+  }
 
   const screenshots = payload.screenshots;
   if (!isObject(screenshots)) errors.push('ticket.screenshots must be an object');

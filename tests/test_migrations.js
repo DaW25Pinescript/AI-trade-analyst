@@ -24,9 +24,10 @@ test('migrateState warns for unsupported schema versions but still returns paylo
   const originalWarn = console.warn;
   console.warn = (message) => warnings.push(message);
 
+  // Use truly unknown versions (not in any migration path) to exercise the warning
   const payload = {
-    ticket: { schemaVersion: '2.0.0' },
-    aar: { schemaVersion: '3.0.0' }
+    ticket: { schemaVersion: '99.0.0' },
+    aar: { schemaVersion: '99.0.0' }
   };
 
   try {
@@ -36,11 +37,12 @@ test('migrateState warns for unsupported schema versions but still returns paylo
     console.warn = originalWarn;
   }
 
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /Unsupported AAR schema version/);
+  assert.equal(warnings.length, 2);
+  assert.match(warnings[0], /Unsupported ticket schema version/);
+  assert.match(warnings[1], /Unsupported AAR schema version/);
 });
 
-test('migrateState upgrades ticket from 1.1.0 to 2.0.0 with defaults', () => {
+test('migrateState upgrades ticket from 1.1.0 to 3.0.0 with defaults', () => {
   const payload = {
     ticket: { schemaVersion: '1.1.0', decisionMode: 'LONG' },
     aar: { schemaVersion: AAR_SCHEMA_VERSION }
@@ -49,7 +51,7 @@ test('migrateState upgrades ticket from 1.1.0 to 2.0.0 with defaults', () => {
   const result = migrateState(payload);
 
   assert.notEqual(result, payload);
-  assert.equal(result.ticket.schemaVersion, '2.0.0');
+  assert.equal(result.ticket.schemaVersion, TICKET_SCHEMA_VERSION);
   assert.equal(result.ticket.counterTrendMode, 'Mixed');
   assert.equal(result.ticket.rawAIReadBias, '');
   assert.equal(result.ticket.decisionMode, 'LONG');
@@ -74,15 +76,36 @@ test('migrateState preserves existing counterTrendMode/rawAIReadBias when upgrad
 });
 
 
-test('migrateState upgrades ticket from 1.2.0 to 2.0.0 with screenshot defaults', () => {
+test('migrateState upgrades ticket from 1.2.0 to 3.0.0 with screenshot defaults', () => {
   const payload = {
     ticket: { schemaVersion: '1.2.0', decisionMode: 'LONG' },
     aar: { schemaVersion: AAR_SCHEMA_VERSION }
   };
 
   const result = migrateState(payload);
-  assert.equal(result.ticket.schemaVersion, '2.0.0');
+  assert.equal(result.ticket.schemaVersion, TICKET_SCHEMA_VERSION);
   assert.equal(result.ticket.edgeScore, 0);
   assert.equal(result.ticket.psychologicalLeakR, 0);
   assert.equal(result.ticket.screenshots.m15Overlay, null);
+});
+
+test('migrateState upgrades ticket from 2.0.0 to 3.0.0 (G8 migration)', () => {
+  const payload = {
+    ticket: {
+      schemaVersion: '2.0.0',
+      decisionMode: 'SHORT',
+      edgeScore: 0.6,
+      psychologicalLeakR: 0.5
+    },
+    aar: { schemaVersion: AAR_SCHEMA_VERSION }
+  };
+
+  const result = migrateState(payload);
+
+  assert.notEqual(result, payload);
+  assert.equal(result.ticket.schemaVersion, TICKET_SCHEMA_VERSION);
+  // Existing fields must be preserved
+  assert.equal(result.ticket.decisionMode, 'SHORT');
+  assert.equal(result.ticket.edgeScore, 0.6);
+  assert.equal(result.ticket.psychologicalLeakR, 0.5);
 });

@@ -22,6 +22,11 @@ function migrateTicket_1_2_to_2_0(ticket) {
   };
 }
 
+function migrateTicket_2_0_to_3_0(ticket) {
+  // G8: aiEdgeScore and revisedFromId are new optional fields — no defaults needed.
+  return { ...ticket, schemaVersion: '3.0.0' };
+}
+
 export function migrateState(payload) {
   if (!payload || typeof payload !== 'object') return null;
 
@@ -40,6 +45,12 @@ export function migrateState(payload) {
     ticket = migrateTicket_1_2_to_2_0(ticket);
     ticketMigrated = true;
     console.info('[migrateState] Migrated ticket from 1.2.0 → 2.0.0.');
+  }
+
+  if (ticket?.schemaVersion === '2.0.0') {
+    ticket = migrateTicket_2_0_to_3_0(ticket);
+    ticketMigrated = true;
+    console.info('[migrateState] Migrated ticket from 2.0.0 → 3.0.0.');
   }
 
   if (typeof ticket?.schemaVersion === 'string' && ticket.schemaVersion !== TICKET_SCHEMA_VERSION) {
