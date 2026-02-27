@@ -42,6 +42,75 @@ function renderHeatmap(metrics) {
   container.innerHTML = `<table class="heatmap-table">${header}${rows}</table>`;
 }
 
+function renderEquityCurve(metrics) {
+  const container = document.getElementById('dashboardEquityCurve');
+  if (!container) return;
+
+  if (!metrics.equityCurve.length) {
+    container.innerHTML = '<p class="hint">No closed trades yet — equity curve appears after AAR outcomes are recorded.</p>';
+    return;
+  }
+
+  const points = metrics.equityCurve;
+  const min = Math.min(0, ...points.map((p) => p.cumulativeR));
+  const max = Math.max(0, ...points.map((p) => p.cumulativeR));
+  const range = Math.max(1, max - min);
+
+  const polylinePoints = points
+    .map((p, idx) => {
+      const x = points.length === 1 ? 0 : (idx / (points.length - 1)) * 100;
+      const y = ((max - p.cumulativeR) / range) * 100;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(' ');
+
+  container.innerHTML = `
+    <div class="curve-meta">Net R: <strong>${points.at(-1).cumulativeR.toFixed(2)}R</strong> across ${points.length} closed trade(s).</div>
+    <svg class="equity-curve" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Equity curve cumulative R">
+      <line x1="0" y1="0" x2="0" y2="100" class="axis" />
+      <line x1="0" y1="100" x2="100" y2="100" class="axis" />
+      <polyline points="${polylinePoints}" class="curve-line" />
+    </svg>
+  `;
+}
+
+function renderPeriodBreakdown(tableId, rows) {
+  const container = document.getElementById(tableId);
+  if (!container) return;
+
+  if (!rows.length) {
+    container.innerHTML = '<p class="hint">No closed trades available for this period.</p>';
+    return;
+  }
+
+  const body = rows
+    .map((row) => `
+      <tr>
+        <td>${row.period}</td>
+        <td>${row.trades}</td>
+        <td>${formatPct(row.winRate)}</td>
+        <td>${formatNum(row.avgR)}</td>
+        <td class="${row.netR < 0 ? 'stat-negative' : ''}">${formatNum(row.netR)}</td>
+      </tr>
+    `)
+    .join('');
+
+  container.innerHTML = `
+    <table class="heatmap-table period-table">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Trades</th>
+          <th>Win Rate</th>
+          <th>Avg R</th>
+          <th>Net R</th>
+        </tr>
+      </thead>
+      <tbody>${body}</tbody>
+    </table>
+  `;
+}
+
 function renderStats(metrics) {
   const numericMapping = {
     dashAvgR: metrics.avgR,
@@ -76,6 +145,9 @@ function renderStats(metrics) {
   }
 
   renderHeatmap(metrics);
+  renderEquityCurve(metrics);
+  renderPeriodBreakdown('dashboardMonthlyBreakdown', metrics.monthlyBreakdown);
+  renderPeriodBreakdown('dashboardQuarterlyBreakdown', metrics.quarterlyBreakdown);
 }
 
 export function initDashboard() {

@@ -115,15 +115,15 @@ canonical data contract between Track A and Track B.
 - Revised Ticket button: create a child ticket linked to original with `revisedFromId`
 - "AI Edge Score vs Actual Outcome" field per ticket
 
-### G9 — Shadow Mode
-- Toggle on main form: runs full analysis → saves ticket → auto-captures outcome after 24h/48h
-- Zero capital risk; user pastes price outcome or integrates public API
-- Allows high data-velocity calibration without real trades
+### G9 — Shadow Mode (COMPLETE)
+- [x] Toggle on main form: runs full analysis → saves ticket → tracks shadow outcomes over 24h/48h
+- [x] Zero capital risk flow: user records outcome price manually with target/stop hit inference
+- [x] Schema + migration support (`3.0.0 → 4.0.0`) with dedicated validation and tests
 
-### G10 — Performance Analytics v2
-- Equity curve simulation based on ticket history + R values
-- Monthly/quarterly breakdown table
-- Export analytics as PDF report
+### G10 — Performance Analytics v2 (IN PROGRESS)
+- [x] Equity curve simulation based on closed trade history + R values
+- [x] Monthly/quarterly breakdown tables (trades, win rate, avg R, net R)
+- [ ] Export analytics as PDF report
 
 ### G11 — API Bridge (Track A → Track B)
 - "Run AI Analysis" button in the app POSTs `GroundTruthPacket`-equivalent payload to
