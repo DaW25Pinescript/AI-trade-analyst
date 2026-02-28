@@ -1,4 +1,9 @@
+import pytest
+
 from ai_analyst.graph.pipeline import build_analysis_graph
+
+
+pytestmark = pytest.mark.asyncio
 
 
 async def test_langgraph_pipeline_routes_direct_to_arbiter_without_overlay(
