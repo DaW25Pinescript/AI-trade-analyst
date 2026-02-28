@@ -16,6 +16,7 @@ import { generateAnalystPromptTemplate } from './generators/promptGenerator.js';
 import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbiterPanel.js';
 import { initDashboard, getLoadedEntries } from './ui/dashboard.js';
 import { exportAnalyticsPDF } from './ui/dashboard.js';
+import { initOperatorDashboard, toggleOperatorDashboard } from './ui/dashboard_shell.js';
 import { analyseViaBridge } from './api_bridge.js';
 import { mountFinalVerdict } from './verdict_card.js';
 
@@ -167,6 +168,7 @@ Object.assign(window, {
   reviseTicket,
   exportAnalyticsPDF,
   runBridgeAnalyse,
+  toggleOperatorDashboard,
   // G9: Shadow Mode
   onShadowModeChange, onShadowCaptureWindowChange, onShadowOutcomeInput, saveShadowOutcome
 });
@@ -178,6 +180,7 @@ window.onload = () => {
   bindShortcuts({ goTo, buildAndShow });
   initSenatePanel();
   initDashboard();
+  initOperatorDashboard();
 
   // G8: restore revision linkage if user clicked "Revise This Ticket"
   const pendingRevision = localStorage.getItem('pendingRevisedFromId');
