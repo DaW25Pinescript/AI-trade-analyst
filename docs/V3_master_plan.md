@@ -130,6 +130,8 @@ canonical data contract between Track A and Track B.
   `ai_analyst` FastAPI endpoint
 - Response populates a new "AI Multi-Model Verdict" card in the UI
 - Requires local Python server running (documented setup)
+- [x] Additive Operator Dashboard Mode (Phase A): dashboard shell toggle + responsive card layout
+      layered over existing 7-step V3 flow (no top-to-bottom rewrite)
 
 ### G12 — Polish + Public Release
 - Full accessibility audit

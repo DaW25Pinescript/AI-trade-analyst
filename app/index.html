@@ -6,6 +6,7 @@
 <title>AI Trade Analyst — V3</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./styles/theme.css">
+<link rel="stylesheet" href="./styles/dashboard.css">
 <link rel="stylesheet" href="./styles/print.css" media="print">
 </head>
 <body>
@@ -14,6 +15,7 @@
   <div class="header-left">
     <div class="logo">AI Trade <span>/ Analyst</span></div>
     <div class="version-pill">V3 · G9</div>
+    <button id="operatorModeBtn" class="operator-mode-btn" onclick="toggleOperatorDashboard()" aria-pressed="false">Operator Dashboard: OFF</button>
     <div id="shadowBadge" style="display:none;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.12em;padding:4px 10px;border-radius:2px;background:rgba(59,111,255,0.15);border:1px solid rgba(59,111,255,0.5);color:var(--accent);">SHADOW</div>
   </div>
   <div class="ticket-id-header">Ticket: <span id="ticketIdHeader">—</span></div>
@@ -23,6 +25,74 @@
   <div class="page-title">Market Analysis Request</div>
   <h1>Build Your Analysis Brief</h1>
   <p class="subtitle">G9 — Shadow Mode: paper trades with zero capital risk, 24h/48h outcome capture, and AI edge calibration</p>
+
+  <section id="operatorDashboard" class="operator-dashboard" aria-label="Operator dashboard mode" hidden>
+    <article class="dash-card dash-chart-card">
+      <div class="dash-card-header">
+        <h2>Chart Viewer</h2>
+        <div class="dash-toolbar">
+          <button class="dash-tab active" type="button">D</button>
+          <button class="dash-tab" type="button">4H</button>
+          <button class="dash-tab" type="button">1H</button>
+          <button class="dash-tab" type="button">15m</button>
+        </div>
+      </div>
+      <div class="dash-chart-stage">
+        <div class="dash-placeholder">Phase A mock chart stage (clean/lens switching in Phase C)</div>
+      </div>
+      <div class="dash-footer-actions">
+        <button class="dash-chip-btn active" type="button">Clean</button>
+        <button class="dash-chip-btn" type="button">Lens</button>
+        <button class="dash-chip-btn" type="button">Upload</button>
+      </div>
+    </article>
+
+    <article class="dash-card dash-ruling-card">
+      <div class="dash-card-header">
+        <h2>Final Ruling</h2>
+        <span id="dashVerdictBadge" class="dash-status-badge">No Trade</span>
+      </div>
+      <div class="dash-metric-stack">
+        <div class="dash-metric-row"><span>Confidence</span><strong id="dashRulingConfidence">0%</strong></div>
+        <div class="dash-progress"><div id="dashConfidenceFill" class="dash-progress-fill"></div></div>
+        <div class="dash-metric-row"><span>Setup Quality</span><strong id="dashSetupQuality">—</strong></div>
+        <div class="dash-metric-row"><span>Arbiter</span><strong id="dashArbiterState">Awaiting analysis</strong></div>
+        <div class="dash-metric-row"><span>Risk Status</span><strong id="dashRiskState">Unconfirmed</strong></div>
+      </div>
+    </article>
+
+    <article class="dash-card dash-context-card">
+      <div class="dash-card-header"><h2>HTF Context</h2></div>
+      <div class="dash-info-list">
+        <div class="dash-metric-row"><span>Asset</span><strong id="dashAsset">XAUUSD</strong></div>
+        <div class="dash-metric-row"><span>Session</span><strong id="dashSession">NY AM</strong></div>
+        <div class="dash-metric-row"><span>Regime</span><strong id="dashRegime">Trending</strong></div>
+        <div class="dash-metric-row"><span>POI</span><strong id="dashPoi">3348–3354</strong></div>
+      </div>
+    </article>
+
+    <article class="dash-card dash-plan-card">
+      <div class="dash-card-header"><h2>Trade Plan</h2></div>
+      <div class="dash-plan-grid">
+        <div class="dash-plan-box"><span>Entry</span><strong id="dashEntry">3351–3354</strong></div>
+        <div class="dash-plan-box"><span>Invalidation</span><strong id="dashInvalidation">Below 3344</strong></div>
+        <div class="dash-plan-box"><span>TP1</span><strong id="dashTp1">3362</strong></div>
+        <div class="dash-plan-box"><span>TP2</span><strong id="dashTp2">3371</strong></div>
+        <div class="dash-plan-box wide"><span>Min R:R</span><strong id="dashMinRr">1 : 2.1</strong></div>
+      </div>
+    </article>
+
+    <article class="dash-card dash-evidence-card">
+      <div class="dash-card-header"><h2>Evidence / Confluence</h2></div>
+      <div id="dashEvidenceChips" class="dash-chip-group"></div>
+      <div class="dash-metric-row dash-score-row"><span>Confluence Score</span><strong id="dashConfluenceScore">0 / 5</strong></div>
+    </article>
+
+    <article class="dash-card dash-agent-card">
+      <div class="dash-card-header"><h2>Agent Panel</h2></div>
+      <div id="dashAgentRows" class="dash-agent-list"></div>
+    </article>
+  </section>
 
   <div class="steps">
     <div class="step active" onclick="goTo(0)"><span class="step-num">01</span>Setup</div>
