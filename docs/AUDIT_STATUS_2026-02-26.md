@@ -36,3 +36,22 @@
 ## Readiness call
 - **Ready for next step?** **Not yet** for full-phase progression.
 - **Ready for targeted next step?** **Yes** — immediate focus should be fixing the two failing Python CLI integration tests.
+
+---
+
+## Follow-up verification (2026-02-28)
+
+### Re-run results
+- **PASS**: `cd ai_analyst && pytest -q`
+  - 117 passed, 0 failed.
+  - Integration tests in `test_cli_integration_v13.py` now pass.
+- **PASS**: `node --test tests/*.js`
+  - 74/74 tests passed.
+
+### Additional cleanup completed
+- Updated `ai_analyst/pytest.ini` test discovery path from `ai_analyst/tests` to `tests`.
+- Result: pytest no longer emits the `No files were found in testpaths` warning when run from the `ai_analyst/` directory.
+
+### Updated readiness call
+- **Ready for next step?** **Yes** — both shipped surfaces are green.
+- **Best next development option:** proceed with the next planned feature increment (V3 roadmap execution), while keeping both suites as required pre-merge checks.
