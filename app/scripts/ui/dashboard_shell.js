@@ -283,7 +283,7 @@ function setMode(active) {
   const btn = document.getElementById('operatorModeBtn');
   if (btn) {
     btn.classList.toggle('active', active);
-    btn.textContent = `Operator Dashboard: ${active ? 'ON' : 'OFF'}`;
+    btn.textContent = `Operator Dashboard mode: ${active ? 'ON' : 'OFF'}`;
     btn.setAttribute('aria-pressed', String(active));
   }
   const panel = document.getElementById('operatorDashboard');
