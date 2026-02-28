@@ -841,6 +841,7 @@
       <label>Analysis Server URL</label>
       <input type="text" id="analysisServerUrl" placeholder="http://localhost:8000" value="http://localhost:8000">
       <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-ghost" onclick="checkBridgeHealthUI()">Check API Health</button>
         <button class="btn btn-primary" onclick="runBridgeAnalyse()">Run API Analysis</button>
       </div>
       <p id="analysisBridgeStatus" class="hint" style="margin-top:8px;">Idle.</p>

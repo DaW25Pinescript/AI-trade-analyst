@@ -63,3 +63,15 @@ export async function analyseViaBridge(serverUrl, doc = document, fetchImpl = fe
   const formData = buildAnalyseFormData(doc);
   return postAnalyse(serverUrl, formData, fetchImpl);
 }
+
+export async function checkBridgeHealth(serverUrl, fetchImpl = fetch) {
+  const trimmed = (serverUrl || '').trim().replace(/\/$/, '');
+  if (!trimmed) throw new Error('Server URL is required.');
+
+  const response = await fetchImpl(`${trimmed}/health`, { method: 'GET' });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Health check failed (${response.status}): ${detail || response.statusText}`);
+  }
+  return response.json();
+}

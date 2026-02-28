@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildAnalyseFormData, postAnalyse } from '../app/scripts/api_bridge.js';
+import { buildAnalyseFormData, postAnalyse, checkBridgeHealth } from '../app/scripts/api_bridge.js';
 
 function makeDoc(overrides = {}) {
   const map = new Map(Object.entries(overrides));
@@ -57,4 +57,22 @@ test('postAnalyse posts to /analyse and returns JSON', async () => {
   const verdict = await postAnalyse('http://localhost:8000/', fd, fakeFetch);
   assert.equal(verdict.decision, 'NO_TRADE');
   assert.equal(verdict.overall_confidence, 0.4);
+});
+
+
+test('checkBridgeHealth requests /health and returns payload', async () => {
+  const fakeFetch = async (url, options) => {
+    assert.equal(url, 'http://localhost:8000/health');
+    assert.equal(options.method, 'GET');
+    return {
+      ok: true,
+      async json() {
+        return { status: 'ok', version: '1.2.0' };
+      }
+    };
+  };
+
+  const health = await checkBridgeHealth('http://localhost:8000/', fakeFetch);
+  assert.equal(health.status, 'ok');
+  assert.equal(health.version, '1.2.0');
 });
