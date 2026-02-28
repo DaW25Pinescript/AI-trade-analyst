@@ -1,0 +1,22 @@
+services:
+  ai-analyst-api:
+    image: python:3.11-slim
+    working_dir: /workspace
+    command: >
+      bash -lc "pip install -r ai_analyst/requirements.txt &&
+      uvicorn ai_analyst.api.main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8000:8000"
+
+  app-static:
+    image: python:3.11-slim
+    working_dir: /workspace
+    command: python -m http.server 8080
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ai-analyst-api

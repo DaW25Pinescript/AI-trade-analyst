@@ -91,6 +91,18 @@ Then navigate to `/app/` at the URL printed by `serve`.
 
 Double-click `run_ai_trade_analyst_python.bat` — it auto-detects Python, starts the server, and opens the browser.
 
+### Option D: Docker Compose (app + API bridge)
+
+```bash
+docker compose up
+```
+
+Then open:
+- Static app: `http://localhost:8080/app/`
+- AI Analyst API health: `http://localhost:8000/health`
+
+This is the fastest way to run the G11 bridge locally with both services up together.
+
 ### Testing (Node)
 
 Run the Node test suite from the repo root:

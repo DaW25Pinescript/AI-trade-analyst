@@ -17,7 +17,7 @@ import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbit
 import { initDashboard, getLoadedEntries } from './ui/dashboard.js';
 import { exportAnalyticsPDF } from './ui/dashboard.js';
 import { initOperatorDashboard, toggleOperatorDashboard, applyBridgeVerdictToDashboard } from './ui/dashboard_shell.js';
-import { analyseViaBridge } from './api_bridge.js';
+import { analyseViaBridge, checkBridgeHealth } from './api_bridge.js';
 import { mountFinalVerdict } from './verdict_card.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
@@ -142,6 +142,20 @@ function clearSenateArb() {
   if (textarea) textarea.value = '';
 }
 
+
+async function checkBridgeHealthUI() {
+  const serverUrl = document.getElementById('analysisServerUrl')?.value || '';
+  const statusEl = document.getElementById('analysisBridgeStatus');
+  try {
+    if (statusEl) statusEl.textContent = 'Checking /health ...';
+    const payload = await checkBridgeHealth(serverUrl);
+    const version = payload?.version ? ` v${payload.version}` : '';
+    if (statusEl) statusEl.textContent = `API online${version}.`;
+  } catch (error) {
+    if (statusEl) statusEl.textContent = `API offline: ${error.message}`;
+  }
+}
+
 async function runBridgeAnalyse() {
   const serverUrl = document.getElementById('analysisServerUrl')?.value || '';
   const statusEl = document.getElementById('analysisBridgeStatus');
@@ -169,6 +183,7 @@ Object.assign(window, {
   reviseTicket,
   exportAnalyticsPDF,
   runBridgeAnalyse,
+  checkBridgeHealthUI,
   toggleOperatorDashboard,
   // G9: Shadow Mode
   onShadowModeChange, onShadowCaptureWindowChange, onShadowOutcomeInput, saveShadowOutcome
@@ -182,6 +197,8 @@ window.onload = () => {
   initSenatePanel();
   initDashboard();
   initOperatorDashboard();
+
+  checkBridgeHealthUI();
 
   // G8: restore revision linkage if user clicked "Revise This Ticket"
   const pendingRevision = localStorage.getItem('pendingRevisedFromId');
