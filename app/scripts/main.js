@@ -16,7 +16,7 @@ import { generateAnalystPromptTemplate } from './generators/promptGenerator.js';
 import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbiterPanel.js';
 import { initDashboard, getLoadedEntries } from './ui/dashboard.js';
 import { exportAnalyticsPDF } from './ui/dashboard.js';
-import { initOperatorDashboard, toggleOperatorDashboard } from './ui/dashboard_shell.js';
+import { initOperatorDashboard, toggleOperatorDashboard, applyBridgeVerdictToDashboard } from './ui/dashboard_shell.js';
 import { analyseViaBridge } from './api_bridge.js';
 import { mountFinalVerdict } from './verdict_card.js';
 
@@ -150,6 +150,7 @@ async function runBridgeAnalyse() {
     if (statusEl) statusEl.textContent = 'Running /analyse ...';
     const verdict = await analyseViaBridge(serverUrl);
     mountFinalVerdict(resultEl, verdict);
+    applyBridgeVerdictToDashboard(verdict);
     if (statusEl) statusEl.textContent = 'Analysis complete.';
   } catch (error) {
     if (statusEl) statusEl.textContent = `Error: ${error.message}`;
