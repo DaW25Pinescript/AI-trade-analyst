@@ -60,6 +60,7 @@ class GroundTruthPacket(BaseModel):
     version: str = "1.2"
     timestamp_utc: datetime = Field(default_factory=datetime.utcnow)
     run_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source_ticket_id: Optional[str] = None  # v2.0: originating app ticket ID for traceability
     instrument: str                    # e.g. "XAUUSD"
     session: str                       # e.g. "NY", "London", "Asia"
     timeframes: list[str]              # e.g. ["H4", "M15", "M5"]

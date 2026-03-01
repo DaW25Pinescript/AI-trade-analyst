@@ -8,7 +8,7 @@ POST /analyse
     - Accepts chart images as multipart file uploads
     - Accepts market parameters as form fields
     - Runs the full LangGraph pipeline (two-phase when 15M overlay is provided)
-    - Returns the FinalVerdict as JSON
+    - Returns AnalysisResponse: { verdict, ticket_draft, run_id, source_ticket_id }
 
 GET /health
     - Liveness check
@@ -19,6 +19,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from ..models.ground_truth import (
     GroundTruthPacket,
@@ -34,15 +35,33 @@ from ..models.lens_config import LensConfig
 from ..models.arbiter_output import FinalVerdict
 from ..graph.pipeline import build_analysis_graph
 from ..graph.state import GraphState
+from ..output.ticket_draft import build_ticket_draft
+
+
+class AnalysisResponse(BaseModel):
+    """
+    v2.0 response envelope for POST /analyse.
+
+    Wraps the full FinalVerdict alongside a partial ticket_draft dict that
+    the browser app can use to pre-populate its ticket form, plus
+    traceability fields linking this analysis run to an originating ticket.
+    """
+
+    verdict: FinalVerdict
+    ticket_draft: dict
+    run_id: str
+    source_ticket_id: Optional[str] = None
 
 app = FastAPI(
     title="AI Trade Analyst — Multi-Model Pipeline",
-    version="1.2.0",
+    version="2.0.0",
     description=(
         "Deterministic, auditable multi-AI trade analysis. "
         "Multiple independent analyst models feed a single Arbiter verdict. "
         "Supports lens-aware screenshot handling: 3 clean price charts + "
-        "optional 15M ICT overlay with isolated two-phase analysis."
+        "optional 15M ICT overlay with isolated two-phase analysis. "
+        "v2.0: POST /analyse returns an AnalysisResponse envelope including "
+        "a ticket_draft block for direct browser app import."
     ),
 )
 
@@ -51,10 +70,10 @@ _graph = build_analysis_graph()
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "1.2.0"}
+    return {"status": "ok", "version": "2.0.0"}
 
 
-@app.post("/analyse", response_model=FinalVerdict)
+@app.post("/analyse", response_model=AnalysisResponse)
 async def analyse(
     # Market identity
     instrument: str = Form(..., description="e.g. XAUUSD"),
@@ -96,6 +115,12 @@ async def analyse(
         None,
         description="15M ICT indicator overlay screenshot (optional). "
                     "Triggers isolated overlay delta analysis phase.",
+    ),
+    # ─── v2.0 traceability ───────────────────────────────────────────────────
+    source_ticket_id: Optional[str] = Form(
+        None,
+        description="v2.0: Originating app ticket ID for traceability. "
+                    "When supplied, echoed in the response and embedded in ticket_draft.",
     ),
     overlay_indicator_source: str = Form(
         "TradingView",
@@ -186,6 +211,7 @@ async def analyse(
     # ── Assemble Ground Truth Packet (immutable after creation) ─────────────
     try:
         ground_truth = GroundTruthPacket(
+            source_ticket_id=source_ticket_id or None,
             instrument=instrument,
             session=session,
             timeframes=tf_list,
@@ -238,4 +264,12 @@ async def analyse(
         raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
 
     verdict: FinalVerdict = final_state["final_verdict"]
-    return JSONResponse(content=verdict.model_dump())
+    ticket_draft = build_ticket_draft(verdict, ground_truth)
+
+    response = AnalysisResponse(
+        verdict=verdict,
+        ticket_draft=ticket_draft,
+        run_id=ground_truth.run_id,
+        source_ticket_id=ground_truth.source_ticket_id,
+    )
+    return JSONResponse(content=response.model_dump())

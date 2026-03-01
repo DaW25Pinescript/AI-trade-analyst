@@ -40,7 +40,7 @@ test('buildAnalyseFormData builds required scalar payload', () => {
   assert.equal(fd.get('timeframes'), '["H4","M15","M5"]');
 });
 
-test('postAnalyse posts to /analyse and returns JSON', async () => {
+test('postAnalyse posts to /analyse and returns v2.0 envelope JSON', async () => {
   const fakeFetch = async (url, options) => {
     assert.equal(url, 'http://localhost:8000/analyse');
     assert.equal(options.method, 'POST');
@@ -48,15 +48,25 @@ test('postAnalyse posts to /analyse and returns JSON', async () => {
     return {
       ok: true,
       async json() {
-        return { decision: 'NO_TRADE', overall_confidence: 0.4 };
+        // v2.0 envelope: { verdict, ticket_draft, run_id, source_ticket_id }
+        return {
+          verdict: { decision: 'NO_TRADE', overall_confidence: 0.4 },
+          ticket_draft: { decisionMode: 'WAIT', rawAIReadBias: 'Bearish', shadowMode: false },
+          run_id: 'run-abc-123',
+          source_ticket_id: null,
+        };
       }
     };
   };
 
   const fd = new FormData();
-  const verdict = await postAnalyse('http://localhost:8000/', fd, fakeFetch);
-  assert.equal(verdict.decision, 'NO_TRADE');
-  assert.equal(verdict.overall_confidence, 0.4);
+  const response = await postAnalyse('http://localhost:8000/', fd, fakeFetch);
+  // Bridge passes the envelope through; callers unpack response.verdict
+  assert.equal(response.verdict.decision, 'NO_TRADE');
+  assert.equal(response.verdict.overall_confidence, 0.4);
+  assert.equal(response.ticket_draft.decisionMode, 'WAIT');
+  assert.equal(response.run_id, 'run-abc-123');
+  assert.equal(response.source_ticket_id, null);
 });
 
 test('postAnalyse retries once on transient 503 and then succeeds', async () => {
@@ -77,19 +87,24 @@ test('postAnalyse retries once on transient 503 and then succeeds', async () => 
     return {
       ok: true,
       async json() {
-        return { decision: 'LONG', overall_confidence: 0.71 };
+        return {
+          verdict: { decision: 'LONG', overall_confidence: 0.71 },
+          ticket_draft: { decisionMode: 'LONG' },
+          run_id: 'run-retry-test',
+          source_ticket_id: null,
+        };
       }
     };
   };
 
-  const verdict = await postAnalyse('http://localhost:8000/', new FormData(), fakeFetch, {
+  const response = await postAnalyse('http://localhost:8000/', new FormData(), fakeFetch, {
     retries: 1,
     retryDelayMs: 0,
     timeoutMs: 500,
   });
 
   assert.equal(calls, 2);
-  assert.equal(verdict.decision, 'LONG');
+  assert.equal(response.verdict.decision, 'LONG');
 });
 
 test('postAnalyse surfaces timeout errors after retries exhausted', async () => {
