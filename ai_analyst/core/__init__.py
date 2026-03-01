@@ -6,7 +6,6 @@ from .json_extractor import extract_json
 from .api_key_manager import check_model_availability, get_available_models, suggest_execution_mode
 from .prompt_pack_generator import PromptPackGenerator
 from .run_state_manager import save_run_state, load_run_state, transition, list_all_runs
-from .execution_router import ExecutionRouter, build_execution_config
 
 __all__ = [
     "load_active_lens_contracts",
@@ -26,6 +25,4 @@ __all__ = [
     "load_run_state",
     "transition",
     "list_all_runs",
-    "ExecutionRouter",
-    "build_execution_config",
 ]

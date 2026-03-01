@@ -10,5 +10,6 @@ class GraphState(TypedDict):
     lens_config: LensConfig
     analyst_outputs: list[AnalystOutput]           # Phase 1 — clean price analysis outputs
     overlay_delta_reports: list[OverlayDeltaReport]  # Phase 2 — 15M overlay delta reports (empty if no overlay)
+    chart_analysis_runtime: Optional[dict]
     final_verdict: Optional[FinalVerdict]
     error: Optional[str]
