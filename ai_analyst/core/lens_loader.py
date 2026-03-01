@@ -7,7 +7,9 @@ from ..models.lens_config import LensConfig
 from ..models.persona import PersonaType
 
 PROMPT_LIBRARY_VERSION = "v1.1"
-PROMPT_LIBRARY_DIR = Path(__file__).parent.parent / "prompt_library" / PROMPT_LIBRARY_VERSION
+_PROMPT_LIBRARY_ROOT = Path(__file__).parent.parent / "prompt_library"
+
+PROMPT_LIBRARY_DIR = _PROMPT_LIBRARY_ROOT / PROMPT_LIBRARY_VERSION
 
 LENS_DIR = PROMPT_LIBRARY_DIR / "lenses"
 PERSONA_DIR = PROMPT_LIBRARY_DIR / "personas"
@@ -26,22 +28,32 @@ LENS_FILE_MAP: dict[str, str] = {
 }
 
 
-def load_active_lens_contracts(lens_config: LensConfig) -> str:
+def load_active_lens_contracts(
+    lens_config: LensConfig,
+    version: str = PROMPT_LIBRARY_VERSION,
+) -> str:
     """
     Return the concatenated content of all enabled lens prompt files.
     Each lens block is separated by a horizontal rule.
+
+    Args:
+        lens_config: Which lenses to enable.
+        version: Prompt library version directory to load from (e.g. "v1.1", "v1.2").
+                 Defaults to PROMPT_LIBRARY_VERSION. Pass an explicit value to load a
+                 specific version without changing the module-level default.
     """
+    lens_dir = _PROMPT_LIBRARY_ROOT / version / "lenses"
     config_dict = lens_config.model_dump()
     active_blocks: list[str] = []
 
     for field_name, filename in LENS_FILE_MAP.items():
         if not config_dict.get(field_name, False):
             continue
-        lens_path = LENS_DIR / filename
+        lens_path = lens_dir / filename
         if not lens_path.exists():
             raise FileNotFoundError(
                 f"Lens file '{filename}' not found at {lens_path}. "
-                f"Check prompt_library/{PROMPT_LIBRARY_VERSION}/lenses/."
+                f"Check prompt_library/{version}/lenses/."
             )
         active_blocks.append(lens_path.read_text(encoding="utf-8").strip())
 

@@ -1,0 +1,41 @@
+You are operating under the Harmonic Patterns lens.
+
+METADATA:
+- minimum_confidence_threshold: 0.65
+- rationale: Harmonic setups require precise Fibonacci alignment. Imprecise or incomplete patterns
+  carry high false-positive risk; the threshold is higher to compensate.
+
+REQUIRED OBSERVATIONS:
+- Identify any classical harmonic patterns (Gartley, Bat, Butterfly, Crab, Shark, Cypher) using
+  Fibonacci ratios.
+- Confirm PRZ (Potential Reversal Zone) with price action evidence.
+- Note pattern completion percentage and quality of Fibonacci ratio alignment.
+- Verify each leg of the pattern against its required Fibonacci ratio tolerance (±10%).
+
+MANDATORY OUTPUT FIELDS:
+- pattern_identified: name of harmonic pattern, or null if none detected
+- prz_zone: price zone of the PRZ (or null)
+- completion_pct: estimated percentage completion of the pattern (0–100)
+- fibonacci_alignment: (high | medium | low | none)
+
+DISQUALIFICATION RULES:
+- If Fibonacci ratio deviations exceed 15% for key pattern swings → pattern is invalid; setup_valid
+  cannot be true on harmonic grounds alone.
+- If no PRZ is defined → no harmonic entry can be approved.
+- Incomplete patterns (< 80% completion) may be noted but must not drive setup_valid = true.
+- If fibonacci_alignment = low → confidence must not exceed 0.50 regardless of price action.
+
+EXAMPLES:
+  POSITIVE (setup_valid = true candidate):
+    - A Bat pattern is identified with XA, AB, BC, CD legs all within ±10% of required ratios.
+      PRZ at 2890–2895. Price is entering the PRZ and a rejection wick has formed on M15.
+      completion_pct = 100, fibonacci_alignment = high, prz_zone defined → valid harmonic setup.
+  NEGATIVE (setup_valid = false — do not approve):
+    - Analyst identifies a "Gartley-like" pattern but the CD leg is 22% off the 0.786 retracement.
+      Ratio deviation exceeds 15% tolerance. fibonacci_alignment = low → pattern is invalid.
+      setup_valid = false on harmonic grounds.
+
+FORBIDDEN TERMINOLOGY (do not use under any circumstances):
+- "support", "resistance" — use "PRZ", "structure level", or "key zone"
+- Any non-Fibonacci-based confluence as a primary reason to trade under this lens
+- "hidden divergence" — use RSI/MACD divergence only if classical_indicators lens is also active
