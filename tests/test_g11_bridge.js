@@ -59,6 +59,52 @@ test('postAnalyse posts to /analyse and returns JSON', async () => {
   assert.equal(verdict.overall_confidence, 0.4);
 });
 
+test('postAnalyse retries once on transient 503 and then succeeds', async () => {
+  let calls = 0;
+  const fakeFetch = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return {
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        async text() {
+          return 'upstream timeout';
+        }
+      };
+    }
+
+    return {
+      ok: true,
+      async json() {
+        return { decision: 'LONG', overall_confidence: 0.71 };
+      }
+    };
+  };
+
+  const verdict = await postAnalyse('http://localhost:8000/', new FormData(), fakeFetch, {
+    retries: 1,
+    retryDelayMs: 0,
+    timeoutMs: 500,
+  });
+
+  assert.equal(calls, 2);
+  assert.equal(verdict.decision, 'LONG');
+});
+
+test('postAnalyse surfaces timeout errors after retries exhausted', async () => {
+  const fakeFetch = (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+  });
+
+  await assert.rejects(
+    () => postAnalyse('http://localhost:8000/', new FormData(), fakeFetch, {
+      retries: 0,
+      timeoutMs: 20,
+    }),
+    /Request timed out after 20ms/
+  );
+});
 
 test('checkBridgeHealth requests /health and returns payload', async () => {
   const fakeFetch = async (url, options) => {
