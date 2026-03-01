@@ -1,0 +1,70 @@
+{
+  "_comment": "Canonical enum values extracted from ticket.schema.json and aar.schema.json. Single source of truth for UI components and cross-language tests. Do NOT edit values here directly — the schema files are authoritative. Update both together if values change.",
+  "_source": {
+    "ticket": "docs/schema/ticket.schema.json",
+    "aar": "docs/schema/aar.schema.json"
+  },
+  "ticket": {
+    "counterTrendMode": ["Strict HTF-only", "Mixed", "Full OK"],
+    "rawAIReadBias": ["", "Bullish", "Bearish", "Neutral", "Range"],
+    "decisionMode": ["LONG", "SHORT", "WAIT", "CONDITIONAL"],
+    "ticketType": ["Zone ticket", "Exact ticket"],
+    "entryType": ["Market", "Limit", "Stop"],
+    "entryTrigger": [
+      "Pullback to zone",
+      "Break + retest",
+      "Sweep + reclaim",
+      "Close above/below level",
+      "Momentum shift (MSS/BOS)"
+    ],
+    "confirmationTF": ["1m", "5m", "15m", "1H"],
+    "timeInForce": ["This session", "Next 1H", "24H", "Custom"],
+    "stopLogic": [
+      "Below swing low / above swing high",
+      "Below zone",
+      "ATR-based",
+      "Structure-based + buffer"
+    ],
+    "targetLabel": ["TP1", "TP2", "TP3"],
+    "gateStatus": ["INCOMPLETE", "PROCEED", "CAUTION", "WAIT"],
+    "waitReasonCode": [
+      "",
+      "Chop / range noise",
+      "HTF-LTF conflict",
+      "No POI / poor R:R",
+      "News risk / volatility",
+      "Already moved / late trend"
+    ],
+    "checklist.htfState": ["Trending", "Ranging", "Transition"],
+    "checklist.htfLocation": ["At POI", "Mid-range", "At extremes"],
+    "checklist.ltfAlignment": ["Aligned", "Counter-trend", "Mixed"],
+    "checklist.liquidityContext": ["Near obvious highs/lows", "Equilibrium", "None identified"],
+    "checklist.volRisk": ["Normal", "Elevated"],
+    "checklist.execQuality": ["Clean", "Messy", "Chop"],
+    "checklist.conviction": ["Very High", "High", "Medium", "Low"],
+    "checklist.edgeTag": [
+      "High-probability pullback",
+      "Liquidity grab",
+      "FVG reclaim",
+      "Structure BOS",
+      "Range boundary",
+      "Other"
+    ],
+    "screenshots.cleanCharts.timeframe": ["H4", "H1", "M15", "M5"]
+  },
+  "aar": {
+    "outcomeEnum": ["WIN", "LOSS", "BREAKEVEN", "MISSED", "SCRATCH"],
+    "verdictEnum": ["PLAN_FOLLOWED", "PLAN_VIOLATION", "PROCESS_GOOD", "PROCESS_POOR"],
+    "exitReasonEnum": ["TP_HIT", "SL_HIT", "TIME_EXIT", "MANUAL_EXIT", "INVALIDATION", "NO_FILL"],
+    "failureReasonCodes": [
+      "LATE_ENTRY",
+      "OVERSIZED_RISK",
+      "IGNORED_GATE",
+      "MISREAD_STRUCTURE",
+      "NEWS_BLINDSPOT",
+      "EMOTIONAL_EXECUTION",
+      "NO_EDGE"
+    ],
+    "psychologicalTag": ["CALM", "FOMO", "HESITATION", "REVENGE", "OVERCONFIDENCE", "FATIGUE", "DISCIPLINED"]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "_comment": "Deterministic FinalVerdict fixture for test_schema_round_trip.py. No live API calls. Paired with examples/sample_ticket.json (XAUUSD_260223_0930, CONDITIONAL → ENTER_LONG).",
+  "final_bias": "Bullish — demand zone held, HTF structure intact",
+  "decision": "ENTER_LONG",
+  "approved_setups": [
+    {
+      "type": "Pullback to demand zone",
+      "entry_zone": "1932.5–1934.0",
+      "stop": "1929.8 — below session low sweep",
+      "targets": ["TP1: 1937.2", "TP2: 1941.6"],
+      "rr_estimate": 2.1,
+      "confidence": 0.78,
+      "indicator_dependent": false
+    }
+  ],
+  "no_trade_conditions": ["Cancel if 1H candle closes below 1930.0"],
+  "overall_confidence": 0.78,
+  "analyst_agreement_pct": 75,
+  "risk_override_applied": false,
+  "arbiter_notes": "Three of four analysts aligned on long direction. Demand zone clean, structure intact. Prosecutor dissent noted regarding entry timing.",
+  "audit_log": {
+    "run_id": "test-xauusd-20260223-0930",
+    "analysts_received": 4,
+    "analysts_valid": 3,
+    "htf_consensus": true,
+    "setup_consensus": true,
+    "risk_override": false,
+    "overlay_provided": false,
+    "indicator_dependent_setups": 0
+  },
+  "overlay_was_provided": false,
+  "indicator_dependent": false,
+  "indicator_dependency_notes": null
+}
