@@ -6,7 +6,7 @@ from ..models.analyst_output import AnalystOutput
 from ..models.arbiter_output import FinalVerdict
 
 LOG_DIR = Path(__file__).parent.parent / "logs" / "runs"
-PROMPT_VERSION = "v1.1"
+PROMPT_VERSION = "v1.2"
 
 
 def log_run(

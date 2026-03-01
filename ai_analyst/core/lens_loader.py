@@ -6,7 +6,7 @@ from pathlib import Path
 from ..models.lens_config import LensConfig
 from ..models.persona import PersonaType
 
-PROMPT_LIBRARY_VERSION = "v1.1"
+PROMPT_LIBRARY_VERSION = "v1.2"
 _PROMPT_LIBRARY_ROOT = Path(__file__).parent.parent / "prompt_library"
 
 PROMPT_LIBRARY_DIR = _PROMPT_LIBRARY_ROOT / PROMPT_LIBRARY_VERSION
