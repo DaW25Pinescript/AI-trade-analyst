@@ -29,8 +29,8 @@ EXAMPLES:
   NEGATIVE (setup_valid = false — do not approve):
     - Price dips below a recent low but recovers with a single doji candle — no displacement.
       No FVG printed. sweep_status = yes but displacement_quality = none → setup_valid = false.
-    - Analyst labels a zone as "support held" without referencing a swept liquidity pool or
-      displacement — forbidden framing, reframe in ICT terms or disqualify.
+    - Analyst labels a zone as "price held here" without referencing a swept liquidity pool or
+      displacement — generic framing with no ICT basis; reframe in ICT terms or disqualify.
 
 FORBIDDEN TERMINOLOGY (do not use under any circumstances):
 - "support", "resistance", "fib retracement", "moving average crossover", "RSI divergence",

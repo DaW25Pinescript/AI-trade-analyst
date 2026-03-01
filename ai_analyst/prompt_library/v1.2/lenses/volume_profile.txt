@@ -31,7 +31,7 @@ EXAMPLES:
   POSITIVE (setup_valid = true candidate):
     - Price has broken above the VAH from below and is now trading in a LVN zone above it. LVN zones
       act as fast-travel areas — price tends to accelerate through them. price_position = above_va,
-      lvn_zones includes current price area → supports a continuation long with tighter stop.
+      lvn_zones includes current price area → adds confluence for a continuation long with tighter stop.
   NEGATIVE (setup_valid = false — do not approve):
     - Volume profile shows a large HVN directly above current price. Price is mid-range inside the
       Value Area. No LVN to accelerate through. price_position = inside_va → continuation momentum
