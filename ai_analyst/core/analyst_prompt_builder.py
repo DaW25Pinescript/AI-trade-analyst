@@ -11,6 +11,7 @@ The two phases use SEPARATE API calls with ISOLATED context to prevent the model
 from anchoring on indicator data during the clean price analysis phase.
 """
 import json
+from pathlib import Path
 from ..models.ground_truth import GroundTruthPacket
 from ..models.lens_config import LensConfig
 from ..models.persona import PersonaType
@@ -47,6 +48,19 @@ OVERLAY_DELTA_SCHEMA = """{
   "contradicts": ["array of items where the overlay contradicts the clean-price reading"],
   "indicator_only_claims": ["array of constructs visible only in the overlay, not in price"]
 }"""
+
+CHART_READER_ENGINE_PATH = (
+    Path(__file__).parent.parent / "prompt_library" / "00_chart_reader_engine_v1.md"
+)
+
+
+def load_chart_reader_engine() -> str:
+    """Load the strict chart-reader grounding contract used when images are attached."""
+    if not CHART_READER_ENGINE_PATH.exists():
+        raise FileNotFoundError(
+            f"Chart Reader Engine prompt not found at {CHART_READER_ENGINE_PATH}."
+        )
+    return CHART_READER_ENGINE_PATH.read_text(encoding="utf-8").strip()
 
 
 def build_analyst_prompt(
@@ -225,6 +239,10 @@ def build_messages(prompt: dict) -> list[dict]:
     """
     # Merge persona into system prompt
     system_content = prompt["system"]
+    if any(img_data for img_data in (prompt.get("images") or {}).values()):
+        chart_reader_engine = load_chart_reader_engine()
+        system_content = f"{chart_reader_engine}\n\n{system_content}"
+
     if prompt.get("developer"):
         system_content += f"\n\n=== ANALYST PERSONA ===\n{prompt['developer']}"
 

@@ -324,3 +324,34 @@ class TestBuildMessages:
         user_content = next(m["content"] for m in messages if m["role"] == "user")
         image_blocks = [c for c in user_content if c.get("type") == "image_url"]
         assert len(image_blocks) == 1  # only the overlay
+
+
+class TestBuildMessagesChartReaderEngine:
+    def test_prepends_chart_reader_engine_when_images_exist(self):
+        prompt = {
+            "system": "SYSTEM CORE",
+            "developer": "PERSONA",
+            "user": "USER",
+            "images": {"H1": "b64img"},
+        }
+
+        messages = build_messages(prompt)
+
+        system_content = messages[0]["content"]
+        assert system_content.startswith("# CHART READER ENGINE v1")
+        assert "SYSTEM CORE" in system_content
+        assert "=== ANALYST PERSONA ===\nPERSONA" in system_content
+
+    def test_skips_chart_reader_engine_when_no_images_exist(self):
+        prompt = {
+            "system": "SYSTEM CORE",
+            "developer": "PERSONA",
+            "user": "USER",
+            "images": {},
+        }
+
+        messages = build_messages(prompt)
+
+        system_content = messages[0]["content"]
+        assert system_content.startswith("SYSTEM CORE")
+        assert "CHART READER ENGINE" not in system_content
