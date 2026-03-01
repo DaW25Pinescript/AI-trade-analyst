@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
 **Version:** 2.0
-**Updated:** 2026-02-24
-**Status:** Active — both tracks in parallel development
+**Updated:** 2026-03-01
+**Status:** Active — G11 stabilization complete, moving to G12/v1.4 execution
 
 ---
 
@@ -12,12 +12,17 @@ two-track architecture:
 
 | Track | Directory | Runtime | Current Version |
 |-------|-----------|---------|-----------------|
-| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G11 in progress |
+| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G11 complete, G12 next |
 | **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v1.3 complete, v1.4 next |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
 G6/v2.0 onwards.
+
+### Current verification snapshot (2026-03-01)
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **77/77 passing**.
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **119/119 passing**.
+- Operational call: baseline is healthy; focus shifts from error-fix work to roadmap execution (G12 + v1.4).
 
 ---
 
