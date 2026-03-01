@@ -217,6 +217,15 @@ Each run dispatches four analyst personas:
 
 An Arbiter node synthesizes all analyst outputs into a `FinalVerdict` with a trade decision, approved setups, confidence score, and no-trade conditions.
 
+### AI Analysis Pipeline
+
+The chart-analysis runtime now includes a modular orchestration layer under `ai_analyst/prompt_library/chart_analysis/`:
+
+- `runtime.orchestrator.md` defines the mandatory sequence: `base → auto_detect → selected lenses → arbiter`.
+- LangGraph wiring mirrors this sequence with nodes `chart_base`, `chart_auto_detect`, `chart_lenses`, `run_arbiter`, plus optional `pinekraft_bridge`.
+- Existing CLI lens toggles (for example `--lens-ict`, `--lens-ms`, `--lens-trendlines`) remain authoritative user overrides.
+- User-facing synthesis remains arbiter-first; raw lens-level outputs are treated as internal analysis context.
+
 ### Testing (pytest)
 
 ```bash

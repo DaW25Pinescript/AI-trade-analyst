@@ -16,6 +16,7 @@ from ..models.lens_config import LensConfig
 from ..models.persona import PersonaType
 from ..models.analyst_output import AnalystOutput
 from .lens_loader import load_active_lens_contracts, load_persona_prompt
+from .chart_analysis_runtime import load_chart_analysis_component, resolve_chart_lenses
 
 OUTPUT_SCHEMA = """{
   "htf_bias": "bullish | bearish | neutral | ranging",
@@ -64,6 +65,14 @@ def build_analyst_prompt(
     The overlay delta is handled by build_overlay_delta_prompt() in a separate call.
     """
     active_lenses = load_active_lens_contracts(lens_config)
+    selected_chart_lenses = resolve_chart_lenses(ground_truth, lens_config)
+    chart_runtime = load_chart_analysis_component("runtime_orchestrator")
+    chart_base = load_chart_analysis_component("base")
+    chart_auto_detect = load_chart_analysis_component("auto_detect")
+    chart_arbiter = load_chart_analysis_component("arbiter")
+    chart_lens_blocks = "\n\n---\n\n".join(
+        load_chart_analysis_component(lens_name) for lens_name in selected_chart_lenses
+    )
     persona_prompt = load_persona_prompt(persona)
 
     system_prompt = f"""You are a professional trading analyst.
@@ -78,6 +87,23 @@ This baseline is used as ground truth before any indicator input is considered.
 
 === ACTIVE LENS CONTRACTS ===
 {active_lenses}
+
+=== MODULAR CHART ANALYSIS RUNTIME (BASE → AUTO-DETECT → SELECTED LENSES → ARBITER) ===
+{chart_runtime}
+
+Selected chart-analysis lenses (resolved from CLI overrides + typed metadata): {', '.join(selected_chart_lenses)}
+
+=== CHART BASE ===
+{chart_base}
+
+=== CHART AUTO-DETECT HEURISTICS ===
+{chart_auto_detect}
+
+=== CHART SELECTED LENS CONTRACTS ===
+{chart_lens_blocks}
+
+=== CHART ARBITER CONTRACT ===
+{chart_arbiter}
 
 === OUTPUT SCHEMA ===
 You must return a JSON object matching this schema exactly.
