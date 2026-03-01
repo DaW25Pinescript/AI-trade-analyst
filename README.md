@@ -122,7 +122,26 @@ node --test tests/*.js
 pytest -q ai_analyst/tests
 ```
 
+Or use the Makefile shorthand (requires `make`):
+
+```bash
+make test-all   # runs both suites in sequence
+make test-web   # Node suite only
+make test-ai    # pytest suite only
+```
+
 If either command fails, fix the issue before pushing so branch status stays merge-ready.
+
+### Makefile quick reference
+
+| Target | Command equivalent |
+|---|---|
+| `make test-web` | `node --test tests/*.js` |
+| `make test-ai` | `cd ai_analyst && pytest -q` |
+| `make test-all` | both of the above |
+| `make run-web` | `python3 -m http.server 8080` → `http://localhost:8080/app/` |
+| `make run-api` | `python3 -m uvicorn ai_analyst.api.main:app --host 0.0.0.0 --port 8000` |
+| `make run-docker` | `docker compose up` |
 
 ---
 
