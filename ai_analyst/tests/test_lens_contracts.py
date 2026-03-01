@@ -195,11 +195,12 @@ class TestV12LensFiles:
 class TestVersionSelection:
     """load_active_lens_contracts version parameter selects correct library."""
 
-    def test_default_version_loads_v11(self):
+    def test_default_version_loads_v12(self):
         config = LensConfig(ICT_ICC=True)
         result = load_active_lens_contracts(config)
-        # v1.1 ict_icc.txt does not have METADATA block
-        assert "METADATA:" not in result
+        assert "METADATA:" in result
+        assert "minimum_confidence_threshold" in result
+        assert "EXAMPLES:" in result
 
     def test_explicit_v11_loads_v11(self):
         config = LensConfig(ICT_ICC=True)
@@ -231,5 +232,5 @@ class TestVersionSelection:
         assert "ICT/ICC" in result
         assert "Market Structure" in result
 
-    def test_default_version_constant_is_v11(self):
-        assert PROMPT_LIBRARY_VERSION == "v1.1"
+    def test_default_version_constant_is_v12(self):
+        assert PROMPT_LIBRARY_VERSION == "v1.2"
