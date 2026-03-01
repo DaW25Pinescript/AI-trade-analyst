@@ -1,0 +1,539 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Trade Analyst \u2014 Multi-Model Pipeline",
+    "description": "Deterministic, auditable multi-AI trade analysis. Multiple independent analyst models feed a single Arbiter verdict. Supports lens-aware screenshot handling: 3 clean price charts + optional 15M ICT overlay with isolated two-phase analysis. v2.0: POST /analyse returns an AnalysisResponse envelope including a ticket_draft block for direct browser app import.",
+    "version": "2.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analyse": {
+      "post": {
+        "summary": "Analyse",
+        "operationId": "analyse_analyse_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyse_analyse_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalysisResponse": {
+        "properties": {
+          "verdict": {
+            "$ref": "#/components/schemas/FinalVerdict"
+          },
+          "ticket_draft": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ticket Draft"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "source_ticket_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ticket Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict",
+          "ticket_draft",
+          "run_id"
+        ],
+        "title": "AnalysisResponse",
+        "description": "v2.0 response envelope for POST /analyse.\n\nWraps the full FinalVerdict alongside a partial ticket_draft dict that\nthe browser app can use to pre-populate its ticket form, plus\ntraceability fields linking this analysis run to an originating ticket."
+      },
+      "ApprovedSetup": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "entry_zone": {
+            "type": "string",
+            "title": "Entry Zone"
+          },
+          "stop": {
+            "type": "string",
+            "title": "Stop"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "rr_estimate": {
+            "type": "number",
+            "title": "Rr Estimate"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "indicator_dependent": {
+            "type": "boolean",
+            "title": "Indicator Dependent",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "entry_zone",
+          "stop",
+          "targets",
+          "rr_estimate",
+          "confidence"
+        ],
+        "title": "ApprovedSetup"
+      },
+      "AuditLog": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "analysts_received": {
+            "type": "integer",
+            "title": "Analysts Received"
+          },
+          "analysts_valid": {
+            "type": "integer",
+            "title": "Analysts Valid"
+          },
+          "htf_consensus": {
+            "type": "boolean",
+            "title": "Htf Consensus"
+          },
+          "setup_consensus": {
+            "type": "boolean",
+            "title": "Setup Consensus"
+          },
+          "risk_override": {
+            "type": "boolean",
+            "title": "Risk Override"
+          },
+          "overlay_provided": {
+            "type": "boolean",
+            "title": "Overlay Provided",
+            "default": false
+          },
+          "indicator_dependent_setups": {
+            "type": "integer",
+            "title": "Indicator Dependent Setups",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "analysts_received",
+          "analysts_valid",
+          "htf_consensus",
+          "setup_consensus",
+          "risk_override"
+        ],
+        "title": "AuditLog"
+      },
+      "Body_analyse_analyse_post": {
+        "properties": {
+          "instrument": {
+            "type": "string",
+            "title": "Instrument",
+            "description": "e.g. XAUUSD"
+          },
+          "session": {
+            "type": "string",
+            "title": "Session",
+            "description": "e.g. NY, London, Asia"
+          },
+          "timeframes": {
+            "type": "string",
+            "title": "Timeframes",
+            "description": "JSON array, e.g. [\"H4\",\"M15\",\"M5\"]"
+          },
+          "account_balance": {
+            "type": "number",
+            "title": "Account Balance"
+          },
+          "min_rr": {
+            "type": "number",
+            "title": "Min Rr",
+            "default": 2.0
+          },
+          "max_risk_per_trade": {
+            "type": "number",
+            "title": "Max Risk Per Trade",
+            "default": 0.5
+          },
+          "max_daily_risk": {
+            "type": "number",
+            "title": "Max Daily Risk",
+            "default": 2.0
+          },
+          "no_trade_windows": {
+            "type": "string",
+            "title": "No Trade Windows",
+            "description": "JSON array of window names",
+            "default": "[\"FOMC\",\"NFP\"]"
+          },
+          "market_regime": {
+            "type": "string",
+            "title": "Market Regime",
+            "description": "trending | ranging | unknown",
+            "default": "unknown"
+          },
+          "news_risk": {
+            "type": "string",
+            "title": "News Risk",
+            "default": "none_noted"
+          },
+          "open_positions": {
+            "type": "string",
+            "title": "Open Positions",
+            "description": "JSON array of open position descriptions",
+            "default": "[]"
+          },
+          "lens_ict_icc": {
+            "type": "boolean",
+            "title": "Lens Ict Icc",
+            "default": true
+          },
+          "lens_market_structure": {
+            "type": "boolean",
+            "title": "Lens Market Structure",
+            "default": true
+          },
+          "lens_orderflow": {
+            "type": "boolean",
+            "title": "Lens Orderflow",
+            "default": false
+          },
+          "lens_trendlines": {
+            "type": "boolean",
+            "title": "Lens Trendlines",
+            "default": false
+          },
+          "lens_classical": {
+            "type": "boolean",
+            "title": "Lens Classical",
+            "default": false
+          },
+          "lens_harmonic": {
+            "type": "boolean",
+            "title": "Lens Harmonic",
+            "default": false
+          },
+          "lens_smt": {
+            "type": "boolean",
+            "title": "Lens Smt",
+            "default": false
+          },
+          "lens_volume_profile": {
+            "type": "boolean",
+            "title": "Lens Volume Profile",
+            "default": false
+          },
+          "chart_h4": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart H4",
+            "description": "4H clean price chart"
+          },
+          "chart_h1": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart H1",
+            "description": "1H clean price chart"
+          },
+          "chart_m15": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart M15",
+            "description": "15M clean price chart (mandatory for overlay)"
+          },
+          "chart_m5": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart M5",
+            "description": "5M clean price chart"
+          },
+          "chart_m15_overlay": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart M15 Overlay",
+            "description": "15M ICT indicator overlay screenshot (optional). Triggers isolated overlay delta analysis phase."
+          },
+          "source_ticket_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ticket Id",
+            "description": "v2.0: Originating app ticket ID for traceability. When supplied, echoed in the response and embedded in ticket_draft."
+          },
+          "overlay_indicator_source": {
+            "type": "string",
+            "title": "Overlay Indicator Source",
+            "description": "Platform/script providing the ICT overlay (e.g. TradingView)",
+            "default": "TradingView"
+          },
+          "overlay_settings_locked": {
+            "type": "boolean",
+            "title": "Overlay Settings Locked",
+            "description": "Confirms indicator settings are locked and consistent across sessions.",
+            "default": true
+          },
+          "overlay_indicator_claims": {
+            "type": "string",
+            "title": "Overlay Indicator Claims",
+            "description": "JSON array of construct types the overlay claims to identify.",
+            "default": "[\"FVG\",\"OrderBlock\",\"SessionLiquidity\"]"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instrument",
+          "session",
+          "timeframes",
+          "account_balance"
+        ],
+        "title": "Body_analyse_analyse_post"
+      },
+      "FinalVerdict": {
+        "properties": {
+          "final_bias": {
+            "type": "string",
+            "title": "Final Bias"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ENTER_LONG",
+              "ENTER_SHORT",
+              "WAIT_FOR_CONFIRMATION",
+              "NO_TRADE"
+            ],
+            "title": "Decision"
+          },
+          "approved_setups": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovedSetup"
+            },
+            "type": "array",
+            "title": "Approved Setups"
+          },
+          "no_trade_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "No Trade Conditions"
+          },
+          "overall_confidence": {
+            "type": "number",
+            "title": "Overall Confidence"
+          },
+          "analyst_agreement_pct": {
+            "type": "integer",
+            "title": "Analyst Agreement Pct"
+          },
+          "risk_override_applied": {
+            "type": "boolean",
+            "title": "Risk Override Applied"
+          },
+          "arbiter_notes": {
+            "type": "string",
+            "title": "Arbiter Notes"
+          },
+          "audit_log": {
+            "$ref": "#/components/schemas/AuditLog"
+          },
+          "overlay_was_provided": {
+            "type": "boolean",
+            "title": "Overlay Was Provided",
+            "default": false
+          },
+          "indicator_dependent": {
+            "type": "boolean",
+            "title": "Indicator Dependent",
+            "default": false
+          },
+          "indicator_dependency_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indicator Dependency Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "final_bias",
+          "decision",
+          "approved_setups",
+          "no_trade_conditions",
+          "overall_confidence",
+          "analyst_agreement_pct",
+          "risk_override_applied",
+          "arbiter_notes",
+          "audit_log"
+        ],
+        "title": "FinalVerdict"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

@@ -162,7 +162,9 @@ async function runBridgeAnalyse() {
   const resultEl = document.getElementById('analysisVerdictCard');
   try {
     if (statusEl) statusEl.textContent = 'Running /analyse ...';
-    const verdict = await analyseViaBridge(serverUrl);
+    // v2.0: response is an envelope { verdict, ticket_draft, run_id, source_ticket_id }
+    const response = await analyseViaBridge(serverUrl);
+    const verdict = response.verdict;
     mountFinalVerdict(resultEl, verdict);
     applyBridgeVerdictToDashboard(verdict);
     if (statusEl) statusEl.textContent = 'Analysis complete.';

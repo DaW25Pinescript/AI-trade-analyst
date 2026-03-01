@@ -20,9 +20,9 @@ fields, regime, risk constraints). A formal integration bridge (Track C) is plan
 G6/v2.0 onwards.
 
 ### Current verification snapshot (2026-03-01)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **77/77 passing**.
-- AI analyst regression suite: **PASS** (`pytest -q`) with **177/177 passing** (v1.4 lens coverage added).
-- Operational call: v1.4 complete; focus shifts to v2.0 (ticket_draft bridge) and G12 (polish/release).
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **81/81 passing**.
+- AI analyst regression suite: **PASS** (`pytest -q`) with **225/225 passing** (v2.0 ticket_draft coverage added).
+- Operational call: v1.4 + v2.0 complete; focus shifts to G11 bridge hardening and G12 (polish/release).
 
 ---
 
@@ -207,15 +207,18 @@ Tasks:
 - [x] Fix forbidden-term body violations in `ict_icc.txt` and `volume_profile.txt` (v1.2)
 - [x] 177/177 pytest passing with full v1.2 lens contract coverage
 
-### v2.0 — Ticket Schema Integration + Bridge API
+### v2.0 — Ticket Schema Integration + Bridge API — COMPLETE
 **Goal:** Align `ai_analyst` output with `app/` ticket schema v2.
 
 Tasks:
-- [ ] Map `FinalVerdict` fields to `ticket.schema.json` v2 fields
-- [ ] `POST /analyse` response includes a `ticket_draft` block ready to import into `app/`
-- [ ] `GroundTruthPacket` accepts a `source_ticket_id` for traceability
-- [ ] Webhook/callback support for async pipeline completion
-- [ ] OpenAPI spec generated from FastAPI and committed to `docs/`
+- [x] Map `FinalVerdict` fields to `ticket.schema.json` v2 fields (`ai_analyst/output/ticket_draft.py`)
+- [x] `POST /analyse` response includes a `ticket_draft` block ready to import into `app/`
+- [x] `GroundTruthPacket` accepts a `source_ticket_id` for traceability
+- [x] `AnalysisResponse` envelope model (`verdict + ticket_draft + run_id + source_ticket_id`)
+- [x] OpenAPI spec generated from FastAPI and committed to `docs/openapi.json`
+- [x] `app/scripts/main.js` unpacks `response.verdict` from the v2.0 envelope
+- [x] 48 new contract tests for ticket_draft mapping (225/225 pytest passing)
+- [ ] Webhook/callback support for async pipeline completion (deferred to v2.1+)
 
 ### v2.1 — Multi-Round Deliberation
 **Goal:** Allow analysts to see a summary of other analysts' verdicts and update.
@@ -330,12 +333,12 @@ All Claude-assisted development occurs on session branches and is merged via PR.
 
 ## Next Immediate Steps (Priority Order)
 
-1. **v2.0 (Track B + C)** — Emit `ticket_draft` from `/analyse`, add `source_ticket_id`, and
-   publish OpenAPI spec in `docs/`. This is the highest-value next step now that v1.4 is done.
-2. **G11 + Track C1/C3 (Bridge hardening)** — Freeze and document strict request/response contract
-   for `POST /analyse`; add payload-mapping and verdict-card edge-case tests.
-3. **Track C2 (Local developer experience)** — Docker Compose for one-command local start;
+1. **G11 + Track C1/C3 (Bridge hardening)** — The `ticket_draft` is now emitted; next step is
+   to make the browser app consume it (populate form fields from `ticket_draft`) and add
+   verdict-card edge-case / offline-fallback tests.
+2. **Track C2 (Local developer experience)** — Docker Compose for one-command local start;
    app-side health-check UX so bridge availability is explicit.
+3. **v2.1 (Track B)** — Multi-round deliberation: optional second-round fan-out + deliberation config flag.
 4. **G12 (Track A)** — Accessibility + print polish + release packaging once G11/Track C are stable.
 
 **Completed in prior sessions:** G1, G2, G3, G4, G5
