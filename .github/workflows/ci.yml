@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  browser-tests:
+    name: Browser app tests (node)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run browser app tests
+        run: node --test tests/*.js
+
+  analyst-tests:
+    name: AI analyst tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install analyst dependencies
+        run: pip install -r ai_analyst/requirements.txt
+
+      - name: Run analyst tests
+        run: pytest -q ai_analyst/tests

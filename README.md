@@ -113,6 +113,17 @@ node --test tests/*.js
 
 This covers deterministic gate/scoring behavior, schema enum stability, and core metrics/calibration fixture expectations.
 
+### Contributor pre-push checklist
+
+Before opening or updating a PR, run the same checks that CI enforces:
+
+```bash
+node --test tests/*.js
+pytest -q ai_analyst/tests
+```
+
+If either command fails, fix the issue before pushing so branch status stays merge-ready.
+
 ---
 
 ## Python AI analyst
