@@ -132,6 +132,8 @@ canonical data contract between Track A and Track B.
 - Requires local Python server running (documented setup)
 - [x] Additive Operator Dashboard Mode (Phase A): dashboard shell toggle + responsive card layout
       layered over existing 7-step V3 flow (no top-to-bottom rewrite)
+- [x] Bridge transport hardening: `/analyse` now enforces request timeout + bounded retry on transient failures
+- [x] Contract regression tests for bridge reliability: transient 5xx retry path and timeout error path
 
 ### G12 — Polish + Public Release
 - Full accessibility audit

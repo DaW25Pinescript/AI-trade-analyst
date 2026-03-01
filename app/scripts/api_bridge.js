@@ -48,27 +48,91 @@ export function buildAnalyseFormData(doc = document) {
   return fd;
 }
 
-export async function postAnalyse(serverUrl, formData, fetchImpl = fetch) {
+export async function postAnalyse(serverUrl, formData, fetchImpl = fetch, options = {}) {
+  return postAnalyseWithOptions(serverUrl, formData, fetchImpl, options);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetriableStatus(status) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+async function fetchWithTimeout(url, options, fetchImpl, timeoutMs) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return fetchImpl(url, options);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
+  try {
+    return await fetchImpl(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    const aborted = error?.name === 'AbortError' || controller.signal.aborted;
+    if (aborted) throw new Error(`Request timed out after ${timeoutMs}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function postAnalyseWithOptions(serverUrl, formData, fetchImpl = fetch, options = {}) {
   const trimmed = (serverUrl || '').trim().replace(/\/$/, '');
   if (!trimmed) throw new Error('Server URL is required.');
-  const response = await fetchImpl(`${trimmed}/analyse`, { method: 'POST', body: formData });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Analyse failed (${response.status}): ${detail || response.statusText}`);
+
+  const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 12000;
+  const retries = Number.isInteger(options.retries) && options.retries >= 0 ? options.retries : 1;
+  const retryDelayMs = Number(options.retryDelayMs) >= 0 ? Number(options.retryDelayMs) : 400;
+
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(
+        `${trimmed}/analyse`,
+        { method: 'POST', body: formData },
+        fetchImpl,
+        timeoutMs
+      );
+
+      if (!response.ok) {
+        const detail = await response.text();
+        const error = new Error(`Analyse failed (${response.status}): ${detail || response.statusText}`);
+        if (isRetriableStatus(response.status) && attempt < retries) {
+          lastError = error;
+          await sleep(retryDelayMs);
+          continue;
+        }
+        throw error;
+      }
+
+      return response.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retries) break;
+      await sleep(retryDelayMs);
+    }
   }
-  return response.json();
+
+  throw lastError || new Error('Analyse request failed.');
 }
 
 export async function analyseViaBridge(serverUrl, doc = document, fetchImpl = fetch) {
   const formData = buildAnalyseFormData(doc);
-  return postAnalyse(serverUrl, formData, fetchImpl);
+  return postAnalyseWithOptions(serverUrl, formData, fetchImpl, {});
 }
 
 export async function checkBridgeHealth(serverUrl, fetchImpl = fetch) {
   const trimmed = (serverUrl || '').trim().replace(/\/$/, '');
   if (!trimmed) throw new Error('Server URL is required.');
 
-  const response = await fetchImpl(`${trimmed}/health`, { method: 'GET' });
+  const response = await fetchWithTimeout(
+    `${trimmed}/health`,
+    { method: 'GET' },
+    fetchImpl,
+    6000
+  );
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`Health check failed (${response.status}): ${detail || response.statusText}`);
