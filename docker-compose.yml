@@ -1,22 +1,83 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Trade Analyst – docker-compose.yml
+#
+# Services:
+#   ai-analyst-api  → FastAPI multi-model pipeline        (host port 8000)
+#   app-static      → Static file server for browser UI   (host port 8080)
+#
+# Usage:
+#   docker compose up            # start both services
+#   docker compose up --wait     # start and wait until healthy
+# ─────────────────────────────────────────────────────────────────────────────
 services:
+
+  # ── FastAPI multi-model trade analysis pipeline ───────────────────────────
+  # Installs Python dependencies at container startup, then serves the
+  # LangGraph pipeline via uvicorn.
+  # Health endpoint: GET /health → {"status": "ok", "version": "..."}
   ai-analyst-api:
     image: python:3.11-slim
+
     working_dir: /workspace
+
+    # pip install runs at startup so the image stays generic; uvicorn follows.
     command: >
       bash -lc "pip install -r ai_analyst/requirements.txt &&
       uvicorn ai_analyst.api.main:app --host 0.0.0.0 --port 8000"
+
     volumes:
+      # Mount the entire repo so ai_analyst/ package and all configs are available.
       - ./:/workspace
+
     ports:
+      # 8000 → FastAPI (POST /analyse, GET /health)
       - "8000:8000"
 
+    healthcheck:
+      # stdlib urllib avoids requiring curl/wget in python:3.11-slim.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # Allow pip install + uvicorn startup time before the first probe fires.
+      start_period: 60s
+
+  # ── Static file server for the browser UI ────────────────────────────────
+  # Serves the repo root over HTTP so the trade ticket UI is reachable at
+  # http://localhost:8080/app/
   app-static:
     image: python:3.11-slim
+
     working_dir: /workspace
+
     command: python -m http.server 8080
+
     volumes:
+      # Same mount as ai-analyst-api so both share the identical repo root.
       - ./:/workspace
+
     ports:
+      # 8080 → static HTTP (directory listing / app/)
       - "8080:8080"
+
     depends_on:
-      - ai-analyst-api
+      # Wait until the API is healthy before considering the UI container ready.
+      ai-analyst-api:
+        condition: service_healthy
+
+    healthcheck:
+      # python http.server returns HTTP 200 for a directory listing request.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/')"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # http.server starts almost immediately.
+      start_period: 10s
