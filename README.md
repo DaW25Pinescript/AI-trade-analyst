@@ -20,6 +20,7 @@ AI Trade Analyst is a two-part system for discretionary trade planning and revie
 
 - The repository ships a runnable static app in `app/` plus milestone snapshots in `app/releases/`.
 - The Python AI analyst (`ai_analyst/`) is at v1.2 and supports manual, hybrid, and automated execution modes.
+- The Macro Risk Officer (`macro_risk_officer/`) is integrated as an advisory context layer (MRO-P1/P2/P3 complete; P4 hardening in progress).
 - V3 of the browser app is being executed in phased milestones (G1–G12); planning documents indicate the direction is ship-ready with execution focused on sequencing and hardening.
 - JSON schema definitions for ticket and AAR payloads are present and used for compatibility validation in import/export and local storage flows.
 
@@ -55,6 +56,13 @@ AI Trade Analyst is a two-part system for discretionary trade planning and revie
 │   ├── schema/                     # Canonical JSON schemas (ticket + AAR)
 │   ├── scoring/                    # Deterministic scoring references
 │   └── V3_*.md                     # V3 planning and design notes
+├── macro_risk_officer/             # Macro Risk Officer (advisory macro-context engine)
+│   ├── core/                       # Context models + decision engine
+│   ├── ingestion/                  # Macro/event data ingestion + normalization
+│   ├── config/                     # Scenario + regime configuration
+│   ├── history/                    # Historical context snapshots/artifacts
+│   ├── data/                       # Local datasets/test fixtures
+│   └── tests/                      # MRO unit/integration tests
 ├── examples/                       # Example ticket/AAR/report artifacts
 ├── tests/                          # Node test suite + fixtures (browser app)
 ├── tooling/                        # Helper scripts and tooling notes
@@ -146,6 +154,20 @@ If either command fails, fix the issue before pushing so branch status stays mer
 ---
 
 ## Python AI analyst
+
+### Macro Risk Officer (MRO) and intended role
+
+The MRO is a **parallel, advisory-only macro context engine** that helps answer:
+_"What type of market environment is currently in play?"_
+
+Its role in this system is intentionally constrained:
+
+- It produces a single structured `MacroContext` object (for example regime, volatility bias, and cross-asset pressure).
+- That context is injected into the **Arbiter prompt** as supporting evidence.
+- It does **not** generate entries/exits, does **not** emit trade signals, and does **not** override price-structure conclusions from analyst personas.
+- Final trade decisions remain Arbiter-owned, with MRO acting only as contextual risk framing.
+
+This design keeps macro influence explicit and auditable while preserving the analyst pipeline's price-action-first decision model.
 
 ### Setup
 
