@@ -6,19 +6,25 @@ Pipeline nodes read from the cache — zero added latency to /analyse.
 
 TTL and instrument exposure defaults are loaded from config YAML (MRO-P3).
 
+Phase-4 addition: every refresh attempt is counted in SchedulerMetrics (in-process)
+and logged to FetchLog (persistent SQLite) so the `kpi` CLI command can report
+macro availability % and context freshness across restarts.
+
 Usage:
     scheduler = MacroScheduler()
     context = scheduler.get_context(instrument="XAUUSD")
+    print(scheduler.metrics.cache_hit_ratio)
 """
 
 from __future__ import annotations
 
 import time
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from macro_risk_officer.config.loader import load_thresholds, load_weights
 from macro_risk_officer.core.models import MacroContext
 from macro_risk_officer.core.reasoning_engine import ReasoningEngine
+from macro_risk_officer.history.metrics import FetchLog, SchedulerMetrics
 from macro_risk_officer.ingestion.clients.finnhub_client import FinnhubClient
 from macro_risk_officer.ingestion.clients.fred_client import FredClient
 from macro_risk_officer.ingestion.clients.gdelt_client import GdeltClient
@@ -26,7 +32,7 @@ from macro_risk_officer.ingestion.normalizer import normalise_events
 
 
 class MacroScheduler:
-    def __init__(self, ttl_seconds: Optional[int] = None) -> None:
+    def __init__(self, ttl_seconds: Optional[int] = None, enable_fetch_log: bool = True) -> None:
         cfg_ttl: int = load_thresholds()["scheduler"]["ttl_seconds"]
         self.ttl: int = ttl_seconds if ttl_seconds is not None else cfg_ttl
 
@@ -41,6 +47,15 @@ class MacroScheduler:
         self._last_fetch: float = 0.0
         self._engine = ReasoningEngine()
 
+        # Phase-4 KPI telemetry
+        self._metrics = SchedulerMetrics()
+        self._fetch_log: Optional[FetchLog] = FetchLog() if enable_fetch_log else None
+
+    @property
+    def metrics(self) -> SchedulerMetrics:
+        """Live in-process KPI counters for this scheduler instance."""
+        return self._metrics
+
     def get_context(self, instrument: str = "XAUUSD") -> Optional[MacroContext]:
         """
         Return a cached MacroContext, refreshing if TTL has expired.
@@ -49,37 +64,62 @@ class MacroScheduler:
         """
         now = time.monotonic()
         if self._cache is not None and (now - self._last_fetch) < self.ttl:
+            self._metrics.cache_hits += 1
             return self._cache
 
+        self._metrics.cache_misses += 1
         try:
-            self._cache = self._refresh(instrument)
+            self._cache, source_mask, event_count = self._refresh(instrument)
             self._last_fetch = now
-        except Exception:
-            pass  # Stale cache or None — Arbiter continues without macro context
+            self._metrics.fetch_successes += 1
+            self._metrics.last_fetch_epoch = now
+            if self._fetch_log is not None:
+                self._fetch_log.record_success(source_mask, event_count)
+        except Exception as exc:
+            self._metrics.fetch_failures += 1
+            if self._fetch_log is not None:
+                self._fetch_log.record_failure(type(exc).__name__)
+            # Stale cache or None — Arbiter continues without macro context
 
         return self._cache
 
-    def _refresh(self, instrument: str) -> MacroContext:
+    def _refresh(self, instrument: str) -> tuple[MacroContext, str, int]:
+        """
+        Fetch fresh events from all available sources and compute MacroContext.
+
+        Returns (context, source_mask, event_count) where source_mask is a
+        comma-separated list of sources that contributed events (e.g. "fred,gdelt").
+        """
         raw_events = []
+        active_sources: List[str] = []
 
         # Finnhub: scheduled event calendar (actual vs forecast surprises)
         try:
             finnhub = FinnhubClient()
-            raw_events.extend(finnhub.fetch_calendar(lookback_days=14, lookahead_days=2))
+            fetched = finnhub.fetch_calendar(lookback_days=14, lookahead_days=2)
+            if fetched:
+                raw_events.extend(fetched)
+                active_sources.append("finnhub")
         except Exception:
             pass  # Continue with FRED-only context if Finnhub unavailable
 
         # FRED: macro series momentum (current vs prior reading)
         try:
             fred = FredClient()
-            raw_events.extend(fred.to_macro_events())
+            fetched = fred.to_macro_events()
+            if fetched:
+                raw_events.extend(fetched)
+                active_sources.append("fred")
         except Exception:
             pass  # Continue with Finnhub-only context if FRED unavailable
 
         # GDELT: geopolitical sentiment (no API key required)
         try:
             gdelt = GdeltClient()
-            raw_events.extend(gdelt.fetch_geopolitical_events(lookback_days=3))
+            fetched = gdelt.fetch_geopolitical_events(lookback_days=3)
+            if fetched:
+                raw_events.extend(fetched)
+                active_sources.append("gdelt")
         except Exception:
             pass  # Non-critical — continue without geopolitical signal
 
@@ -88,8 +128,10 @@ class MacroScheduler:
 
         events = normalise_events(raw_events)
         exposures = self._instrument_exposures.get(instrument, {})
-        return self._engine.generate_context(events, exposures)
+        context = self._engine.generate_context(events, exposures)
+        return context, ",".join(active_sources), len(events)
 
     def invalidate(self) -> None:
         """Force a refresh on next get_context() call."""
+        self._cache = None
         self._last_fetch = 0.0

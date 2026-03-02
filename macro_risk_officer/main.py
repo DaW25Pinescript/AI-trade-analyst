@@ -4,6 +4,7 @@ Macro Risk Officer — CLI entry point.
 Usage:
     python -m macro_risk_officer status [--instrument XAUUSD] [--json]
     python -m macro_risk_officer audit
+    python -m macro_risk_officer kpi
 """
 
 from __future__ import annotations
@@ -36,6 +37,17 @@ def cmd_audit() -> None:
     print(tracker.audit_report())
 
 
+def cmd_kpi() -> None:
+    """Print the Phase-4 release-gate KPI report from the persistent fetch log."""
+    from macro_risk_officer.config.loader import load_thresholds
+    from macro_risk_officer.history.metrics import KpiReport
+
+    cfg = load_thresholds().get("scheduler", {})
+    stale_threshold = cfg.get("stale_threshold_seconds", 3600)
+    report = KpiReport.from_db(stale_threshold_seconds=stale_threshold)
+    print(report.format())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="macro_risk_officer",
@@ -51,7 +63,11 @@ def main() -> None:
         "--json", action="store_true", dest="as_json", help="Output raw JSON"
     )
 
-    subparsers.add_parser("audit", help="Print outcome tracking report (MRO-P3 stub)")
+    subparsers.add_parser("audit", help="Print outcome tracking report")
+    subparsers.add_parser(
+        "kpi",
+        help="Print Phase-4 release-gate KPI report (macro availability, freshness)",
+    )
 
     args = parser.parse_args()
 
@@ -59,6 +75,8 @@ def main() -> None:
         cmd_status(args.instrument, args.as_json)
     elif args.command == "audit":
         cmd_audit()
+    elif args.command == "kpi":
+        cmd_kpi()
 
 
 if __name__ == "__main__":

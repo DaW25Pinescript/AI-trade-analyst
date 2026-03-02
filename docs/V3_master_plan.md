@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.2
+**Version:** 2.3
 **Updated:** 2026-03-02
-**Status:** Active — G11 stabilized, v2.0 complete, MRO-P1/P2/P3 complete, MRO-P4 audit in progress
+**Status:** Active — G11 stabilized, v2.0 complete, MRO-P1/P2/P3/P4 complete
 
 ---
 
@@ -15,7 +15,7 @@ two-track architecture:
 | **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G11 complete, G12 next |
 | **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0 complete, v2.1 next |
 | **C — Integration** | shared | schema + bridge | C1/C3 in progress |
-| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | MRO-P1/P2/P3 complete, P4 in progress |
+| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | MRO-P1/P2/P3/P4 complete |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
@@ -392,14 +392,18 @@ Tasks:
 - [x] Confidence audit baseline (distribution + confidence/conflict summaries by regime)
 - [x] Auditable outcome report: `python -m macro_risk_officer audit`
 
-### MRO-P4 — Progress Audit + Hardening Gate (IN PROGRESS)
+### MRO-P4 — Progress Audit + Hardening Gate (COMPLETE)
 
 Tasks:
 - [x] Verify MRO unit/integration suite health (`pytest -q macro_risk_officer/tests`)
 - [x] Verify pipeline integration behavior for macro-aware arbiter paths
 - [x] Publish progress audit report with readiness call and next-step actions
-- [ ] Add non-flaky live-source smoke checks for scheduler clients (behind opt-in flag)
-- [ ] Define release gate KPIs (cache hit ratio, macro availability %, context freshness)
+- [x] Add non-flaky live-source smoke checks for scheduler clients (behind `MRO_SMOKE_TESTS=1` flag)
+- [x] Define release gate KPIs: cache hit ratio, macro availability %, context freshness
+      — `SchedulerMetrics` (in-process), `FetchLog` (SQLite-backed), `KpiReport` formatter
+      — `stale_threshold_seconds` added to `thresholds.yaml`
+      — `python -m macro_risk_officer kpi` CLI command
+- [x] Add runbook for degraded macro mode (`docs/MRO_RUNBOOK.md`)
 
 ---
 
