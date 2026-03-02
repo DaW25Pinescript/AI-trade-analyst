@@ -16,7 +16,7 @@ Series tracked:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -60,7 +60,7 @@ class FredClient:
                 "file_type": "json",
                 "sort_order": "desc",
                 "limit": n_obs,
-                "observation_end": datetime.utcnow().strftime("%Y-%m-%d"),
+                "observation_end": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             },
             timeout=10.0,
         )
@@ -104,7 +104,7 @@ class FredClient:
         """
         snapshot = self.fetch_macro_snapshot()
         events: List[MacroEvent] = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         for series_id, pair in snapshot.items():
             if pair is None:
@@ -116,7 +116,7 @@ class FredClient:
                     event_id=f"fred-{series_id}-{now.strftime('%Y%m%d')}",
                     category=category,
                     tier=tier,
-                    timestamp=datetime(now.year, now.month, 1),  # monthly release anchor
+                    timestamp=datetime(now.year, now.month, 1, tzinfo=timezone.utc),  # monthly release anchor
                     actual=current,
                     forecast=previous,
                     previous=previous,

@@ -13,7 +13,7 @@ Tier classification rules:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 import httpx
@@ -71,8 +71,9 @@ class FinnhubClient:
         Fetch economic calendar events within the lookback/lookahead window.
         Returns only events that have both actual and forecast values (surprise-eligible).
         """
-        from_dt = (datetime.utcnow() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-        to_dt = (datetime.utcnow() + timedelta(days=lookahead_days)).strftime("%Y-%m-%d")
+        now_utc = datetime.now(timezone.utc)
+        from_dt = (now_utc - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+        to_dt = (now_utc + timedelta(days=lookahead_days)).strftime("%Y-%m-%d")
 
         response = httpx.get(
             f"{_BASE_URL}/calendar/economic",
