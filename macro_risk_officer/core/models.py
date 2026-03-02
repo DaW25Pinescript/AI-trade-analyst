@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -34,7 +34,9 @@ class MacroEvent(BaseModel):
     @property
     def age_hours(self) -> float:
         """Hours elapsed since the event timestamp."""
-        delta = datetime.utcnow() - self.timestamp.replace(tzinfo=None)
+        now_utc = datetime.now(timezone.utc)
+        event_ts = self.timestamp if self.timestamp.tzinfo else self.timestamp.replace(tzinfo=timezone.utc)
+        delta = now_utc - event_ts
         return delta.total_seconds() / 3600
 
 

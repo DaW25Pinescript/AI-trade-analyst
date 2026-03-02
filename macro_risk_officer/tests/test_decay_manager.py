@@ -9,7 +9,7 @@ from macro_risk_officer.core.models import MacroEvent
 
 
 def _event_aged(hours: float, tier: int = 1) -> MacroEvent:
-    ts = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(hours=hours)
+    ts = datetime.now(timezone.utc) - timedelta(hours=hours)
     return MacroEvent(
         event_id=f"decay-test-{tier}-{hours}h",
         category="monetary_policy",
