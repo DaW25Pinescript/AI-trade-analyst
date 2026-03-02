@@ -31,3 +31,4 @@ scheduler:
   ttl_seconds: 1800               # 30 min cache TTL
   lookback_days: 14
   lookahead_days: 2
+  stale_threshold_seconds: 3600   # P4 KPI gate: context older than 60 min is flagged stale
