@@ -17,6 +17,7 @@ from typing import Dict, Optional
 from macro_risk_officer.core.models import MacroContext
 from macro_risk_officer.core.reasoning_engine import ReasoningEngine
 from macro_risk_officer.ingestion.clients.finnhub_client import FinnhubClient
+from macro_risk_officer.ingestion.clients.fred_client import FredClient
 from macro_risk_officer.ingestion.normalizer import normalise_events
 
 # Default instrument → asset exposure mapping (used for conflict_score calculation)
@@ -57,8 +58,25 @@ class MacroScheduler:
         return self._cache
 
     def _refresh(self, instrument: str) -> MacroContext:
-        client = FinnhubClient()
-        raw_events = client.fetch_calendar(lookback_days=14, lookahead_days=2)
+        raw_events = []
+
+        # Finnhub: scheduled event calendar (actual vs forecast surprises)
+        try:
+            finnhub = FinnhubClient()
+            raw_events.extend(finnhub.fetch_calendar(lookback_days=14, lookahead_days=2))
+        except Exception:
+            pass  # Continue with FRED-only context if Finnhub unavailable
+
+        # FRED: macro series momentum (current vs prior reading)
+        try:
+            fred = FredClient()
+            raw_events.extend(fred.to_macro_events())
+        except Exception:
+            pass  # Continue with Finnhub-only context if FRED unavailable
+
+        if not raw_events:
+            raise RuntimeError("No events retrieved from any data source.")
+
         events = normalise_events(raw_events)
         exposures = _INSTRUMENT_EXPOSURES.get(instrument, {})
         return self._engine.generate_context(events, exposures)

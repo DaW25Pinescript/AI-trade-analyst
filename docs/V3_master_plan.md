@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.1
+**Version:** 2.2
 **Updated:** 2026-03-02
-**Status:** Active — G11 stabilized, v2.0 complete, MRO Track D added
+**Status:** Active — G11 stabilized, v2.0 complete, MRO-P1 complete (55 tests passing)
 
 ---
 
@@ -15,7 +15,7 @@ two-track architecture:
 | **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G11 complete, G12 next |
 | **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0 complete, v2.1 next |
 | **C — Integration** | shared | schema + bridge | C1/C3 in progress |
-| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | MRO-P1 starting |
+| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | MRO-P1 complete |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
@@ -346,23 +346,34 @@ Three files in `ai_analyst/` require changes when MRO-P2 is implemented:
 3. **Persistence for Phase 3**: `history/tracker.py` needs a storage backend. SQLite is
    sufficient. This is a Phase 3 concern — do not add until MRO-P2 is stable.
 
-### MRO-P1 — Standalone Read-Only Context (current)
+### MRO-P1 — Standalone Read-Only Context (COMPLETE)
 
 **Deliverable:** `python -m macro_risk_officer status` prints `MacroContext` JSON to stdout.
 
+```bash
+# Text output (human-readable arbiter block)
+python -m macro_risk_officer status --instrument XAUUSD
+
+# JSON output (pipe-friendly)
+python -m macro_risk_officer status --instrument XAUUSD --json
+```
+
 Tasks:
-- [ ] `core/models.py` — `MacroEvent`, `AssetPressure`, `MacroContext` Pydantic models
-- [ ] `core/sensitivity_matrix.py` — full asset × event-type × direction matrix
-- [ ] `core/decay_manager.py` — time-decay factor per event age
-- [ ] `core/reasoning_engine.py` — aggregate events → `MacroContext`
-- [ ] `ingestion/clients/finnhub_client.py` — economic calendar with actual vs forecast
-- [ ] `ingestion/clients/fred_client.py` — macro time series (DFF, T10Y, UNRATE, CPIAUCSL)
-- [ ] `ingestion/normalizer.py` — standardise surprise direction + magnitude across sources
-- [ ] `ingestion/scheduler.py` — TTL cache with background refresh
-- [ ] `config/thresholds.yaml` + `config/weights.yaml`
-- [ ] `main.py` — `status` CLI command
-- [ ] `utils/explanations.py` — human-readable explanation builder
-- [ ] Unit tests for matrix, decay, reasoning engine
+- [x] `core/models.py` — `MacroEvent`, `AssetPressure`, `MacroContext` Pydantic models
+- [x] `core/sensitivity_matrix.py` — full 12-entry asset × event-type × direction matrix
+- [x] `core/decay_manager.py` — exponential time-decay per tier (7d/3d/1d half-lives)
+- [x] `core/reasoning_engine.py` — aggregate events → `MacroContext` (weighted, normalised)
+- [x] `ingestion/clients/finnhub_client.py` — economic calendar with tier/category classification
+- [x] `ingestion/clients/fred_client.py` — DFF, T10Y2Y, CPI, UNRATE, WTI with `to_macro_events()`
+- [x] `ingestion/normalizer.py` — deduplication + sign correction across sources
+- [x] `ingestion/scheduler.py` — TTL cache (30 min), Finnhub + FRED merged, per-instrument exposures
+- [x] `config/thresholds.yaml` + `config/weights.yaml` — all tunable parameters externalised
+- [x] `__main__.py` — enables `python -m macro_risk_officer`
+- [x] `main.py` — `status` + `audit` CLI commands
+- [x] `utils/explanations.py` — human-readable explanation builder
+- [x] `requirements.txt` — `httpx`, `pyyaml`, `pydantic`
+- [x] `.env.example` — `FINNHUB_API_KEY`, `FRED_API_KEY` documented
+- [x] **55 unit + integration tests passing** (decay, models, matrix, engine, CLI, FRED converter)
 
 ### MRO-P2 — Arbiter Prompt Injection (next after P1 stable)
 

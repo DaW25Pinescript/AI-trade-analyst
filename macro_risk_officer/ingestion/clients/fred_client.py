@@ -21,6 +21,8 @@ from typing import Dict, List, Optional, Tuple
 
 import httpx
 
+from macro_risk_officer.core.models import MacroEvent
+
 _BASE_URL = "https://api.stlouisfed.org/fred"
 
 _SERIES = {
@@ -29,6 +31,14 @@ _SERIES = {
     "CPIAUCSL": ("inflation", 1),
     "UNRATE": ("employment", 2),
     "DCOILWTICO": ("growth", 3),
+}
+
+_SERIES_DESCRIPTIONS = {
+    "DFF": "Effective Federal Funds Rate (current vs prior month)",
+    "T10Y2Y": "10Y-2Y Treasury Yield Spread (inversion signal)",
+    "CPIAUCSL": "CPI All Urban Consumers (inflation momentum)",
+    "UNRATE": "Unemployment Rate (employment momentum)",
+    "DCOILWTICO": "WTI Crude Oil Price (growth/inflation proxy)",
 }
 
 
@@ -78,6 +88,43 @@ class FredClient:
             except Exception:
                 snapshot[series_id] = None
         return snapshot
+
+    def to_macro_events(self) -> List[MacroEvent]:
+        """
+        Convert FRED snapshot into MacroEvents for the ReasoningEngine.
+
+        FRED provides current vs previous readings rather than actual vs
+        consensus forecast. We treat:
+          actual   = current value  (most recent release)
+          forecast = previous value (prior reading used as baseline)
+          surprise = current - previous  (momentum direction signal)
+
+        This is a valid macro signal — e.g. DFF rising month-on-month is a
+        tightening impulse regardless of whether the market expected it.
+        """
+        snapshot = self.fetch_macro_snapshot()
+        events: List[MacroEvent] = []
+        now = datetime.utcnow()
+
+        for series_id, pair in snapshot.items():
+            if pair is None:
+                continue
+            current, previous = pair
+            category, tier = self.series_metadata(series_id)
+            events.append(
+                MacroEvent(
+                    event_id=f"fred-{series_id}-{now.strftime('%Y%m%d')}",
+                    category=category,
+                    tier=tier,
+                    timestamp=datetime(now.year, now.month, 1),  # monthly release anchor
+                    actual=current,
+                    forecast=previous,
+                    previous=previous,
+                    description=_SERIES_DESCRIPTIONS.get(series_id, series_id),
+                    source="fred",
+                )
+            )
+        return events
 
     @staticmethod
     def series_metadata(series_id: str) -> Tuple[str, int]:
