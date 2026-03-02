@@ -16,6 +16,7 @@ from ..models.ground_truth import (
 from ..output.ticket_draft import (
     build_ticket_draft,
     _try_parse_price,
+    _parse_price_range,
     _conviction_from_confidence,
     _confluence_score,
 )
@@ -211,6 +212,28 @@ class TestSetupMapping:
         assert "stop" not in draft
         assert "targets" not in draft
 
+    def test_entry_pricemin_parsed_from_range_string(self):
+        draft = build_ticket_draft(_make_verdict(), _make_packet())
+        assert draft["entry"]["priceMin"] == 1930.0
+
+    def test_entry_pricemax_parsed_from_range_string(self):
+        draft = build_ticket_draft(_make_verdict(), _make_packet())
+        assert draft["entry"]["priceMax"] == 1935.0
+
+    def test_entry_prices_equal_for_single_value_zone(self):
+        setup = _make_approved_setup(entry_zone="1930.00")
+        verdict = _make_verdict(approved_setups=[setup])
+        draft = build_ticket_draft(verdict, _make_packet())
+        assert draft["entry"]["priceMin"] == 1930.0
+        assert draft["entry"]["priceMax"] == 1930.0
+
+    def test_entry_prices_null_for_vague_zone(self):
+        setup = _make_approved_setup(entry_zone="above key zone")
+        verdict = _make_verdict(approved_setups=[setup])
+        draft = build_ticket_draft(verdict, _make_packet())
+        assert draft["entry"]["priceMin"] is None
+        assert draft["entry"]["priceMax"] is None
+
 
 # ── Confluence score ──────────────────────────────────────────────────────────
 
@@ -304,3 +327,26 @@ class TestDefaults:
         verdict = _make_verdict(overall_confidence=0.723456)
         draft = build_ticket_draft(verdict, _make_packet())
         assert draft["aiEdgeScore"] == round(0.723456, 4)
+
+
+# ── Price range parser ────────────────────────────────────────────────────────
+
+
+class TestPriceRangeParser:
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            ("1930–1935",        (1930.0, 1935.0)),
+            ("1930 - 1935",      (1930.0, 1935.0)),
+            ("1930 to 1935",     (1930.0, 1935.0)),
+            ("1935 to 1930",     (1930.0, 1935.0)),  # sorted
+            ("1930.00",          (1930.0, 1930.0)),  # single value → point range
+            ("around 1930",      (1930.0, 1930.0)),
+            ("near 1930.5",      (1930.5, 1930.5)),
+            ("above key zone",   (None,   None)),
+            ("Below recent swing", (None, None)),
+            ("",                 (None,   None)),
+        ],
+    )
+    def test_parse_price_range(self, text, expected):
+        assert _parse_price_range(text) == expected

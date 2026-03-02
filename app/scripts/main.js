@@ -19,6 +19,7 @@ import { exportAnalyticsPDF } from './ui/dashboard.js';
 import { initOperatorDashboard, toggleOperatorDashboard, applyBridgeVerdictToDashboard } from './ui/dashboard_shell.js';
 import { analyseViaBridge, checkBridgeHealth } from './api_bridge.js';
 import { mountFinalVerdict } from './verdict_card.js';
+import { applyTicketDraftToForm } from './ui/ticket_form.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
 function buildAndShow() {
@@ -146,13 +147,24 @@ function clearSenateArb() {
 async function checkBridgeHealthUI() {
   const serverUrl = document.getElementById('analysisServerUrl')?.value || '';
   const statusEl = document.getElementById('analysisBridgeStatus');
+  const badge = document.getElementById('bridgeHealthBadge');
   try {
     if (statusEl) statusEl.textContent = 'Checking /health ...';
     const payload = await checkBridgeHealth(serverUrl);
     const version = payload?.version ? ` v${payload.version}` : '';
     if (statusEl) statusEl.textContent = `API online${version}.`;
+    if (badge) {
+      badge.textContent = `API${version}`;
+      badge.className = 'bridge-badge bridge-badge--online';
+      badge.style.display = 'inline-block';
+    }
   } catch (error) {
     if (statusEl) statusEl.textContent = `API offline: ${error.message}`;
+    if (badge) {
+      badge.textContent = 'API offline';
+      badge.className = 'bridge-badge bridge-badge--offline';
+      badge.style.display = 'inline-block';
+    }
   }
 }
 
@@ -167,6 +179,7 @@ async function runBridgeAnalyse() {
     const verdict = response.verdict;
     mountFinalVerdict(resultEl, verdict);
     applyBridgeVerdictToDashboard(verdict);
+    if (response.ticket_draft) applyTicketDraftToForm(response.ticket_draft);
     if (statusEl) statusEl.textContent = 'Analysis complete.';
   } catch (error) {
     if (statusEl) statusEl.textContent = `Error: ${error.message}`;
