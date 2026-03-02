@@ -1,16 +1,10 @@
 """
-Outcome tracker — MRO-P3 implementation.
+Outcome tracker — MRO-P3/P4 implementation.
 
 Records MacroContext snapshots alongside the Arbiter verdict for each run.
-Provides an audit report summarising regime distribution, decision
-breakdown, and confidence statistics across all recorded runs.
-
-No price-outcome tracking in this phase — that requires a live price feed.
-The recorded data is sufficient for:
-  - Human review of macro context quality over time
-  - Identifying systematic bias (e.g. always risk_off when instrument is XAUUSD)
-  - Confidence distribution analysis
-  - Pre-flight for future price-outcome integration (the schema is forward-ready)
+In MRO-P4, price outcome columns are added (via schema migration) so that
+`update-outcomes` can backfill T+1h/T+24h/T+5d prices and compute regime
+accuracy scores visible in the audit report.
 
 Storage: SQLite at macro_risk_officer/data/outcomes.db (auto-created).
 The DB path can be overridden via constructor for testing.
@@ -47,9 +41,30 @@ CREATE TABLE IF NOT EXISTS runs (
     decision             TEXT,
     overall_confidence   REAL,
     analyst_agreement    INTEGER,
-    risk_override        INTEGER
+    risk_override        INTEGER,
+    -- MRO-P4: price outcomes (backfilled by update-outcomes command)
+    price_at_record      REAL,
+    price_at_1h          REAL,
+    price_at_24h         REAL,
+    price_at_5d          REAL,
+    pct_change_1h        REAL,
+    pct_change_24h       REAL,
+    pct_change_5d        REAL,
+    predicted_direction  INTEGER
 );
 """
+
+# Columns added in MRO-P4 that may be absent in existing DBs
+_P4_COLUMNS = [
+    "price_at_record     REAL",
+    "price_at_1h         REAL",
+    "price_at_24h        REAL",
+    "price_at_5d         REAL",
+    "pct_change_1h       REAL",
+    "pct_change_24h      REAL",
+    "pct_change_5d       REAL",
+    "predicted_direction INTEGER",
+]
 
 
 class OutcomeTracker:
@@ -78,8 +93,7 @@ class OutcomeTracker:
             context    : The MacroContext produced for this run.
             run_id     : Unique run identifier from GroundTruthPacket.
             instrument : Trading instrument (e.g. "XAUUSD").
-            verdict    : FinalVerdict from the Arbiter (optional — may be None
-                         if the run errored before the Arbiter stage).
+            verdict    : FinalVerdict from the Arbiter (optional).
         """
         now = datetime.now(timezone.utc).isoformat()
 
@@ -160,13 +174,29 @@ class OutcomeTracker:
                 "FROM runs GROUP BY regime ORDER BY regime"
             ).fetchall()
 
+            # MRO-P4: price outcome accuracy (only for priced runs where predicted_direction != 0)
+            accuracy_rows = conn.execute(
+                "SELECT regime, "
+                "  COUNT(*) AS total, "
+                "  SUM(CASE WHEN (predicted_direction > 0 AND pct_change_24h > 0) "
+                "           OR  (predicted_direction < 0 AND pct_change_24h < 0) "
+                "      THEN 1 ELSE 0 END) AS correct "
+                "FROM runs "
+                "WHERE pct_change_24h IS NOT NULL AND predicted_direction != 0 "
+                "GROUP BY regime ORDER BY regime"
+            ).fetchall()
+
+            priced_count = conn.execute(
+                "SELECT COUNT(*) FROM runs WHERE price_at_record IS NOT NULL"
+            ).fetchone()[0]
+
             recent = conn.execute(
                 "SELECT run_id, instrument, recorded_at, regime, decision "
                 "FROM runs ORDER BY id DESC LIMIT 5"
             ).fetchall()
 
         lines = [
-            f"=== MRO AUDIT REPORT ({total} runs) ===",
+            f"=== MRO AUDIT REPORT ({total} runs, {priced_count} priced) ===",
             "",
             "── REGIME DISTRIBUTION ──────────────────────────────",
         ]
@@ -197,6 +227,35 @@ class OutcomeTracker:
                 f"{arb:>14} {row['avg_conflict']:>10.3f}"
             )
 
+        # MRO-P4: regime accuracy section (only shown when price data exists)
+        if accuracy_rows:
+            lines += ["", "── REGIME ACCURACY (24h direction, priced runs) ─────"]
+            lines.append(
+                f"  {'Regime':<12} {'Correct':>9} {'Total':>7} {'Accuracy':>10}"
+            )
+            all_correct = sum(r["correct"] for r in accuracy_rows)
+            all_total   = sum(r["total"]   for r in accuracy_rows)
+            for row in accuracy_rows:
+                acc = 100.0 * row["correct"] / row["total"] if row["total"] else 0.0
+                lines.append(
+                    f"  {row['regime']:<12} {row['correct']:>9} {row['total']:>7} {acc:>9.0f}%"
+                )
+            if all_total > 0:
+                overall_acc = 100.0 * all_correct / all_total
+                lines.append(
+                    f"  {'Overall':<12} {all_correct:>9} {all_total:>7} {overall_acc:>9.0f}%"
+                )
+            lines.append(
+                "  (run `python -m macro_risk_officer update-outcomes` to backfill prices)"
+            )
+        elif priced_count == 0 and total > 0:
+            lines += [
+                "",
+                "── REGIME ACCURACY ──────────────────────────────────",
+                "  No price data yet.",
+                "  Run: python -m macro_risk_officer update-outcomes",
+            ]
+
         lines += ["", "── MOST RECENT 5 RUNS ───────────────────────────────"]
         for row in recent:
             decision_label = row["decision"] or "N/A"
@@ -213,3 +272,13 @@ class OutcomeTracker:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(_CREATE_TABLE)
+            self._migrate_db(conn)
+
+    def _migrate_db(self, conn: sqlite3.Connection) -> None:
+        """Add MRO-P4 columns to existing DBs that pre-date Phase 4."""
+        for col_def in _P4_COLUMNS:
+            col_name = col_def.split()[0]
+            try:
+                conn.execute(f"ALTER TABLE runs ADD COLUMN {col_def}")
+            except sqlite3.OperationalError:
+                pass  # Column already exists — normal for fresh DBs

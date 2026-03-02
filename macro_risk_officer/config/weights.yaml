@@ -27,6 +27,9 @@ instrument_exposures:
   XAUUSD:
     GOLD: 1.0
     USD: -0.5
+  XAGUSD:
+    GOLD: 0.7      # Silver correlates strongly with gold but less than 1:1
+    USD: -0.4
   EURUSD:
     USD: -1.0
   GBPUSD:
@@ -39,3 +42,11 @@ instrument_exposures:
     NQ: 1.0
   USOIL:
     OIL: 1.0
+  BTCUSD:
+    NQ: 0.6        # BTC tracks risk-on/off similarly to tech equities
+    VIX: -0.3
+  ETHUSD:
+    NQ: 0.7
+    VIX: -0.4
+  DXY:
+    USD: 1.0
