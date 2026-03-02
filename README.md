@@ -19,9 +19,10 @@ AI Trade Analyst is a two-part system for discretionary trade planning and revie
 ### Current status
 
 - The repository ships a runnable static app in `app/` plus milestone snapshots in `app/releases/`.
-- The Python AI analyst (`ai_analyst/`) is at v1.2 and supports manual, hybrid, and automated execution modes.
-- The Macro Risk Officer (`macro_risk_officer/`) is integrated as an advisory context layer (MRO-P1/P2/P3 complete; P4 hardening in progress).
-- V3 of the browser app is being executed in phased milestones (G1–G12); planning documents indicate the direction is ship-ready with execution focused on sequencing and hardening.
+- The Python AI analyst (`ai_analyst/`) is at **v2.0** and supports manual, hybrid, and automated execution modes, plus a `ticket_draft` bridge response for app integration.
+- The Macro Risk Officer (`macro_risk_officer/`) is **fully complete** (MRO-P1 through P4): standalone context CLI, Arbiter prompt injection, SQLite outcome tracking, KPI telemetry, price outcome accuracy, and degraded-mode runbook.
+- V3 of the browser app is being executed in phased milestones (G1–G12); G1–G10 are complete. G11 infrastructure (bridge transport, Docker Compose, envelope unpacking) is done — the remaining item is the "Run AI Analysis" button POST and verdict card in the UI.
+- Test suite status (2026-03-02): **514 passing, 0 failing** across browser (105), AI analyst (256), and MRO (153 + 16 intentional skips).
 - JSON schema definitions for ticket and AAR payloads are present and used for compatibility validation in import/export and local storage flows.
 
 ---
@@ -30,7 +31,7 @@ AI Trade Analyst is a two-part system for discretionary trade planning and revie
 
 ```text
 .
-├── ai_analyst/                     # Python multi-model AI analyst (v1.2)
+├── ai_analyst/                     # Python multi-model AI analyst (v2.0)
 │   ├── cli.py                      # CLI entrypoint (run, status, arbiter, history, replay)
 │   ├── requirements.txt            # Python dependencies
 │   ├── pytest.ini                  # Pytest config

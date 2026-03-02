@@ -75,3 +75,74 @@
 ### Updated progress call
 - **Where we are now:** repository baseline is green across both app and AI analyst surfaces.
 - **Immediate next step:** execute the next planned roadmap increment (G12 polish/release hardening for the browser track, and v1.4 prompt-library tuning for the AI pipeline) while preserving dual-suite green checks as a merge gate.
+
+---
+
+## Audit refresh (2026-03-02)
+
+### Scope
+- All three test suites validated (browser app, AI analyst, MRO).
+- Environment issue identified and fixed: `pytest-asyncio` was installed into the system
+  Python but not into the uv-isolated pytest environment; resolved via `uv tool install pytest --with "pytest-asyncio==0.23.8"`.
+- Verified that 8 async tests (`test_macro_context_node.py`, `test_llm_client_retry.py`)
+  were silently failing due to this environment mismatch; they now pass.
+
+### Re-run results
+- **PASS**: `node --test tests/*.js` — **105 passed, 0 failed**
+  - Coverage includes deterministic gate logic, G11 bridge reliability, dashboard/operator
+    metrics, schema enum stability, AAR flow, and shadow mode.
+- **PASS**: `pytest -q ai_analyst/tests` — **256 passed, 0 failed**
+  - Includes full async integration tests, macro context node, LLM retry paths, and all
+    v2.0 ticket_draft contract coverage.
+- **PASS**: `pytest -q macro_risk_officer/tests` — **153 passed, 16 skipped**
+  - 16 skips = live-source smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys
+    (by design; controlled by env flag).
+- **Total: 514 passing, 0 failing** across all three suites.
+
+### MRO track status
+- MRO-P4 merged (PR #67): KPI telemetry, price outcome tracking, regime accuracy metrics,
+  runbook, and expanded instruments — Track D fully complete.
+
+### Updated progress call
+- **Where we are now:** all four tracks green; Track D (MRO) fully complete.
+- **Single remaining blocker for G12:** G11 UI verdict card — the "Run AI Analysis" button
+  POST and response population in the browser app.
+- **Immediate next step:** implement G11 UI card (wire POST + populate verdict/ticket_draft
+  in browser app), then proceed to G12 polish and v2.1 deliberation.
+
+---
+
+## Audit refresh (2026-03-02)
+
+### Scope
+Full three-suite audit following MRO Phase 4 merge (PR #67). Includes MRO suite for first time.
+
+### Re-run results
+- **PASS**: `node --test tests/*.js`
+  - **105 passed, 0 failed**
+  - Coverage includes G11 bridge reliability, dashboard/operator metrics, gate logic, schema enum stability, and shadow/calibration fixtures.
+- **PASS**: `pytest -q ai_analyst/tests`
+  - **256 passed, 0 failed**
+  - All async tests now correctly running under `pytest-asyncio` (env isolation fix applied).
+  - Coverage includes CLI integration, prompt builder contracts, extractor robustness, LangGraph async integration, arbiter rule enforcement, macro context node, and ticket_draft mapping.
+- **PASS**: `pytest -q macro_risk_officer/tests`
+  - **153 passed, 16 skipped**
+  - Skips are intentional live smoke tests (require `MRO_SMOKE_TESTS=1` + real API keys).
+  - Coverage includes decay, models, sensitivity matrix, reasoning engine, CLI, FRED converter, outcome tracker, KPI reporter.
+- **Total: 514 passed, 0 failed, 16 skipped (by design)**
+
+### Environment note
+The `pytest` binary runs in a uv-isolated virtual environment (`/root/.local/share/uv/tools/pytest/`). `pytest-asyncio` must be installed into that environment via `uv tool install pytest --with "pytest-asyncio==0.23.8"`, not via system `pip`. This is now done.
+
+### Track completion as of this audit
+| Track | Status |
+|-------|--------|
+| Track A (Browser) | G1–G10 complete, G11 partially complete (UI card pending), G12 not started |
+| Track B (AI Pipeline) | v1.1–v2.0 complete, v2.1 not started |
+| Track C (Integration) | C1 complete, C2 complete, C3 partial (UI card is the remaining piece) |
+| Track D (MRO) | **ALL COMPLETE — P1, P2, P3, P4** |
+
+### Readiness call
+- **Ready for next step?** **Yes.**
+- **Single remaining blocker:** G11 UI card — "Run AI Analysis" button POST + verdict card population in the browser app.
+- Once G11 is closed, the path to G12 (release) is clear.
