@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
 **Version:** 2.2
 **Updated:** 2026-03-02
-**Status:** Active — G11 stabilized, v2.0 complete, MRO-P1 complete (55 tests passing)
+**Status:** Active — G11 stabilized, v2.0 complete, MRO-P1/P2/P3 complete, MRO-P4 audit in progress
 
 ---
 
@@ -15,7 +15,7 @@ two-track architecture:
 | **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G11 complete, G12 next |
 | **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0 complete, v2.1 next |
 | **C — Integration** | shared | schema + bridge | C1/C3 in progress |
-| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | MRO-P1 complete |
+| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | MRO-P1/P2/P3 complete, P4 in progress |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
@@ -375,22 +375,31 @@ Tasks:
 - [x] `.env.example` — `FINNHUB_API_KEY`, `FRED_API_KEY` documented
 - [x] **55 unit + integration tests passing** (decay, models, matrix, engine, CLI, FRED converter)
 
-### MRO-P2 — Arbiter Prompt Injection (next after P1 stable)
+### MRO-P2 — Arbiter Prompt Injection (COMPLETE)
 
 Tasks:
-- [ ] `ai_analyst/graph/state.py` — add `macro_context` field
-- [ ] `ai_analyst/graph/pipeline.py` — `fetch_macro_context` node with `enable_macro_context` gate
-- [ ] `ai_analyst/core/arbiter_prompt_builder.py` — `macro_section` injection block
-- [ ] `ai_analyst/api/main.py` — `enable_macro_context` form parameter
-- [ ] Conflict scoring wired into arbiter notes (LLM interprets `conflict_score` in prompt)
-- [ ] Integration tests: MRO context present vs absent, conflict paths
+- [x] `ai_analyst/graph/state.py` — `macro_context` field added
+- [x] `ai_analyst/graph/pipeline.py` — `macro_context_node` added before analyst/arbiter execution
+- [x] `ai_analyst/core/arbiter_prompt_builder.py` — `macro_section` injection block
+- [x] `ai_analyst/api/main.py` — `enable_macro_context` form parameter
+- [x] Conflict scoring wired into arbiter notes (LLM interprets `conflict_score` in prompt)
+- [x] Integration tests: MRO context present vs absent, conflict paths
 
-### MRO-P3 — Outcome Tracking (deferred, post-P2 stable)
+### MRO-P3 — Outcome Tracking (COMPLETE)
 
 Tasks:
-- [ ] `history/tracker.py` — SQLite outcome log (1h / 24h / 5d post-event price moves)
-- [ ] Confidence calibration audit (predicted regime vs observed market behaviour)
-- [ ] Auditable outcome report: `python -m macro_risk_officer audit`
+- [x] `history/tracker.py` — SQLite outcome log for MacroContext + verdict snapshots
+- [x] Confidence audit baseline (distribution + confidence/conflict summaries by regime)
+- [x] Auditable outcome report: `python -m macro_risk_officer audit`
+
+### MRO-P4 — Progress Audit + Hardening Gate (IN PROGRESS)
+
+Tasks:
+- [x] Verify MRO unit/integration suite health (`pytest -q macro_risk_officer/tests`)
+- [x] Verify pipeline integration behavior for macro-aware arbiter paths
+- [x] Publish progress audit report with readiness call and next-step actions
+- [ ] Add non-flaky live-source smoke checks for scheduler clients (behind opt-in flag)
+- [ ] Define release gate KPIs (cache hit ratio, macro availability %, context freshness)
 
 ---
 
