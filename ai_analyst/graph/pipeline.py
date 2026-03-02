@@ -2,12 +2,15 @@
 LangGraph pipeline definition.
 
 Graph flow (no overlay):
-  validate_input → chart_base → chart_auto_detect → chart_lenses
+  validate_input → macro_context → chart_base → chart_auto_detect → chart_lenses
   → run_arbiter → pinekraft_bridge (optional no-op) → log_and_emit → END
 
 Graph flow (with 15M overlay):
-  validate_input → chart_base → chart_auto_detect → chart_lenses
+  validate_input → macro_context → chart_base → chart_auto_detect → chart_lenses
   → fan_out_overlay_delta → run_arbiter → pinekraft_bridge → log_and_emit → END
+
+macro_context runs before chart analysis and is advisory-only. It fails silently
+(sets macro_context=None) so macro data outages never block the pipeline.
 
 The conditional branch is resolved after the chart-lenses stage, based on whether
 ground_truth.m15_overlay is populated in the immutable Ground Truth Packet.
@@ -24,6 +27,7 @@ from .chart_analysis_nodes import (
 )
 from .arbiter_node import arbiter_node
 from .logging_node import logging_node
+from .macro_context_node import macro_context_node
 
 
 async def validate_input_node(state: GraphState) -> GraphState:
@@ -68,6 +72,7 @@ def build_analysis_graph() -> StateGraph:
     graph = StateGraph(GraphState)
 
     graph.add_node("validate_input",        validate_input_node)
+    graph.add_node("macro_context",         macro_context_node)
     graph.add_node("chart_base",            chart_base_node)
     graph.add_node("chart_auto_detect",     chart_auto_detect_node)
     graph.add_node("chart_lenses",          chart_lenses_node)
@@ -77,7 +82,8 @@ def build_analysis_graph() -> StateGraph:
     graph.add_node("log_and_emit",          logging_node)
 
     graph.set_entry_point("validate_input")
-    graph.add_edge("validate_input", "chart_base")
+    graph.add_edge("validate_input", "macro_context")
+    graph.add_edge("macro_context",  "chart_base")
     graph.add_edge("chart_base", "chart_auto_detect")
     graph.add_edge("chart_auto_detect", "chart_lenses")
 

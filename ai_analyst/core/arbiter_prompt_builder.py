@@ -4,11 +4,20 @@ The Arbiter never sees chart images — only structured Evidence Objects (JSON).
 
 When a 15M overlay was provided, the arbiter also receives the overlay delta reports
 and applies the weighting rules defined in the lens-aware screenshot architecture.
+
+When macro_context is provided (MRO Phase 2), the arbiter_block() text is injected
+after the overlay section as advisory-only contextual evidence.
 """
+from __future__ import annotations
+
 import json
+from typing import TYPE_CHECKING, Optional
 from ..models.analyst_output import AnalystOutput, OverlayDeltaReport
 from ..models.ground_truth import RiskConstraints
 from .lens_loader import load_arbiter_template
+
+if TYPE_CHECKING:
+    from macro_risk_officer.core.models import MacroContext
 
 
 def build_arbiter_prompt(
@@ -17,6 +26,7 @@ def build_arbiter_prompt(
     run_id: str,
     overlay_delta_reports: list[OverlayDeltaReport] | None = None,
     overlay_was_provided: bool = False,
+    macro_context: Optional[MacroContext] = None,
 ) -> str:
     """
     Load the arbiter template and inject:
@@ -25,6 +35,7 @@ def build_arbiter_prompt(
       - risk_constraints_json   : JSON of the risk constraints
       - min_rr                  : minimum acceptable R:R from risk constraints
       - overlay_section         : overlay delta reports + weighting rules (if overlay provided)
+      - macro_section           : MacroContext arbiter block, or MRO-unavailable notice
     """
     template = load_arbiter_template()
 
@@ -38,6 +49,7 @@ def build_arbiter_prompt(
     )
 
     overlay_section = _build_overlay_section(overlay_delta_reports, overlay_was_provided)
+    macro_section = _build_macro_section(macro_context)
 
     return template.format(
         N=len(analyst_outputs),
@@ -47,7 +59,20 @@ def build_arbiter_prompt(
         run_id=run_id,
         overlay_section=overlay_section,
         overlay_was_provided=str(overlay_was_provided).lower(),
+        macro_section=macro_section,
     )
+
+
+def _build_macro_section(macro_context: Optional[MacroContext]) -> str:
+    """Build the macro risk section injected into the arbiter prompt."""
+    if macro_context is None:
+        return (
+            "=== MACRO RISK CONTEXT ===\n"
+            "MRO unavailable for this run. "
+            "No macro context — base verdict on price structure and risk constraints only.\n"
+            "macro_context_available: false"
+        )
+    return macro_context.arbiter_block()
 
 
 def _build_overlay_section(

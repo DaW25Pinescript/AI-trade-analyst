@@ -18,6 +18,7 @@ from macro_risk_officer.core.models import MacroContext
 from macro_risk_officer.core.reasoning_engine import ReasoningEngine
 from macro_risk_officer.ingestion.clients.finnhub_client import FinnhubClient
 from macro_risk_officer.ingestion.clients.fred_client import FredClient
+from macro_risk_officer.ingestion.clients.gdelt_client import GdeltClient
 from macro_risk_officer.ingestion.normalizer import normalise_events
 
 # Default instrument → asset exposure mapping (used for conflict_score calculation)
@@ -73,6 +74,13 @@ class MacroScheduler:
             raw_events.extend(fred.to_macro_events())
         except Exception:
             pass  # Continue with Finnhub-only context if FRED unavailable
+
+        # GDELT: geopolitical sentiment (MRO-P2, no API key required)
+        try:
+            gdelt = GdeltClient()
+            raw_events.extend(gdelt.fetch_geopolitical_events(lookback_days=3))
+        except Exception:
+            pass  # Non-critical — continue without geopolitical signal
 
         if not raw_events:
             raise RuntimeError("No events retrieved from any data source.")

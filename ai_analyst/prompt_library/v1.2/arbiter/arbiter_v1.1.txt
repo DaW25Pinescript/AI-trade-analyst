@@ -20,6 +20,8 @@ YOUR ROLE IS JUDGEMENT, NOT PERCEPTION. You cannot and must not invent price lev
 
 {overlay_section}
 
+{macro_section}
+
 === REQUIRED OUTPUT SCHEMA ===
 {{
   "final_bias": "bullish | bearish | neutral | bullish_with_caution | bearish_with_caution",
