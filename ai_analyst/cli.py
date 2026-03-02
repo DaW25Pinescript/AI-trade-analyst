@@ -492,10 +492,17 @@ def replay(
     ARBITER_MODEL = "claude-haiku-4-5-20251001"
 
     async def _replay():
+        macro_context = None
+        try:
+            from macro_risk_officer.ingestion.scheduler import MacroScheduler
+            macro_context = MacroScheduler().get_context(instrument=ground_truth.instrument)
+        except Exception:
+            pass
         prompt = build_arbiter_prompt(
             analyst_outputs=outputs,
             risk_constraints=ground_truth.risk_constraints,
             run_id=f"{run_id}-replay",
+            macro_context=macro_context,
         )
         response = await acompletion(
             model=ARBITER_MODEL,

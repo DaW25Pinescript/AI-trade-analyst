@@ -10,5 +10,8 @@ pyyaml>=6.0
 # Data validation (shared with ai_analyst — ensure version compatibility)
 pydantic>=2.5.0
 
+# Price outcome fetching (MRO-P4 — soft dependency, YFinanceClient fails gracefully if absent)
+yfinance>=0.2.40
+
 # Testing
 pytest>=8.0.0
