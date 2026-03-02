@@ -181,11 +181,11 @@ class TestCLI:
         captured = capsys.readouterr()
         assert "ERROR" in captured.out
 
-    def test_audit_command_prints_stub_message(self, capsys):
+    def test_audit_command_prints_report_header(self, capsys):
         from macro_risk_officer.main import cmd_audit
         cmd_audit()
         captured = capsys.readouterr()
-        assert "MRO-P3" in captured.out
+        assert "MRO AUDIT REPORT" in captured.out
 
     def test_module_entry_point_exists(self):
         """Verify python -m macro_risk_officer --help exits without ImportError."""

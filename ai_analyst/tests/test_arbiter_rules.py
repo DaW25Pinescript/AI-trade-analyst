@@ -22,6 +22,7 @@ from ..core.arbiter_prompt_builder import build_arbiter_prompt
 from ..core.lens_loader import load_arbiter_template
 from ..models.analyst_output import AnalystOutput, OverlayDeltaReport
 from ..models.ground_truth import RiskConstraints
+from macro_risk_officer.core.models import AssetPressure, MacroContext
 
 
 # ---------------------------------------------------------------------------
@@ -279,3 +280,94 @@ class TestArbiterOverlaySection:
         # Both the contradiction and indicator-only rules must be present
         assert "CONTRADICTION RULE" in prompt
         assert "INDICATOR-ONLY RULE" in prompt
+
+
+# ---------------------------------------------------------------------------
+# Macro section injection tests (MRO Phase 2)
+# ---------------------------------------------------------------------------
+
+class TestArbiterMacroSection:
+    """
+    Tests for the macro risk section injected into the arbiter prompt.
+
+    When macro_context is provided, the arbiter receives the full arbiter_block()
+    text with regime, vol_bias, conflict_score, and explanations.
+    When macro_context is None (MRO unavailable), the prompt states so explicitly.
+    """
+
+    def _sample_context(self, conflict_score: float = -0.45) -> MacroContext:
+        return MacroContext(
+            regime="risk_off",
+            vol_bias="expanding",
+            asset_pressure=AssetPressure(USD=0.7, GOLD=0.5, SPX=-0.6),
+            conflict_score=conflict_score,
+            confidence=0.72,
+            time_horizon_days=45,
+            explanation=["Tier-1 hawkish Fed surprise → tighter liquidity, equities pressured."],
+            active_event_ids=["finnhub-fed-2026-03"],
+        )
+
+    def _build(self, macro_context=None) -> str:
+        return build_arbiter_prompt(
+            analyst_outputs=[_make_analyst("SHORT", 0.7)],
+            risk_constraints=RiskConstraints(),
+            run_id="macro-test-run",
+            macro_context=macro_context,
+        )
+
+    def test_macro_section_present_when_context_provided(self):
+        """Arbiter prompt contains MACRO RISK CONTEXT header when context is given."""
+        prompt = self._build(self._sample_context())
+        assert "MACRO RISK CONTEXT" in prompt
+
+    def test_regime_visible_in_prompt(self):
+        """Regime value from MacroContext appears in the prompt."""
+        prompt = self._build(self._sample_context())
+        assert "risk_off" in prompt
+
+    def test_vol_bias_visible_in_prompt(self):
+        """Vol bias from MacroContext appears in the prompt."""
+        prompt = self._build(self._sample_context())
+        assert "expanding" in prompt
+
+    def test_conflict_score_visible_in_prompt(self):
+        """Negative conflict_score appears formatted in the prompt."""
+        prompt = self._build(self._sample_context(conflict_score=-0.62))
+        assert "-0.62" in prompt
+
+    def test_advisory_rule_embedded_in_prompt(self):
+        """The 'advisory only' enforcement rule appears in the macro section."""
+        prompt = self._build(self._sample_context())
+        assert "advisory only" in prompt
+
+    def test_price_structure_precedence_rule_present(self):
+        """Arbiter rule that price structure takes precedence is in the prompt."""
+        prompt = self._build(self._sample_context())
+        assert "price structure" in prompt.lower()
+
+    def test_mro_unavailable_section_when_none(self):
+        """When macro_context=None, prompt explicitly states MRO unavailable."""
+        prompt = self._build(macro_context=None)
+        assert "MRO unavailable" in prompt
+        assert "macro_context_available: false" in prompt
+
+    def test_mro_unavailable_does_not_contain_regime(self):
+        """The unavailability notice must not invent a regime value."""
+        prompt = self._build(macro_context=None)
+        assert "risk_off" not in prompt
+        assert "risk_on" not in prompt
+
+    def test_macro_section_does_not_break_overlay_section(self):
+        """
+        Regression: adding macro_section must not corrupt the overlay section.
+        The no-overlay text must still appear alongside the macro section.
+        """
+        prompt = self._build(macro_context=None)
+        assert "No overlay was provided" in prompt
+        assert "overlay_was_provided: false" in prompt
+
+    def test_explanation_text_in_prompt(self):
+        """The MacroContext explanation list appears in the prompt."""
+        ctx = self._sample_context()
+        prompt = self._build(ctx)
+        assert "hawkish Fed surprise" in prompt

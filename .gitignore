@@ -149,5 +149,8 @@ ai_analyst/data/charts/*/
 ai_analyst/output/runs/*/
 ai_analyst/.env
 
+# MRO — runtime artefacts (SQLite outcome DB is not committed)
+macro_risk_officer/data/*.db
+
 # Python test cache
 .pytest_cache/

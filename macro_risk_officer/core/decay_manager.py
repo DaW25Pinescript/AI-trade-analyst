@@ -6,29 +6,32 @@ Tier 3 events decay quickly.
 
 Decay is exponential: factor = exp(-age_hours / half_life_hours)
 where half_life_hours is tier-dependent.
+
+Half-lives and the minimum decay floor are loaded from
+config/thresholds.yaml at instantiation time (MRO-P3).
 """
 
 from __future__ import annotations
 
 import math
+from typing import Dict
 
+from macro_risk_officer.config.loader import load_thresholds
 from macro_risk_officer.core.models import MacroEvent
 
 
-# Hours at which a tier's relevance halves
-_HALF_LIFE_HOURS: dict[int, float] = {
-    1: 168.0,   # Tier 1: 7-day half-life (Fed, NFP, CPI)
-    2: 72.0,    # Tier 2: 3-day half-life (retail sales, ISM, PMI)
-    3: 24.0,    # Tier 3: 1-day half-life (minor releases)
-}
-
-# Minimum decay floor — even old events carry some residual weight
-_MIN_DECAY: float = 0.05
-
-
 class DecayManager:
+    def __init__(self) -> None:
+        decay_cfg = load_thresholds()["decay"]
+        self._half_life: Dict[int, float] = {
+            1: decay_cfg["tier_1_half_life_hours"],
+            2: decay_cfg["tier_2_half_life_hours"],
+            3: decay_cfg["tier_3_half_life_hours"],
+        }
+        self._min_floor: float = decay_cfg["min_floor"]
+
     def get_decay_factor(self, event: MacroEvent) -> float:
-        """Return a decay multiplier in [_MIN_DECAY, 1.0] for the event."""
-        half_life = _HALF_LIFE_HOURS.get(event.tier, 72.0)
+        """Return a decay multiplier in [min_floor, 1.0] for the event."""
+        half_life = self._half_life.get(event.tier, 72.0)
         factor = math.exp(-event.age_hours / half_life)
-        return max(_MIN_DECAY, min(1.0, factor))
+        return max(self._min_floor, min(1.0, factor))

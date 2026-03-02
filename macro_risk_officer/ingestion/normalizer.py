@@ -34,8 +34,8 @@ def normalise_events(events: List[MacroEvent]) -> List[MacroEvent]:
         event = _apply_sign_corrections(event)
         normalised.append(event)
 
-    # Sort: highest tier first, then most recent
-    normalised.sort(key=lambda e: (e.tier, -e.age_hours))
+    # Sort: highest tier first (tier 1 = most important), then most recent
+    normalised.sort(key=lambda e: (e.tier, e.age_hours))
     return normalised
 
 

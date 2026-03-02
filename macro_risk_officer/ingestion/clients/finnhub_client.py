@@ -12,6 +12,7 @@ Tier classification rules:
 
 from __future__ import annotations
 
+import hashlib
 import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -98,7 +99,7 @@ class FinnhubClient:
 
             events.append(
                 MacroEvent(
-                    event_id=f"finnhub-{item.get('id', hash(description))}",
+                    event_id=f"finnhub-{item.get('id') or hashlib.md5(description.encode()).hexdigest()[:12]}",
                     category=_classify_category(description),
                     tier=_classify_tier(description),
                     timestamp=timestamp,

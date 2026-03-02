@@ -261,6 +261,7 @@ async def analyse(
         "lens_config": lens_config,
         "analyst_outputs": [],
         "overlay_delta_reports": [],
+        "macro_context": None,      # populated by macro_context_node
         "final_verdict": None,
         "error": None,
     }

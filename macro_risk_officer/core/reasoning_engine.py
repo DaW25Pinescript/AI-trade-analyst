@@ -2,6 +2,8 @@
 Reasoning Engine — aggregates MacroEvents into a MacroContext.
 
 No ML. Pure rule-based heuristics with auditable calculations.
+All tunable constants are loaded from config/thresholds.yaml and
+config/weights.yaml at instantiation time (MRO-P3: no more hardcoded values).
 """
 
 from __future__ import annotations
@@ -9,31 +11,58 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Dict, List
 
+from macro_risk_officer.config.loader import load_thresholds, load_weights
 from macro_risk_officer.core.decay_manager import DecayManager
 from macro_risk_officer.core.models import AssetPressure, MacroContext, MacroEvent
 from macro_risk_officer.core.sensitivity_matrix import AssetSensitivityMatrix
 from macro_risk_officer.utils.explanations import build_explanation
 
 
-# Surprise normalisation cap: surprises beyond this magnitude are capped
-_SURPRISE_CAP = 3.0
-
-# Tier weight amplifiers: Tier 1 events carry 3× the base weight
-_TIER_WEIGHT = {1: 3.0, 2: 1.5, 3: 0.75}
-
-# Regime classification thresholds
-_REGIME_RISK_OFF_THRESHOLD = -0.25
-_REGIME_RISK_ON_THRESHOLD = 0.25
-
-# Volatility bias thresholds (based on VIX pressure + conflict score)
-_VOL_EXPANDING_THRESHOLD = 0.20
-_VOL_CONTRACTING_THRESHOLD = -0.20
-
-
 class ReasoningEngine:
     def __init__(self) -> None:
         self.matrix = AssetSensitivityMatrix()
         self.decay = DecayManager()
+
+        thresholds = load_thresholds()
+        weights = load_weights()
+
+        # Surprise normalisation cap
+        self._surprise_cap: float = thresholds["surprise"]["cap"]
+
+        # Tier weight amplifiers
+        tw = weights["tier_weights"]
+        self._tier_weight: Dict[int, float] = {
+            1: tw["tier_1"],
+            2: tw["tier_2"],
+            3: tw["tier_3"],
+        }
+
+        # Regime classification thresholds
+        reg = thresholds["regime"]
+        self._regime_risk_off: float = reg["risk_off_threshold"]
+        self._regime_risk_on: float = reg["risk_on_threshold"]
+
+        # Volatility bias thresholds
+        vol = thresholds["volatility"]
+        self._vol_expanding: float = vol["expanding_threshold"]
+        self._vol_contracting: float = vol["contracting_threshold"]
+
+        # Regime composite weights (SPX, VIX, GOLD contributions)
+        rw = weights["regime_weights"]
+        self._spx_w: float = rw["spx_weight"]
+        self._vix_w: float = rw["vix_weight"]
+        self._gold_w: float = rw["gold_weight"]
+        self._regime_denom: float = self._spx_w + self._vix_w + self._gold_w
+
+        # Vol composite weights
+        vw = weights["vol_weights"]
+        self._vix_press_w: float = vw["vix_pressure"]
+        self._conflict_mag_w: float = vw["conflict_magnitude"]
+
+        # Confidence scaling
+        conf = weights["confidence"]
+        self._conf_scale: float = conf["scale_factor"]
+        self._conf_max: float = conf["max"]
 
     def generate_context(
         self,
@@ -66,7 +95,7 @@ class ReasoningEngine:
                 continue
 
             surprise_mult = self._surprise_multiplier(event)
-            tier_weight = _TIER_WEIGHT.get(event.tier, 1.0)
+            tier_weight = self._tier_weight.get(event.tier, 1.0)
             decay = self.decay.get_decay_factor(event)
             combined_weight = surprise_mult * tier_weight * decay
 
@@ -121,7 +150,6 @@ class ReasoningEngine:
         if pair is None:
             return None
 
-        # For geopolitical/systemic, positive actual = escalation/stress
         return pair[0] if surprise > 0 else pair[1]
 
     def _surprise_multiplier(self, event: MacroEvent) -> float:
@@ -133,19 +161,19 @@ class ReasoningEngine:
             magnitude = abs(surprise / event.forecast)
         except ZeroDivisionError:
             magnitude = abs(surprise)
-        capped = min(magnitude, _SURPRISE_CAP)
-        # Map [0, _SURPRISE_CAP] → [0.5, 2.0]
-        return 0.5 + (capped / _SURPRISE_CAP) * 1.5
+        capped = min(magnitude, self._surprise_cap)
+        return 0.5 + (capped / self._surprise_cap) * 1.5
 
     def _derive_regime(self, normalised: Dict[str, float]) -> str:
         spx = normalised.get("SPX", 0.0)
         gold = normalised.get("GOLD", 0.0)
         vix = normalised.get("VIX", 0.0)
-        # Simple composite: negative SPX + positive VIX/GOLD = risk-off
-        composite = (spx - vix * 0.5 - gold * 0.3) / 1.8
-        if composite < _REGIME_RISK_OFF_THRESHOLD:
+        composite = (
+            spx * self._spx_w - vix * self._vix_w - gold * self._gold_w
+        ) / self._regime_denom
+        if composite < self._regime_risk_off:
             return "risk_off"
-        if composite > _REGIME_RISK_ON_THRESHOLD:
+        if composite > self._regime_risk_on:
             return "risk_on"
         return "neutral"
 
@@ -153,10 +181,13 @@ class ReasoningEngine:
         self, normalised: Dict[str, float], conflict_score: float
     ) -> str:
         vix_pressure = normalised.get("VIX", 0.0)
-        composite = vix_pressure * 0.7 + abs(conflict_score) * 0.3
-        if composite > _VOL_EXPANDING_THRESHOLD:
+        composite = (
+            vix_pressure * self._vix_press_w
+            + abs(conflict_score) * self._conflict_mag_w
+        )
+        if composite > self._vol_expanding:
             return "expanding"
-        if composite < _VOL_CONTRACTING_THRESHOLD:
+        if composite < self._vol_contracting:
             return "contracting"
         return "neutral"
 
@@ -176,17 +207,15 @@ class ReasoningEngine:
             normalised.get(asset, 0.0) * exposure
             for asset, exposure in technical_exposures.items()
         )
-        # Normalise by number of assets to keep in [-1, 1]
         n = len(technical_exposures)
         return max(-1.0, min(1.0, total / n))
 
     def _confidence(self, events: List[MacroEvent]) -> float:
-        """Confidence scales with number and tier of events, capped at 0.95."""
+        """Confidence scales with number and tier of events, capped at conf_max."""
         if not events:
             return 0.0
-        score = sum(_TIER_WEIGHT.get(e.tier, 1.0) for e in events)
-        # 3 Tier-1 events → score=9 → confidence≈0.9
-        return round(min(0.95, score / 10.0), 2)
+        score = sum(self._tier_weight.get(e.tier, 1.0) for e in events)
+        return round(min(self._conf_max, score / self._conf_scale), 2)
 
     def _time_horizon(self, events: List[MacroEvent]) -> int:
         """Horizon driven by highest-tier event present."""

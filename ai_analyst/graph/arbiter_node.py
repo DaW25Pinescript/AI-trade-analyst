@@ -29,6 +29,7 @@ async def arbiter_node(state: GraphState) -> GraphState:
     ground_truth = state["ground_truth"]
     overlay_delta_reports = state.get("overlay_delta_reports") or []
     overlay_was_provided = ground_truth.m15_overlay is not None
+    macro_context = state.get("macro_context")
 
     prompt = build_arbiter_prompt(
         analyst_outputs=analyst_outputs,
@@ -36,6 +37,7 @@ async def arbiter_node(state: GraphState) -> GraphState:
         run_id=ground_truth.run_id,
         overlay_delta_reports=overlay_delta_reports,
         overlay_was_provided=overlay_was_provided,
+        macro_context=macro_context,
     )
 
     response = await acompletion(
