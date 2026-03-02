@@ -1,0 +1,33 @@
+# Regime classification thresholds
+regime:
+  risk_off_threshold: -0.25   # Composite score below this → risk_off
+  risk_on_threshold: 0.25     # Composite score above this → risk_on
+
+# Volatility bias thresholds
+volatility:
+  expanding_threshold: 0.20   # VIX composite above this → expanding
+  contracting_threshold: -0.20
+
+# Conflict score gates (for Arbiter prompt guidance)
+conflict:
+  headwind_gate: -0.50        # Below → note significant macro headwind
+  tailwind_gate: 0.50         # Above → note macro confirmation
+
+# Surprise magnitude thresholds for event classification
+surprise:
+  significant: 0.10           # >10% deviation from forecast = significant
+  large: 0.25                 # >25% = large surprise
+  cap: 3.0                    # Maximum surprise multiplier cap
+
+# Decay half-lives in hours per tier
+decay:
+  tier_1_half_life_hours: 168.0   # 7 days
+  tier_2_half_life_hours: 72.0    # 3 days
+  tier_3_half_life_hours: 24.0    # 1 day
+  min_floor: 0.05                 # Minimum residual weight
+
+# Scheduler
+scheduler:
+  ttl_seconds: 1800               # 30 min cache TTL
+  lookback_days: 14
+  lookahead_days: 2

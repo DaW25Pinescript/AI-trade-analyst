@@ -1,0 +1,41 @@
+# Tier event weights (amplify higher-tier events relative to tier 3)
+tier_weights:
+  tier_1: 3.0
+  tier_2: 1.5
+  tier_3: 0.75
+
+# Asset pressure contribution weights per regime component
+regime_weights:
+  spx_weight: 1.0
+  vix_weight: 0.5
+  gold_weight: 0.3
+
+# Volatility composite weights
+vol_weights:
+  vix_pressure: 0.7
+  conflict_magnitude: 0.3
+
+# Confidence scoring
+confidence:
+  # Confidence = min(0.95, total_tier_weight / scale_factor)
+  scale_factor: 10.0
+  max: 0.95
+
+# Asset exposure defaults per instrument (for conflict_score calculation)
+# Positive = long exposure to that asset; Negative = short exposure
+instrument_exposures:
+  XAUUSD:
+    GOLD: 1.0
+    USD: -0.5
+  EURUSD:
+    USD: -1.0
+  GBPUSD:
+    USD: -0.9
+  USDJPY:
+    USD: 1.0
+  US500:
+    SPX: 1.0
+  NAS100:
+    NQ: 1.0
+  USOIL:
+    OIL: 1.0
