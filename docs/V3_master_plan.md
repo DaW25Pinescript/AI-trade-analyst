@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.0
-**Updated:** 2026-03-01
-**Status:** Active — G11 stabilization complete, moving to G12/v1.4 execution
+**Version:** 2.1
+**Updated:** 2026-03-02
+**Status:** Active — G11 stabilized, v2.0 complete, MRO Track D added
 
 ---
 
@@ -13,7 +13,9 @@ two-track architecture:
 | Track | Directory | Runtime | Current Version |
 |-------|-----------|---------|-----------------|
 | **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G11 complete, G12 next |
-| **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v1.3 complete, v1.4 next |
+| **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0 complete, v2.1 next |
+| **C — Integration** | shared | schema + bridge | C1/C3 in progress |
+| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | MRO-P1 starting |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
@@ -36,6 +38,8 @@ G6/v2.0 onwards.
 6. **Minimum quorum** — at least 2 valid analyst responses required to proceed.
 7. **Full audit trail** — every run is logged to JSONL; every ticket has an AAR path.
 8. **Horse & Cart compatibility** — the pipeline works with zero API keys via prompt packs.
+9. **Macro context is advisory** — MRO never overrides price structure; bias is injected as
+   contextual evidence into the Arbiter prompt, never as a post-hoc verdict modifier.
 
 ---
 
@@ -244,6 +248,141 @@ Tasks:
 
 ---
 
+## Track D — Macro Risk Officer (`macro_risk_officer/`)
+
+The MRO is a **parallel, advisory-only context engine** that answers:
+*"What kind of market environment are we in right now?"*
+
+It is consumed exclusively by the Arbiter prompt builder as structured contextual evidence.
+Price action from analysts remains the sole authority for entries and exits.
+
+### Hard Constraints (non-negotiable, enforced in code)
+- MRO never generates trading signals
+- MRO never overrides price structure
+- MRO output is injected into the **Arbiter prompt**, not applied post-hoc to `FinalVerdict`
+- Rule-based heuristics only in MRO-P1 and MRO-P2; no ML until MRO-P3
+- All reasoning is fully explainable and auditable
+
+### Arbiter Output Contract
+
+MRO produces a single `MacroContext` object stored in `GraphState`. The Arbiter prompt
+builder injects it as a `macro_section` block (identical pattern to `overlay_section`).
+The LLM arbiter weighs it as contextual evidence — it does not modify `FinalVerdict` fields
+directly. The `apply_macro_context()` post-processing pattern from the RFC is **not used**;
+prompt injection is the correct integration point for this architecture.
+
+```json
+{
+  "regime": "risk_off",
+  "vol_bias": "expanding",
+  "asset_pressure": { "USD": 0.85, "GOLD": 0.65, "SPX": -0.75, "NQ": -0.80, "OIL": 0.40 },
+  "conflict_score": -0.62,
+  "confidence": 0.72,
+  "time_horizon_days": 45,
+  "explanation": ["Tier-1 hawkish Fed surprise → tighter liquidity → USD supported, equities pressured"],
+  "active_event_ids": ["fed-rate-2025-03-19", "cpi-mar-2025"]
+}
+```
+
+### Repository Structure
+
+```
+macro_risk_officer/
+├── config/
+│   ├── thresholds.yaml
+│   └── weights.yaml
+├── core/
+│   ├── models.py           # MacroEvent, AssetPressure, MacroContext (Pydantic)
+│   ├── sensitivity_matrix.py
+│   ├── decay_manager.py
+│   └── reasoning_engine.py
+├── ingestion/
+│   ├── clients/
+│   │   ├── finnhub_client.py
+│   │   ├── fred_client.py
+│   │   └── gdelt_client.py
+│   ├── normalizer.py
+│   └── scheduler.py
+├── history/
+│   └── tracker.py
+├── utils/
+│   └── explanations.py
+├── main.py                 # CLI: python -m macro_risk_officer status
+└── tests/
+```
+
+### Approved Data Sources (V1 only — listed order is priority)
+
+| Source | Purpose |
+|--------|---------|
+| Finnhub | Economic calendar (actual vs forecast) |
+| FRED | Historical macro time series |
+| Financial Modeling Prep | Consensus macro releases |
+| EODHD | Macro indicators + events |
+| GDELT | Structured geopolitical events |
+
+Excluded in V1: social media, raw headlines, retail sentiment feeds.
+
+### Pipeline Integration Points (Track B)
+
+Three files in `ai_analyst/` require changes when MRO-P2 is implemented:
+
+| File | Change |
+|------|--------|
+| `ai_analyst/graph/state.py` | Add `macro_context: Optional[MacroContext] = None` to `GraphState` |
+| `ai_analyst/graph/pipeline.py` | Insert `fetch_macro_context` node before `run_arbiter`; gated by `enable_macro_context` flag |
+| `ai_analyst/core/arbiter_prompt_builder.py` | Add `macro_section` parameter; inject when present (same pattern as `overlay_section`) |
+| `ai_analyst/api/main.py` | Add `enable_macro_context: bool = Form(False)` parameter |
+
+### Known Integration Gaps (resolve before MRO-P2)
+
+1. **`technical_exposures` source**: `ReasoningEngine.generate_context()` requires a dict
+   mapping assets to directional exposures. Solution: derive from `ground_truth.instrument`
+   via a static lookup table (e.g. `XAUUSD → {"GOLD": 1.0, "USD": -0.3}`).
+
+2. **Latency**: External API calls (Finnhub/FRED) must not block `/analyse`. Solution:
+   TTL-cached context (15–30 min refresh via background scheduler); pipeline reads from cache.
+
+3. **Persistence for Phase 3**: `history/tracker.py` needs a storage backend. SQLite is
+   sufficient. This is a Phase 3 concern — do not add until MRO-P2 is stable.
+
+### MRO-P1 — Standalone Read-Only Context (current)
+
+**Deliverable:** `python -m macro_risk_officer status` prints `MacroContext` JSON to stdout.
+
+Tasks:
+- [ ] `core/models.py` — `MacroEvent`, `AssetPressure`, `MacroContext` Pydantic models
+- [ ] `core/sensitivity_matrix.py` — full asset × event-type × direction matrix
+- [ ] `core/decay_manager.py` — time-decay factor per event age
+- [ ] `core/reasoning_engine.py` — aggregate events → `MacroContext`
+- [ ] `ingestion/clients/finnhub_client.py` — economic calendar with actual vs forecast
+- [ ] `ingestion/clients/fred_client.py` — macro time series (DFF, T10Y, UNRATE, CPIAUCSL)
+- [ ] `ingestion/normalizer.py` — standardise surprise direction + magnitude across sources
+- [ ] `ingestion/scheduler.py` — TTL cache with background refresh
+- [ ] `config/thresholds.yaml` + `config/weights.yaml`
+- [ ] `main.py` — `status` CLI command
+- [ ] `utils/explanations.py` — human-readable explanation builder
+- [ ] Unit tests for matrix, decay, reasoning engine
+
+### MRO-P2 — Arbiter Prompt Injection (next after P1 stable)
+
+Tasks:
+- [ ] `ai_analyst/graph/state.py` — add `macro_context` field
+- [ ] `ai_analyst/graph/pipeline.py` — `fetch_macro_context` node with `enable_macro_context` gate
+- [ ] `ai_analyst/core/arbiter_prompt_builder.py` — `macro_section` injection block
+- [ ] `ai_analyst/api/main.py` — `enable_macro_context` form parameter
+- [ ] Conflict scoring wired into arbiter notes (LLM interprets `conflict_score` in prompt)
+- [ ] Integration tests: MRO context present vs absent, conflict paths
+
+### MRO-P3 — Outcome Tracking (deferred, post-P2 stable)
+
+Tasks:
+- [ ] `history/tracker.py` — SQLite outcome log (1h / 24h / 5d post-event price moves)
+- [ ] Confidence calibration audit (predicted regime vs observed market behaviour)
+- [ ] Auditable outcome report: `python -m macro_risk_officer audit`
+
+---
+
 ## Track C — Integration (app/ ↔ ai_analyst/)
 
 This track begins at G6/v2.0 when both schema and API are stable.
@@ -333,12 +472,25 @@ All Claude-assisted development occurs on session branches and is merged via PR.
 
 ## Next Immediate Steps (Priority Order)
 
-1. **G11 + Track C1/C3 (Bridge hardening)** — The `ticket_draft` is now emitted; next step is
-   to make the browser app consume it (populate form fields from `ticket_draft`) and add
-   verdict-card edge-case / offline-fallback tests.
-2. **Track C2 (Local developer experience)** — Docker Compose for one-command local start;
-   app-side health-check UX so bridge availability is explicit.
-3. **v2.1 (Track B)** — Multi-round deliberation: optional second-round fan-out + deliberation config flag.
-4. **G12 (Track A)** — Accessibility + print polish + release packaging once G11/Track C are stable.
+1. **MRO-P1 (Track D)** — Build standalone `macro_risk_officer/` module: core models,
+   full sensitivity matrix, decay manager, Finnhub + FRED clients, TTL cache scheduler,
+   CLI `status` command. Deliverable: `python -m macro_risk_officer status` prints
+   `MacroContext` JSON. **Starting now.**
 
-**Completed in prior sessions:** G1, G2, G3, G4, G5
+2. **G11 + Track C1/C3 (Bridge hardening)** — Browser app consumes `ticket_draft` to
+   populate form fields; verdict-card edge-case / offline-fallback tests.
+
+3. **Track C2 (Local developer experience)** — Docker Compose for one-command local start;
+   app-side health-check UX so bridge availability is explicit.
+
+4. **v2.1 (Track B)** — Multi-round deliberation: optional second-round fan-out +
+   deliberation config flag.
+
+5. **MRO-P2 (Track D → Track B)** — After P1 stable: integrate `MacroContext` into
+   Arbiter prompt builder as `macro_section` block; add `fetch_macro_context` pipeline
+   node; add `enable_macro_context` API flag. Resolve three integration gaps first
+   (see Track D section).
+
+6. **G12 (Track A)** — Accessibility + print polish + release packaging once G11/C are stable.
+
+**Completed in prior sessions:** G1, G2, G3, G4, G5, v1.1–v2.0, G9, G10
