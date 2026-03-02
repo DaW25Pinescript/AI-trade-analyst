@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.3
+**Version:** 2.4
 **Updated:** 2026-03-02
-**Status:** Active — G11 stabilized, v2.0 complete, MRO-P1/P2/P3/P4 complete
+**Status:** Active — G11 infrastructure complete (UI verdict card pending), v2.0 complete, MRO fully complete (P1–P4)
 
 ---
 
@@ -12,19 +12,21 @@ two-track architecture:
 
 | Track | Directory | Runtime | Current Version |
 |-------|-----------|---------|-----------------|
-| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G11 complete, G12 next |
+| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G1–G10 complete, G11 partial, G12 next |
 | **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0 complete, v2.1 next |
-| **C — Integration** | shared | schema + bridge | C1/C3 in progress |
-| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | MRO-P1/P2/P3/P4 complete |
+| **C — Integration** | shared | schema + bridge | C1 complete, C2 complete, C3 partial |
+| **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | **ALL COMPLETE (P1–P4)** |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
 G6/v2.0 onwards.
 
-### Current verification snapshot (2026-03-01)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **81/81 passing**.
-- AI analyst regression suite: **PASS** (`pytest -q`) with **225/225 passing** (v2.0 ticket_draft coverage added).
-- Operational call: v1.4 + v2.0 complete; focus shifts to G11 bridge hardening and G12 (polish/release).
+### Current verification snapshot (2026-03-02)
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **105/105 passing**.
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **256/256 passing**.
+- MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
+- **Total: 514 passing, 0 failing** across all three suites.
+- Operational call: Track D fully complete; G11 UI card is the single remaining blocker before G12.
 
 ---
 
@@ -72,7 +74,7 @@ Tasks:
 
 **Debt carried from PR #11:** Resolved in current `work` branch; G2 checklist items are now implemented and covered by tests.
 
-### G3 — After-Action Review (AAR) — IN PROGRESS
+### G3 — After-Action Review (AAR) — COMPLETE
 **Goal:** Close the feedback loop with a structured post-trade review step.
 
 Tasks:
@@ -134,15 +136,20 @@ canonical data contract between Track A and Track B.
 - [x] Monthly/quarterly breakdown tables (trades, win rate, avg R, net R)
 - [x] Export analytics as PDF report
 
-### G11 — API Bridge (Track A → Track B) — IN PROGRESS
-- "Run AI Analysis" button in the app POSTs `GroundTruthPacket`-equivalent payload to
-  `ai_analyst` FastAPI endpoint
-- Response populates a new "AI Multi-Model Verdict" card in the UI
-- Requires local Python server running (documented setup)
+### G11 — API Bridge (Track A → Track B) — IN PROGRESS (infrastructure complete; UI card pending)
 - [x] Additive Operator Dashboard Mode (Phase A): dashboard shell toggle + responsive card layout
       layered over existing 7-step V3 flow (no top-to-bottom rewrite)
 - [x] Bridge transport hardening: `/analyse` now enforces request timeout + bounded retry on transient failures
 - [x] Contract regression tests for bridge reliability: transient 5xx retry path and timeout error path
+- [x] Docker Compose (`docker-compose.yml`): one-command local start for app + API together (C2)
+- [x] OpenAPI spec committed (`docs/openapi.json`); `ticket_draft` in API response envelope
+- [ ] **"Run AI Analysis" button** — `app/` POSTs `GroundTruthPacket`-equivalent payload to
+      the FastAPI `/analyse` endpoint (the button exists but does not yet POST)
+- [ ] **AI Multi-Model Verdict card** — response (`verdict` + `ticket_draft`) populates a
+      structured results card in the UI; local server availability is surfaced to the user
+
+**Requires local Python server running (documented setup). This is the single remaining
+blocker before G12.**
 
 ### G12 — Polish + Public Release
 - Full accessibility audit
@@ -411,18 +418,20 @@ Tasks:
 
 This track begins at G6/v2.0 when both schema and API are stable.
 
-### C1 — Shared Schema Contract
-- Formalise ticket schema as a shared JSON Schema file referenced by both tracks
-- `ai_analyst` output validated against this schema before any `app/` import
+### C1 — Shared Schema Contract (COMPLETE)
+- [x] `docs/openapi.json` committed (FastAPI-generated); `ticket_draft` contract stable
+- [x] `ai_analyst` output validated against schema before any `app/` import
 
-### C2 — Local Server Setup
-- `docker-compose.yml` for one-command local start (FastAPI + static file server)
-- Health check endpoint used by `app/` to detect if pipeline is available
+### C2 — Local Server Setup (COMPLETE)
+- [x] `docker-compose.yml` for one-command local start (FastAPI + static file server)
+- [x] `GET /health` endpoint — used by `app/` to detect pipeline availability
 
-### C3 — Browser ↔ Pipeline Bridge
-- `app/` POSTs `GroundTruthPacket` to local `ai_analyst` server
-- Response populates AI verdict card (G11)
-- Graceful degradation if server is unavailable
+### C3 — Browser ↔ Pipeline Bridge (PARTIAL — G11 UI card remaining)
+- [x] Bridge transport hardened (timeout, retry, 5xx paths tested)
+- [x] `app/scripts/main.js` envelope unpacking (`response.verdict`)
+- [ ] "Run AI Analysis" button POST wired in browser app
+- [ ] Verdict card populated from API response in UI
+- [ ] Graceful degradation UX when server unreachable
 
 ### C4 — Unified Export
 - Single export from `app/` includes both ticket data and full analyst JSON logs
@@ -435,20 +444,23 @@ This track begins at G6/v2.0 when both schema and API are stable.
 ### Track A (`app/`)
 | Issue | Priority | Target |
 |-------|----------|--------|
-| `export_json_backup.js` hardcodes G2 fields | High | G2 |
-| `exportJSONBackup`/`importJSONBackup` not on `window` | High | G2 |
-| `migrations.js` has no `schemaVersion` check | High | G2 |
-| Enum cross-check test missing | Medium | G2 |
-| No integration test for full G1 flow | Medium | G3 |
+| G11 "Run AI Analysis" button not yet wired to POST | High | G11 |
+| AI Multi-Model Verdict card not populated from response | High | G11 |
+| All G2 debt items | Resolved | G2 |
 
 ### Track B (`ai_analyst/`)
 | Issue | Priority | Target |
 |-------|----------|--------|
-| No end-to-end integration test with real images | High | v1.3 |
-| `replay` command not covered by tests | Medium | v1.3 |
-| `harmonic.txt` / `volume_profile.txt` lenses are stubs | Medium | v1.4 |
-| Arbiter model hardcoded to `claude-haiku-4-5-20251001` | Low | v2.0 |
-| No timeout/retry on individual analyst API calls | ~~Medium~~ Resolved | v1.3 |
+| `harmonic.txt` / `volume_profile.txt` lenses are stubs | Medium | v2.x |
+| Arbiter model hardcoded to `claude-haiku-4-5-20251001` | Low | v2.1 |
+| Webhook/callback for async pipeline completion | Low | v2.1+ |
+| All v1.3 debt items | Resolved | v1.3 |
+
+### Track D (`macro_risk_officer/`)
+| Issue | Priority | Target |
+|-------|----------|--------|
+| Live smoke tests require manual env var + real API keys | Low | by design |
+| Price outcome accuracy requires real trade data to be meaningful | Low | ongoing |
 
 ---
 
@@ -486,35 +498,42 @@ This track begins at G6/v2.0 when both schema and API are stable.
 
 | Branch | Purpose |
 |--------|---------|
-| `main` | Stable, reviewed code only |
-| `claude/audit-repo-branches-Y2rjV` | Current development session |
-| Feature branches | Per-milestone (`feature/g2-prediction-mode`, etc.) |
+| `main` | Stable, reviewed code only — all MRO phases and G1–G10 merged |
+| Feature branches | Per-milestone, prefixed `claude/` for AI-assisted sessions |
 
 All Claude-assisted development occurs on session branches and is merged via PR.
+The orphaned `codex/create-spa-shell-with-extracted-assets` branch has no common merge
+base with `main` (predates current repo structure) and can be safely deleted.
 
 ---
 
 ## Next Immediate Steps (Priority Order)
 
-1. **MRO-P1 (Track D)** — Build standalone `macro_risk_officer/` module: core models,
-   full sensitivity matrix, decay manager, Finnhub + FRED clients, TTL cache scheduler,
-   CLI `status` command. Deliverable: `python -m macro_risk_officer status` prints
-   `MacroContext` JSON. **Starting now.**
+> Last updated: 2026-03-02. All MRO phases complete. Test suite: 514 passing, 0 failing.
 
-2. **G11 + Track C1/C3 (Bridge hardening)** — Browser app consumes `ticket_draft` to
-   populate form fields; verdict-card edge-case / offline-fallback tests.
+1. **G11 completion — "Run AI Analysis" button + verdict card (Track A + C3)**
+   The single remaining G11 item. Wire the POST from the browser app to `/analyse`,
+   unpack the `AnalysisResponse` envelope, and populate the AI Multi-Model Verdict card
+   in the UI. Add graceful degradation UX for when the Python server is unreachable.
+   **This unblocks G12.**
 
-3. **Track C2 (Local developer experience)** — Docker Compose for one-command local start;
-   app-side health-check UX so bridge availability is explicit.
+2. **G12 — Polish + Public Release (Track A)**
+   Full accessibility audit, print stylesheet finalisation, user guide update, and
+   release packaging in `releases/`. Only starts once G11 is fully green.
 
-4. **v2.1 (Track B)** — Multi-round deliberation: optional second-round fan-out +
-   deliberation config flag.
+3. **v2.1 — Multi-Round Deliberation (Track B)**
+   Optional second-round analyst fan-out after initial results, with Arbiter weighting
+   both rounds. Config flag `enable_deliberation: bool = False` (off by default).
+   Independent of G11/G12 — can be developed in parallel.
 
-5. **MRO-P2 (Track D → Track B)** — After P1 stable: integrate `MacroContext` into
-   Arbiter prompt builder as `macro_section` block; add `fetch_macro_context` pipeline
-   node; add `enable_macro_context` API flag. Resolve three integration gaps first
-   (see Track D section).
+4. **C4 — Unified Export (Track C)**
+   Single `app/` export that includes ticket data + full analyst JSON logs from the
+   pipeline, importable back into either system.
 
-6. **G12 (Track A)** — Accessibility + print polish + release packaging once G11/C are stable.
+5. **v2.2 — Streaming + Real-Time UI (Track B)**
+   Server-Sent Events from FastAPI as analysts complete; CLI live progress; browser
+   app SSE subscription (requires G11 complete first).
 
-**Completed in prior sessions:** G1, G2, G3, G4, G5, v1.1–v2.0, G9, G10
+**Completed:** G1–G10, G3 (AAR), v1.1–v2.0, MRO-P1/P2/P3/P4, C1, C2, G11 infrastructure
+**In progress:** G11 UI card (C3 final leg)
+**Not started:** G12, v2.1, C4, v2.2
