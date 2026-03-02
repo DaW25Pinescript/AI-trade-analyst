@@ -5,36 +5,48 @@
 #   ai-analyst-api  → FastAPI multi-model pipeline        (host port 8000)
 #   app-static      → Static file server for browser UI   (host port 8080)
 #
-# Usage:
+# Quick start:
 #   docker compose up            # start both services
 #   docker compose up --wait     # start and wait until healthy
+#   docker compose up --build    # rebuild after dependency changes
+#
+# Access:
+#   API:  http://localhost:8000  (POST /analyse, GET /health)
+#   App:  http://localhost:8080/app/
+#
+# API keys:
+#   Copy ai_analyst/.env.example → ai_analyst/.env and fill in your keys.
+#   The api service picks them up automatically via the env_file directive.
 # ─────────────────────────────────────────────────────────────────────────────
 services:
 
   # ── FastAPI multi-model trade analysis pipeline ───────────────────────────
-  # Installs Python dependencies at container startup, then serves the
-  # LangGraph pipeline via uvicorn.
+  # Built from the repo Dockerfile so pip install runs at build time, not
+  # at every container start. Rebuild with: docker compose up --build
   # Health endpoint: GET /health → {"status": "ok", "version": "..."}
   ai-analyst-api:
-    image: python:3.11-slim
+    build: .
 
     working_dir: /workspace
 
-    # pip install runs at startup so the image stays generic; uvicorn follows.
-    command: >
-      bash -lc "pip install -r ai_analyst/requirements.txt &&
-      uvicorn ai_analyst.api.main:app --host 0.0.0.0 --port 8000"
+    command: uvicorn ai_analyst.api.main:app --host 0.0.0.0 --port 8000
+
+    env_file:
+      - path: ./ai_analyst/.env
+        required: false   # silently skipped when .env is absent
 
     volumes:
-      # Mount the entire repo so ai_analyst/ package and all configs are available.
+      # Mount the live source tree for hot-reload during development.
       - ./:/workspace
 
     ports:
       # 8000 → FastAPI (POST /analyse, GET /health)
       - "8000:8000"
 
+    restart: on-failure
+
     healthcheck:
-      # stdlib urllib avoids requiring curl/wget in python:3.11-slim.
+      # stdlib urllib avoids requiring curl/wget in the slim image.
       test:
         - "CMD"
         - "python"
@@ -43,8 +55,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      # Allow pip install + uvicorn startup time before the first probe fires.
-      start_period: 60s
+      # pip no longer runs at startup — allow only uvicorn cold-start time.
+      start_period: 15s
 
   # ── Static file server for the browser UI ────────────────────────────────
   # Serves the repo root over HTTP so the trade ticket UI is reachable at
@@ -65,9 +77,11 @@ services:
       - "8080:8080"
 
     depends_on:
-      # Wait until the API is healthy before considering the UI container ready.
+      # Wait for the API container to start before bringing up the static server.
+      # Using service_started (not service_healthy) so the UI is accessible
+      # even when the API health check is still warming up.
       ai-analyst-api:
-        condition: service_healthy
+        condition: service_started
 
     healthcheck:
       # python http.server returns HTTP 200 for a directory listing request.
@@ -79,5 +93,4 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      # http.server starts almost immediately.
       start_period: 10s

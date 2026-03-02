@@ -46,6 +46,27 @@ def _try_parse_price(text: str) -> Optional[float]:
     return float(match.group()) if match else None
 
 
+def _parse_price_range(text: str) -> tuple[Optional[float], Optional[float]]:
+    """
+    Extract a price range (min, max) from a zone description string.
+
+    Rules:
+      - 0 numbers found  → (None, None)
+      - 1 number found   → (n, n)       point zone e.g. "around 1930"
+      - 2+ numbers found → (min, max)   range e.g. "1930–1935", "1935 to 1930"
+        Only the first two numbers are used; extras are ignored.
+    """
+    if not text:
+        return (None, None)
+    nums = [float(m) for m in re.findall(r"\d+(?:\.\d+)?", text)]
+    if not nums:
+        return (None, None)
+    if len(nums) == 1:
+        return (nums[0], nums[0])
+    a, b = nums[0], nums[1]
+    return (min(a, b), max(a, b))
+
+
 def _conviction_from_confidence(confidence: float) -> str:
     if confidence >= 0.80:
         return "Very High"
@@ -111,10 +132,11 @@ def build_ticket_draft(
     if verdict.approved_setups:
         setup = verdict.approved_setups[0]
 
+        price_min, price_max = _parse_price_range(setup.entry_zone)
         draft["entry"] = {
             "zone": setup.entry_zone,
-            "priceMin": None,
-            "priceMax": None,
+            "priceMin": price_min,
+            "priceMax": price_max,
             "notes": f"AI setup type: {setup.type}",
         }
 

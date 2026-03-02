@@ -18,6 +18,7 @@ import json
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -63,6 +64,15 @@ app = FastAPI(
         "v2.0: POST /analyse returns an AnalysisResponse envelope including "
         "a ticket_draft block for direct browser app import."
     ),
+)
+
+# Allow the browser app (localhost:8080) to reach the API (localhost:8000).
+# Restricted to localhost origins only — tighten for production deployments.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
 
 _graph = build_analysis_graph()
