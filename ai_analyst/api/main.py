@@ -37,6 +37,8 @@ from ..models.arbiter_output import FinalVerdict
 from ..graph.pipeline import build_analysis_graph
 from ..graph.state import GraphState
 from ..output.ticket_draft import build_ticket_draft
+from ..core.run_paths import get_run_dir
+from ..core.usage_meter import summarize_usage
 
 
 class AnalysisResponse(BaseModel):
@@ -52,6 +54,7 @@ class AnalysisResponse(BaseModel):
     ticket_draft: dict
     run_id: str
     source_ticket_id: Optional[str] = None
+    usage_summary: dict
 
 app = FastAPI(
     title="AI Trade Analyst — Multi-Model Pipeline",
@@ -276,11 +279,28 @@ async def analyse(
 
     verdict: FinalVerdict = final_state["final_verdict"]
     ticket_draft = build_ticket_draft(verdict, ground_truth)
+    try:
+        usage_summary = summarize_usage(get_run_dir(ground_truth.run_id))
+    except Exception:
+        usage_summary = {
+            "total_calls": 0,
+            "successful_calls": 0,
+            "failed_calls": 0,
+            "calls_by_stage": {},
+            "calls_by_node": {},
+            "calls_by_model": {},
+            "calls_by_provider": {},
+            "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            "calls_with_token_usage": 0,
+            "calls_without_token_usage": 0,
+            "total_cost_usd": 0.0,
+        }
 
     response = AnalysisResponse(
         verdict=verdict,
         ticket_draft=ticket_draft,
         run_id=ground_truth.run_id,
         source_ticket_id=ground_truth.source_ticket_id,
+        usage_summary=usage_summary,
     )
     return JSONResponse(content=response.model_dump())

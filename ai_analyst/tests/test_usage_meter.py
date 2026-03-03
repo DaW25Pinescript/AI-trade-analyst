@@ -40,16 +40,32 @@ def test_summarize_usage_aggregates(tmp_path):
     path.write_text(
         "\n".join(
             [
-                json.dumps({
-                    "stage": "phase1_analyst", "model": "gpt-4o",
-                    "prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30,
-                    "cost_usd": 0.01,
-                }),
-                json.dumps({
-                    "stage": "arbiter", "model": "claude-haiku",
-                    "prompt_tokens": None, "completion_tokens": None, "total_tokens": None,
-                    "cost_usd": None,
-                }),
+                json.dumps(
+                    {
+                        "stage": "phase1_analyst",
+                        "node": "default_analyst",
+                        "model": "gpt-4o",
+                        "provider": "openai",
+                        "success": True,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 20,
+                        "total_tokens": 30,
+                        "cost_usd": 0.01,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "stage": "arbiter",
+                        "node": "arbiter_node",
+                        "model": "claude-haiku",
+                        "provider": "anthropic",
+                        "success": False,
+                        "prompt_tokens": None,
+                        "completion_tokens": None,
+                        "total_tokens": None,
+                        "cost_usd": None,
+                    }
+                ),
             ]
         ),
         encoding="utf-8",
@@ -58,7 +74,13 @@ def test_summarize_usage_aggregates(tmp_path):
     summary = summarize_usage(run_dir)
 
     assert summary["total_calls"] == 2
+    assert summary["successful_calls"] == 1
+    assert summary["failed_calls"] == 1
     assert summary["calls_by_stage"]["phase1_analyst"] == 1
+    assert summary["calls_by_node"]["default_analyst"] == 1
     assert summary["calls_by_model"]["gpt-4o"] == 1
+    assert summary["calls_by_provider"]["openai"] == 1
     assert summary["tokens"]["total_tokens"] == 30
+    assert summary["calls_with_token_usage"] == 1
+    assert summary["calls_without_token_usage"] == 1
     assert summary["total_cost_usd"] == 0.01

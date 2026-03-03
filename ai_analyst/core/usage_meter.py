@@ -139,9 +139,15 @@ def summarize_usage(run_dir: Path) -> dict:
     path = run_dir / "usage.jsonl"
     summary = {
         "total_calls": 0,
+        "successful_calls": 0,
+        "failed_calls": 0,
         "calls_by_stage": {},
+        "calls_by_node": {},
         "calls_by_model": {},
+        "calls_by_provider": {},
         "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        "calls_with_token_usage": 0,
+        "calls_without_token_usage": 0,
         "total_cost_usd": 0.0,
     }
     if not path.exists():
@@ -154,15 +160,32 @@ def summarize_usage(run_dir: Path) -> dict:
                 continue
             row = json.loads(line)
             summary["total_calls"] += 1
+            if row.get("success") is False:
+                summary["failed_calls"] += 1
+            else:
+                summary["successful_calls"] += 1
+
             stage = row.get("stage")
+            node = row.get("node")
             model = row.get("model")
+            provider = row.get("provider")
             summary["calls_by_stage"][stage] = summary["calls_by_stage"].get(stage, 0) + 1
+            summary["calls_by_node"][node] = summary["calls_by_node"].get(node, 0) + 1
             summary["calls_by_model"][model] = summary["calls_by_model"].get(model, 0) + 1
+            summary["calls_by_provider"][provider] = summary["calls_by_provider"].get(provider, 0) + 1
+
+            has_usage = False
 
             for k in ("prompt_tokens", "completion_tokens", "total_tokens"):
                 value = row.get(k)
                 if isinstance(value, int):
                     summary["tokens"][k] += value
+                    has_usage = True
+
+            if has_usage:
+                summary["calls_with_token_usage"] += 1
+            else:
+                summary["calls_without_token_usage"] += 1
 
             cost = row.get("cost_usd")
             if isinstance(cost, (float, int)):
