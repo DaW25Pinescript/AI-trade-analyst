@@ -82,7 +82,7 @@ async function postAnalyseWithOptions(serverUrl, formData, fetchImpl = fetch, op
   const trimmed = (serverUrl || '').trim().replace(/\/$/, '');
   if (!trimmed) throw new Error('Server URL is required.');
 
-  const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 12000;
+  const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 180_000;
   const retries = Number.isInteger(options.retries) && options.retries >= 0 ? options.retries : 1;
   const retryDelayMs = Number(options.retryDelayMs) >= 0 ? Number(options.retryDelayMs) : 400;
 
@@ -120,7 +120,7 @@ async function postAnalyseWithOptions(serverUrl, formData, fetchImpl = fetch, op
 
 export async function analyseViaBridge(serverUrl, doc = document, fetchImpl = fetch) {
   const formData = buildAnalyseFormData(doc);
-  return postAnalyseWithOptions(serverUrl, formData, fetchImpl, {});
+  return postAnalyseWithOptions(serverUrl, formData, fetchImpl, { timeoutMs: 180_000 });
 }
 
 export async function checkBridgeHealth(serverUrl, fetchImpl = fetch) {
