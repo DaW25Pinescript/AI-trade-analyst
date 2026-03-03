@@ -163,19 +163,19 @@ blocker before G12.**
 0. [ ] **Gate check: complete remaining G11 UI verdict card/POST integration first.**
    - G12 work begins only after G11 is green end-to-end (button POST + verdict rendering + graceful offline UX).
 
-1. [ ] **Form accessibility foundations (highest impact).**
+1. [x] **Form accessibility foundations (highest impact).**
    - Ensure stable `id` on every `input`, `textarea`, and `select`.
    - Ensure each `<label>` uses `for="<matching-id>"`.
    - For grouped checkboxes/radios, use semantic `fieldset`/`legend` where appropriate.
 
-2. [ ] **Prevent accidental form submissions.**
+2. [x] **Prevent accidental form submissions.**
    - Add explicit `type="button"` to every non-submit UI/navigation button.
 
-3. [ ] **Keyboard visibility and operability polish.**
+3. [x] **Keyboard visibility and operability polish.**
    - Add robust `:focus-visible` styles for buttons, links, form controls, and custom interactive elements.
    - Ensure focus indicator is obvious in both dark and light contexts (not color-only).
 
-4. [ ] **Dynamic announcement semantics.**
+4. [x] **Dynamic announcement semantics.**
    - Add `aria-live` regions for dynamic status/verdict/pipeline/validation updates.
    - Default to `aria-live="polite"`; reserve `assertive`/`role="alert"` for genuinely critical updates.
    - Avoid repetitive re-announcement noise.

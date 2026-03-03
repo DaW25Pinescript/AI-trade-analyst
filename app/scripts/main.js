@@ -51,6 +51,18 @@ function copyPrompt() {
 }
 function resetForm(){ location.reload(); }
 
+
+function bindKeyboardClickables() {
+  const clickables = document.querySelectorAll('[role="button"][tabindex="0"]');
+  clickables.forEach((node) => {
+    node.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      node.click();
+    });
+  });
+}
+
 function showWeeklyPrompt() {
   const prompt = buildWeeklyPrompt(getLoadedEntries());
   const out = document.getElementById('weeklyOutputText');
@@ -218,6 +230,7 @@ window.onload = () => {
   initSenatePanel();
   initDashboard();
   initOperatorDashboard();
+  bindKeyboardClickables();
 
   checkBridgeHealthUI();
 

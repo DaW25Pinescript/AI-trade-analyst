@@ -5,10 +5,10 @@
 Priority order: highest impact/risk first.
 
 - [ ] **P0 prerequisite:** Finish G11 UI verdict card + `/analyse` POST wiring (G12 starts only after this is complete).
-- [ ] **P1 accessibility labels:** Ensure all `input`/`textarea`/`select` controls have stable `id` + matching `<label for>`; use `fieldset`/`legend` for grouped radios/checkboxes.
-- [ ] **P1 form-safety hardening:** Add `type="button"` to all non-submit/navigation buttons.
-- [ ] **P1 keyboard UX:** Add clear `:focus-visible` styles (buttons, links, fields, custom controls) that work in dark/light themes.
-- [ ] **P1 dynamic announcements:** Add `aria-live` (`polite` default; `assertive` only if critical) to changing status/verdict/pipeline regions.
+- [x] **P1 accessibility labels:** Ensure all `input`/`textarea`/`select` controls have stable `id` + matching `<label for>`; use `fieldset`/`legend` for grouped radios/checkboxes.
+- [x] **P1 form-safety hardening:** Add `type="button"` to all non-submit/navigation buttons.
+- [x] **P1 keyboard UX:** Add clear `:focus-visible` styles (buttons, links, fields, custom controls) that work in dark/light themes.
+- [x] **P1 dynamic announcements:** Add `aria-live` (`polite` default; `assertive` only if critical) to changing status/verdict/pipeline regions.
 - [ ] **P1 contrast polish:** Tune `--muted`/secondary text token(s) for WCAG AA-friendly readability.
 - [ ] **P1 print polish:** Remove dark-theme bleed in print, enforce readable print colors, add page-break controls for major blocks/tables.
 - [ ] **P2 docs/release snapshot:** Create G12 snapshot in `app/releases/` and add matching entry to `app/releases/README.md`.
