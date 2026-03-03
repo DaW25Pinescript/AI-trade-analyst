@@ -17,8 +17,8 @@ import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbit
 import { initDashboard, getLoadedEntries } from './ui/dashboard.js';
 import { exportAnalyticsPDF } from './ui/dashboard.js';
 import { initOperatorDashboard, toggleOperatorDashboard, applyBridgeVerdictToDashboard } from './ui/dashboard_shell.js';
-import { analyseViaBridge, checkBridgeHealth } from './api_bridge.js';
-import { mountFinalVerdict } from './verdict_card.js';
+import { analyseViaBridge, checkBridgeHealth, getRunUsage } from './api_bridge.js';
+import { mountAnalysisResults } from './verdict_card.js';
 import { applyTicketDraftToForm } from './ui/ticket_form.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
@@ -194,9 +194,18 @@ async function runBridgeAnalyse() {
       throw new Error('API response did not include a verdict payload.');
     }
 
-    mountFinalVerdict(resultEl, verdict);
+    mountAnalysisResults(resultEl, verdict, response?.usage, response?.run_id);
     applyBridgeVerdictToDashboard(verdict);
     if (response.ticket_draft) applyTicketDraftToForm(response.ticket_draft);
+    if (response?.run_id) {
+      getRunUsage(serverUrl, response.run_id)
+        .then((usage) => {
+          mountAnalysisResults(resultEl, verdict, usage, response.run_id);
+        })
+        .catch(() => {
+          // Keep snapshot usage from POST /analyse when usage endpoint is unavailable.
+        });
+    }
     const runIdSuffix = response?.run_id ? ` (run_id: ${response.run_id})` : '';
     if (statusEl) statusEl.textContent = `AI analysis complete${runIdSuffix}.`;
   } catch (error) {

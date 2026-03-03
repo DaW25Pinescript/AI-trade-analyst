@@ -139,3 +139,23 @@ export async function checkBridgeHealth(serverUrl, fetchImpl = fetch) {
   }
   return response.json();
 }
+
+export async function getRunUsage(serverUrl, runId, fetchImpl = fetch) {
+  const trimmed = (serverUrl || '').trim().replace(/\/$/, '');
+  const normalizedRunId = String(runId || '').trim();
+  if (!trimmed) throw new Error('Server URL is required.');
+  if (!normalizedRunId) throw new Error('run_id is required.');
+
+  const response = await fetchWithTimeout(
+    `${trimmed}/runs/${encodeURIComponent(normalizedRunId)}/usage`,
+    { method: 'GET' },
+    fetchImpl,
+    6000
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Usage fetch failed (${response.status}): ${detail || response.statusText}`);
+  }
+
+  return response.json();
+}
