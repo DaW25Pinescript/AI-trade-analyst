@@ -21,7 +21,8 @@ from ..core.analyst_prompt_builder import (
     build_overlay_delta_prompt,
     build_messages,
 )
-from ..core.llm_client import acompletion_with_retry
+from ..core.run_paths import get_run_dir
+from ..core.usage_meter import acompletion_metered
 from .state import GraphState
 
 # Analyst roster — model names routed through LiteLLM.
@@ -36,16 +37,19 @@ ANALYST_CONFIGS: list[dict] = [
 MINIMUM_VALID_ANALYSTS = 2   # design rule #6
 
 
-async def run_analyst(config: dict, prompt: dict) -> AnalystOutput:
+async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
     """
     Phase 1: Call one analyst model and validate the response against the AnalystOutput schema.
     Raises on model error or schema validation failure — caller handles exceptions.
     """
-    from litellm import acompletion  # lazy import — litellm is optional for non-API paths
-    response = await acompletion_with_retry(
-        acompletion,
+    messages = build_messages(prompt)
+    response = await acompletion_metered(
+        run_dir=get_run_dir(run_id),
+        run_id=run_id,
+        stage="phase1_analyst",
+        node=config["persona"].value,
         model=config["model"],
-        messages=build_messages(prompt),
+        messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,   # low temperature for determinism
         max_tokens=1500,
@@ -57,6 +61,7 @@ async def run_analyst(config: dict, prompt: dict) -> AnalystOutput:
 async def run_overlay_delta(
     config: dict,
     prompt: dict,
+    run_id: str,
 ) -> OverlayDeltaReport:
     """
     Phase 2: Call one analyst model for overlay delta analysis.
@@ -64,11 +69,14 @@ async def run_overlay_delta(
     Validates response against OverlayDeltaReport schema.
     Raises on model error or schema validation failure.
     """
-    from litellm import acompletion  # lazy import — litellm is optional for non-API paths
-    response = await acompletion_with_retry(
-        acompletion,
+    messages = build_messages(prompt)
+    response = await acompletion_metered(
+        run_dir=get_run_dir(run_id),
+        run_id=run_id,
+        stage="phase2_overlay",
+        node=config["persona"].value,
         model=config["model"],
-        messages=build_messages(prompt),
+        messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,
         max_tokens=1000,
@@ -91,6 +99,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
         run_analyst(
             config,
             build_analyst_prompt(ground_truth, lens_config, config["persona"]),
+            ground_truth.run_id,
         )
         for config in ANALYST_CONFIGS
     ]
@@ -147,6 +156,7 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
         run_overlay_delta(
             ANALYST_CONFIGS[i % len(ANALYST_CONFIGS)],
             build_overlay_delta_prompt(ground_truth, analyst_output),
+            ground_truth.run_id,
         )
         for i, analyst_output in enumerate(analyst_outputs)
     ]
