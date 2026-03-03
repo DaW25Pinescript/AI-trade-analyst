@@ -518,6 +518,40 @@ def replay(
     _print_verdict(verdict)
 
 
+@app.command()
+def usage(
+    run_id: str = typer.Option(..., "--run-id", help="Run ID to summarize usage for"),
+):
+    """Summarize LLM usage.jsonl for a run."""
+    from .core.run_paths import get_run_dir
+    from .core.usage_meter import summarize_usage
+
+    run_dir = get_run_dir(run_id)
+    summary = summarize_usage(run_dir)
+    out_path = run_dir / "usage_summary.json"
+    out_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+    typer.echo(f"\n{_SEP}")
+    typer.echo("AI ANALYST — USAGE SUMMARY")
+    typer.echo(_SEP)
+    typer.echo(f"Run ID: {run_id}")
+    typer.echo(f"Total calls: {summary['total_calls']}")
+    typer.echo("Calls by stage:")
+    for k, v in summary["calls_by_stage"].items():
+        typer.echo(f"  - {k}: {v}")
+    typer.echo("Calls by model:")
+    for k, v in summary["calls_by_model"].items():
+        typer.echo(f"  - {k}: {v}")
+    typer.echo(
+        "Tokens (summed non-null): "
+        f"prompt={summary['tokens']['prompt_tokens']} "
+        f"completion={summary['tokens']['completion_tokens']} "
+        f"total={summary['tokens']['total_tokens']}"
+    )
+    typer.echo(f"Total cost (summed non-null): ${summary['total_cost_usd']:.6f}")
+    typer.echo(f"Saved: {out_path}")
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------

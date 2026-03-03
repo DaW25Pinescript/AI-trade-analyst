@@ -15,7 +15,7 @@ async def test_acompletion_with_retry_succeeds_after_transient_failure():
             raise RuntimeError("transient")
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="{}"))])
 
-    result = await acompletion_with_retry(
+    result, attempts = await acompletion_with_retry(
         flaky_completion,
         max_retries=2,
         retry_backoff_s=0,
@@ -25,6 +25,7 @@ async def test_acompletion_with_retry_succeeds_after_transient_failure():
 
     assert result.choices[0].message.content == "{}"
     assert calls["count"] == 2
+    assert attempts == 2
 
 
 @pytest.mark.asyncio

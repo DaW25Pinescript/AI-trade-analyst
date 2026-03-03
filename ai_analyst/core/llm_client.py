@@ -13,7 +13,7 @@ async def acompletion_with_retry(
     max_retries: int = DEFAULT_LLM_MAX_RETRIES,
     retry_backoff_s: float = DEFAULT_RETRY_BACKOFF_S,
     **kwargs,
-) -> Any:
+) -> tuple[Any, int]:
     """
     Execute an async LiteLLM completion call with timeout + bounded retries.
 
@@ -25,7 +25,8 @@ async def acompletion_with_retry(
 
     for attempt in range(1, attempts + 1):
         try:
-            return await asyncio.wait_for(acompletion_func(**kwargs), timeout=timeout_s)
+            response = await asyncio.wait_for(acompletion_func(**kwargs), timeout=timeout_s)
+            return response, attempt
         except Exception as exc:  # noqa: BLE001 - surface original provider/runtime failures
             last_error = exc
             if attempt >= attempts:

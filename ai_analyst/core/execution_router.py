@@ -28,7 +28,8 @@ from .prompt_pack_generator import PromptPackGenerator
 from .json_extractor import extract_json
 from .run_state_manager import transition, save_run_state
 from .logger import log_run
-from .llm_client import acompletion_with_retry
+from .run_paths import get_run_dir
+from .usage_meter import acompletion_metered
 
 OUTPUT_BASE = Path(__file__).parent.parent / "output" / "runs"
 
@@ -160,6 +161,7 @@ class ExecutionRouter:
             run_analyst(
                 {"model": a.model, "persona": a.persona},
                 build_analyst_prompt(self.ground_truth, self.lens_config, a.persona),
+                self.run_id,
             )
             for a in api_configs
         ]
@@ -194,8 +196,6 @@ class ExecutionRouter:
     async def _run_arbiter_and_finalise(
         self, all_outputs: list[AnalystOutput]
     ) -> FinalVerdict:
-        from litellm import acompletion
-
         # Generate and optionally write the arbiter prompt to disk
         arbiter_prompt = build_arbiter_prompt(
             analyst_outputs=all_outputs,
@@ -213,8 +213,11 @@ class ExecutionRouter:
 
         self.run_state = transition(self.run_state, RunStatus.ARBITER_COMPLETE)
 
-        response = await acompletion_with_retry(
-            acompletion,
+        response = await acompletion_metered(
+            run_dir=get_run_dir(self.run_id),
+            run_id=self.run_id,
+            stage="arbiter",
+            node="execution_router",
             model=ARBITER_MODEL,
             messages=[{"role": "user", "content": arbiter_prompt}],
             response_format={"type": "json_object"},

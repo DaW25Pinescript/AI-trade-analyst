@@ -7,9 +7,10 @@ When a 15M overlay was provided, the arbiter also receives the overlay delta rep
 and applies the lens-aware weighting rules (agreement, refinement, contradiction,
 indicator-only, risk override, no-trade priority).
 """
-from litellm import acompletion
 from ..models.arbiter_output import FinalVerdict
 from ..core.arbiter_prompt_builder import build_arbiter_prompt
+from ..core.run_paths import get_run_dir
+from ..core.usage_meter import acompletion_metered
 from .state import GraphState
 
 # Text-only model for the Arbiter — cheaper, no vision needed
@@ -40,7 +41,11 @@ async def arbiter_node(state: GraphState) -> GraphState:
         macro_context=macro_context,
     )
 
-    response = await acompletion(
+    response = await acompletion_metered(
+        run_dir=get_run_dir(ground_truth.run_id),
+        run_id=ground_truth.run_id,
+        stage="arbiter",
+        node="arbiter_node",
         model=ARBITER_MODEL,
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
