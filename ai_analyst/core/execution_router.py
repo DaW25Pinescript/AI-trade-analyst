@@ -10,8 +10,49 @@ In all cases the same Arbiter logic runs once analyst Evidence Objects are colle
 """
 import asyncio
 import json
+import logging
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from macro_risk_officer.core.models import MacroContext
+
+logger = logging.getLogger(__name__)
+
+# Module-level MRO scheduler singleton — shared across ExecutionRouter instances.
+# Same lazy-init / fail-silent pattern as graph/macro_context_node.py so the
+# MRO package remains a soft dependency.
+_mro_scheduler: Optional[object] = None
+
+
+def _get_mro_scheduler() -> Optional[object]:
+    global _mro_scheduler
+    if _mro_scheduler is None:
+        try:
+            from macro_risk_officer.ingestion.scheduler import MacroScheduler
+            _mro_scheduler = MacroScheduler()
+        except ImportError:
+            logger.warning(
+                "[MRO] macro_risk_officer not available — macro context disabled in ExecutionRouter."
+            )
+    return _mro_scheduler
+
+
+def _try_fetch_macro_context(instrument: str) -> Optional["MacroContext"]:
+    """Fetch macro context for *instrument*, returning None on any failure."""
+    scheduler = _get_mro_scheduler()
+    if scheduler is None:
+        return None
+    try:
+        return scheduler.get_context(instrument=instrument)
+    except Exception as exc:
+        logger.warning(
+            "[MRO] MacroContext fetch failed in ExecutionRouter (%s: %s) — "
+            "continuing without macro context.",
+            type(exc).__name__,
+            exc,
+        )
+        return None
 
 from ..models.ground_truth import GroundTruthPacket
 from ..models.lens_config import LensConfig
@@ -44,12 +85,14 @@ class ExecutionRouter:
         ground_truth: GroundTruthPacket,
         lens_config: LensConfig,
         run_state: RunState,
+        macro_context: Optional["MacroContext"] = None,
     ) -> None:
         self.config = config
         self.ground_truth = ground_truth
         self.lens_config = lens_config
         self.run_state = run_state
         self.run_id = ground_truth.run_id
+        self.macro_context = macro_context
         self.analyst_outputs_dir = OUTPUT_BASE / self.run_id / "analyst_outputs"
         self.analyst_outputs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -196,11 +239,20 @@ class ExecutionRouter:
     async def _run_arbiter_and_finalise(
         self, all_outputs: list[AnalystOutput]
     ) -> FinalVerdict:
+        # Fetch macro context if not already injected (fail-silent).
+        if self.macro_context is None:
+            self.macro_context = _try_fetch_macro_context(self.ground_truth.instrument)
+
+        overlay_was_provided = bool(self.ground_truth.m15_overlay)
+
         # Generate and optionally write the arbiter prompt to disk
         arbiter_prompt = build_arbiter_prompt(
             analyst_outputs=all_outputs,
             risk_constraints=self.ground_truth.risk_constraints,
             run_id=self.run_id,
+            overlay_delta_reports=[],
+            overlay_was_provided=overlay_was_provided,
+            macro_context=self.macro_context,
         )
 
         # Write arbiter_prompt.txt if prompt pack exists
