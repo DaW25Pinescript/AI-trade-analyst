@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.5
+**Version:** 2.6
 **Updated:** 2026-03-03
-**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 observability in progress
+**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 in progress (CRITICAL debt from 2026-03-03 audit)
 
 ---
 
@@ -12,9 +12,9 @@ two-track architecture:
 
 | Track | Directory | Runtime | Current Version |
 |-------|-----------|---------|-----------------|
-| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G1–G10 complete, G11 partial, G12 next |
-| **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0 complete, v2.1 next |
-| **C — Integration** | shared | schema + bridge | C1 complete, C2 complete, C3 partial |
+| **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G1–G12 complete |
+| **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0.1 complete, v2.0.2 in progress |
+| **C — Integration** | shared | schema + bridge | C1–C3 complete |
 | **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | **ALL COMPLETE (P1–P4)** |
 
 The two tracks are **independent** but share conceptual schema (instrument, session, ticket
@@ -23,10 +23,11 @@ G6/v2.0 onwards.
 
 ### Current verification snapshot (2026-03-03)
 - Browser regression suite: **PASS** (`node --test tests/*.js`) with **108/108 passing**.
-- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **256/256 passing**.
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **260/260 passing**.
+  - +4 new regression tests added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix (macro_context + overlay flags reaching arbiter in CLI/hybrid path).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 517 passing, 0 failing** across all three suites.
-- Operational call: Tracks A (through G12) and D are complete; near-term execution focus is Track B v2.0.1/v2.1.
+- **Total: 521 passing, 0 failing** across all three suites.
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.1 complete. Immediate focus: v2.0.2 CRITICAL+HIGH debt remediation (see Technical Debt section below).
 
 ---
 
@@ -285,7 +286,7 @@ Tasks:
 - [x] 48 new contract tests for ticket_draft mapping (225/225 pytest passing)
 - [ ] Webhook/callback support for async pipeline completion (deferred to v2.1+)
 
-### v2.0.1 — Run Observability Foundation (IN PROGRESS)
+### v2.0.1 — Run Observability Foundation (COMPLETE)
 **Goal:** Promote run metering + API service boundary to first-class architecture for production operations.
 
 Architecture components:
@@ -300,13 +301,38 @@ Architecture components:
   - Response envelope carries both analysis outputs and run-level usage summary so API consumers can correlate decision output with resource footprint.
   - Wrapper remains backward compatible with current manual/hybrid workflow while serving as the future integration surface for UI, automations, and external tooling.
 
-Integration with orchestration:
-- Meter is invoked at each LLM call site in analyst + arbiter nodes using the same `run_id` the pipeline uses for artifacts/logging.
-- API wrapper resolves usage summary by `run_id` after orchestration completes, enabling per-run observability without changing core decision schemas.
+### v2.0.2 — CRITICAL Debt Remediation (IN PROGRESS)
+**Goal:** Close the four CRITICAL correctness and reliability issues identified in the 2026-03-03 audit before v2.1.
 
-Operational relevance:
-- Enables cost reporting, per-provider/per-model diagnostics, expensive-workflow debugging, and future dashboarding/admin views without refactoring call sites later.
-- Establishes production-ready run accounting semantics ahead of deliberation/streaming phases.
+Issues addressed by priority:
+
+- [x] **CRITICAL-1 — ExecutionRouter drops `macro_context` + `overlay_delta_reports`** *(FIXED 2026-03-03)*
+  - `_run_arbiter_and_finalise()` now passes `macro_context`, `overlay_was_provided`, and `overlay_delta_reports=[]` to `build_arbiter_prompt()` in all CLI/hybrid/manual paths.
+  - Added fail-silent `_try_fetch_macro_context()` helper (same pattern as `macro_context_node.py`) so the router self-fetches when no context is injected.
+  - Added optional `macro_context=None` constructor parameter for test injection.
+  - 4 new regression tests added in `tests/test_execution_router_arbiter.py`.
+
+- [ ] **CRITICAL-3 — Browser API bridge 12 s timeout breaks G11 for all users**
+  - `api_bridge.js:85` hardcodes 12 s; multi-model pipeline needs ~3 min.
+  - Fix: raise default to `180_000` ms; pass explicitly in `analyseViaBridge()`.
+  - Add JS test: slow backend times out with user-visible error message.
+
+- [ ] **CRITICAL-2 — Synchronous HTTP in async MRO pipeline blocks event loop**
+  - `finnhub_client.py`, `fred_client.py`, `gdelt_client.py` all use sync `httpx.get()`.
+  - Fix: convert to `async httpx.AsyncClient`; make `scheduler._refresh()` async.
+  - Interim option: wrap in `asyncio.to_thread()` while migration is staged.
+
+- [ ] **CRITICAL-4 — Overlay delta node assigns wrong model after Phase 1 partial failure**
+  - `analyst_nodes.py:155` re-indexes by position, not by original config slot.
+  - Fix: track `(config, output)` pairs through Phase 1; pass config directly to Phase 2.
+  - Add `analyst_configs_used` field to `GraphState`; update overlay delta node.
+
+- [ ] **HIGH-5 — Grok model string `grok/grok-4-vision` does not exist**
+  - All ICT_PURIST analyst calls fail silently. Update to verified LiteLLM model ID.
+
+- [ ] **HIGH-1 — Retry logic retries non-retriable exceptions with too-short backoff**
+  - `llm_client.py` catches all exceptions; retries `AuthenticationError`; backoff is 0.4 s.
+  - Fix: distinguish retriable vs non-retriable; use exponential backoff with jitter up to 60 s.
 
 ### v2.1 — Multi-Round Deliberation
 **Goal:** Allow analysts to see a summary of other analysts' verdicts and update.
@@ -516,27 +542,81 @@ This track begins at G6/v2.0 when both schema and API are stable.
 
 ---
 
-## Known Technical Debt
+## Technical Debt Register
+*Last updated from audit_2026-03-03.md. Severity from audit: 🔥 CRITICAL / ⚠️ HIGH / ℹ️ MEDIUM / 💡 LOW.*
 
-### Track A (`app/`)
-| Issue | Priority | Target |
-|-------|----------|--------|
-| Browser bridge requires local API server availability for full UX | Medium | ongoing |
-| All G2 debt items | Resolved | G2 |
+### 🔥 CRITICAL
 
-### Track B (`ai_analyst/`)
-| Issue | Priority | Target |
-|-------|----------|--------|
-| `harmonic.txt` / `volume_profile.txt` lenses are stubs | Medium | v2.x |
-| Arbiter model hardcoded to `claude-haiku-4-5-20251001` | Low | v2.1 |
-| Webhook/callback for async pipeline completion | Low | v2.1+ |
-| All v1.3 debt items | Resolved | v1.3 |
+| ID | Issue | Status | File | Target |
+|----|-------|--------|------|--------|
+| CRITICAL-1 | `ExecutionRouter` drops `macro_context` + `overlay_delta_reports` — CLI/hybrid arbiter weaker than API arbiter | ✅ **FIXED 2026-03-03** | `execution_router.py` | v2.0.2 |
+| CRITICAL-2 | Sync `httpx.get()` in async MRO pipeline blocks event loop (up to 30 s on cold miss) | ⬜ pending | `finnhub_client.py`, `fred_client.py`, `gdelt_client.py` | v2.0.2 |
+| CRITICAL-3 | Browser bridge default timeout 12 s — G11 always times out before multi-model pipeline completes | ⬜ pending | `api_bridge.js:85` | v2.0.2 |
+| CRITICAL-4 | Overlay delta node re-indexes by position after Phase 1 partial failure — wrong model assigned to surviving analyst | ⬜ pending | `analyst_nodes.py:155` | v2.0.2 |
 
-### Track D (`macro_risk_officer/`)
-| Issue | Priority | Target |
-|-------|----------|--------|
-| Live smoke tests require manual env var + real API keys | Low | by design |
-| Price outcome accuracy requires real trade data to be meaningful | Low | ongoing |
+### ⚠️ HIGH
+
+| ID | Issue | Status | File | Target |
+|----|-------|--------|------|--------|
+| HIGH-1 | Retry catches all exceptions incl. non-retriable (AuthError, ValueError); backoff 0.4 s too short for rate limits | ⬜ pending | `llm_client.py:30` | v2.0.2 |
+| HIGH-2 | `datetime.utcnow()` deprecated — will break on Python 3.12+; returns naive datetime | ⬜ pending | `ground_truth.py`, `execution_config.py`, `run_state_manager.py` | v2.1 |
+| HIGH-3 | `FinalVerdict.final_bias` is unvalidated `str` — any freeform value silently produces empty `rawAIReadBias` in ticket draft | ⬜ pending | `arbiter_output.py:27` | v2.1 |
+| HIGH-4 | `MacroScheduler` not thread-safe — thundering herd on cache miss under multi-worker uvicorn | ⬜ pending | `scheduler.py:66` | v2.1 |
+| HIGH-5 | Grok model name `grok/grok-4-vision` does not exist — ICT_PURIST persona always fails | ⬜ pending | `analyst_nodes.py:34`, `api_key_manager.py:29` | v2.0.2 |
+| HIGH-6 | No budget guard — oversized chart inputs can cost $5–$20+ per request; no per-run token cap | ⬜ pending | `api/main.py`, `usage_meter.py` | v2.0.2 |
+| HIGH-7 | No rate limiting on `/analyse` endpoint — open abuse surface | ⬜ pending | `api/main.py` | v2.1 |
+| HIGH-8 | `_graph` built at module import time — not safe across uvicorn worker restarts; MRO TTL cache is per-process | ⬜ pending | `api/main.py:111` | v2.1 |
+
+### ℹ️ MEDIUM
+
+| ID | Issue | Status | File | Target |
+|----|-------|--------|------|--------|
+| MED-1 | FRED timestamps anchored to first of month — up to 28-day decay error | ⬜ pending | `fred_client.py:119` | v2.1 |
+| MED-2 | GDELT artificial `actual=1.0 / forecast=0.0` — removes tone magnitude from surprise calc; always tier-2 | ⬜ pending | `gdelt_client.py:106` | v2.1 |
+| MED-3 | `print()` instead of structured logging in graph nodes | ⬜ pending | `analyst_nodes.py` | v2.1 |
+| MED-4 | `usage_meter.append_usage` swallows all exceptions silently | ⬜ pending | `usage_meter.py:21` | v2.1 |
+| MED-5 | `api_bridge.js` timeframes list hardcoded `['H4','M15','M5']` regardless of uploaded charts | ⬜ pending | `api_bridge.js:14` | v2.0.2 |
+| MED-6 | `build_ticket_draft()` missing required ticket fields — non-schema-compliant without `_draft: true` marker | ⬜ pending | `ticket_draft.py` | v2.1 |
+| MED-7 | `is_text_only` routing gap — list-format content with only text blocks incorrectly flagged as multimodal | ⬜ pending | `is_text_only.py:12` | v2.1 |
+| MED-8 | `backup_validation.js` requires `m15Overlay: null` — G11 overlay feature blocked at schema validation level | ⬜ pending | `backup_validation.js:192` | v2.0.2 |
+
+### 💡 LOW
+
+| ID | Issue | Status | File | Target |
+|----|-------|--------|------|--------|
+| LOW-1 | Docker runs as root | ⬜ pending | `Dockerfile` | v2.x |
+| LOW-2 | CI does not install or test `macro_risk_officer/requirements.txt` | ⬜ pending | `.github/workflows/ci.yml` | v2.1 |
+| LOW-3 | `MINIMUM_VALID_ANALYSTS = 2` hardcoded — 50% failure rate appears healthy | ⬜ pending | `analyst_nodes.py:37` | v2.x |
+| LOW-4 | `run_state_manager.py` uses `datetime.utcnow()` outside Pydantic (missed by HIGH-2 sweep) | ⬜ pending | `run_state_manager.py:38` | v2.1 |
+| LOW-5 | `ExecutionConfig.mode` field is `str` not `Literal["manual","hybrid","automated"]` | ⬜ pending | `execution_config.py:23` | v2.1 |
+| LOW-6 | `api_bridge.js` never sends `source_ticket_id` — traceability link always null | ⬜ pending | `api_bridge.js` | v2.1 |
+| LOW-7 | `storage_indexeddb.js` is a localStorage stub — 5–10 MB ceiling as journal grows | ⬜ pending | `storage_indexeddb.js` | v2.x |
+| LOW-8 | CORS `allow_headers=["*"]` overly permissive | ⬜ pending | `api/main.py:108` | v2.x |
+
+### Testing Gaps (from audit TEST-1 through TEST-10)
+
+| ID | Test needed | Status | Target |
+|----|------------|--------|--------|
+| TEST-1 | Hybrid mode arbiter receives macro_context + overlay (CRITICAL-1 regression) | ✅ **ADDED 2026-03-03** (`test_execution_router_arbiter.py`) | v2.0.2 |
+| TEST-2 | Overlay delta node — correct config after Phase 1 partial failure (CRITICAL-4) | ⬜ pending | v2.0.2 |
+| TEST-3 | Full FastAPI `/analyse` integration test via TestClient | ⬜ pending | v2.1 |
+| TEST-4 | Browser bridge: slow backend → user-visible timeout error (not silent hang) | ⬜ pending | v2.0.2 |
+| TEST-5 | MRO degraded mode end-to-end — all sources fail → valid FinalVerdict | ⬜ pending | v2.1 |
+| TEST-6 | Schema migration chain: v1.1.0 → v4.0.0 in one call | ⬜ pending | v2.1 |
+| TEST-7 | Document JS/Python analyst schema divergence as a known-failing spec test | ⬜ pending | v2.x |
+| TEST-8 | `buildAnalyseFormData` — timeframes match uploaded charts (guards MED-5) | ⬜ pending | v2.0.2 |
+| TEST-9 | Concurrent `/analyse` cache misses call `_refresh()` once with lock (guards HIGH-4) | ⬜ pending | v2.1 |
+| TEST-10 | Unexpected `final_bias` value → ticket draft `rawAIReadBias` empty (guards HIGH-3) | ⬜ pending | v2.1 |
+
+### Architectural Debt (long-term, no immediate target)
+
+| Issue | Impact | Effort |
+|-------|--------|--------|
+| Browser ↔ Python analyst schema divergence (JS: 0–100, Long/Short/Wait; Python: 0.0–1.0, LONG/SHORT/NO_TRADE) | Blocks unified replay, dashboard, telemetry parity | XL |
+| Model strings duplicated across `analyst_nodes.py`, `api_key_manager.py`, `execution_router.py` | Adding a model requires 3+ consistent edits | S — centralize in `MODEL_REGISTRY` |
+| MRO scheduler as module-level singleton — not injectable, not per-worker-safe | Limits testability and multi-worker deployment | M — move to `app.state` + `@app.on_event("startup")` |
+| `storage_indexeddb.js` is a stub — localStorage growth ceiling | Long-term journal retention at risk | L — implement real IndexedDB adapter |
+| No shared `analyst_output.schema.json` canonical spec | JS and Python output shapes drift silently | M — define in `docs/schema/`, validate both sides |
 
 ---
 
@@ -585,31 +665,37 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Next Immediate Steps (Priority Order)
 
-> Last updated: 2026-03-02. All MRO phases complete. Test suite: 514 passing, 0 failing.
+> Last updated: 2026-03-03. All tracks complete through G12 / v2.0.1 / MRO P1–P4. Test suite: 521 passing, 0 failing.
+> Active focus: v2.0.2 — close CRITICAL and HIGH debt before v2.1 feature work.
 
-1. **G11 completion — "Run AI Analysis" button + verdict card (Track A + C3)**
-   The single remaining G11 item. Wire the POST from the browser app to `/analyse`,
-   unpack the `AnalysisResponse` envelope, and populate the AI Multi-Model Verdict card
-   in the UI. Add graceful degradation UX for when the Python server is unreachable.
-   **This unblocks G12.**
+1. **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** *(~30 min)*
+   `api_bridge.js:85` — change default from 12 s to 180 s; make `analyseViaBridge()`
+   pass it explicitly. Add JS test for slow-backend timeout path. Unblocks G11 for all users.
 
-2. **G12 — Polish + Public Release (Track A)**
-   Full accessibility audit, print stylesheet finalisation, user guide update, and
-   release packaging in `releases/`. Only starts once G11 is fully green.
+2. **v2.0.2 item: Convert MRO clients to async httpx (CRITICAL-2)** *(~3–4 h)*
+   `finnhub_client.py`, `fred_client.py`, `gdelt_client.py` — replace sync `httpx.get()`
+   with `async httpx.AsyncClient`; make `scheduler._refresh()` async. Use
+   `asyncio.to_thread()` as an interim bridge during the migration.
 
-3. **v2.1 — Multi-Round Deliberation (Track B)**
-   Optional second-round analyst fan-out after initial results, with Arbiter weighting
-   both rounds. Config flag `enable_deliberation: bool = False` (off by default).
-   Independent of G11/G12 — can be developed in parallel.
+3. **v2.0.2 item: Fix overlay delta model alignment (CRITICAL-4)** *(~3–4 h)*
+   Track `(config, output)` pairs through Phase 1; add `analyst_configs_used` to
+   `GraphState`; pass correct config to Phase 2. Add regression test (TEST-2).
 
-4. **C4 — Unified Export (Track C)**
-   Single `app/` export that includes ticket data + full analyst JSON logs from the
-   pipeline, importable back into either system.
+4. **v2.0.2 item: Fix Grok model string + add budget guard (HIGH-5 + HIGH-6)** *(~2–3 h)*
+   Update `grok/grok-4-vision` to the verified LiteLLM model ID. Add image size
+   validation in `api/main.py`; add per-run cost ceiling env var in `usage_meter.py`.
 
-5. **v2.2 — Streaming + Real-Time UI (Track B)**
-   Server-Sent Events from FastAPI as analysts complete; CLI live progress; browser
-   app SSE subscription (requires G11 complete first).
+5. **v2.0.2 item: Fix hardcoded timeframes in `api_bridge.js` + lift m15Overlay null guard (MED-5 + MED-8)** *(~2 h)*
+   Build timeframes list dynamically from uploaded files. Define typed overlay metadata
+   shape in `backup_validation.js`; validate object rather than requiring null.
 
-**Completed:** G1–G10, G3 (AAR), v1.1–v2.0, MRO-P1/P2/P3/P4, C1, C2, G11 infrastructure
-**In progress:** G11 UI card (C3 final leg)
-**Not started:** G12, v2.1, C4, v2.2
+6. **v2.1 — Multi-Round Deliberation (Track B)**
+   Optional second-round analyst fan-out; Arbiter weights both rounds.
+   Config flag `enable_deliberation: bool = False`. Independent of above.
+
+7. **C4 — Unified Export (Track C)**
+   Single `app/` export including ticket + full analyst JSON logs, importable back.
+
+**Completed:** G1–G12, v1.1–v2.0.1, MRO P1–P4, C1–C3, CRITICAL-1
+**In progress:** v2.0.2 (CRITICAL-2, CRITICAL-3, CRITICAL-4, HIGH-5, HIGH-6, MED-5, MED-8)
+**Not started:** v2.1, C4, v2.2
