@@ -173,14 +173,20 @@ async function runBridgeAnalyse() {
   const statusEl = document.getElementById('analysisBridgeStatus');
   const resultEl = document.getElementById('analysisVerdictCard');
   try {
-    if (statusEl) statusEl.textContent = 'Running /analyse ...';
+    if (statusEl) statusEl.textContent = 'Running AI analysis via POST /analyse ...';
     // v2.0: response is an envelope { verdict, ticket_draft, run_id, source_ticket_id }
     const response = await analyseViaBridge(serverUrl);
-    const verdict = response.verdict;
+    const verdict = response?.verdict || null;
+
+    if (!verdict) {
+      throw new Error('API response did not include a verdict payload.');
+    }
+
     mountFinalVerdict(resultEl, verdict);
     applyBridgeVerdictToDashboard(verdict);
     if (response.ticket_draft) applyTicketDraftToForm(response.ticket_draft);
-    if (statusEl) statusEl.textContent = 'Analysis complete.';
+    const runIdSuffix = response?.run_id ? ` (run_id: ${response.run_id})` : '';
+    if (statusEl) statusEl.textContent = `AI analysis complete${runIdSuffix}.`;
   } catch (error) {
     if (statusEl) statusEl.textContent = `Error: ${error.message}`;
   }
