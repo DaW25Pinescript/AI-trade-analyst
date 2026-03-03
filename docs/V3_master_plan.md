@@ -136,20 +136,19 @@ canonical data contract between Track A and Track B.
 - [x] Monthly/quarterly breakdown tables (trades, win rate, avg R, net R)
 - [x] Export analytics as PDF report
 
-### G11 — API Bridge (Track A → Track B) — IN PROGRESS (infrastructure complete; UI card pending)
+### G11 — API Bridge (Track A → Track B) — COMPLETE
 - [x] Additive Operator Dashboard Mode (Phase A): dashboard shell toggle + responsive card layout
       layered over existing 7-step V3 flow (no top-to-bottom rewrite)
 - [x] Bridge transport hardening: `/analyse` now enforces request timeout + bounded retry on transient failures
 - [x] Contract regression tests for bridge reliability: transient 5xx retry path and timeout error path
 - [x] Docker Compose (`docker-compose.yml`): one-command local start for app + API together (C2)
 - [x] OpenAPI spec committed (`docs/openapi.json`); `ticket_draft` in API response envelope
-- [ ] **"Run AI Analysis" button** — `app/` POSTs `GroundTruthPacket`-equivalent payload to
-      the FastAPI `/analyse` endpoint (the button exists but does not yet POST)
-- [ ] **AI Multi-Model Verdict card** — response (`verdict` + `ticket_draft`) populates a
-      structured results card in the UI; local server availability is surfaced to the user
+- [x] **"Run AI Analysis" button** — `app/` POSTs `GroundTruthPacket`-equivalent payload to
+      the FastAPI `/analyse` endpoint.
+- [x] **AI Multi-Model Verdict card** — response (`verdict` + `ticket_draft`) populates a
+      structured results card in the UI; local server availability is surfaced to the user.
 
-**Requires local Python server running (documented setup). This is the single remaining
-blocker before G12.**
+**Requires local Python server running (documented setup).**
 
 ### G12 — Polish + Public Release
 
@@ -160,7 +159,7 @@ blocker before G12.**
 
 **Prioritized G12 task list (merged):**
 
-0. [ ] **Gate check: complete remaining G11 UI verdict card/POST integration first.**
+0. [x] **Gate check: complete remaining G11 UI verdict card/POST integration first.**
    - G12 work begins only after G11 is green end-to-end (button POST + verdict rendering + graceful offline UX).
 
 1. [x] **Form accessibility foundations (highest impact).**
@@ -180,37 +179,37 @@ blocker before G12.**
    - Default to `aria-live="polite"`; reserve `assertive`/`role="alert"` for genuinely critical updates.
    - Avoid repetitive re-announcement noise.
 
-5. [ ] **Readable contrast tuning for secondary text token(s).**
+5. [x] **Readable contrast tuning for secondary text token(s).**
    - Adjust `--muted` (or equivalent) to meet WCAG AA while preserving hierarchy.
 
-6. [ ] **Print output correctness and readability.**
+6. [x] **Print output correctness and readability.**
    - Resolve any `color-scheme: dark` bleed in print styles.
    - Force high-contrast print defaults (white background, readable text).
    - Add print page-break controls to keep key blocks together (ticket header/summary, verdict/gates) and improve long-table behavior.
 
-7. [ ] **Release artifact + release log updates.**
+7. [x] **Release artifact + release log updates.**
    - Create G12 snapshot in `app/releases/` following prior milestone format.
    - Update `app/releases/README.md` with the new G12 entry.
 
-8. [ ] **User-facing documentation updates.**
+8. [x] **User-facing documentation updates.**
    - Create or expand a practical user guide covering ticket entry, section navigation, dynamic status/verdict behavior, print/export flow, and keyboard-accessibility expectations.
 
-9. [ ] **QA pass + evidence collection.**
+9. [x] **QA pass + evidence collection.**
    - Manual keyboard tab pass across interactive controls.
    - Manual scan for unlabeled inputs.
    - Print preview validation (no dark bleed, intentional page breaks).
    - Capture concise QA notes and changed-file list in the G12 release snapshot.
 
 **Definition of Done (G12):**
-- [ ] No obvious unlabeled form controls in primary UI flow; labels are programmatically associated.
-- [ ] Non-submit buttons no longer trigger unintended form submissions.
-- [ ] Keyboard focus indicator is consistently visible across interactive controls.
-- [ ] Dynamic status/verdict updates are announced appropriately by assistive tech.
-- [ ] Muted/secondary text contrast is improved to WCAG AA-friendly levels.
-- [ ] Print preview is readable, high-contrast, and free from dark-theme bleed; key blocks avoid awkward splits.
-- [ ] G12 release snapshot exists in `app/releases/` and `app/releases/README.md` has a matching entry.
-- [ ] User guide is present/updated with workflow and accessibility notes.
-- [ ] Regression checks remain green (`node --test tests/*.js`; plus any relevant Python checks if touched).
+- [x] No obvious unlabeled form controls in primary UI flow; labels are programmatically associated.
+- [x] Non-submit buttons no longer trigger unintended form submissions.
+- [x] Keyboard focus indicator is consistently visible across interactive controls.
+- [x] Dynamic status/verdict updates are announced appropriately by assistive tech.
+- [x] Muted/secondary text contrast is improved to WCAG AA-friendly levels.
+- [x] Print preview is readable, high-contrast, and free from dark-theme bleed; key blocks avoid awkward splits.
+- [x] G12 release snapshot exists in `app/releases/` and `app/releases/README.md` has a matching entry.
+- [x] User guide is present/updated with workflow and accessibility notes.
+- [x] Regression checks remain green (`node --test tests/*.js`; plus any relevant Python checks if touched).
 
 ---
 

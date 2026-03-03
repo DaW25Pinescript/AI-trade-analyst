@@ -8,8 +8,14 @@ This folder stores standalone HTML milestone snapshots of the AI Trade Analyst i
   V2 variant focused on export workflows/output handling.
 - **`V3-G1.html`**  
   V3 Generation 1 milestone with a larger redesign and feature iteration beyond V2.
+- **`V3-G12.html`**  
+  V3 Generation 12 release snapshot including final accessibility, print, and verdict-flow polish baseline.
+- **`V3-G12-QA.md`**  
+  QA evidence and changed-file log for the G12 release increment.
 
 ## Version-to-version changes
 
 - **V2 → V2_Exports:** keeps the V2 foundation while adding/export-focused behavior and layout updates.
 - **V2_Exports → V3-G1:** moves to the next milestone generation with broader UI/flow refinements.
+
+- **V3-G1 → V3-G12:** completes G12 polish/release-readiness updates with accessibility, print, and documentation closure.
