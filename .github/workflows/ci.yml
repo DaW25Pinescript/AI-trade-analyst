@@ -38,5 +38,29 @@ jobs:
       - name: Install analyst dependencies
         run: pip install -r ai_analyst/requirements.txt
 
+      - name: Scan analyst dependencies for CVEs
+        run: pip install pip-audit && pip-audit -r ai_analyst/requirements.txt
+
       - name: Run analyst tests
         run: pytest -q ai_analyst/tests
+
+  mro-tests:
+    name: Macro Risk Officer tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install MRO dependencies
+        run: pip install -r macro_risk_officer/requirements.txt
+
+      - name: Scan MRO dependencies for CVEs
+        run: pip install pip-audit && pip-audit -r macro_risk_officer/requirements.txt
+
+      - name: Run MRO tests
+        run: pytest -q macro_risk_officer/tests

@@ -15,6 +15,7 @@ GET /health
 """
 import base64
 import json
+import os
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -66,11 +67,16 @@ app = FastAPI(
     ),
 )
 
-# Allow the browser app (localhost:8080) to reach the API (localhost:8000).
-# Restricted to localhost origins only — tighten for production deployments.
+# Allow the browser app to reach the API.
+# Override ALLOWED_ORIGINS (comma-separated) for non-localhost deployments.
+# Defaults to localhost:8080 / 127.0.0.1:8080 for local development.
+_default_origins = ["http://localhost:8080", "http://127.0.0.1:8080"]
+_env_origins = os.environ.get("ALLOWED_ORIGINS", "")
+_allow_origins = [o.strip() for o in _env_origins.split(",") if o.strip()] or _default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_origins=_allow_origins,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -271,8 +277,8 @@ async def analyse(
     except RuntimeError as e:
         # Propagate pipeline failures (e.g. insufficient analysts) as 503
         raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal pipeline error. Check server logs.")
 
     verdict: FinalVerdict = final_state["final_verdict"]
     ticket_draft = build_ticket_draft(verdict, ground_truth)
