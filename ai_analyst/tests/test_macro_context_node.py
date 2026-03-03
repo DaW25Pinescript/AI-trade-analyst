@@ -47,6 +47,7 @@ def _make_state(instrument: str = "XAUUSD") -> dict:
         "ground_truth": gt,
         "lens_config": LensConfig(),
         "analyst_outputs": [],
+        "analyst_configs_used": [],
         "overlay_delta_reports": [],
         "macro_context": None,
         "final_verdict": None,

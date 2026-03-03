@@ -29,6 +29,7 @@ async def test_langgraph_pipeline_routes_direct_to_arbiter_without_overlay(
     async def fake_lenses_node(state):
         calls.append("lenses")
         state["analyst_outputs"] = []
+        state["analyst_configs_used"] = []
         return state
 
     async def fake_overlay_node(state):
@@ -63,6 +64,7 @@ async def test_langgraph_pipeline_routes_direct_to_arbiter_without_overlay(
             "ground_truth": sample_ground_truth,
             "lens_config": sample_lens_config,
             "analyst_outputs": [],
+            "analyst_configs_used": [],
             "overlay_delta_reports": [],
             "macro_context": None,
             "final_verdict": None,
@@ -97,6 +99,7 @@ async def test_langgraph_pipeline_runs_overlay_branch_when_overlay_present(
     async def fake_lenses_node(state):
         calls.append("lenses")
         state["analyst_outputs"] = []
+        state["analyst_configs_used"] = []
         return state
 
     async def fake_overlay_node(state):
@@ -132,6 +135,7 @@ async def test_langgraph_pipeline_runs_overlay_branch_when_overlay_present(
             "ground_truth": sample_ground_truth_with_overlay,
             "lens_config": sample_lens_config,
             "analyst_outputs": [],
+            "analyst_configs_used": [],
             "overlay_delta_reports": [],
             "macro_context": None,
             "final_verdict": None,
@@ -160,6 +164,7 @@ async def test_macro_context_none_does_not_block_pipeline(
 
     async def fake_lenses_node(state):
         state["analyst_outputs"] = []
+        state["analyst_configs_used"] = []
         return state
 
     async def fake_arbiter_node(state):
@@ -187,6 +192,7 @@ async def test_macro_context_none_does_not_block_pipeline(
             "ground_truth": sample_ground_truth,
             "lens_config": sample_lens_config,
             "analyst_outputs": [],
+            "analyst_configs_used": [],
             "overlay_delta_reports": [],
             "macro_context": None,
             "final_verdict": None,

@@ -13,6 +13,7 @@ class GraphState(TypedDict):
     ground_truth: GroundTruthPacket
     lens_config: LensConfig
     analyst_outputs: list[AnalystOutput]           # Phase 1 — clean price analysis outputs
+    analyst_configs_used: list[dict]               # Phase 1 — configs that produced valid outputs (parallel to analyst_outputs)
     overlay_delta_reports: list[OverlayDeltaReport]  # Phase 2 — 15M overlay delta reports (empty if no overlay)
     chart_analysis_runtime: Optional[dict]
     macro_context: Optional[MacroContext]           # MRO Phase 2 — injected before chart analysis, advisory only
