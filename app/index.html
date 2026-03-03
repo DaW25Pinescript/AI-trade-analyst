@@ -838,16 +838,16 @@
     </div>
 
     <div class="card">
-      <div class="card-label green">G11 — API Bridge (POST /analyse)</div>
-      <p class="step-note">Send current form + chart uploads to AI Analyst API and render returned <code>FinalVerdict</code>.</p>
+      <div class="card-label green">G11 — AI Multi-Model Verdict (POST /analyse)</div>
+      <p class="step-note">Send current form + chart uploads to AI Analyst API and render returned <code>ticket_draft</code> + <code>FinalVerdict</code> into the UI card below.</p>
       <label>Analysis Server URL</label>
       <input type="text" id="analysisServerUrl" placeholder="http://localhost:8000" value="http://localhost:8000">
       <div class="btn-row" style="margin-top:10px;">
         <button class="btn btn-ghost" onclick="checkBridgeHealthUI()">Check API Health</button>
-        <button class="btn btn-primary" onclick="runBridgeAnalyse()">Run API Analysis</button>
+        <button class="btn btn-primary" onclick="runBridgeAnalyse()">Run AI Analysis</button>
       </div>
       <p id="analysisBridgeStatus" class="hint" style="margin-top:8px;">Idle.</p>
-      <div id="analysisVerdictCard" style="margin-top:10px;"></div>
+      <div id="analysisVerdictCard" style="margin-top:10px;"><p class="hint">AI Multi-Model Verdict card will appear here after analysis.</p></div>
     </div>
 
     <!-- G9: Shadow Outcome — visible only when Shadow Mode is active -->
