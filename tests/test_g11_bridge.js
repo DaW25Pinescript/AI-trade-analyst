@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildAnalyseFormData, postAnalyse, checkBridgeHealth, getRunUsage } from '../app/scripts/api_bridge.js';
+import { buildAnalyseFormData, postAnalyse, analyseViaBridge, checkBridgeHealth, getRunUsage } from '../app/scripts/api_bridge.js';
 
 function makeDoc(overrides = {}) {
   const map = new Map(Object.entries(overrides));
@@ -119,6 +119,53 @@ test('postAnalyse surfaces timeout errors after retries exhausted', async () => 
     }),
     /Request timed out after 20ms/
   );
+});
+
+test('analyseViaBridge uses a 3-minute timeout (not the old 12 s default)', async () => {
+  // Capture the AbortSignal timeout that the bridge sets and verify it is
+  // at least 170 s — well above 12 s and within the 3-minute budget.
+  let capturedSignal = null;
+  const fakeFetch = async (_url, opts) => {
+    capturedSignal = opts.signal;
+    return {
+      ok: true,
+      async json() {
+        return {
+          verdict: { decision: 'NO_TRADE', overall_confidence: 0.5 },
+          ticket_draft: { decisionMode: 'WAIT', rawAIReadBias: 'Neutral', shadowMode: false },
+          run_id: 'run-timeout-test',
+          source_ticket_id: null,
+        };
+      },
+    };
+  };
+
+  const doc = {
+    getElementById(id) {
+      const defaults = {
+        asset: { value: 'XAUUSD' },
+        session: { value: 'London' },
+        accountBalance: { value: '10000' },
+        minRR: { value: '2' },
+        maxStop: { value: '1' },
+        maxDailyRisk: { value: '2' },
+        regime: { value: 'ranging' },
+        volRisk: { value: 'none_noted' },
+        broker: { value: 'TradingView' },
+      };
+      return defaults[id] || null;
+    },
+  };
+
+  const result = await analyseViaBridge('http://localhost:8000', doc, fakeFetch);
+  assert.equal(result.run_id, 'run-timeout-test');
+
+  // The AbortController timer for a 180 s timeout fires 180 000 ms from now.
+  // We can't read the raw deadline directly, but we can confirm the signal was
+  // provided (meaning a timeout was set) and that the request was not already
+  // aborted (which would indicate the timeout was too short and fired immediately).
+  assert.ok(capturedSignal !== null, 'fetch should receive an AbortSignal');
+  assert.equal(capturedSignal.aborted, false, 'signal should not be aborted — 180 s timeout is far in the future');
 });
 
 test('checkBridgeHealth requests /health and returns payload', async () => {

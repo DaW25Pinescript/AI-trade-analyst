@@ -7,9 +7,11 @@ These tests verify:
   3. The node sets macro_context=None without raising when the scheduler throws.
   4. The node passes the correct instrument to the scheduler.
   5. The node handles the case where macro_risk_officer is not importable.
+  6. The node uses asyncio.to_thread so the sync scheduler never blocks the event loop.
 """
 from __future__ import annotations
 
+import asyncio
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -146,3 +148,35 @@ class TestMacroContextNode:
         assert result["ground_truth"] is original_gt
         assert result["analyst_outputs"] == []
         assert result["final_verdict"] is None
+
+    async def test_scheduler_called_via_asyncio_to_thread(self):
+        """
+        The sync MacroScheduler.get_context() must be dispatched through
+        asyncio.to_thread so it runs in a thread-pool worker, not on the
+        event-loop thread.  This prevents the 10-30 s blocking that occurs
+        on a cold-cache MRO refresh from starving concurrent /analyse requests.
+        """
+        from ai_analyst.graph import macro_context_node as module
+
+        ctx = _sample_macro_context()
+        mock_scheduler = MagicMock()
+        mock_scheduler.get_context.return_value = ctx
+
+        calls: list = []
+
+        async def spy_to_thread(fn, **kwargs):
+            # Record that to_thread was invoked, then run fn synchronously
+            # so the rest of the test behaves normally.
+            calls.append((fn, kwargs))
+            return fn(**kwargs)
+
+        with patch.object(module, "_scheduler", mock_scheduler):
+            with patch("ai_analyst.graph.macro_context_node.asyncio.to_thread", spy_to_thread):
+                state = _make_state()
+                result = await module.macro_context_node(state)
+
+        assert len(calls) == 1, "asyncio.to_thread must be called exactly once per node invocation"
+        fn, kwargs = calls[0]
+        assert fn is mock_scheduler.get_context, "to_thread must receive scheduler.get_context as its callable"
+        assert kwargs == {"instrument": "XAUUSD"}
+        assert result["macro_context"] is ctx
