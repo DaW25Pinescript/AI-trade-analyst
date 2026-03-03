@@ -285,6 +285,29 @@ Tasks:
 - [x] 48 new contract tests for ticket_draft mapping (225/225 pytest passing)
 - [ ] Webhook/callback support for async pipeline completion (deferred to v2.1+)
 
+### v2.0.1 — Run Observability Foundation (IN PROGRESS)
+**Goal:** Promote run metering + API service boundary to first-class architecture for production operations.
+
+Architecture components:
+- **Token/Call Meter (`ai_analyst/core/usage_meter.py`)**
+  - Append-only `usage.jsonl` per run (`run_id` scoped).
+  - Per-call capture: stage/node, model/provider, attempts, latency, token usage where available, and failure metadata.
+  - Run summary API for operations: total/success/failed calls, token totals, provider/model/stage/node rollups, token-availability coverage, and aggregated cost.
+  - Fail-soft invariant: metering never blocks analysis; missing usage metadata is recorded as null/unknown and execution continues.
+- **FastAPI Wrapper (`ai_analyst/api/main.py`)**
+  - `POST /analyse` is the canonical service-layer entrypoint for one analysis run.
+  - Request lifecycle creates immutable `GroundTruthPacket` (includes unique `run_id`) and executes one pipeline run.
+  - Response envelope carries both analysis outputs and run-level usage summary so API consumers can correlate decision output with resource footprint.
+  - Wrapper remains backward compatible with current manual/hybrid workflow while serving as the future integration surface for UI, automations, and external tooling.
+
+Integration with orchestration:
+- Meter is invoked at each LLM call site in analyst + arbiter nodes using the same `run_id` the pipeline uses for artifacts/logging.
+- API wrapper resolves usage summary by `run_id` after orchestration completes, enabling per-run observability without changing core decision schemas.
+
+Operational relevance:
+- Enables cost reporting, per-provider/per-model diagnostics, expensive-workflow debugging, and future dashboarding/admin views without refactoring call sites later.
+- Establishes production-ready run accounting semantics ahead of deliberation/streaming phases.
+
 ### v2.1 — Multi-Round Deliberation
 **Goal:** Allow analysts to see a summary of other analysts' verdicts and update.
 
