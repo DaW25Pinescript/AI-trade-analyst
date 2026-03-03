@@ -15,7 +15,7 @@
   <div class="header-left">
     <div class="logo">AI Trade <span>/ Analyst</span></div>
     <div class="version-pill">V3 · G9</div>
-    <button id="operatorModeBtn" class="operator-mode-btn" onclick="toggleOperatorDashboard()" aria-pressed="false">Operator Dashboard mode: OFF</button>
+    <button type="button" id="operatorModeBtn" class="operator-mode-btn" onclick="toggleOperatorDashboard()" aria-pressed="false">Operator Dashboard mode: OFF</button>
     <div id="shadowBadge" style="display:none;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.12em;padding:4px 10px;border-radius:2px;background:rgba(59,111,255,0.15);border:1px solid rgba(59,111,255,0.5);color:var(--accent);">SHADOW</div>
     <div id="bridgeHealthBadge" class="bridge-badge" style="display:none;"></div>
   </div>
@@ -112,7 +112,7 @@
     <div class="card">
       <div class="card-label">Asset, Session & Platform</div>
 
-      <label>Asset / Ticker</label>
+      <label for="asset">Asset / Ticker</label>
       <input type="text" id="asset" placeholder="e.g. XAUUSD, EURUSD, BTCUSDT" oninput="onAssetInput()">
       <div class="suggestions">
         <span class="sug-pill" onclick="setAsset('XAUUSD')">XAUUSD</span>
@@ -125,7 +125,7 @@
 
       <div class="row">
         <div>
-          <label>Session</label>
+          <label for="session">Session</label>
           <select id="session" onchange="syncOutput()">
             <option value="">— Select —</option>
             <option>London Open</option>
@@ -138,7 +138,7 @@
           </select>
         </div>
         <div>
-          <label>Execution Horizon</label>
+          <label for="execHorizon">Execution Horizon</label>
           <select id="execHorizon" onchange="syncOutput()">
             <option value="">— Select —</option>
             <option>Scalp</option>
@@ -151,7 +151,7 @@
 
       <div class="row">
         <div>
-          <label>Broker / Platform</label>
+          <label for="broker">Broker / Platform</label>
           <select id="broker" onchange="syncOutput()">
             <option>TradingView</option>
             <option>MT5</option>
@@ -160,7 +160,7 @@
           </select>
         </div>
         <div>
-          <label>Candle Type</label>
+          <label for="candleType">Candle Type</label>
           <select id="candleType" onchange="syncOutput()">
             <option>Normal</option>
             <option>Heikin Ashi</option>
@@ -171,18 +171,18 @@
 
       <div class="row">
         <div>
-          <label>Chart Timezone</label>
+          <label for="chartTimezone">Chart Timezone</label>
           <input type="text" id="chartTimezone" placeholder="e.g. UTC+3, NY time, Server time" oninput="syncOutput()">
         </div>
         <div>
-          <label>Price Now (optional)</label>
+          <label for="priceNow">Price Now (optional)</label>
           <input type="text" id="priceNow" placeholder="e.g. 2934.65" oninput="syncOutput()">
         </div>
       </div>
 
       <div class="row">
         <div>
-          <label>Market Regime</label>
+          <label for="regime">Market Regime</label>
           <select id="regime" onchange="syncOutput()">
             <option value="">— Select —</option>
             <option>Trending</option>
@@ -192,7 +192,7 @@
           </select>
         </div>
         <div>
-          <label>Bias Horizon</label>
+          <label for="biasHorizon">Bias Horizon</label>
           <select id="biasHorizon" onchange="syncOutput()">
             <option value="">— Select —</option>
             <option>HTF swing bias (D/4H)</option>
@@ -206,7 +206,7 @@
       <!-- G4: Counter-trend toggle -->
       <div class="row">
         <div>
-          <label>Allow Counter-Trend Ideas?</label>
+          <label for="counterTrendMode">Allow Counter-Trend Ideas?</label>
           <select id="counterTrendMode" onchange="syncOutput()">
             <option value="Strict HTF-only">Strict HTF-only (no CT ideas)</option>
             <option value="Mixed" selected>Mixed (CT if strongly justified)</option>
@@ -235,7 +235,7 @@
 
       <div class="row">
         <div>
-          <label>Min R:R Required</label>
+          <label for="minRR">Min R:R Required</label>
           <select id="minRR" onchange="syncOutput()">
             <option value="">— Any —</option>
             <option value="1.5">1.5R minimum</option>
@@ -245,7 +245,7 @@
           </select>
         </div>
         <div>
-          <label>Allow R:R Exception?</label>
+          <label for="rrException">Allow R:R Exception?</label>
           <select id="rrException" onchange="toggleRRJustification(); syncOutput()">
             <option value="no">No — strict filter</option>
             <option value="yes">Yes — if win-rate logic is strong</option>
@@ -253,22 +253,22 @@
         </div>
       </div>
       <div id="rrJustWrap" style="display:none;">
-        <label>Exception Justification (required)</label>
+        <label for="rrJustification">Exception Justification (required)</label>
         <input type="text" id="rrJustification" placeholder="e.g. High-probability mean reversion with historical 70%+ hit rate" oninput="syncOutput()">
       </div>
 
       <div class="row">
         <div>
-          <label>Max Stop Distance (pips / $)</label>
+          <label for="maxStop">Max Stop Distance (pips / $)</label>
           <input type="text" id="maxStop" placeholder="e.g. 50 pips, $200" oninput="syncOutput()">
         </div>
         <div>
-          <label>Spread / Slippage Assumption</label>
+          <label for="spread">Spread / Slippage Assumption</label>
           <input type="text" id="spread" placeholder="e.g. 0.3 pips, $0.50" oninput="syncOutput()">
         </div>
       </div>
 
-      <label>Correlation Context (optional)</label>
+      <label for="correlationNote">Correlation Context (optional)</label>
       <div class="row">
         <div>
           <input type="text" id="correlationNote" placeholder="e.g. DXY strengthening, SPX risk-off" oninput="syncOutput()" style="margin-bottom:0">
@@ -284,7 +284,7 @@
       </div>
       <p class="hint" style="margin-top:6px;">Used as secondary confirmation only — never primary justification.</p>
 
-      <label>Persona Override (optional)</label>
+      <label for="persona">Persona Override (optional)</label>
       <select id="persona" onchange="syncOutput()">
         <option value="">Default — ruthless prop trader</option>
         <option value="ICT purist">ICT purist</option>
@@ -307,7 +307,7 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="goTo(1)">Next: Charts →</button>
+      <button type="button" class="btn btn-primary" onclick="goTo(1)">Next: Charts →</button>
     </div>
   </div>
 
@@ -401,7 +401,7 @@
 
       <div class="row">
         <div>
-          <label>HTF Context (price location)</label>
+          <label for="htfContextSetup">HTF Context (price location)</label>
           <select id="htfContextSetup" onchange="syncOutput()">
             <option value="">— Select —</option>
             <option>At HTF demand / support</option>
@@ -413,7 +413,7 @@
           </select>
         </div>
         <div>
-          <label>Chart Cleanliness (clean slots)</label>
+          <label for="chartCleanliness">Chart Cleanliness (clean slots)</label>
           <select id="chartCleanliness" onchange="syncOutput()">
             <option value="Clean">Clean — no drawings</option>
             <option value="Light">Light drawings — some annotations</option>
@@ -424,8 +424,8 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-ghost" onclick="goTo(0)">← Back</button>
-      <button class="btn btn-primary" onclick="goToChartsNext()">Next: Context →</button>
+      <button type="button" class="btn btn-ghost" onclick="goTo(0)">← Back</button>
+      <button type="button" class="btn btn-primary" onclick="goToChartsNext()">Next: Context →</button>
     </div>
   </div>
 
@@ -436,16 +436,16 @@
     <div class="card">
       <div class="card-label">Market Context</div>
 
-      <label>Indicators on chart</label>
+      <label for="indicators">Indicators on chart</label>
       <input type="text" id="indicators" placeholder="e.g. EMA 50/200, ICT FVG, Fibonacci, SR Zones" oninput="syncOutput()">
 
-      <label>Key levels I already see</label>
+      <label for="levels">Key levels I already see</label>
       <textarea id="levels" placeholder="e.g. Resistance at 2950 (previous swing high). Support at 2898 (HTF demand zone). Trendline from Jan lows." oninput="syncOutput()"></textarea>
 
-      <label>Upcoming news / events</label>
+      <label for="news">Upcoming news / events</label>
       <input type="text" id="news" placeholder="e.g. CPI tomorrow 8:30 ET, FOMC next week" oninput="syncOutput()">
 
-      <label>Any open positions?</label>
+      <label for="position">Any open positions?</label>
       <input type="text" id="position" placeholder="e.g. Long XAUUSD from 2880, SL at 2855" oninput="syncOutput()">
     </div>
 
@@ -453,43 +453,43 @@
       <div class="card-label">Analysis Requests</div>
       <div class="checkbox-grid" id="requests">
         <label class="checkbox-item checked" onclick="toggleCheck(this)">
-          <input type="checkbox" checked><div class="check-box">✓</div>
+          <input type="checkbox" id="requestTrendLevels" checked><div class="check-box">✓</div>
           <span class="check-text">Trend & key levels per TF</span>
         </label>
         <label class="checkbox-item checked" onclick="toggleCheck(this)">
-          <input type="checkbox" checked><div class="check-box">✓</div>
+          <input type="checkbox" id="requestPrimaryTicket" checked><div class="check-box">✓</div>
           <span class="check-text">Primary trade ticket</span>
         </label>
         <label class="checkbox-item checked" onclick="toggleCheck(this)">
-          <input type="checkbox" checked><div class="check-box">✓</div>
+          <input type="checkbox" id="requestNoTrade" checked><div class="check-box">✓</div>
           <span class="check-text">No-trade conditions</span>
         </label>
         <label class="checkbox-item checked" onclick="toggleCheck(this)">
-          <input type="checkbox" checked><div class="check-box">✓</div>
+          <input type="checkbox" id="requestKillSwitch" checked><div class="check-box">✓</div>
           <span class="check-text">Kill-switch conditions</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox"><div class="check-box"></div>
+          <input type="checkbox" id="requestConditionalAlternative"><div class="check-box"></div>
           <span class="check-text">Conditional alternative ticket</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox"><div class="check-box"></div>
+          <input type="checkbox" id="requestLiquidityAnalysis"><div class="check-box"></div>
           <span class="check-text">Liquidity analysis</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox"><div class="check-box"></div>
+          <input type="checkbox" id="requestHtfLtfConfluence"><div class="check-box"></div>
           <span class="check-text">HTF/LTF confluence</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox"><div class="check-box"></div>
+          <input type="checkbox" id="requestInvalidationScenarios"><div class="check-box"></div>
           <span class="check-text">Invalidation scenarios</span>
         </label>
       </div>
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
-      <button class="btn btn-primary" onclick="goTo(3)">Next: Pre-Ticket →</button>
+      <button type="button" class="btn btn-ghost" onclick="goTo(1)">← Back</button>
+      <button type="button" class="btn btn-primary" onclick="goTo(3)">Next: Pre-Ticket →</button>
     </div>
   </div>
 
@@ -602,7 +602,7 @@
 
       <!-- WAIT Panel (shown when gate logic fires) -->
       <div class="wait-panel" id="waitPanel">
-        <label>⚠ WAIT Reason Code</label>
+        <label for="waitReason">⚠ WAIT Reason Code</label>
         <select id="waitReason" onchange="syncOutput()">
           <option value="">— Select reason —</option>
           <option>Chop / range noise</option>
@@ -611,16 +611,16 @@
           <option>News risk / volatility</option>
           <option>Already moved / late trend</option>
         </select>
-        <label>Re-entry Condition (what would change WAIT to trade?)</label>
+        <label for="reentryCondition">Re-entry Condition (what would change WAIT to trade?)</label>
         <input type="text" id="reentryCondition" placeholder="e.g. Price sweeps 2890 liquidity and reclaims 2895 on 15m close" oninput="syncOutput()">
-        <label>Time horizon for re-evaluation</label>
+        <label for="reentryTime">Time horizon for re-evaluation</label>
         <input type="text" id="reentryTime" placeholder="e.g. Re-check in 2H at NY open" oninput="syncOutput()">
       </div>
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
-      <button class="btn btn-primary" onclick="goTo(4)">Next: Test Mode →</button>
+      <button type="button" class="btn btn-ghost" onclick="goTo(2)">← Back</button>
+      <button type="button" class="btn btn-primary" onclick="goTo(4)">Next: Test Mode →</button>
     </div>
   </div>
 
@@ -634,7 +634,7 @@
 
       <div class="row">
         <div>
-          <label>Decision Mode</label>
+          <label for="decisionMode">Decision Mode</label>
           <select id="decisionMode" onchange="onDecisionModeChange(this)">
             <option value="LONG">LONG</option>
             <option value="SHORT">SHORT</option>
@@ -643,7 +643,7 @@
           </select>
         </div>
         <div>
-          <label>Ticket Type</label>
+          <label for="ticketType">Ticket Type</label>
           <select id="ticketType" onchange="syncOutput()">
             <option value="Zone ticket">Zone ticket (default)</option>
             <option value="Exact ticket">Exact ticket</option>
@@ -652,13 +652,13 @@
       </div>
 
       <div id="conditionalWrap" style="display:none;">
-        <label>Conditional Alternative (if Decision = CONDITIONAL)</label>
+        <label for="conditionalText">Conditional Alternative (if Decision = CONDITIONAL)</label>
         <textarea id="conditionalText" placeholder="Describe the alternative scenario or trigger that would change the direction..." oninput="syncOutput()"></textarea>
       </div>
 
       <div class="row">
         <div>
-          <label>Entry Type</label>
+          <label for="entryType">Entry Type</label>
           <select id="entryType" onchange="syncOutput()">
             <option value="Market">Market</option>
             <option value="Limit" selected>Limit</option>
@@ -666,7 +666,7 @@
           </select>
         </div>
         <div>
-          <label>Entry Trigger Type</label>
+          <label for="entryTrigger">Entry Trigger Type</label>
           <select id="entryTrigger" onchange="syncOutput()">
             <option value="Pullback to zone">Pullback to zone</option>
             <option value="Break + retest">Break + retest</option>
@@ -679,7 +679,7 @@
 
       <div class="row">
         <div>
-          <label>Confirmation Timeframe</label>
+          <label for="confTF">Confirmation Timeframe</label>
           <select id="confTF" onchange="syncOutput()">
             <option value="1m">1m</option>
             <option value="5m">5m</option>
@@ -688,7 +688,7 @@
           </select>
         </div>
         <div>
-          <label>Stop Logic</label>
+          <label for="stopLogic">Stop Logic</label>
           <select id="stopLogic" onchange="syncOutput()">
             <option value="Below swing low / above swing high">Below swing low / above swing high</option>
             <option value="Below zone">Below zone</option>
@@ -700,7 +700,7 @@
 
       <div class="row">
         <div>
-          <label>Time-in-Force</label>
+          <label for="timeInForce">Time-in-Force</label>
           <select id="timeInForce" onchange="syncOutput()">
             <option value="This session">This session</option>
             <option value="Next 1H">Next 1H</option>
@@ -709,7 +709,7 @@
           </select>
         </div>
         <div>
-          <label>Max Entry Attempts</label>
+          <label for="maxAttempts">Max Entry Attempts</label>
           <select id="maxAttempts" onchange="syncOutput()">
             <option value="1">1</option>
             <option value="2" selected>2</option>
@@ -722,11 +722,11 @@
 
       <div class="row">
         <div>
-          <label>Entry Zone Low</label>
+          <label for="entryPriceMin">Entry Zone Low</label>
           <input type="number" id="entryPriceMin" placeholder="e.g. 2895.00" oninput="syncOutput()" step="any">
         </div>
         <div>
-          <label>Entry Zone High</label>
+          <label for="entryPriceMax">Entry Zone High</label>
           <input type="number" id="entryPriceMax" placeholder="e.g. 2905.00" oninput="syncOutput()" step="any">
         </div>
       </div>
@@ -734,38 +734,38 @@
 
       <div class="row">
         <div>
-          <label>Stop Price</label>
+          <label for="stopPrice">Stop Price</label>
           <input type="number" id="stopPrice" placeholder="e.g. 2875.00" oninput="syncOutput()" step="any">
         </div>
         <div>
-          <label>Stop Rationale</label>
+          <label for="stopRationale">Stop Rationale</label>
           <input type="text" id="stopRationale" placeholder="e.g. Below swing low at 2870" oninput="syncOutput()">
         </div>
       </div>
 
       <div class="row">
         <div>
-          <label>TP1 Price</label>
+          <label for="tp1Price">TP1 Price</label>
           <input type="number" id="tp1Price" placeholder="e.g. 2935.00" oninput="syncOutput()" step="any">
         </div>
         <div>
-          <label>TP1 Rationale</label>
+          <label for="tp1Rationale">TP1 Rationale</label>
           <input type="text" id="tp1Rationale" placeholder="e.g. Previous swing high / supply zone" oninput="syncOutput()">
         </div>
       </div>
 
       <div class="row">
         <div>
-          <label>TP2 Price (optional)</label>
+          <label for="tp2Price">TP2 Price (optional)</label>
           <input type="number" id="tp2Price" placeholder="e.g. 2960.00" oninput="syncOutput()" step="any">
         </div>
         <div>
-          <label>TP2 Rationale (optional)</label>
+          <label for="tp2Rationale">TP2 Rationale (optional)</label>
           <input type="text" id="tp2Rationale" placeholder="e.g. HTF supply / weekly target" oninput="syncOutput()">
         </div>
       </div>
 
-      <label>Entry Notes (optional)</label>
+      <label for="entryNotes">Entry Notes (optional)</label>
       <input type="text" id="entryNotes" placeholder="e.g. Wait for 15m engulfing candle before entry" oninput="syncOutput()">
 
       <div class="toggle-wrap">
@@ -781,8 +781,8 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-ghost" onclick="goTo(3)">← Back to Pre-Ticket</button>
-      <button class="btn btn-primary" onclick="buildAndShow()">Generate V3 Prompt →</button>
+      <button type="button" class="btn btn-ghost" onclick="goTo(3)">← Back to Pre-Ticket</button>
+      <button type="button" class="btn btn-primary" onclick="buildAndShow()">Generate V3 Prompt →</button>
     </div>
   </div>
 
@@ -798,11 +798,11 @@
         <div class="output-header">
           <span class="output-title">● PROMPT READY · <span id="outputTicketId">—</span></span>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
-            <button class="export-btn" onclick="exportHTML()">Download HTML</button>
-            <button class="export-btn" onclick="exportPDF()">Print / PDF</button>
-            <button class="export-btn" onclick="exportJSONBackup()">Export JSON</button>
-            <button class="export-btn" onclick="exportAnalyticsPDF()">Export Analytics PDF</button>
+            <button type="button" class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
+            <button type="button" class="export-btn" onclick="exportHTML()">Download HTML</button>
+            <button type="button" class="export-btn" onclick="exportPDF()">Print / PDF</button>
+            <button type="button" class="export-btn" onclick="exportJSONBackup()">Export JSON</button>
+            <button type="button" class="export-btn" onclick="exportAnalyticsPDF()">Export Analytics PDF</button>
           </div>
         </div>
         <div id="outputText">Fill in the form steps to generate your V3 prompt...</div>
@@ -820,7 +820,7 @@
       <p class="step-note">Fill in after reading the AI response. These fields are stored in your ticket for AAR comparison and weekly review analysis.</p>
       <div class="row">
         <div>
-          <label>AI's Raw Bias Verdict (from chart narrative)</label>
+          <label for="rawAIReadBias">AI's Raw Bias Verdict (from chart narrative)</label>
           <select id="rawAIReadBias" onchange="syncOutput()">
             <option value="">— Not yet recorded —</option>
             <option value="Bullish">Bullish</option>
@@ -830,7 +830,7 @@
           </select>
         </div>
         <div>
-          <label>AI Confidence Score (0.0–1.0, from AI response)</label>
+          <label for="aiEdgeScore">AI Confidence Score (0.0–1.0, from AI response)</label>
           <input type="number" id="aiEdgeScore" min="0" max="1" step="0.01" placeholder="e.g. 0.72" oninput="syncOutput()">
           <p class="hint" style="margin-top:4px;">Record the AI's overall confidence/edge score if provided. Used in AAR comparison.</p>
         </div>
@@ -840,11 +840,11 @@
     <div class="card">
       <div class="card-label green">G11 — AI Multi-Model Verdict (POST /analyse)</div>
       <p class="step-note">Send current form + chart uploads to AI Analyst API and render returned <code>ticket_draft</code> + <code>FinalVerdict</code> into the UI card below.</p>
-      <label>Analysis Server URL</label>
+      <label for="analysisServerUrl">Analysis Server URL</label>
       <input type="text" id="analysisServerUrl" placeholder="http://localhost:8000" value="http://localhost:8000">
       <div class="btn-row" style="margin-top:10px;">
-        <button class="btn btn-ghost" onclick="checkBridgeHealthUI()">Check API Health</button>
-        <button class="btn btn-primary" onclick="runBridgeAnalyse()">Run AI Analysis</button>
+        <button type="button" class="btn btn-ghost" onclick="checkBridgeHealthUI()">Check API Health</button>
+        <button type="button" class="btn btn-primary" onclick="runBridgeAnalyse()">Run AI Analysis</button>
       </div>
       <p id="analysisBridgeStatus" class="hint" style="margin-top:8px;">Idle.</p>
       <div id="analysisVerdictCard" style="margin-top:10px;"><p class="hint">AI Multi-Model Verdict card will appear here after analysis.</p></div>
@@ -856,7 +856,7 @@
       <p class="step-note">This is a shadow (paper) trade. After your capture window expires, paste the actual price to calibrate AI edge accuracy. The system will compute R outcome and whether TP1/stop was hit.</p>
       <div class="row">
         <div>
-          <label>Capture Window</label>
+          <label for="shadowCaptureWindow">Capture Window</label>
           <select id="shadowCaptureWindow" onchange="onShadowCaptureWindowChange()">
             <option value="24">24 hours</option>
             <option value="48">48 hours</option>
@@ -869,7 +869,7 @@
       </div>
       <div class="row">
         <div>
-          <label>Actual Price at Capture (paste from chart)</label>
+          <label for="shadowOutcomePrice">Actual Price at Capture (paste from chart)</label>
           <input type="number" id="shadowOutcomePrice" placeholder="e.g. 2945.00" step="any" oninput="onShadowOutcomeInput()">
         </div>
         <div>
@@ -888,14 +888,14 @@
         </div>
       </div>
       <div class="btn-row" style="margin-top:8px;">
-        <button class="btn btn-ghost shadow-save-btn" onclick="saveShadowOutcome()">Save Shadow Outcome →</button>
+        <button type="button" class="btn btn-ghost shadow-save-btn" onclick="saveShadowOutcome()">Save Shadow Outcome →</button>
       </div>
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-ghost" onclick="goTo(4)">← Edit Test Mode</button>
-      <button class="btn btn-ghost" onclick="goTo(6)">After-Action Review →</button>
-      <button class="btn btn-primary" onclick="resetForm()">New Ticket</button>
+      <button type="button" class="btn btn-ghost" onclick="goTo(4)">← Edit Test Mode</button>
+      <button type="button" class="btn btn-ghost" onclick="goTo(6)">After-Action Review →</button>
+      <button type="button" class="btn btn-primary" onclick="resetForm()">New Ticket</button>
     </div>
   </div>
 
@@ -916,7 +916,7 @@
 
       <div class="row">
         <div>
-          <label>Outcome</label>
+          <label for="aarOutcome">Outcome</label>
           <select id="aarOutcome" onchange="onAAROutcomeChange(this)">
             <option value="MISSED">MISSED (no fill)</option>
             <option value="WIN">WIN</option>
@@ -926,7 +926,7 @@
           </select>
         </div>
         <div>
-          <label>Process Verdict</label>
+          <label for="aarVerdict">Process Verdict</label>
           <select id="aarVerdict" onchange="updateEdgeScore()">
             <option value="PLAN_FOLLOWED">Plan Followed</option>
             <option value="PROCESS_GOOD">Process Good</option>
@@ -938,22 +938,22 @@
 
       <div class="row">
         <div>
-          <label>Actual Entry Price</label>
+          <label for="aarActualEntry">Actual Entry Price</label>
           <input type="number" id="aarActualEntry" placeholder="e.g. 2902.50" step="any">
         </div>
         <div>
-          <label>Actual Exit Price</label>
+          <label for="aarActualExit">Actual Exit Price</label>
           <input type="number" id="aarActualExit" placeholder="e.g. 2935.00" step="any">
         </div>
       </div>
 
       <div class="row">
         <div>
-          <label>R Achieved</label>
+          <label for="aarRachieved">R Achieved</label>
           <input type="number" id="aarRachieved" placeholder="e.g. 1.5 or -1.0" step="0.1">
         </div>
         <div>
-          <label>Exit Reason</label>
+          <label for="aarExitReason">Exit Reason</label>
           <select id="aarExitReason">
             <option value="NO_FILL">No Fill</option>
             <option value="TP_HIT">TP Hit</option>
@@ -994,38 +994,38 @@
       <label>Failure Reason Codes (all that apply)</label>
       <div class="checkbox-grid" id="aarFailureCodes">
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox" data-code="LATE_ENTRY"><div class="check-box"></div>
+          <input type="checkbox" id="aarFailureLateEntry" data-code="LATE_ENTRY"><div class="check-box"></div>
           <span class="check-text">Late Entry</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox" data-code="OVERSIZED_RISK"><div class="check-box"></div>
+          <input type="checkbox" id="aarFailureOversizedRisk" data-code="OVERSIZED_RISK"><div class="check-box"></div>
           <span class="check-text">Oversized Risk</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox" data-code="IGNORED_GATE"><div class="check-box"></div>
+          <input type="checkbox" id="aarFailureIgnoredGate" data-code="IGNORED_GATE"><div class="check-box"></div>
           <span class="check-text">Ignored Gate</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox" data-code="MISREAD_STRUCTURE"><div class="check-box"></div>
+          <input type="checkbox" id="aarFailureMisreadStructure" data-code="MISREAD_STRUCTURE"><div class="check-box"></div>
           <span class="check-text">Misread Structure</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox" data-code="NEWS_BLINDSPOT"><div class="check-box"></div>
+          <input type="checkbox" id="aarFailureNewsBlindspot" data-code="NEWS_BLINDSPOT"><div class="check-box"></div>
           <span class="check-text">News Blindspot</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox" data-code="EMOTIONAL_EXECUTION"><div class="check-box"></div>
+          <input type="checkbox" id="aarFailureEmotionalExecution" data-code="EMOTIONAL_EXECUTION"><div class="check-box"></div>
           <span class="check-text">Emotional Execution</span>
         </label>
         <label class="checkbox-item" onclick="toggleCheck(this)">
-          <input type="checkbox" data-code="NO_EDGE"><div class="check-box"></div>
+          <input type="checkbox" id="aarFailureNoEdge" data-code="NO_EDGE"><div class="check-box"></div>
           <span class="check-text">No Edge</span>
         </label>
       </div>
 
       <div class="row">
         <div>
-          <label>Psychological Tag</label>
+          <label for="aarPsychTag">Psychological Tag</label>
           <select id="aarPsychTag">
             <option value="CALM">Calm</option>
             <option value="DISCIPLINED">Disciplined</option>
@@ -1056,25 +1056,25 @@
 
       <div class="row">
         <div>
-          <label>HTF State (actual)</label>
+          <label for="aarDeltaHtfState">HTF State (actual)</label>
           <input type="text" id="aarDeltaHtfState" placeholder="e.g. Switched to Ranging after entry">
         </div>
         <div>
-          <label>LTF Alignment (actual)</label>
+          <label for="aarDeltaLtfAlignment">LTF Alignment (actual)</label>
           <input type="text" id="aarDeltaLtfAlignment" placeholder="e.g. Counter-trend signal missed">
         </div>
       </div>
       <div class="row">
         <div>
-          <label>Vol Risk (actual)</label>
+          <label for="aarDeltaVolRisk">Vol Risk (actual)</label>
           <input type="text" id="aarDeltaVolRisk" placeholder="e.g. Elevated — news hit mid-trade">
         </div>
         <div>
-          <label>Exec Quality (actual)</label>
+          <label for="aarDeltaExecQuality">Exec Quality (actual)</label>
           <input type="text" id="aarDeltaExecQuality" placeholder="e.g. Slipped 3 pips on entry">
         </div>
       </div>
-      <label>Checklist Delta Notes</label>
+      <label for="aarDeltaNotes">Checklist Delta Notes</label>
       <textarea id="aarDeltaNotes" placeholder="What would you have changed in your pre-trade read with hindsight?"></textarea>
 
       <div class="divider"></div>
@@ -1091,7 +1091,7 @@
       <canvas id="aarPhotoCanvas" style="display:none;"></canvas>
 
       <div class="divider"></div>
-      <label>AAR Notes <span style="color:var(--red);">*</span></label>
+      <label for="aarNotes">AAR Notes <span style="color:var(--red);">*</span></label>
       <textarea id="aarNotes" placeholder="What happened? Was the plan correct? What would you do differently next time?" style="min-height:80px;"></textarea>
     </div>
 
@@ -1101,7 +1101,7 @@
         <div class="output-panel">
           <div class="output-header">
             <span class="output-title">● AAR PROMPT READY</span>
-            <button class="copy-btn aar-copy-btn" onclick="copyAARPrompt()">Copy AAR Prompt</button>
+            <button type="button" class="copy-btn aar-copy-btn" onclick="copyAARPrompt()">Copy AAR Prompt</button>
           </div>
           <div id="aarOutputText" style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);"></div>
         </div>
@@ -1113,7 +1113,7 @@
       <div class="card-label green">G7 / G8 / G10 — Dashboard, Weekly Review & Performance Analytics</div>
       <p class="hint">Upload one or more exported JSON backup files to compute journal stats across tickets.</p>
 
-      <label>Load JSON Backups</label>
+      <label for="dashboardJsonFiles">Load JSON Backups</label>
       <input type="file" id="dashboardJsonFiles" accept="application/json" multiple>
       <p id="dashboardStatus" class="hint" style="margin-top:6px;"></p>
 
@@ -1151,12 +1151,12 @@
       <div class="divider"></div>
       <label>Weekly Review</label>
       <p class="hint">Generate a structured AI prompt aggregating your week's trades for performance coaching.</p>
-      <button class="btn btn-ghost" onclick="showWeeklyPrompt()" style="margin-bottom:8px;">Generate Weekly Review Prompt</button>
+      <button type="button" class="btn btn-ghost" onclick="showWeeklyPrompt()" style="margin-bottom:8px;">Generate Weekly Review Prompt</button>
       <div id="weeklyOutputWrap" style="display:none;margin-top:8px;">
         <div class="output-panel">
           <div class="output-header">
             <span class="output-title">● WEEKLY REVIEW PROMPT READY</span>
-            <button class="copy-btn weekly-copy-btn" onclick="copyWeeklyPrompt()">Copy Prompt</button>
+            <button type="button" class="copy-btn weekly-copy-btn" onclick="copyWeeklyPrompt()">Copy Prompt</button>
           </div>
           <div id="weeklyOutputText" style="white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);"></div>
         </div>
@@ -1164,10 +1164,10 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-ghost" onclick="goTo(5)">← Back to Output</button>
-      <button class="btn btn-ghost" onclick="showAARPrompt()">Generate AAR Prompt</button>
-      <button class="btn btn-ghost" onclick="reviseTicket()" title="Start a new ticket linked to this one as a revision">Revise This Ticket</button>
-      <button class="btn btn-primary" onclick="exportJSONBackup()">Export Full JSON (with AAR)</button>
+      <button type="button" class="btn btn-ghost" onclick="goTo(5)">← Back to Output</button>
+      <button type="button" class="btn btn-ghost" onclick="showAARPrompt()">Generate AAR Prompt</button>
+      <button type="button" class="btn btn-ghost" onclick="reviseTicket()" title="Start a new ticket linked to this one as a revision">Revise This Ticket</button>
+      <button type="button" class="btn btn-primary" onclick="exportJSONBackup()">Export Full JSON (with AAR)</button>
     </div>
   </div>
 
