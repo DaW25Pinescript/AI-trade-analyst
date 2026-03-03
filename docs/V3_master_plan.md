@@ -152,10 +152,65 @@ canonical data contract between Track A and Track B.
 blocker before G12.**
 
 ### G12 — Polish + Public Release
-- Full accessibility audit
-- Print stylesheet finalisation
-- README / user guide
-- Release packaging (`releases/` directory)
+
+**Comparison summary (existing plan vs Claude proposal):**
+- Existing plan already captured the four high-level themes (a11y, print, docs, release packaging).
+- Claude's proposal adds the missing implementation-level specifics required to execute and verify G12.
+- This section now merges both into one prioritized execution list, with explicit Definition of Done.
+
+**Prioritized G12 task list (merged):**
+
+0. [ ] **Gate check: complete remaining G11 UI verdict card/POST integration first.**
+   - G12 work begins only after G11 is green end-to-end (button POST + verdict rendering + graceful offline UX).
+
+1. [ ] **Form accessibility foundations (highest impact).**
+   - Ensure stable `id` on every `input`, `textarea`, and `select`.
+   - Ensure each `<label>` uses `for="<matching-id>"`.
+   - For grouped checkboxes/radios, use semantic `fieldset`/`legend` where appropriate.
+
+2. [ ] **Prevent accidental form submissions.**
+   - Add explicit `type="button"` to every non-submit UI/navigation button.
+
+3. [ ] **Keyboard visibility and operability polish.**
+   - Add robust `:focus-visible` styles for buttons, links, form controls, and custom interactive elements.
+   - Ensure focus indicator is obvious in both dark and light contexts (not color-only).
+
+4. [ ] **Dynamic announcement semantics.**
+   - Add `aria-live` regions for dynamic status/verdict/pipeline/validation updates.
+   - Default to `aria-live="polite"`; reserve `assertive`/`role="alert"` for genuinely critical updates.
+   - Avoid repetitive re-announcement noise.
+
+5. [ ] **Readable contrast tuning for secondary text token(s).**
+   - Adjust `--muted` (or equivalent) to meet WCAG AA while preserving hierarchy.
+
+6. [ ] **Print output correctness and readability.**
+   - Resolve any `color-scheme: dark` bleed in print styles.
+   - Force high-contrast print defaults (white background, readable text).
+   - Add print page-break controls to keep key blocks together (ticket header/summary, verdict/gates) and improve long-table behavior.
+
+7. [ ] **Release artifact + release log updates.**
+   - Create G12 snapshot in `app/releases/` following prior milestone format.
+   - Update `app/releases/README.md` with the new G12 entry.
+
+8. [ ] **User-facing documentation updates.**
+   - Create or expand a practical user guide covering ticket entry, section navigation, dynamic status/verdict behavior, print/export flow, and keyboard-accessibility expectations.
+
+9. [ ] **QA pass + evidence collection.**
+   - Manual keyboard tab pass across interactive controls.
+   - Manual scan for unlabeled inputs.
+   - Print preview validation (no dark bleed, intentional page breaks).
+   - Capture concise QA notes and changed-file list in the G12 release snapshot.
+
+**Definition of Done (G12):**
+- [ ] No obvious unlabeled form controls in primary UI flow; labels are programmatically associated.
+- [ ] Non-submit buttons no longer trigger unintended form submissions.
+- [ ] Keyboard focus indicator is consistently visible across interactive controls.
+- [ ] Dynamic status/verdict updates are announced appropriately by assistive tech.
+- [ ] Muted/secondary text contrast is improved to WCAG AA-friendly levels.
+- [ ] Print preview is readable, high-contrast, and free from dark-theme bleed; key blocks avoid awkward splits.
+- [ ] G12 release snapshot exists in `app/releases/` and `app/releases/README.md` has a matching entry.
+- [ ] User guide is present/updated with workflow and accessibility notes.
+- [ ] Regression checks remain green (`node --test tests/*.js`; plus any relevant Python checks if touched).
 
 ---
 
