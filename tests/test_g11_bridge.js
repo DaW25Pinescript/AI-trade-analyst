@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildAnalyseFormData, postAnalyse, checkBridgeHealth } from '../app/scripts/api_bridge.js';
+import { buildAnalyseFormData, postAnalyse, checkBridgeHealth, getRunUsage } from '../app/scripts/api_bridge.js';
 
 function makeDoc(overrides = {}) {
   const map = new Map(Object.entries(overrides));
@@ -136,4 +136,23 @@ test('checkBridgeHealth requests /health and returns payload', async () => {
   const health = await checkBridgeHealth('http://localhost:8000/', fakeFetch);
   assert.equal(health.status, 'ok');
   assert.equal(health.version, '1.2.0');
+});
+
+test('getRunUsage requests /runs/{run_id}/usage and returns payload', async () => {
+  const fakeFetch = async (url, options) => {
+    assert.equal(url, 'http://localhost:8000/runs/run-abc-123/usage');
+    assert.equal(options.method, 'GET');
+    return {
+      ok: true,
+      async json() {
+        return { run_id: 'run-abc-123', calls: 4, total_tokens: 1234, models: ['claude-3-5-sonnet'] };
+      }
+    };
+  };
+
+  const usage = await getRunUsage('http://localhost:8000/', 'run-abc-123', fakeFetch);
+  assert.equal(usage.run_id, 'run-abc-123');
+  assert.equal(usage.calls, 4);
+  assert.equal(usage.total_tokens, 1234);
+  assert.deepEqual(usage.models, ['claude-3-5-sonnet']);
 });
