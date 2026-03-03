@@ -96,13 +96,13 @@
   </section>
 
   <div class="steps">
-    <div class="step active" onclick="goTo(0)"><span class="step-num">01</span>Setup</div>
-    <div class="step" onclick="goTo(1)"><span class="step-num">02</span>Charts</div>
-    <div class="step" onclick="goTo(2)"><span class="step-num">03</span>Context</div>
-    <div class="step" onclick="goTo(3)"><span class="step-num">04</span>Pre-Ticket</div>
-    <div class="step" onclick="goTo(4)"><span class="step-num">05</span>Test Mode</div>
-    <div class="step" onclick="goTo(5)"><span class="step-num">06</span>Output</div>
-    <div class="step" onclick="goTo(6)"><span class="step-num">07</span>AAR</div>
+    <div class="step active" onclick="goTo(0)" role="button" tabindex="0" aria-label="Go to step 1 setup"><span class="step-num">01</span>Setup</div>
+    <div class="step" onclick="goTo(1)" role="button" tabindex="0" aria-label="Go to step 2 charts"><span class="step-num">02</span>Charts</div>
+    <div class="step" onclick="goTo(2)" role="button" tabindex="0" aria-label="Go to step 3 context"><span class="step-num">03</span>Context</div>
+    <div class="step" onclick="goTo(3)" role="button" tabindex="0" aria-label="Go to step 4 pre-ticket"><span class="step-num">04</span>Pre-Ticket</div>
+    <div class="step" onclick="goTo(4)" role="button" tabindex="0" aria-label="Go to step 5 test mode"><span class="step-num">05</span>Test Mode</div>
+    <div class="step" onclick="goTo(5)" role="button" tabindex="0" aria-label="Go to step 6 output"><span class="step-num">06</span>Output</div>
+    <div class="step" onclick="goTo(6)" role="button" tabindex="0" aria-label="Go to step 7 after-action review"><span class="step-num">07</span>AAR</div>
   </div>
 
   <!-- ════════════════════════════════════════
@@ -595,7 +595,7 @@
       </div>
 
       <!-- Gate Status -->
-      <div class="gate-status" id="gateStatus">
+      <div class="gate-status" id="gateStatus" role="status" aria-live="polite" aria-atomic="true">
         <div class="gate-dot"></div>
         <span id="gateText">Complete all 8 fields to see gate decision.</span>
       </div>
@@ -846,8 +846,8 @@
         <button type="button" class="btn btn-ghost" onclick="checkBridgeHealthUI()">Check API Health</button>
         <button type="button" class="btn btn-primary" onclick="runBridgeAnalyse()">Run AI Analysis</button>
       </div>
-      <p id="analysisBridgeStatus" class="hint" style="margin-top:8px;">Idle.</p>
-      <div id="analysisVerdictCard" style="margin-top:10px;"><p class="hint">AI Multi-Model Verdict card will appear here after analysis.</p></div>
+      <p id="analysisBridgeStatus" class="hint" style="margin-top:8px;" role="status" aria-live="polite" aria-atomic="true">Idle.</p>
+      <div id="analysisVerdictCard" style="margin-top:10px;" role="region" aria-live="polite" aria-label="AI multi-model verdict result"><p class="hint">AI Multi-Model Verdict card will appear here after analysis.</p></div>
     </div>
 
     <!-- G9: Shadow Outcome — visible only when Shadow Mode is active -->
