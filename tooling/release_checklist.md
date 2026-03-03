@@ -17,7 +17,7 @@ Priority order: highest impact/risk first.
 
 ## Final release checks (run before merge)
 
-- [ ] Run tests: `node --test tests/*.js`
+- [x] Run tests: `node --test tests/*.js` (108/108 passing on 2026-03-03)
 - [ ] Verify app loads from static server (`/app/`)
 - [ ] Validate export/import roundtrip with sample data
 - [ ] Confirm schemas match current enum/reference docs

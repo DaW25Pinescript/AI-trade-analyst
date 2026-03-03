@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.4
-**Updated:** 2026-03-02
-**Status:** Active — G11 infrastructure complete (UI verdict card pending), v2.0 complete, MRO fully complete (P1–P4)
+**Version:** 2.5
+**Updated:** 2026-03-03
+**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 observability in progress
 
 ---
 
@@ -21,12 +21,12 @@ The two tracks are **independent** but share conceptual schema (instrument, sess
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
 G6/v2.0 onwards.
 
-### Current verification snapshot (2026-03-02)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **105/105 passing**.
+### Current verification snapshot (2026-03-03)
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **108/108 passing**.
 - AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **256/256 passing**.
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 514 passing, 0 failing** across all three suites.
-- Operational call: Track D fully complete; G11 UI card is the single remaining blocker before G12.
+- **Total: 517 passing, 0 failing** across all three suites.
+- Operational call: Tracks A (through G12) and D are complete; near-term execution focus is Track B v2.0.1/v2.1.
 
 ---
 
@@ -503,12 +503,12 @@ This track begins at G6/v2.0 when both schema and API are stable.
 - [x] `docker-compose.yml` for one-command local start (FastAPI + static file server)
 - [x] `GET /health` endpoint — used by `app/` to detect pipeline availability
 
-### C3 — Browser ↔ Pipeline Bridge (PARTIAL — G11 UI card remaining)
+### C3 — Browser ↔ Pipeline Bridge (COMPLETE)
 - [x] Bridge transport hardened (timeout, retry, 5xx paths tested)
 - [x] `app/scripts/main.js` envelope unpacking (`response.verdict`)
-- [ ] "Run AI Analysis" button POST wired in browser app
-- [ ] Verdict card populated from API response in UI
-- [ ] Graceful degradation UX when server unreachable
+- [x] "Run AI Analysis" button POST wired in browser app
+- [x] Verdict card populated from API response in UI
+- [x] Graceful degradation UX when server unreachable
 
 ### C4 — Unified Export
 - Single export from `app/` includes both ticket data and full analyst JSON logs
@@ -521,8 +521,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 ### Track A (`app/`)
 | Issue | Priority | Target |
 |-------|----------|--------|
-| G11 "Run AI Analysis" button not yet wired to POST | High | G11 |
-| AI Multi-Model Verdict card not populated from response | High | G11 |
+| Browser bridge requires local API server availability for full UX | Medium | ongoing |
 | All G2 debt items | Resolved | G2 |
 
 ### Track B (`ai_analyst/`)
