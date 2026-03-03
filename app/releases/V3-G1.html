@@ -18,7 +18,8 @@
     --red: #ef4444;
     --amber: #f59e0b;
     --text: #e8eaf0;
-    --muted: #6b7385;
+    --muted: #96a0b5;
+    --secondary-text: #b3bbcd;
     --accent: #3b6fff;
   }
 
@@ -532,12 +533,64 @@
 
   /* ── PRINT / PDF ── */
   @media print {
-    body { background: #0a0b0e !important; color: #e8eaf0 !important; color-scheme: dark; }
-    .header { background: #111318 !important; border-color: #1e2430 !important; }
-    .card { background: #111318 !important; border-color: #1e2430 !important; }
-    .output-panel { background: #0a0b0e !important; border-color: #1e2430 !important; }
-    #outputText { color: #e8eaf0 !important; }
+    :root {
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --surface2: #ffffff;
+      --border: #d1d5df;
+      --border2: #bcc4d3;
+      --text: #10131a;
+      --muted: #4d5668;
+      --secondary-text: #2d3444;
+    }
+
+    * {
+      color-scheme: light !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+
+    body {
+      background: #ffffff !important;
+      color: #10131a !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body::before { display: none !important; }
+
+    .header,
+    .card,
+    .output-panel {
+      background: #ffffff !important;
+      border-color: #d1d5df !important;
+    }
+
+    #outputText { color: #10131a !important; }
     .btn-row, .steps, .sug-pill { display: none !important; }
+
+    .header,
+    .card,
+    .output-panel,
+    .checkbox-item,
+    .toggle-wrap,
+    .wait-panel,
+    .step-note,
+    .gate-badge,
+    .verdict-box {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    table,
+    tr,
+    td,
+    th {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .section { display: block !important; }
   }
 </style>
 </head>
@@ -1520,7 +1573,7 @@ function _buildReportHTML() {
           <div class="ih"><span class="it">${_safeText(x.title)}</span><span class="im">${_safeText(x.name)}</span></div>
           <img src="${x.src}" alt="${_safeText(x.title)}" style="width:100%;display:block;">
         </div>`).join('')
-    : `<p style="color:#6b7385;font-size:13px;">No screenshots embedded.</p>`;
+    : `<p style="color:#96a0b5;font-size:13px;">No screenshots embedded.</p>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1533,15 +1586,22 @@ function _buildReportHTML() {
   .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
   .brand{font-size:11px;letter-spacing:.15em;color:#d4a843;text-transform:uppercase;font-weight:700;margin-bottom:4px;}
   h1{font-size:20px;margin:0 0 4px;}
-  .meta{font-size:12px;color:#6b7385;}
-  .stamp{font-size:11px;color:#6b7385;font-family:monospace;}
+  .meta{font-size:12px;color:#96a0b5;}
+  .stamp{font-size:11px;color:#96a0b5;font-family:monospace;}
   .card{background:#111318;border:1px solid #1e2430;border-radius:6px;padding:16px;margin-bottom:12px;}
   pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:ui-monospace,Menlo,Monaco,monospace;font-size:11.5px;line-height:1.7;color:#e8eaf0;}
   .ic{background:#0b0c10;border:1px solid #1e2430;border-radius:5px;overflow:hidden;margin-bottom:10px;}
   .ih{padding:10px 12px 7px;border-bottom:1px solid #1e2430;display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
   .it{font-weight:600;font-size:13px;}
-  .im{color:#6b7385;font-size:11px;}
-  @media print{body{background:#0a0b0e!important;color:#e8eaf0!important;color-scheme:dark;}}
+  .im{color:#96a0b5;font-size:11px;}
+  @media print{
+    body{background:#fff!important;color:#111827!important;color-scheme:light;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+    .w{max-width:none;padding:12px;}
+    .card,.ic,.hdr{background:#fff!important;color:#111827!important;border-color:#d1d5df!important;break-inside:avoid;page-break-inside:avoid;}
+    .meta,.stamp,.im{color:#4b5567!important;}
+    pre{color:#111827!important;}
+    img{break-inside:avoid;page-break-inside:avoid;}
+  }
 </style>
 </head>
 <body>
