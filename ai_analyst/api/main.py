@@ -56,6 +56,36 @@ class AnalysisResponse(BaseModel):
     source_ticket_id: Optional[str] = None
     usage_summary: dict
 
+
+class RunUsageResponse(BaseModel):
+    """Response envelope for GET /runs/{run_id}/usage."""
+
+    run_id: str
+    usage_summary: dict
+
+
+def _empty_usage_summary() -> dict:
+    return {
+        "total_calls": 0,
+        "successful_calls": 0,
+        "failed_calls": 0,
+        "calls_by_stage": {},
+        "calls_by_node": {},
+        "calls_by_model": {},
+        "calls_by_provider": {},
+        "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        "calls_with_token_usage": 0,
+        "calls_without_token_usage": 0,
+        "total_cost_usd": 0.0,
+    }
+
+
+def _load_usage_summary(run_id: str) -> dict:
+    try:
+        return summarize_usage(get_run_dir(run_id))
+    except Exception:
+        return _empty_usage_summary()
+
 app = FastAPI(
     title="AI Trade Analyst — Multi-Model Pipeline",
     version="2.0.0",
@@ -84,6 +114,12 @@ _graph = build_analysis_graph()
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "2.0.0"}
+
+
+@app.get("/runs/{run_id}/usage", response_model=RunUsageResponse)
+async def get_run_usage(run_id: str):
+    response = RunUsageResponse(run_id=run_id, usage_summary=_load_usage_summary(run_id))
+    return JSONResponse(content=response.model_dump())
 
 
 @app.post("/analyse", response_model=AnalysisResponse)
@@ -279,22 +315,7 @@ async def analyse(
 
     verdict: FinalVerdict = final_state["final_verdict"]
     ticket_draft = build_ticket_draft(verdict, ground_truth)
-    try:
-        usage_summary = summarize_usage(get_run_dir(ground_truth.run_id))
-    except Exception:
-        usage_summary = {
-            "total_calls": 0,
-            "successful_calls": 0,
-            "failed_calls": 0,
-            "calls_by_stage": {},
-            "calls_by_node": {},
-            "calls_by_model": {},
-            "calls_by_provider": {},
-            "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-            "calls_with_token_usage": 0,
-            "calls_without_token_usage": 0,
-            "total_cost_usd": 0.0,
-        }
+    usage_summary = _load_usage_summary(ground_truth.run_id)
 
     response = AnalysisResponse(
         verdict=verdict,

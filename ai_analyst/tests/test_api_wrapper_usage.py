@@ -101,3 +101,50 @@ def test_analyse_usage_summary_fail_safe(monkeypatch):
     body = resp.json()
     assert body["usage_summary"]["total_calls"] == 0
     assert body["usage_summary"]["tokens"]["total_tokens"] == 0
+
+
+def test_get_run_usage_returns_summary(monkeypatch):
+    calls = []
+
+    def _fake_summarize(run_dir):
+        calls.append(str(run_dir))
+        return {
+            "total_calls": 2,
+            "successful_calls": 2,
+            "failed_calls": 0,
+            "calls_by_stage": {"arbiter": 2},
+            "calls_by_node": {"arbiter_node": 2},
+            "calls_by_model": {"gpt-4o": 2},
+            "calls_by_provider": {"openai": 2},
+            "tokens": {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30},
+            "calls_with_token_usage": 2,
+            "calls_without_token_usage": 0,
+            "total_cost_usd": 0.03,
+        }
+
+    monkeypatch.setattr(api_main, "summarize_usage", _fake_summarize)
+
+    client = TestClient(api_main.app)
+    resp = client.get("/runs/run-abc/usage")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["run_id"] == "run-abc"
+    assert body["usage_summary"]["total_calls"] == 2
+    assert calls and "run-abc" in calls[0]
+
+
+def test_get_run_usage_fail_safe(monkeypatch):
+    def _raise(_run_dir):
+        raise RuntimeError("meter read failed")
+
+    monkeypatch.setattr(api_main, "summarize_usage", _raise)
+
+    client = TestClient(api_main.app)
+    resp = client.get("/runs/run-def/usage")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["run_id"] == "run-def"
+    assert body["usage_summary"]["total_calls"] == 0
+    assert body["usage_summary"]["tokens"]["total_tokens"] == 0
