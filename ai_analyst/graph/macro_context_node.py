@@ -13,6 +13,7 @@ Design rules (enforced here and in the prompt):
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -55,7 +56,7 @@ async def macro_context_node(state: GraphState) -> GraphState:
         return state
 
     try:
-        ctx = scheduler.get_context(instrument=instrument)
+        ctx = await asyncio.to_thread(scheduler.get_context, instrument=instrument)
         state["macro_context"] = ctx
         if ctx is None:
             logger.warning(
