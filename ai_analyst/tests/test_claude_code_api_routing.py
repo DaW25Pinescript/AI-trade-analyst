@@ -68,4 +68,10 @@ async def test_multimodal_does_not_route_to_wrapper(monkeypatch, tmp_path):
 
 def test_is_text_only():
     assert is_text_only([{"role": "user", "content": "hello"}])
-    assert not is_text_only([{"role": "user", "content": [{"type": "text", "text": "x"}]}])
+    # MED-7 fix: list-format content with only text blocks is now correctly treated
+    # as text-only so it can be routed to the claude_code_api backend.
+    assert is_text_only([{"role": "user", "content": [{"type": "text", "text": "x"}]}])
+    # Images still block text-only routing
+    assert not is_text_only([
+        {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}}]}
+    ])

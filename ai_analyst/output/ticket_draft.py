@@ -187,4 +187,10 @@ def build_ticket_draft(
     }
 
     draft["shadowMode"] = False
+
+    # MED-6: mark the draft as incomplete so importers can distinguish it from
+    # a fully-completed ticket. Required fields omitted here (e.g. exact price
+    # levels) must be filled in by the user before submission.
+    draft["_draft"] = True
+
     return draft

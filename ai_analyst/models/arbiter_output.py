@@ -24,7 +24,7 @@ class AuditLog(BaseModel):
 
 
 class FinalVerdict(BaseModel):
-    final_bias: str
+    final_bias: Literal["bullish", "bearish", "neutral", "ranging"]
     decision: Literal["ENTER_LONG", "ENTER_SHORT", "WAIT_FOR_CONFIRMATION", "NO_TRADE"]
     approved_setups: list[ApprovedSetup]
     no_trade_conditions: list[str]

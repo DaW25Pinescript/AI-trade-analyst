@@ -47,7 +47,10 @@ def _multipart_payload():
 
 def test_analyse_includes_run_usage_summary(monkeypatch):
     verdict = _sample_verdict()
-    monkeypatch.setattr(api_main, "_graph", _StubGraph(verdict))
+    stub = _StubGraph(verdict)
+    # HIGH-8: graph is now set via lifespan startup — patch build_analysis_graph so
+    # the lifespan sets app.state.graph to our stub instead of the real pipeline.
+    monkeypatch.setattr(api_main, "build_analysis_graph", lambda: stub)
     monkeypatch.setattr(api_main, "build_ticket_draft", lambda _v, _g: {"id": "draft-1"})
 
     calls = []
@@ -70,9 +73,9 @@ def test_analyse_includes_run_usage_summary(monkeypatch):
 
     monkeypatch.setattr(api_main, "summarize_usage", _fake_summarize)
 
-    client = TestClient(api_main.app)
-    data, files = _multipart_payload()
-    resp = client.post("/analyse", data=data, files=files)
+    with TestClient(api_main.app) as client:
+        data, files = _multipart_payload()
+        resp = client.post("/analyse", data=data, files=files)
 
     assert resp.status_code == 200
     body = resp.json()
@@ -85,7 +88,8 @@ def test_analyse_includes_run_usage_summary(monkeypatch):
 
 def test_analyse_usage_summary_fail_safe(monkeypatch):
     verdict = _sample_verdict()
-    monkeypatch.setattr(api_main, "_graph", _StubGraph(verdict))
+    stub = _StubGraph(verdict)
+    monkeypatch.setattr(api_main, "build_analysis_graph", lambda: stub)
     monkeypatch.setattr(api_main, "build_ticket_draft", lambda _v, _g: {"id": "draft-2"})
 
     def _raise(_run_dir):
@@ -93,9 +97,9 @@ def test_analyse_usage_summary_fail_safe(monkeypatch):
 
     monkeypatch.setattr(api_main, "summarize_usage", _raise)
 
-    client = TestClient(api_main.app)
-    data, files = _multipart_payload()
-    resp = client.post("/analyse", data=data, files=files)
+    with TestClient(api_main.app) as client:
+        data, files = _multipart_payload()
+        resp = client.post("/analyse", data=data, files=files)
 
     assert resp.status_code == 200
     body = resp.json()
@@ -124,8 +128,8 @@ def test_get_run_usage_returns_summary(monkeypatch):
 
     monkeypatch.setattr(api_main, "summarize_usage", _fake_summarize)
 
-    client = TestClient(api_main.app)
-    resp = client.get("/runs/run-abc/usage")
+    with TestClient(api_main.app) as client:
+        resp = client.get("/runs/run-abc/usage")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -140,8 +144,8 @@ def test_get_run_usage_fail_safe(monkeypatch):
 
     monkeypatch.setattr(api_main, "summarize_usage", _raise)
 
-    client = TestClient(api_main.app)
-    resp = client.get("/runs/run-def/usage")
+    with TestClient(api_main.app) as client:
+        resp = client.get("/runs/run-def/usage")
 
     assert resp.status_code == 200
     body = resp.json()

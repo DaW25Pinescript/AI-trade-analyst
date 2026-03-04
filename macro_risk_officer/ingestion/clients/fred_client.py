@@ -16,7 +16,7 @@ Series tracked:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -67,22 +67,22 @@ class FredClient:
         response.raise_for_status()
         return response.json().get("observations", [])
 
-    def fetch_macro_snapshot(self) -> Dict[str, Optional[Tuple[float, float]]]:
+    def fetch_macro_snapshot(self) -> Dict[str, Optional[Tuple[float, float, str]]]:
         """
-        Return a dict of {series_id: (latest_value, previous_value)} for all
-        tracked series. None if data unavailable.
+        Return a dict of {series_id: (latest_value, previous_value, obs_date)} for
+        all tracked series. obs_date is the FRED observation date string (YYYY-MM-DD)
+        for the most recent observation. None if data unavailable.
         """
-        snapshot: Dict[str, Optional[Tuple[float, float]]] = {}
+        snapshot: Dict[str, Optional[Tuple[float, float, str]]] = {}
         for series_id in _SERIES:
             try:
                 obs = self.fetch_latest(series_id, n_obs=2)
-                values = [
-                    float(o["value"]) for o in obs if o.get("value") not in (".", None)
-                ]
+                valid_obs = [o for o in obs if o.get("value") not in (".", None)]
+                values = [float(o["value"]) for o in valid_obs]
                 if len(values) >= 2:
-                    snapshot[series_id] = (values[0], values[1])
+                    snapshot[series_id] = (values[0], values[1], valid_obs[0].get("date", ""))
                 elif len(values) == 1:
-                    snapshot[series_id] = (values[0], values[0])
+                    snapshot[series_id] = (values[0], values[0], valid_obs[0].get("date", ""))
                 else:
                     snapshot[series_id] = None
             except Exception:
@@ -101,22 +101,32 @@ class FredClient:
 
         This is a valid macro signal — e.g. DFF rising month-on-month is a
         tightening impulse regardless of whether the market expected it.
+
+        MED-1 fix: use the actual FRED observation date rather than anchoring
+        all timestamps to the first of the current month (up to 28-day error).
         """
         snapshot = self.fetch_macro_snapshot()
         events: List[MacroEvent] = []
         now = datetime.now(timezone.utc)
 
-        for series_id, pair in snapshot.items():
-            if pair is None:
+        for series_id, triple in snapshot.items():
+            if triple is None:
                 continue
-            current, previous = pair
+            current, previous, obs_date = triple
             category, tier = self.series_metadata(series_id)
+
+            # Parse the FRED observation date; fall back to current date if missing
+            try:
+                ts = datetime.strptime(obs_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except (ValueError, TypeError):
+                ts = now
+
             events.append(
                 MacroEvent(
-                    event_id=f"fred-{series_id}-{now.strftime('%Y%m%d')}",
+                    event_id=f"fred-{series_id}-{ts.strftime('%Y%m%d')}",
                     category=category,
                     tier=tier,
-                    timestamp=datetime(now.year, now.month, 1, tzinfo=timezone.utc),  # monthly release anchor
+                    timestamp=ts,
                     actual=current,
                     forecast=previous,
                     previous=previous,

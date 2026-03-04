@@ -54,6 +54,11 @@ export function buildAnalyseFormData(doc = document) {
   fd.append('overlay_settings_locked', 'true');
   fd.append('overlay_indicator_claims', JSON.stringify(['FVG', 'OrderBlock', 'SessionLiquidity']));
 
+  // LOW-6: send source_ticket_id for traceability so the API response can link
+  // the analysis run back to the originating ticket in the browser journal.
+  const ticketId = get('ticketId', '');
+  if (ticketId) fd.append('source_ticket_id', ticketId);
+
   return fd;
 }
 

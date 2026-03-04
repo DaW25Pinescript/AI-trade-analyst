@@ -104,11 +104,17 @@ class GdeltClient:
 
         if avg_tone < _ESCALATION_THRESHOLD:
             direction_label = "escalation"
-            actual = 1.0
+            # MED-2: scale actual by tone magnitude so surprise calc reflects signal strength.
+            # GDELT tone typically ranges [-20, +20] for financial news; cap at [-10, 10].
+            # Escalation → positive actual (risk-off pressure), clipped to [0.1, 1.0].
+            magnitude = min(abs(avg_tone) / 10.0, 1.0)
+            actual = max(0.1, magnitude)
             forecast = 0.0
         elif avg_tone > _DE_ESCALATION_THRESHOLD:
             direction_label = "de-escalation"
-            actual = -1.0
+            # De-escalation → negative actual (risk-on relief), clipped to [-1.0, -0.1].
+            magnitude = min(avg_tone / 10.0, 1.0)
+            actual = -max(0.1, magnitude)
             forecast = 0.0
         else:
             return None  # within noise floor — no actionable signal

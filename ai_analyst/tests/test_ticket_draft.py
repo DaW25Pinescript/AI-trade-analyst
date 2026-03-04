@@ -115,14 +115,15 @@ class TestBiasMapping:
             ("bearish", "Bearish"),
             ("neutral", "Neutral"),
             ("ranging", "Range"),
-            ("BULLISH", "Bullish"),    # case-insensitive
-            ("unknown_bias", ""),      # unmapped → empty string
         ],
     )
     def test_bias_maps_correctly(self, bias, expected):
         verdict = _make_verdict(final_bias=bias)
         draft = build_ticket_draft(verdict, _make_packet())
         assert draft["rawAIReadBias"] == expected
+    # NOTE: "BULLISH" and "unknown_bias" were removed — HIGH-3 fix makes final_bias
+    # a Literal enum that rejects invalid values at the schema level (ValidationError).
+    # Invalid-bias rejection is tested in test_v21_fixes.py::test_final_bias_invalid_value_*.
 
 
 # ── Conviction ────────────────────────────────────────────────────────────────

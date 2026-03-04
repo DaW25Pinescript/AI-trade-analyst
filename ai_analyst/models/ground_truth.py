@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Literal
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class RiskConstraints(BaseModel):
@@ -58,7 +58,7 @@ MAX_SCREENSHOTS = 4
 
 class GroundTruthPacket(BaseModel):
     version: str = "1.2"
-    timestamp_utc: datetime = Field(default_factory=datetime.utcnow)
+    timestamp_utc: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     run_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     source_ticket_id: Optional[str] = None  # v2.0: originating app ticket ID for traceability
     instrument: str                    # e.g. "XAUUSD"

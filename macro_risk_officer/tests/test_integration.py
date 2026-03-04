@@ -211,11 +211,11 @@ class TestFredToMacroEvents:
         client.api_key = "dummy"
 
         mock_snapshot = {
-            "DFF": (5.33, 5.25),
-            "CPIAUCSL": (315.2, 312.0),
-            "T10Y2Y": (-0.3, -0.1),
-            "UNRATE": (4.1, 4.0),
-            "DCOILWTICO": (78.5, 75.0),
+            "DFF": (5.33, 5.25, "2026-01-15"),
+            "CPIAUCSL": (315.2, 312.0, "2026-01-15"),
+            "T10Y2Y": (-0.3, -0.1, "2026-01-15"),
+            "UNRATE": (4.1, 4.0, "2026-01-15"),
+            "DCOILWTICO": (78.5, 75.0, "2026-01-15"),
         }
         with patch.object(client, "fetch_macro_snapshot", return_value=mock_snapshot):
             events = client.to_macro_events()
@@ -230,7 +230,7 @@ class TestFredToMacroEvents:
         client.api_key = "dummy"
 
         with patch.object(client, "fetch_macro_snapshot", return_value={
-            "DFF": (5.5, 5.25),
+            "DFF": (5.5, 5.25, "2026-01-15"),
             "CPIAUCSL": None,
             "T10Y2Y": None,
             "UNRATE": None,
@@ -250,7 +250,7 @@ class TestFredToMacroEvents:
         with patch.object(client, "fetch_macro_snapshot", return_value={
             "DFF": None,
             "CPIAUCSL": None,
-            "T10Y2Y": (0.1, 0.2),
+            "T10Y2Y": (0.1, 0.2, "2026-01-15"),
             "UNRATE": None,
             "DCOILWTICO": None,
         }):

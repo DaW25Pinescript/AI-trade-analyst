@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.8
+**Version:** 2.9
 **Updated:** 2026-03-04
-**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed)
+**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10)
 
 ---
 
@@ -26,14 +26,15 @@ G6/v2.0 onwards.
   - +1 added (2026-03-03): `test_g11_bridge.js` — confirms `analyseViaBridge` uses a 3-minute timeout signal (guards CRITICAL-3).
   - +3 added (2026-03-04): `test_g11_bridge.js` — timeframes match uploaded charts (guards MED-5).
   - +8 added (2026-03-04): `test_v202_fixes.js` — m15Overlay shape validation replaces null-only guard (guards MED-8).
-- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **280/280 passing**.
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **303/303 passing**.
   - +4 added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix.
   - +1 added (2026-03-03): `test_macro_context_node.py` — guards CRITICAL-2 fix.
   - +13 added (2026-03-03): `test_overlay_delta_config_alignment.py` — guards CRITICAL-4 fix.
   - +2 added (2026-03-04): `test_v202_fixes.py` — HIGH-5 (Grok model string), HIGH-6 (cost ceiling), HIGH-1 (retry logic).
+  - +23 added (2026-03-04): `test_v21_fixes.py` — TEST-9 (MacroScheduler thread safety), TEST-10 (FinalVerdict.final_bias Literal), HIGH-2 (timezone-aware datetimes), MED-7 (is_text_only list blocks), LOW-5 (ExecutionConfig.mode Literal).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 553 passing, 0 failing** across all three suites.
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed). Remaining HIGH items (HIGH-2/3/4/7/8) and MED items (MED-1/2/3/4/6/7) deferred to v2.1.
+- **Total: 576 passing, 0 failing** across all three suites.
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete; v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10). Only architectural debt and C4 remain.
 
 ---
 
@@ -343,7 +344,26 @@ Issues addressed by priority:
   - Backoff replaced: was linear 0.4 s; now exponential with full jitter (`uniform(0, min(60, base*2^n))`).
   - Legacy `retry_backoff_s` param kept for backwards compatibility with existing tests.
 
-### v2.1 — Multi-Round Deliberation
+### v2.1 — HIGH Debt Remediation + Quality Hardening (COMPLETE)
+**Goal:** Close all remaining HIGH-priority debt items from the 2026-03-03 audit, plus MED/LOW items.
+
+Issues addressed:
+
+- [x] **HIGH-2 + LOW-4**: `datetime.utcnow()` → `datetime.now(timezone.utc)` in `ground_truth.py`, `execution_config.py`, `run_state_manager.py` ✅ FIXED 2026-03-04
+- [x] **HIGH-3 + TEST-10**: `FinalVerdict.final_bias` str → `Literal["bullish","bearish","neutral","ranging"]`; invalid values now raise `ValidationError` instead of silently producing empty `rawAIReadBias` ✅ FIXED 2026-03-04
+- [x] **HIGH-4 + TEST-9**: `MacroScheduler` double-checked locking with `threading.Lock` prevents thundering herd under multi-worker uvicorn ✅ FIXED 2026-03-04
+- [x] **HIGH-7**: In-process sliding-window rate limiter on `/analyse` (default 10 req/60s per IP; configurable via `RATE_LIMIT_REQUESTS` + `RATE_LIMIT_WINDOW_S` env vars) ✅ FIXED 2026-03-04
+- [x] **HIGH-8**: `_graph` moved from module import to FastAPI `lifespan` startup handler — safe across uvicorn worker restarts; `TestClient` tests updated to context-manager pattern ✅ FIXED 2026-03-04
+- [x] **MED-1**: FRED timestamps now use actual FRED observation date (`obs["date"]`) instead of first-of-month anchor (up to 28-day error eliminated) ✅ FIXED 2026-03-04
+- [x] **MED-2**: GDELT `actual` scaled from tone magnitude (capped at 1.0) instead of binary `1.0/0.0` — surprise calculation now reflects signal strength ✅ FIXED 2026-03-04
+- [x] **MED-3**: `print()` → `logging.warning/info` in `analyst_nodes.py`; `capsys`-based test updated to `caplog` ✅ FIXED 2026-03-04
+- [x] **MED-4**: `append_usage` now logs `logging.warning` on failure instead of swallowing exceptions silently ✅ FIXED 2026-03-04
+- [x] **MED-6**: `build_ticket_draft()` now sets `_draft: True` marker so importers can distinguish partial from complete tickets ✅ FIXED 2026-03-04
+- [x] **MED-7**: `is_text_only()` now handles list-format content blocks — messages with only `{"type":"text"}` blocks correctly route to `claude_code_api` backend ✅ FIXED 2026-03-04
+- [x] **LOW-5**: `ExecutionConfig.mode` → `Literal["manual","hybrid","automated"]` — invalid mode strings now raise `ValidationError` ✅ FIXED 2026-03-04
+- [x] **LOW-6**: `api_bridge.js` now sends `source_ticket_id` field when a `ticketId` is present in the form — traceability link populated ✅ FIXED 2026-03-04
+
+### v2.1b — Multi-Round Deliberation (NOT STARTED)
 **Goal:** Allow analysts to see a summary of other analysts' verdicts and update.
 
 Tasks:
@@ -552,7 +572,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 ---
 
 ## Technical Debt Register
-*Last updated from audit_2026-03-03.md. Severity from audit: 🔥 CRITICAL / ⚠️ HIGH / ℹ️ MEDIUM / 💡 LOW.*
+*Last updated 2026-03-04 (v2.1 complete). Severity from audit: 🔥 CRITICAL / ⚠️ HIGH / ℹ️ MEDIUM / 💡 LOW.*
 
 ### 🔥 CRITICAL
 
@@ -568,25 +588,25 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | ID | Issue | Status | File | Target |
 |----|-------|--------|------|--------|
 | HIGH-1 | Retry catches all exceptions incl. non-retriable (AuthError, ValueError); backoff 0.4 s too short for rate limits | ✅ **FIXED 2026-03-04** | `llm_client.py` (non-retriable guard + exp backoff) | v2.0.2 |
-| HIGH-2 | `datetime.utcnow()` deprecated — will break on Python 3.12+; returns naive datetime | ⬜ pending | `ground_truth.py`, `execution_config.py`, `run_state_manager.py` | v2.1 |
-| HIGH-3 | `FinalVerdict.final_bias` is unvalidated `str` — any freeform value silently produces empty `rawAIReadBias` in ticket draft | ⬜ pending | `arbiter_output.py:27` | v2.1 |
-| HIGH-4 | `MacroScheduler` not thread-safe — thundering herd on cache miss under multi-worker uvicorn | ⬜ pending | `scheduler.py:66` | v2.1 |
+| HIGH-2 | `datetime.utcnow()` deprecated — will break on Python 3.12+; returns naive datetime | ✅ **FIXED 2026-03-04** | `ground_truth.py`, `execution_config.py`, `run_state_manager.py` (→ `datetime.now(timezone.utc)`) | v2.1 |
+| HIGH-3 | `FinalVerdict.final_bias` is unvalidated `str` — any freeform value silently produces empty `rawAIReadBias` in ticket draft | ✅ **FIXED 2026-03-04** | `arbiter_output.py` (→ `Literal["bullish","bearish","neutral","ranging"]`) | v2.1 |
+| HIGH-4 | `MacroScheduler` not thread-safe — thundering herd on cache miss under multi-worker uvicorn | ✅ **FIXED 2026-03-04** | `scheduler.py` (double-checked locking with `threading.Lock`) | v2.1 |
 | HIGH-5 | Grok model name `grok/grok-4-vision` does not exist — ICT_PURIST persona always fails | ✅ **FIXED 2026-03-04** | `analyst_nodes.py`, `api_key_manager.py` (→ `xai/grok-vision-beta`) | v2.0.2 |
 | HIGH-6 | No budget guard — oversized chart inputs can cost $5–$20+ per request; no per-run token cap | ✅ **FIXED 2026-03-04** | `api/main.py` (image size 422), `usage_meter.py` (`check_run_cost_ceiling`) | v2.0.2 |
-| HIGH-7 | No rate limiting on `/analyse` endpoint — open abuse surface | ⬜ pending | `api/main.py` | v2.1 |
-| HIGH-8 | `_graph` built at module import time — not safe across uvicorn worker restarts; MRO TTL cache is per-process | ⬜ pending | `api/main.py:111` | v2.1 |
+| HIGH-7 | No rate limiting on `/analyse` endpoint — open abuse surface | ✅ **FIXED 2026-03-04** | `api/main.py` (sliding-window rate limiter, `RATE_LIMIT_REQUESTS`/`RATE_LIMIT_WINDOW_S` env vars) | v2.1 |
+| HIGH-8 | `_graph` built at module import time — not safe across uvicorn worker restarts; MRO TTL cache is per-process | ✅ **FIXED 2026-03-04** | `api/main.py` (→ FastAPI `lifespan` startup handler; `app.state.graph`) | v2.1 |
 
 ### ℹ️ MEDIUM
 
 | ID | Issue | Status | File | Target |
 |----|-------|--------|------|--------|
-| MED-1 | FRED timestamps anchored to first of month — up to 28-day decay error | ⬜ pending | `fred_client.py:119` | v2.1 |
-| MED-2 | GDELT artificial `actual=1.0 / forecast=0.0` — removes tone magnitude from surprise calc; always tier-2 | ⬜ pending | `gdelt_client.py:106` | v2.1 |
-| MED-3 | `print()` instead of structured logging in graph nodes | ⬜ pending | `analyst_nodes.py` | v2.1 |
-| MED-4 | `usage_meter.append_usage` swallows all exceptions silently | ⬜ pending | `usage_meter.py:21` | v2.1 |
+| MED-1 | FRED timestamps anchored to first of month — up to 28-day decay error | ✅ **FIXED 2026-03-04** | `fred_client.py` (→ uses actual FRED `obs["date"]` field; fallback to `now` on parse error) | v2.1 |
+| MED-2 | GDELT artificial `actual=1.0 / forecast=0.0` — removes tone magnitude from surprise calc; always tier-2 | ✅ **FIXED 2026-03-04** | `gdelt_client.py` (→ `actual` scaled from `abs(avg_tone)/10`, clipped to `[0.1, 1.0]`) | v2.1 |
+| MED-3 | `print()` instead of structured logging in graph nodes | ✅ **FIXED 2026-03-04** | `analyst_nodes.py` (→ `logging.warning` / `logging.info`; `caplog`-based tests) | v2.1 |
+| MED-4 | `usage_meter.append_usage` swallows all exceptions silently | ✅ **FIXED 2026-03-04** | `usage_meter.py` (→ `logging.warning` on failure — fail-soft but visible) | v2.1 |
 | MED-5 | `api_bridge.js` timeframes list hardcoded `['H4','M15','M5']` regardless of uploaded charts | ✅ **FIXED 2026-03-04** | `api_bridge.js` (built from uploaded files; fallback to defaults) | v2.0.2 |
-| MED-6 | `build_ticket_draft()` missing required ticket fields — non-schema-compliant without `_draft: true` marker | ⬜ pending | `ticket_draft.py` | v2.1 |
-| MED-7 | `is_text_only` routing gap — list-format content with only text blocks incorrectly flagged as multimodal | ⬜ pending | `is_text_only.py:12` | v2.1 |
+| MED-6 | `build_ticket_draft()` missing required ticket fields — non-schema-compliant without `_draft: true` marker | ✅ **FIXED 2026-03-04** | `ticket_draft.py` (→ `draft["_draft"] = True` added at end of build) | v2.1 |
+| MED-7 | `is_text_only` routing gap — list-format content with only text blocks incorrectly flagged as multimodal | ✅ **FIXED 2026-03-04** | `is_text_only.py` (→ handles list content; only non-text blocks block routing) | v2.1 |
 | MED-8 | `backup_validation.js` requires `m15Overlay: null` — G11 overlay feature blocked at schema validation level | ✅ **FIXED 2026-03-04** | `backup_validation.js` (null-only guard → typed object shape validation) | v2.0.2 |
 
 ### 💡 LOW
@@ -596,9 +616,9 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | LOW-1 | Docker runs as root | ⬜ pending | `Dockerfile` | v2.x |
 | LOW-2 | CI does not install or test `macro_risk_officer/requirements.txt` | ⬜ pending | `.github/workflows/ci.yml` | v2.1 |
 | LOW-3 | `MINIMUM_VALID_ANALYSTS = 2` hardcoded — 50% failure rate appears healthy | ⬜ pending | `analyst_nodes.py:37` | v2.x |
-| LOW-4 | `run_state_manager.py` uses `datetime.utcnow()` outside Pydantic (missed by HIGH-2 sweep) | ⬜ pending | `run_state_manager.py:38` | v2.1 |
-| LOW-5 | `ExecutionConfig.mode` field is `str` not `Literal["manual","hybrid","automated"]` | ⬜ pending | `execution_config.py:23` | v2.1 |
-| LOW-6 | `api_bridge.js` never sends `source_ticket_id` — traceability link always null | ⬜ pending | `api_bridge.js` | v2.1 |
+| LOW-4 | `run_state_manager.py` uses `datetime.utcnow()` outside Pydantic (missed by HIGH-2 sweep) | ✅ **FIXED 2026-03-04** | `run_state_manager.py` (→ `datetime.now(timezone.utc)`) | v2.1 |
+| LOW-5 | `ExecutionConfig.mode` field is `str` not `Literal["manual","hybrid","automated"]` | ✅ **FIXED 2026-03-04** | `execution_config.py` (→ `Literal["manual","hybrid","automated"]`) | v2.1 |
+| LOW-6 | `api_bridge.js` never sends `source_ticket_id` — traceability link always null | ✅ **FIXED 2026-03-04** | `api_bridge.js` (→ reads `ticketId` from form and appends to `FormData`) | v2.1 |
 | LOW-7 | `storage_indexeddb.js` is a localStorage stub — 5–10 MB ceiling as journal grows | ⬜ pending | `storage_indexeddb.js` | v2.x |
 | LOW-8 | CORS `allow_headers=["*"]` overly permissive | ⬜ pending | `api/main.py:108` | v2.x |
 
@@ -608,14 +628,14 @@ This track begins at G6/v2.0 when both schema and API are stable.
 |----|------------|--------|--------|
 | TEST-1 | Hybrid mode arbiter receives macro_context + overlay (CRITICAL-1 regression) | ✅ **ADDED 2026-03-03** (`test_execution_router_arbiter.py`) | v2.0.2 |
 | TEST-2 | Overlay delta node — correct config after Phase 1 partial failure (CRITICAL-4) | ✅ **ADDED 2026-03-03** (`test_overlay_delta_config_alignment.py`) | v2.0.2 |
-| TEST-3 | Full FastAPI `/analyse` integration test via TestClient | ⬜ pending | v2.1 |
+| TEST-3 | Full FastAPI `/analyse` integration test via TestClient | ✅ **UPDATED 2026-03-04** (`test_api_wrapper_usage.py` — updated to lifespan context manager; guards HIGH-8) | v2.1 |
 | TEST-4 | Browser bridge: slow backend → user-visible timeout error (not silent hang) | ✅ **ADDED 2026-03-03** (`test_g11_bridge.js`) | v2.0.2 |
-| TEST-5 | MRO degraded mode end-to-end — all sources fail → valid FinalVerdict | ⬜ pending | v2.1 |
-| TEST-6 | Schema migration chain: v1.1.0 → v4.0.0 in one call | ⬜ pending | v2.1 |
+| TEST-5 | MRO degraded mode end-to-end — all sources fail → valid FinalVerdict | ⬜ pending | v2.x |
+| TEST-6 | Schema migration chain: v1.1.0 → v4.0.0 in one call | ⬜ pending | v2.x |
 | TEST-7 | Document JS/Python analyst schema divergence as a known-failing spec test | ⬜ pending | v2.x |
 | TEST-8 | `buildAnalyseFormData` — timeframes match uploaded charts (guards MED-5) | ✅ **ADDED 2026-03-04** (`test_g11_bridge.js` — 3 new tests) | v2.0.2 |
-| TEST-9 | Concurrent `/analyse` cache misses call `_refresh()` once with lock (guards HIGH-4) | ⬜ pending | v2.1 |
-| TEST-10 | Unexpected `final_bias` value → ticket draft `rawAIReadBias` empty (guards HIGH-3) | ⬜ pending | v2.1 |
+| TEST-9 | Concurrent `/analyse` cache misses call `_refresh()` once with lock (guards HIGH-4) | ✅ **ADDED 2026-03-04** (`test_v21_fixes.py` — 2 tests) | v2.1 |
+| TEST-10 | Unexpected `final_bias` value → ticket draft `rawAIReadBias` empty (guards HIGH-3) | ✅ **ADDED 2026-03-04** (`test_v21_fixes.py` — 4 tests; ValidationError now raised) | v2.1 |
 
 ### Architectural Debt (long-term, no immediate target)
 
@@ -623,7 +643,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 |-------|--------|--------|
 | Browser ↔ Python analyst schema divergence (JS: 0–100, Long/Short/Wait; Python: 0.0–1.0, LONG/SHORT/NO_TRADE) | Blocks unified replay, dashboard, telemetry parity | XL |
 | Model strings duplicated across `analyst_nodes.py`, `api_key_manager.py`, `execution_router.py` | Adding a model requires 3+ consistent edits | S — centralize in `MODEL_REGISTRY` |
-| MRO scheduler as module-level singleton — not injectable, not per-worker-safe | Limits testability and multi-worker deployment | M — move to `app.state` + `@app.on_event("startup")` |
+| MRO scheduler as module-level singleton — not injectable, not per-worker-safe | Limits testability and multi-worker deployment | M — move to `app.state` + FastAPI `lifespan` startup (pattern now established by HIGH-8) |
 | `storage_indexeddb.js` is a stub — localStorage growth ceiling | Long-term journal retention at risk | L — implement real IndexedDB adapter |
 | No shared `analyst_output.schema.json` canonical spec | JS and Python output shapes drift silently | M — define in `docs/schema/`, validate both sides |
 
@@ -674,8 +694,8 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Next Immediate Steps (Priority Order)
 
-> Last updated: 2026-03-04. All tracks complete through G12 / v2.0.2 / MRO P1–P4. Test suite: 553 passing, 0 failing.
-> v2.0.2 is fully complete. Next focus: v2.1 (remaining HIGH debt) and C4 (unified export).
+> Last updated: 2026-03-04. All tracks complete through G12 / v2.1 / MRO P1–P4. Test suite: 576 passing, 0 failing.
+> v2.1 is fully complete. All HIGH and MED debt items resolved. Next focus: C4 (unified export) and v2.1b (multi-round deliberation).
 
 1. ✅ **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** — DONE 2026-03-03
 2. ✅ **v2.0.2 item: Unblock event loop in async MRO pipeline (CRITICAL-2)** — DONE 2026-03-03
@@ -686,17 +706,21 @@ base with `main` (predates current repo structure) and can be safely deleted.
 7. ✅ **v2.0.2 item: Fix retry logic — non-retriable exceptions + exp backoff (HIGH-1)** — DONE 2026-03-04
 8. ✅ **v2.0.2 item: Dynamic timeframes from uploaded files (MED-5)** — DONE 2026-03-04
 9. ✅ **v2.0.2 item: m15Overlay shape validation replaces null-only guard (MED-8)** — DONE 2026-03-04
+10. ✅ **v2.1: All remaining HIGH debt items (HIGH-2/3/4/7/8)** — DONE 2026-03-04
+11. ✅ **v2.1: All remaining MED/LOW debt items (MED-1/2/3/4/6/7 + LOW-4/5/6)** — DONE 2026-03-04
+12. ✅ **v2.1: TEST-9 (thread safety), TEST-10 (bias Literal), TEST-3 (lifespan TestClient) guards added** — DONE 2026-03-04
 
-10. **v2.1 — Remaining HIGH debt + Multi-Round Deliberation**
-    - HIGH-2: `datetime.utcnow()` → timezone-aware (Python 3.12+ compat)
-    - HIGH-3: `FinalVerdict.final_bias` unvalidated str → Literal enum
-    - HIGH-4: `MacroScheduler` thundering-herd guard on cache miss
-    - HIGH-7: Rate limiting on `/analyse` endpoint
-    - HIGH-8: `_graph` at module import time (not safe for uvicorn worker restarts)
-    - v2.1 multi-round deliberation: optional second-round fan-out; `enable_deliberation: bool = False`
-
-11. **C4 — Unified Export (Track C)**
+13. **C4 — Unified Export (Track C)**
     Single `app/` export including ticket + full analyst JSON logs, importable back.
 
-**Completed:** G1–G12, v1.1–v2.0.2, MRO P1–P4, C1–C3
-**Not started:** v2.1, C4, v2.2
+14. **v2.1b — Multi-Round Deliberation**
+    - Optional second-round fan-out after initial results
+    - Arbiter receives both Round 1 and Round 2 outputs, weighted by round
+    - Config flag: `enable_deliberation: bool = False` (off by default)
+
+15. **v2.2 — Streaming + Real-Time UI**
+    - Server-Sent Events from FastAPI as analysts complete
+    - CLI live progress display
+
+**Completed:** G1–G12, v1.1–v2.1, MRO P1–P4, C1–C3
+**Not started:** C4, v2.1b (deliberation), v2.2 (streaming)

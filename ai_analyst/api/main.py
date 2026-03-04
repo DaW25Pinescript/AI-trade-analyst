@@ -14,11 +14,15 @@ GET /health
     - Liveness check
 """
 import base64
+import collections
 import json
 import os
+import time
+import threading
+from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -87,6 +91,63 @@ def _load_usage_summary(run_id: str) -> dict:
     except Exception:
         return _empty_usage_summary()
 
+
+# ── Budget guards ────────────────────────────────────────────────────────────
+# MAX_IMAGE_SIZE_MB: per-image upload ceiling (default 5 MB).
+# MAX_COST_PER_RUN_USD: optional per-run cost ceiling (default disabled).
+_MAX_IMAGE_BYTES: int = int(os.environ.get("MAX_IMAGE_SIZE_MB", "5")) * 1024 * 1024
+_MAX_COST_PER_RUN: float | None = (
+    float(os.environ["MAX_COST_PER_RUN_USD"])
+    if os.environ.get("MAX_COST_PER_RUN_USD")
+    else None
+)
+
+# ── Rate limiter (HIGH-7) ────────────────────────────────────────────────────
+# Simple in-process sliding-window rate limiter. Default: 10 requests per 60 s
+# per client IP. Override with RATE_LIMIT_REQUESTS and RATE_LIMIT_WINDOW_S env vars.
+_RATE_LIMIT_REQUESTS: int = int(os.environ.get("RATE_LIMIT_REQUESTS", "10"))
+_RATE_LIMIT_WINDOW_S: int = int(os.environ.get("RATE_LIMIT_WINDOW_S", "60"))
+_rate_windows: dict[str, collections.deque] = {}
+_rate_lock = threading.Lock()
+
+
+def _check_rate_limit(client_ip: str) -> None:
+    """
+    Sliding-window rate limiter. Raises HTTPException(429) when the client
+    has exceeded RATE_LIMIT_REQUESTS requests within the last RATE_LIMIT_WINDOW_S
+    seconds. Thread-safe via a shared lock.
+    """
+    now = time.monotonic()
+    cutoff = now - _RATE_LIMIT_WINDOW_S
+    with _rate_lock:
+        window = _rate_windows.setdefault(client_ip, collections.deque())
+        # Evict timestamps older than the sliding window
+        while window and window[0] < cutoff:
+            window.popleft()
+        if len(window) >= _RATE_LIMIT_REQUESTS:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Rate limit exceeded: {_RATE_LIMIT_REQUESTS} requests "
+                    f"per {_RATE_LIMIT_WINDOW_S}s. Retry after the window expires."
+                ),
+            )
+        window.append(now)
+
+
+# ── Application lifespan (HIGH-8) ────────────────────────────────────────────
+# Build the LangGraph pipeline during startup rather than at module import time.
+# This is safe across uvicorn worker restarts and avoids holding references to
+# async event loops or per-process MRO cache at import time.
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.graph = build_analysis_graph()
+    yield
+    # Teardown (if needed in future) goes here
+
+
 app = FastAPI(
     title="AI Trade Analyst — Multi-Model Pipeline",
     version="2.0.0",
@@ -98,6 +159,7 @@ app = FastAPI(
         "v2.0: POST /analyse returns an AnalysisResponse envelope including "
         "a ticket_draft block for direct browser app import."
     ),
+    lifespan=lifespan,
 )
 
 # Allow the browser app to reach the API.
@@ -114,18 +176,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Budget guards ────────────────────────────────────────────────────────────
-# MAX_IMAGE_SIZE_MB: per-image upload ceiling (default 5 MB).
-# MAX_COST_PER_RUN_USD: optional per-run cost ceiling (default disabled).
-_MAX_IMAGE_BYTES: int = int(os.environ.get("MAX_IMAGE_SIZE_MB", "5")) * 1024 * 1024
-_MAX_COST_PER_RUN: float | None = (
-    float(os.environ["MAX_COST_PER_RUN_USD"])
-    if os.environ.get("MAX_COST_PER_RUN_USD")
-    else None
-)
-
-_graph = build_analysis_graph()
-
 
 @app.get("/health")
 async def health():
@@ -140,6 +190,8 @@ async def get_run_usage(run_id: str):
 
 @app.post("/analyse", response_model=AnalysisResponse)
 async def analyse(
+    request: Request,
+
     # Market identity
     instrument: str = Form(..., description="e.g. XAUUSD"),
     session: str = Form(..., description="e.g. NY, London, Asia"),
@@ -200,6 +252,10 @@ async def analyse(
         description="JSON array of construct types the overlay claims to identify.",
     ),
 ):
+    # ── Rate limit check (HIGH-7) ────────────────────────────────────────────
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+
     # ── Parse JSON fields ────────────────────────────────────────────────────
     try:
         tf_list: list[str] = json.loads(timeframes)
@@ -338,7 +394,7 @@ async def analyse(
     }
 
     try:
-        final_state = await _graph.ainvoke(initial_state)
+        final_state = await request.app.state.graph.ainvoke(initial_state)
     except RuntimeError as e:
         # Propagate pipeline failures (e.g. insufficient analysts) as 503
         raise HTTPException(status_code=503, detail=str(e))

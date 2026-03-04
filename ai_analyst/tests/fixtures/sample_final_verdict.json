@@ -1,6 +1,6 @@
 {
   "_comment": "Deterministic FinalVerdict fixture for test_schema_round_trip.py. No live API calls. Paired with examples/sample_ticket.json (XAUUSD_260223_0930, CONDITIONAL → ENTER_LONG).",
-  "final_bias": "Bullish — demand zone held, HTF structure intact",
+  "final_bias": "bullish",
   "decision": "ENTER_LONG",
   "approved_setups": [
     {

@@ -12,7 +12,10 @@ Phase 2 — overlay_delta_node (conditional, only when 15M overlay provided):
   Uses SEPARATE API calls with ISOLATED context — prevents anchoring.
 """
 import asyncio
+import logging
 from pydantic import ValidationError
+
+logger = logging.getLogger(__name__)
 
 from ..models.persona import PersonaType
 from ..models.analyst_output import AnalystOutput, OverlayDeltaReport
@@ -115,9 +118,9 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
             valid_outputs.append(result)
             configs_used.append(config)
         elif isinstance(result, ValidationError):
-            print(f"[WARN] Analyst '{model}' Phase 1 returned schema-invalid output: {result}")
+            logger.warning("Analyst '%s' Phase 1 returned schema-invalid output: %s", model, result)
         else:
-            print(f"[WARN] Analyst '{model}' Phase 1 failed with error: {result}")
+            logger.warning("Analyst '%s' Phase 1 failed with error: %s", model, result)
 
     if len(valid_outputs) < MINIMUM_VALID_ANALYSTS:
         raise RuntimeError(
@@ -151,11 +154,11 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
 
     if not ground_truth.m15_overlay:
         # Should not happen — pipeline only routes here when overlay is present
-        print("[WARN] overlay_delta_node called but no m15_overlay in ground_truth. Skipping.")
+        logger.warning("overlay_delta_node called but no m15_overlay in ground_truth. Skipping.")
         state["overlay_delta_reports"] = []
         return state
 
-    print(f"[INFO] Phase 2 — overlay delta analysis for {len(analyst_outputs)} analysts.")
+    logger.info("Phase 2 — overlay delta analysis for %d analysts.", len(analyst_outputs))
 
     tasks = [
         run_overlay_delta(
@@ -174,13 +177,15 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
         if isinstance(result, OverlayDeltaReport):
             delta_reports.append(result)
         elif isinstance(result, ValidationError):
-            print(f"[WARN] Analyst '{model}' Phase 2 returned schema-invalid delta report: {result}")
+            logger.warning(
+                "Analyst '%s' Phase 2 returned schema-invalid delta report: %s", model, result
+            )
         else:
-            print(f"[WARN] Analyst '{model}' Phase 2 failed with error: {result}")
+            logger.warning("Analyst '%s' Phase 2 failed with error: %s", model, result)
 
     if not delta_reports:
-        print(
-            "[WARN] No valid overlay delta reports produced. "
+        logger.warning(
+            "No valid overlay delta reports produced. "
             "Arbiter will proceed with clean analysis only."
         )
 

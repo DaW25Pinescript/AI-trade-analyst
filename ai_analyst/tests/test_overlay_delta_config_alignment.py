@@ -255,8 +255,10 @@ class TestOverlayDeltaConfigAlignment:
 
         assert result["overlay_delta_reports"] == []
 
-    async def test_phase2_partial_failure_logs_correct_model_name(self, monkeypatch, capsys):
+    async def test_phase2_partial_failure_logs_correct_model_name(self, monkeypatch, caplog):
         """When Phase 2 fails for a specific analyst, the warning shows the correct model name."""
+        import logging
+
         call_index = {"n": 0}
 
         async def mock_run_overlay_delta(config, prompt, run_id):
@@ -276,9 +278,10 @@ class TestOverlayDeltaConfigAlignment:
         state["analyst_outputs"] = [_sample_analyst_output(), _sample_analyst_output()]
         state["analyst_configs_used"] = [ANALYST_CONFIGS[1], ANALYST_CONFIGS[3]]
 
-        result = await overlay_delta_node(state)
+        with caplog.at_level(logging.WARNING, logger="ai_analyst.graph.analyst_nodes"):
+            result = await overlay_delta_node(state)
 
-        captured = capsys.readouterr()
-        # The warning should reference claude-sonnet-4-6 (configs_used[0]), not gpt-4o
-        assert ANALYST_CONFIGS[1]["model"] in captured.out
+        # MED-3: warnings now go to the logging system (not stdout).
+        # The warning should reference claude-sonnet-4-6 (configs_used[0]), not gpt-4o.
+        assert ANALYST_CONFIGS[1]["model"] in caplog.text
         assert len(result["overlay_delta_reports"]) == 1

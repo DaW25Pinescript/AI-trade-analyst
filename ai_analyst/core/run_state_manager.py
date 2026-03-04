@@ -5,7 +5,7 @@ if the user closes the app mid-way (design principle #6 of spec v1.2).
 """
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models.execution_config import RunState, RunStatus
 
@@ -35,7 +35,7 @@ def transition(state: RunState, new_status: RunStatus, **updates) -> RunState:
     """Return a new RunState with updated status and timestamp."""
     data = state.model_dump()
     data["status"] = new_status
-    data["updated_at"] = datetime.utcnow().isoformat()
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
     data.update(updates)
     new_state = RunState(**data)
     save_run_state(new_state)
