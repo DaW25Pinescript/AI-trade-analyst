@@ -173,3 +173,65 @@ export async function getRunUsage(serverUrl, runId, fetchImpl = fetch) {
 
   return response.json();
 }
+
+// ── Phase 2a: Feeder bridge helpers ──────────────────────────────────────────
+
+/**
+ * POST a feeder contract JSON payload to the API server's /feeder/ingest
+ * endpoint. Returns the ingested MacroContext and metadata.
+ *
+ * @param {string} serverUrl  Base URL of the AI analyst API
+ * @param {object} payload    Feeder contract JSON (contract_version, events, etc.)
+ * @param {Function} fetchImpl  Fetch implementation (for testing)
+ * @returns {Promise<object>}   { status, macro_context, ingested_at }
+ */
+export async function postFeederPayload(serverUrl, payload, fetchImpl = fetch) {
+  const trimmed = (serverUrl || '').trim().replace(/\/$/, '');
+  if (!trimmed) throw new Error('Server URL is required.');
+  if (!payload || typeof payload !== 'object') throw new Error('Feeder payload must be a JSON object.');
+
+  const response = await fetchWithTimeout(
+    `${trimmed}/feeder/ingest`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    fetchImpl,
+    30_000
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Feeder ingest failed (${response.status}): ${detail || response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * GET the current feeder health status from the API server.
+ * Returns staleness, source health, and last ingestion metadata.
+ *
+ * @param {string} serverUrl  Base URL of the AI analyst API
+ * @param {Function} fetchImpl  Fetch implementation (for testing)
+ * @returns {Promise<object>}   { status, stale, age_seconds, source_health, ... }
+ */
+export async function getFeederHealth(serverUrl, fetchImpl = fetch) {
+  const trimmed = (serverUrl || '').trim().replace(/\/$/, '');
+  if (!trimmed) throw new Error('Server URL is required.');
+
+  const response = await fetchWithTimeout(
+    `${trimmed}/feeder/health`,
+    { method: 'GET' },
+    fetchImpl,
+    6000
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Feeder health check failed (${response.status}): ${detail || response.statusText}`);
+  }
+
+  return response.json();
+}

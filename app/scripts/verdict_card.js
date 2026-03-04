@@ -7,12 +7,39 @@ function esc(value) {
     .replaceAll("'", '&#39;');
 }
 
+/**
+ * Phase 2a float fix: format a 0.0–1.0 confidence float as a percentage string.
+ * Handles both Python-side 0.0–1.0 floats and legacy 0–100 integer values.
+ * Returns "N/A" for non-numeric or missing values.
+ */
+export function formatConfidencePct(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 'N/A';
+  // If value is already in 0–100 range (> 1.0), treat as percentage directly.
+  // Otherwise, multiply by 100 to convert 0.0–1.0 to percentage.
+  const pct = num > 1.0 ? num : num * 100;
+  return `${Math.round(pct)}%`;
+}
+
+/**
+ * Phase 2a float fix: format a price float to a display string with appropriate
+ * decimal places. Gold prices use 2 decimals; forex pairs use 5.
+ */
+export function formatPrice(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 'N/A';
+  // Heuristic: values > 100 are likely gold/index prices (2 decimals)
+  // values < 100 are likely forex rates (5 decimals)
+  const decimals = num > 100 ? 2 : 5;
+  return num.toFixed(decimals);
+}
+
 export function renderFinalVerdict(verdict) {
   if (!verdict) return '<p class="hint">No verdict available yet.</p>';
 
   const setups = (verdict.approved_setups || []).map((s) => `
     <li>
-      <strong>${esc(s.type)}</strong> · R:R ${esc(s.rr_estimate)} · confidence ${esc(s.confidence)}
+      <strong>${esc(s.type)}</strong> · R:R ${esc(s.rr_estimate)} · confidence ${formatConfidencePct(s.confidence)}
       <div style="font-size:12px;color:var(--muted);">Entry: ${esc(s.entry_zone)} | Stop: ${esc(s.stop)} | Targets: ${esc((s.targets || []).join(', '))}</div>
     </li>
   `).join('');
@@ -27,7 +54,7 @@ export function renderFinalVerdict(verdict) {
       <div style="white-space:normal;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;">
         <p><strong>Decision:</strong> ${esc(verdict.decision)}</p>
         <p><strong>Final Bias:</strong> ${esc(verdict.final_bias)}</p>
-        <p><strong>Overall Confidence:</strong> ${esc(verdict.overall_confidence)}</p>
+        <p><strong>Overall Confidence:</strong> ${formatConfidencePct(verdict.overall_confidence)}</p>
         <p><strong>Analyst Agreement:</strong> ${esc(verdict.analyst_agreement_pct)}%</p>
         <p><strong>Arbiter Notes:</strong> ${esc(verdict.arbiter_notes)}</p>
         <div><strong>Approved Setups:</strong>
