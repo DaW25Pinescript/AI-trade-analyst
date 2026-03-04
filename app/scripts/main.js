@@ -22,7 +22,7 @@ import { mountAnalysisResults } from './verdict_card.js';
 import { applyTicketDraftToForm } from './ui/ticket_form.js';
 import { exportUnified } from './exports/export_unified.js';
 import { importUnified } from './exports/import_unified.js';
-import { initMacroPage, showMacroPage, showWorkflowPage } from './ui/macro_page.js';
+import { initMacroPage, initScoutPage, showMacroPage, showScoutPage, showWorkflowPage } from './ui/macro_page.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
 function buildAndShow() {
@@ -248,7 +248,7 @@ Object.assign(window, {
   // C4: unified export / import
   exportUnified,
   handleImportUnified,
-  showMacroPage, showWorkflowPage,
+  showMacroPage, showScoutPage, showWorkflowPage,
   // G9: Shadow Mode
   onShadowModeChange, onShadowCaptureWindowChange, onShadowOutcomeInput, saveShadowOutcome
 });
@@ -263,6 +263,7 @@ window.onload = () => {
   initOperatorDashboard();
   bindKeyboardClickables();
   initMacroPage();
+  initScoutPage();
 
   checkBridgeHealthUI();
 
