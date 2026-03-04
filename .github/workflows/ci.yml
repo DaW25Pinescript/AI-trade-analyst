@@ -41,8 +41,8 @@ jobs:
       - name: Scan analyst dependencies for CVEs
         run: pip install pip-audit && pip-audit -r ai_analyst/requirements.txt
 
-      - name: Run analyst tests
-        run: pytest -q ai_analyst/tests
+      - name: Run analyst tests with coverage
+        run: pytest --cov=ai_analyst --cov-report=term-missing --cov-fail-under=70 -q ai_analyst/tests
 
   mro-tests:
     name: Macro Risk Officer tests (pytest)
@@ -62,5 +62,5 @@ jobs:
       - name: Scan MRO dependencies for CVEs
         run: pip install pip-audit && pip-audit -r macro_risk_officer/requirements.txt
 
-      - name: Run MRO tests
-        run: pytest -q macro_risk_officer/tests
+      - name: Run MRO tests with coverage
+        run: pytest --cov=macro_risk_officer --cov-report=term-missing --cov-fail-under=70 -q macro_risk_officer/tests
