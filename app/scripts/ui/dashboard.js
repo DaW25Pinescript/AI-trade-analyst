@@ -12,11 +12,20 @@ let _loadedEntries = [];
 export function getLoadedEntries() { return _loadedEntries; }
 
 export function buildAnalyticsReportHTML(exportOverrides = null, doc = document) {
+  let safeOverrides = exportOverrides;
+  let safeDoc = doc;
+
+  // Backward compatibility: older callers passed (doc) as the first argument.
+  if (safeOverrides && typeof safeOverrides.getElementById === 'function') {
+    safeDoc = safeOverrides;
+    safeOverrides = null;
+  }
+
   const getChartHTML = (id) => {
-    if (exportOverrides && exportOverrides[id]) return exportOverrides[id];
-    return doc.getElementById(id)?.innerHTML || '<p>No data.</p>';
+    if (safeOverrides && safeOverrides[id]) return safeOverrides[id];
+    return safeDoc.getElementById(id)?.innerHTML || '<p>No data.</p>';
   };
-  const getText = (id, fallback = '0') => doc.getElementById(id)?.textContent?.trim() || fallback;
+  const getText = (id, fallback = '0') => safeDoc.getElementById(id)?.textContent?.trim() || fallback;
 
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Analytics Export</title>

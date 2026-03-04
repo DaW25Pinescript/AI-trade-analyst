@@ -24,6 +24,20 @@ function prepareContainer(container) {
   }
 }
 
+function renderPlot(container, data, layout) {
+  if (typeof window.Plotly?.react === 'function') {
+    window.Plotly.react(container, data, layout, PLOTLY_CONFIG);
+    return;
+  }
+  window.Plotly.newPlot(container, data, layout, PLOTLY_CONFIG);
+}
+
+function isValidTimestamp(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime());
+}
+
 export function isPlotlyAvailable() {
   return typeof window.Plotly === 'object' && window.Plotly !== null;
 }
@@ -45,7 +59,7 @@ export function renderHeatmapPlotly(metrics) {
   const text = heatmapRows.map((row) => row.map((cell) => `Setup: ${cell?.setup || 'Other'}<br>Session: ${cell?.session || 'Unknown'}<br>Count: ${Number(cell?.count ?? 0)}`));
 
   prepareContainer(container);
-  window.Plotly.newPlot(container, [{
+  renderPlot(container, [{
     type: 'heatmap',
     x,
     y,
@@ -60,7 +74,7 @@ export function renderHeatmapPlotly(metrics) {
     yaxis: { title: { text: 'Setup' }, automargin: true },
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
-  }, PLOTLY_CONFIG);
+  });
 }
 
 export function renderEquityCurvePlotly(metrics) {
@@ -73,11 +87,12 @@ export function renderEquityCurvePlotly(metrics) {
     return;
   }
 
-  const x = points.map((point, idx) => point?.timestamp || idx + 1);
+  const useTimestamps = points.every((point) => isValidTimestamp(point?.timestamp));
+  const x = points.map((point, idx) => (useTimestamps ? point.timestamp : idx + 1));
   const y = points.map((point) => Number(point?.cumulativeR ?? 0));
 
   prepareContainer(container);
-  window.Plotly.newPlot(container, [{
+  renderPlot(container, [{
     type: 'scatter',
     mode: 'lines+markers',
     x,
@@ -96,8 +111,8 @@ export function renderEquityCurvePlotly(metrics) {
     title: { text: 'Equity Curve (R-Based)', font: { size: 14 } },
     margin: { t: 42, r: 20, b: 44, l: 52 },
     xaxis: {
-      title: { text: points.some((point) => point?.timestamp) ? 'Timestamp' : 'Trade #' },
-      type: points.some((point) => point?.timestamp) ? 'date' : 'linear',
+      title: { text: useTimestamps ? 'Timestamp' : 'Trade #' },
+      type: useTimestamps ? 'date' : 'linear',
     },
     yaxis: { title: { text: 'Cumulative R' }, zeroline: true, zerolinewidth: 1.5 },
     shapes: [{
@@ -112,7 +127,7 @@ export function renderEquityCurvePlotly(metrics) {
     }],
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
-  }, PLOTLY_CONFIG);
+  });
 }
 
 export function renderPeriodBreakdownPlotly(containerId, rows, title) {
@@ -130,7 +145,7 @@ export function renderPeriodBreakdownPlotly(containerId, rows, title) {
   const avgR = safeRows.map((row) => Number(row?.avgR ?? 0));
 
   prepareContainer(container);
-  window.Plotly.newPlot(container, [
+  renderPlot(container, [
     { type: 'bar', name: 'Net R', x: periods, y: netR },
     { type: 'bar', name: 'Avg R', x: periods, y: avgR },
   ], {
@@ -141,7 +156,7 @@ export function renderPeriodBreakdownPlotly(containerId, rows, title) {
     yaxis: { title: { text: 'R' }, zeroline: true, zerolinewidth: 1.5 },
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
-  }, PLOTLY_CONFIG);
+  });
 }
 
 export async function capturePlotlyChartsForExport() {
