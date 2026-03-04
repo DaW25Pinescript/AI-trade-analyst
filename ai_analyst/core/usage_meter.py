@@ -1,9 +1,12 @@
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from ..models.llm_usage import LLMUsageEntry
 from .claude_code_api_client import chat_completions
@@ -17,8 +20,10 @@ def append_usage(run_dir: Path, entry: LLMUsageEntry) -> None:
         path = run_dir / "usage.jsonl"
         with path.open("a", encoding="utf-8") as f:
             f.write(entry.model_dump_json() + "\n")
-    except Exception:
-        return
+    except Exception as exc:
+        # MED-4: log a warning so metering failures are visible in server logs
+        # without blocking the analysis result.
+        logger.warning("append_usage failed for run %s: %s", entry.run_id, exc)
 
 
 def extract_usage_tokens(resp: Any) -> tuple[int | None, int | None, int | None]:

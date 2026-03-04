@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Dict, List, Optional
 
@@ -46,6 +47,7 @@ class MacroScheduler:
         self._cache: Optional[MacroContext] = None
         self._last_fetch: float = 0.0
         self._engine = ReasoningEngine()
+        self._refresh_lock = threading.Lock()  # HIGH-4: prevents thundering herd on cache miss
 
         # Phase-4 KPI telemetry
         self._metrics = SchedulerMetrics()
@@ -63,23 +65,32 @@ class MacroScheduler:
         main pipeline is never blocked).
         """
         now = time.monotonic()
+        # Fast path: cache valid — no lock needed for reads
         if self._cache is not None and (now - self._last_fetch) < self.ttl:
             self._metrics.cache_hits += 1
             return self._cache
 
+        # Slow path: acquire lock then re-check to prevent thundering herd (HIGH-4).
+        # Only one thread runs _refresh(); others wait and then use the fresh cache.
         self._metrics.cache_misses += 1
-        try:
-            self._cache, source_mask, event_count = self._refresh(instrument)
-            self._last_fetch = now
-            self._metrics.fetch_successes += 1
-            self._metrics.last_fetch_epoch = now
-            if self._fetch_log is not None:
-                self._fetch_log.record_success(source_mask, event_count)
-        except Exception as exc:
-            self._metrics.fetch_failures += 1
-            if self._fetch_log is not None:
-                self._fetch_log.record_failure(type(exc).__name__)
-            # Stale cache or None — Arbiter continues without macro context
+        with self._refresh_lock:
+            # Re-check inside lock — another thread may have already refreshed
+            now = time.monotonic()
+            if self._cache is not None and (now - self._last_fetch) < self.ttl:
+                return self._cache
+
+            try:
+                self._cache, source_mask, event_count = self._refresh(instrument)
+                self._last_fetch = time.monotonic()
+                self._metrics.fetch_successes += 1
+                self._metrics.last_fetch_epoch = self._last_fetch
+                if self._fetch_log is not None:
+                    self._fetch_log.record_success(source_mask, event_count)
+            except Exception as exc:
+                self._metrics.fetch_failures += 1
+                if self._fetch_log is not None:
+                    self._fetch_log.record_failure(type(exc).__name__)
+                # Stale cache or None — Arbiter continues without macro context
 
         return self._cache
 

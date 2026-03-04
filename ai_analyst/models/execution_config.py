@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from enum import Enum
-from typing import Optional
-from datetime import datetime
+from typing import Optional, Literal
+from datetime import datetime, timezone
 
 from .persona import PersonaType  # no circular dependency — persona.py imports nothing from here
 
@@ -20,7 +20,7 @@ class AnalystConfig(BaseModel):
 
 
 class ExecutionConfig(BaseModel):
-    mode: str  # "manual" | "hybrid" | "automated"
+    mode: Literal["manual", "hybrid", "automated"]
     analysts: list[AnalystConfig]
 
     @property
@@ -61,8 +61,8 @@ class RunState(BaseModel):
     mode: str
     instrument: str
     session: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     analysts_pending: list[str] = []   # analyst_ids not yet responded
     analysts_complete: list[str] = []  # analyst_ids with validated responses
     prompt_pack_dir: Optional[str] = None
