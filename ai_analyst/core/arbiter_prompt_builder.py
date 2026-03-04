@@ -7,6 +7,9 @@ and applies the weighting rules defined in the lens-aware screenshot architectur
 
 When macro_context is provided (MRO Phase 2), the arbiter_block() text is injected
 after the overlay section as advisory-only contextual evidence.
+
+v2.1b: When deliberation_outputs are provided, the arbiter receives both Round 1
+and Round 2 analyst outputs and applies deliberation weighting rules.
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ def build_arbiter_prompt(
     overlay_delta_reports: list[OverlayDeltaReport] | None = None,
     overlay_was_provided: bool = False,
     macro_context: Optional[MacroContext] = None,
+    deliberation_outputs: list[AnalystOutput] | None = None,
 ) -> str:
     """
     Load the arbiter template and inject:
@@ -36,6 +40,7 @@ def build_arbiter_prompt(
       - min_rr                  : minimum acceptable R:R from risk constraints
       - overlay_section         : overlay delta reports + weighting rules (if overlay provided)
       - macro_section           : MacroContext arbiter block, or MRO-unavailable notice
+      - deliberation_section    : v2.1b Round 2 outputs + weighting rules (if deliberation ran)
     """
     template = load_arbiter_template()
 
@@ -50,6 +55,7 @@ def build_arbiter_prompt(
 
     overlay_section = _build_overlay_section(overlay_delta_reports, overlay_was_provided)
     macro_section = _build_macro_section(macro_context)
+    deliberation_section = _build_deliberation_section(deliberation_outputs)
 
     return template.format(
         N=len(analyst_outputs),
@@ -60,6 +66,7 @@ def build_arbiter_prompt(
         overlay_section=overlay_section,
         overlay_was_provided=str(overlay_was_provided).lower(),
         macro_section=macro_section,
+        deliberation_section=deliberation_section,
     )
 
 
@@ -125,3 +132,50 @@ delta_reports_received: {len(delta_reports or [])}
 6. NO-TRADE PRIORITY: If ambiguity between clean price and overlay exceeds your confidence
    threshold after applying the rules above -> NO_TRADE is the preferred outcome.
    A defensible NO_TRADE is better than a speculative entry."""
+
+
+def _build_deliberation_section(
+    deliberation_outputs: list[AnalystOutput] | None,
+) -> str:
+    """
+    v2.1b — Build the deliberation section injected into the arbiter template.
+
+    When deliberation ran, the arbiter receives both Round 1 (Phase 1) and
+    Round 2 (deliberation) analyst outputs and applies peer-informed weighting.
+    """
+    if not deliberation_outputs:
+        return (
+            "=== ROUND 2 DELIBERATION ===\n"
+            "Deliberation was not enabled for this run. "
+            "Base verdict on Round 1 analyst outputs only.\n"
+            "deliberation_enabled: false"
+        )
+
+    delib_json = json.dumps(
+        [a.model_dump() for a in deliberation_outputs],
+        indent=2,
+    )
+
+    return f"""=== ROUND 2 DELIBERATION OUTPUTS ===
+deliberation_enabled: true
+round2_analysts_received: {len(deliberation_outputs)}
+
+{delib_json}
+
+=== DELIBERATION WEIGHTING RULES (apply these in order) ===
+
+1. BASELINE: Round 1 (Phase 1 clean price analysis) establishes the analytical baseline.
+
+2. REVISION WEIGHT: Round 2 (deliberation) reflects peer-informed reasoning.
+   Weight Round 2 conclusions at 1.5x Round 1 when they differ.
+   Prefer the Round 2 position if the revision is clearly reasoned.
+
+3. REAFFIRMATION BOOST: If Round 2 reaffirms Round 1, confidence in that analyst's
+   position increases. Count as stronger evidence.
+
+4. INTRA-ANALYST CONFLICT: If a single analyst's Round 1 and Round 2 positions contradict
+   significantly (e.g. LONG vs NO_TRADE), reduce that analyst's weight and flag uncertainty.
+
+5. NO-TRADE PRIORITY: If the majority of Round 2 outputs recommend NO_TRADE,
+   prefer NO_TRADE in the final verdict even if Round 1 was directional,
+   unless Round 2 reasoning is clearly weaker than Round 1."""

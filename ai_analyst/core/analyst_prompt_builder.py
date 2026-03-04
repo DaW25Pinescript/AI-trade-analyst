@@ -206,6 +206,79 @@ Return ONLY valid JSON matching the delta report schema."""
     }
 
 
+def build_deliberation_prompt(
+    own_round1_output: AnalystOutput,
+    peer_round1_outputs: list[AnalystOutput],
+    persona: PersonaType,
+) -> dict:
+    """
+    v2.1b — Round 2 deliberation prompt.
+
+    Each analyst receives:
+    - Its own Round 1 AnalystOutput as context (self-reference)
+    - Anonymized peer Round 1 outputs labelled "Peer Analyst A/B/C..."
+      (no model names — prevents anchoring on provider reputation)
+
+    The analyst may revise or reaffirm its analysis. Same output schema as Round 1.
+    No chart images are attached — deliberation is text-only.
+    """
+    own_json = json.dumps(own_round1_output.model_dump(), indent=2)
+
+    peer_labels = ["A", "B", "C", "D"]
+    peer_blocks: list[str] = []
+    for label, peer in zip(peer_labels, peer_round1_outputs):
+        peer_json = json.dumps(peer.model_dump(), indent=2)
+        peer_blocks.append(f"--- Peer Analyst {label} ---\n{peer_json}")
+    peers_section = "\n\n".join(peer_blocks) if peer_blocks else "No peer analyses available."
+
+    persona_prompt = load_persona_prompt(persona)
+
+    system_prompt = f"""You are a professional trading analyst performing a Round 2 deliberation review.
+
+=== ROUND 2 — DELIBERATION ===
+You have already completed a Round 1 clean price analysis (your output is shown below).
+You now have access to anonymized peer analyses from other analysts who examined the same charts.
+
+YOUR TASK:
+- Review the peer analyses alongside your own Round 1 output.
+- Revise your analysis if peer evidence reveals something you missed or contradicts your conclusion.
+- Reaffirm your analysis if you remain confident after reviewing peers.
+- Do NOT simply defer to peer consensus — apply independent critical judgment.
+
+RULES:
+- Your Round 2 output must still adhere to the same HARD RULES as Round 1.
+- If setup_valid == false OR confidence < 0.45 OR disqualifiers is non-empty
+  -> recommended_action MUST be "NO_TRADE".
+- Evidence hierarchy: clean price action > peer consensus > any single peer's opinion.
+- If you change your position, state the reason in the "notes" field.
+- If you reaffirm your position, briefly confirm that in "notes".
+- Do NOT identify which model or provider produced each peer analysis.
+
+=== OUTPUT SCHEMA ===
+Return a JSON object matching this schema exactly (identical to Round 1).
+
+{OUTPUT_SCHEMA}
+
+HARD RULE: If setup_valid == false OR confidence < 0.45 OR disqualifiers list is non-empty
+-> recommended_action MUST be "NO_TRADE". No exceptions."""
+
+    user_content = f"""=== YOUR ROUND 1 ANALYSIS ===
+{own_json}
+
+=== ANONYMIZED PEER ANALYSES ===
+{peers_section}
+
+Review the above and return your Round 2 revised or reaffirmed analysis.
+Return ONLY valid JSON matching the output schema. No prose. No markdown."""
+
+    return {
+        "system": system_prompt,
+        "developer": persona_prompt,
+        "user": user_content,
+        "images": {},   # deliberation is text-only — no chart images
+    }
+
+
 def build_user_message(ground_truth: GroundTruthPacket) -> str:
     """Serialise the Ground Truth Packet as JSON (charts excluded — passed as vision attachments)."""
     gt_dict = ground_truth.model_dump(exclude={"charts", "m15_overlay"})

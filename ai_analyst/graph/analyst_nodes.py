@@ -1,15 +1,23 @@
 """
-Two-phase analyst fan-out:
+Two-phase analyst fan-out + v2.1b deliberation round:
 
 Phase 1 — parallel_analyst_node (mandatory):
   Runs all analysts against CLEAN price charts only. No overlay.
   Produces AnalystOutput per analyst.
+  Pushes per-analyst progress events to progress_store if registered (v2.2).
 
 Phase 2 — overlay_delta_node (conditional, only when 15M overlay provided):
   Runs all analysts against the 15M ICT overlay screenshot.
   Each analyst receives its own Phase 1 output as context.
   Produces OverlayDeltaReport per analyst.
   Uses SEPARATE API calls with ISOLATED context — prevents anchoring.
+  Pushes progress events to progress_store if registered (v2.2).
+
+Phase 3 — deliberation_node (optional, v2.1b, only when enable_deliberation=True):
+  Runs all analysts again with anonymized peer Round 1 outputs as context.
+  Each analyst may revise or reaffirm its Phase 1 analysis.
+  Produces a second list of AnalystOutput objects (deliberation_outputs).
+  Pushes progress events to progress_store if registered (v2.2).
 """
 import asyncio
 import logging
@@ -22,10 +30,12 @@ from ..models.analyst_output import AnalystOutput, OverlayDeltaReport
 from ..core.analyst_prompt_builder import (
     build_analyst_prompt,
     build_overlay_delta_prompt,
+    build_deliberation_prompt,
     build_messages,
 )
 from ..core.run_paths import get_run_dir
 from ..core.usage_meter import acompletion_metered
+from ..core import progress_store
 from .state import GraphState
 
 # Analyst roster — model names routed through LiteLLM.
@@ -43,6 +53,7 @@ MINIMUM_VALID_ANALYSTS = 2   # design rule #6
 async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
     """
     Phase 1: Call one analyst model and validate the response against the AnalystOutput schema.
+    Pushes a progress event to the run's queue (if registered) on completion.
     Raises on model error or schema validation failure — caller handles exceptions.
     """
     messages = build_messages(prompt)
@@ -58,7 +69,18 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
         max_tokens=1500,
     )
     raw: str = response.choices[0].message.content
-    return AnalystOutput.model_validate_json(raw)
+    result = AnalystOutput.model_validate_json(raw)
+
+    # v2.2 — push progress event so SSE/CLI consumers can display live progress
+    await progress_store.push_event(run_id, {
+        "type": "analyst_done",
+        "stage": "phase1",
+        "persona": config["persona"].value,
+        "model": config["model"],
+        "action": result.recommended_action,
+        "confidence": result.confidence,
+    })
+    return result
 
 
 async def run_overlay_delta(
@@ -70,6 +92,7 @@ async def run_overlay_delta(
     Phase 2: Call one analyst model for overlay delta analysis.
     Uses a separate API call with isolated context (no Phase 1 contamination).
     Validates response against OverlayDeltaReport schema.
+    Pushes a progress event to the run's queue (if registered) on completion.
     Raises on model error or schema validation failure.
     """
     messages = build_messages(prompt)
@@ -85,7 +108,62 @@ async def run_overlay_delta(
         max_tokens=1000,
     )
     raw: str = response.choices[0].message.content
-    return OverlayDeltaReport.model_validate_json(raw)
+    result = OverlayDeltaReport.model_validate_json(raw)
+
+    # v2.2 — push progress event
+    await progress_store.push_event(run_id, {
+        "type": "analyst_done",
+        "stage": "phase2_overlay",
+        "persona": config["persona"].value,
+        "model": config["model"],
+        "contradictions": len(result.contradicts),
+    })
+    return result
+
+
+async def run_deliberation_round(
+    config: dict,
+    own_output: AnalystOutput,
+    peer_outputs: list[AnalystOutput],
+    run_id: str,
+) -> AnalystOutput:
+    """
+    v2.1b — Phase 3: Run one analyst through the deliberation round.
+    The analyst receives its own Round 1 output plus anonymized peer outputs.
+    Produces a revised or reaffirmed AnalystOutput.
+    Pushes a progress event to the run's queue (if registered) on completion.
+    Raises on model error or schema validation failure.
+    """
+    prompt = build_deliberation_prompt(
+        own_round1_output=own_output,
+        peer_round1_outputs=peer_outputs,
+        persona=config["persona"],
+    )
+    messages = build_messages(prompt)
+    response = await acompletion_metered(
+        run_dir=get_run_dir(run_id),
+        run_id=run_id,
+        stage="phase3_deliberation",
+        node=config["persona"].value,
+        model=config["model"],
+        messages=messages,
+        response_format={"type": "json_object"},
+        temperature=0.1,
+        max_tokens=1500,
+    )
+    raw: str = response.choices[0].message.content
+    result = AnalystOutput.model_validate_json(raw)
+
+    # v2.2 — push progress event
+    await progress_store.push_event(run_id, {
+        "type": "analyst_done",
+        "stage": "deliberation",
+        "persona": config["persona"].value,
+        "model": config["model"],
+        "action": result.recommended_action,
+        "confidence": result.confidence,
+    })
+    return result
 
 
 async def parallel_analyst_node(state: GraphState) -> GraphState:
@@ -190,4 +268,53 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
         )
 
     state["overlay_delta_reports"] = delta_reports
+    return state
+
+
+async def deliberation_node(state: GraphState) -> GraphState:
+    """
+    v2.1b — Phase 3 deliberation fan-out.
+
+    Each analyst that completed Phase 1 reviews anonymized peer outputs and may
+    revise or reaffirm its analysis. Only called when state["enable_deliberation"] is True.
+
+    Peer outputs are anonymized (labelled A/B/C/D) — no model names exposed.
+    Cross-analyst contamination is limited to text summaries, never chart images.
+
+    If a deliberation call fails schema validation, that analyst's Round 1 output
+    is retained in analyst_outputs; a warning is logged but the pipeline continues.
+    """
+    ground_truth = state["ground_truth"]
+    analyst_outputs = state["analyst_outputs"]
+    configs_used = state["analyst_configs_used"]
+
+    logger.info(
+        "Phase 3 — deliberation round for %d analysts.", len(analyst_outputs)
+    )
+
+    tasks = [
+        run_deliberation_round(
+            config=configs_used[i],
+            own_output=analyst_outputs[i],
+            peer_outputs=[analyst_outputs[j] for j in range(len(analyst_outputs)) if j != i],
+            run_id=ground_truth.run_id,
+        )
+        for i in range(len(analyst_outputs))
+    ]
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    delib_outputs: list[AnalystOutput] = []
+    for i, result in enumerate(results):
+        model = configs_used[i]["model"]
+        if isinstance(result, AnalystOutput):
+            delib_outputs.append(result)
+        elif isinstance(result, ValidationError):
+            logger.warning(
+                "Analyst '%s' deliberation returned schema-invalid output: %s", model, result
+            )
+        else:
+            logger.warning("Analyst '%s' deliberation failed with error: %s", model, result)
+
+    state["deliberation_outputs"] = delib_outputs
     return state
