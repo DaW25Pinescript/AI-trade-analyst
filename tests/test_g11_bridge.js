@@ -203,3 +203,88 @@ test('getRunUsage requests /runs/{run_id}/usage and returns payload', async () =
   assert.equal(usage.total_tokens, 1234);
   assert.deepEqual(usage.models, ['claude-3-5-sonnet']);
 });
+
+// ── MED-5: timeframes built dynamically from uploaded charts ─────────────────
+
+test('buildAnalyseFormData timeframes reflect only the uploaded charts (H4 + M15)', () => {
+  // Simulate user uploading only H4 and M15 charts (no M5)
+  const fakeFile = { name: 'chart.png', size: 1024 };
+  const doc = {
+    getElementById(id) {
+      const map = {
+        asset: { value: 'XAUUSD' },
+        session: { value: 'London' },
+        accountBalance: { value: '10000' },
+        minRR: { value: '2' },
+        maxStop: { value: '1' },
+        regime: { value: 'trending' },
+        volRisk: { value: 'normal' },
+        broker: { value: 'TradingView' },
+        'upload-htf':  { files: [fakeFile] },
+        'upload-m15':  { files: [fakeFile] },
+        'upload-m5':   { files: [] },            // no M5
+        'upload-m15overlay': { files: [] },
+      };
+      return map[id] || null;
+    },
+  };
+
+  const fd = buildAnalyseFormData(doc);
+  const tfs = JSON.parse(fd.get('timeframes'));
+  assert.deepEqual(tfs, ['H4', 'M15'], 'timeframes must only include uploaded charts');
+  assert.ok(!tfs.includes('M5'), 'M5 must not appear when no M5 chart is uploaded');
+});
+
+test('buildAnalyseFormData timeframes fall back to defaults when no charts uploaded', () => {
+  const doc = {
+    getElementById(id) {
+      const map = {
+        asset: { value: 'EURUSD' },
+        session: { value: 'NY Open' },
+        accountBalance: { value: '5000' },
+        minRR: { value: '2' },
+        maxStop: { value: '1' },
+        regime: { value: 'ranging' },
+        volRisk: { value: 'none_noted' },
+        broker: { value: 'TradingView' },
+        'upload-htf':  { files: [] },
+        'upload-m15':  { files: [] },
+        'upload-m5':   { files: [] },
+        'upload-m15overlay': { files: [] },
+      };
+      return map[id] || null;
+    },
+  };
+
+  const fd = buildAnalyseFormData(doc);
+  const tfs = JSON.parse(fd.get('timeframes'));
+  // No files uploaded → fall back to defaults so the form is still submittable
+  assert.deepEqual(tfs, ['H4', 'M15', 'M5'], 'must fall back to default timeframes when no files provided');
+});
+
+test('buildAnalyseFormData timeframes include M5 only when M5 file is present', () => {
+  const fakeFile = { name: 'chart.png', size: 512 };
+  const doc = {
+    getElementById(id) {
+      const map = {
+        asset: { value: 'XAUUSD' },
+        session: { value: 'Asia' },
+        accountBalance: { value: '10000' },
+        minRR: { value: '2' },
+        maxStop: { value: '1' },
+        regime: { value: 'unknown' },
+        volRisk: { value: 'normal' },
+        broker: { value: 'TradingView' },
+        'upload-htf':  { files: [] },
+        'upload-m15':  { files: [fakeFile] },
+        'upload-m5':   { files: [fakeFile] },
+        'upload-m15overlay': { files: [] },
+      };
+      return map[id] || null;
+    },
+  };
+
+  const fd = buildAnalyseFormData(doc);
+  const tfs = JSON.parse(fd.get('timeframes'));
+  assert.deepEqual(tfs, ['M15', 'M5']);
+});
