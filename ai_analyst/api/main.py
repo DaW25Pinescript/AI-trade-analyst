@@ -39,7 +39,7 @@ from ..graph.pipeline import build_analysis_graph
 from ..graph.state import GraphState
 from ..output.ticket_draft import build_ticket_draft
 from ..core.run_paths import get_run_dir
-from ..core.usage_meter import summarize_usage
+from ..core.usage_meter import summarize_usage, check_run_cost_ceiling
 
 
 class AnalysisResponse(BaseModel):
@@ -112,6 +112,16 @@ app.add_middleware(
     allow_origins=_allow_origins,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
+)
+
+# ── Budget guards ────────────────────────────────────────────────────────────
+# MAX_IMAGE_SIZE_MB: per-image upload ceiling (default 5 MB).
+# MAX_COST_PER_RUN_USD: optional per-run cost ceiling (default disabled).
+_MAX_IMAGE_BYTES: int = int(os.environ.get("MAX_IMAGE_SIZE_MB", "5")) * 1024 * 1024
+_MAX_COST_PER_RUN: float | None = (
+    float(os.environ["MAX_COST_PER_RUN_USD"])
+    if os.environ.get("MAX_COST_PER_RUN_USD")
+    else None
 )
 
 _graph = build_analysis_graph()
@@ -212,6 +222,14 @@ async def analyse(
     for tf_label, upload in clean_chart_uploads.items():
         if upload is not None:
             raw_bytes = await upload.read()
+            if len(raw_bytes) > _MAX_IMAGE_BYTES:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Chart {tf_label} exceeds the {_MAX_IMAGE_BYTES // (1024 * 1024)} MB "
+                        "per-image size limit. Resize or compress the image before uploading."
+                    ),
+                )
             charts[tf_label] = base64.b64encode(raw_bytes).decode("utf-8")
             screenshot_metadata.append(
                 ScreenshotMetadata(
@@ -242,6 +260,14 @@ async def analyse(
                 detail="overlay_indicator_claims must not be empty when overlay is provided.",
             )
         raw_bytes = await chart_m15_overlay.read()
+        if len(raw_bytes) > _MAX_IMAGE_BYTES:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Overlay image exceeds the {_MAX_IMAGE_BYTES // (1024 * 1024)} MB "
+                    "per-image size limit. Resize or compress the image before uploading."
+                ),
+            )
         m15_overlay_b64 = base64.b64encode(raw_bytes).decode("utf-8")
         m15_overlay_meta = ScreenshotMetadata(
             timeframe=OVERLAY_TIMEFRAME,
@@ -322,6 +348,10 @@ async def analyse(
     verdict: FinalVerdict = final_state["final_verdict"]
     ticket_draft = build_ticket_draft(verdict, ground_truth)
     usage_summary = _load_usage_summary(ground_truth.run_id)
+
+    # Budget guard: warn if per-run cost ceiling is configured and exceeded.
+    if _MAX_COST_PER_RUN is not None:
+        check_run_cost_ceiling(get_run_dir(ground_truth.run_id), _MAX_COST_PER_RUN)
 
     response = AnalysisResponse(
         verdict=verdict,

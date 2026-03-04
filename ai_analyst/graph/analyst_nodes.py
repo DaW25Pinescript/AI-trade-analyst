@@ -31,7 +31,7 @@ ANALYST_CONFIGS: list[dict] = [
     {"model": "gpt-4o",                     "persona": PersonaType.DEFAULT_ANALYST},
     {"model": "claude-sonnet-4-6",           "persona": PersonaType.RISK_OFFICER},
     {"model": "gemini/gemini-1.5-pro",       "persona": PersonaType.PROSECUTOR},
-    {"model": "grok/grok-4-vision",          "persona": PersonaType.ICT_PURIST},
+    {"model": "xai/grok-vision-beta",         "persona": PersonaType.ICT_PURIST},
 ]
 
 MINIMUM_VALID_ANALYSTS = 2   # design rule #6

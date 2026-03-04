@@ -26,8 +26,8 @@ SUPPORTED_MODELS: dict[str, str] = {
     "gpt-4o":                     "OPENAI_API_KEY",
     "gpt-4o-mini":                "OPENAI_API_KEY",
     "gemini/gemini-1.5-pro":      "GOOGLE_API_KEY",
-    "grok/grok-4-vision":         "XAI_API_KEY",
-    "grok/grok-3":                "XAI_API_KEY",
+    "xai/grok-vision-beta":       "XAI_API_KEY",
+    "xai/grok-3":                 "XAI_API_KEY",
 }
 
 # Human-readable provider labels used in CLI output
@@ -100,7 +100,7 @@ def get_model_for_analyst_index(analyst_index: int) -> tuple[Optional[str], Opti
         "claude-sonnet-4-6",
         "gpt-4o",
         "gemini/gemini-1.5-pro",
-        "grok/grok-4-vision",
+        "xai/grok-vision-beta",
     ]
     if analyst_index >= len(slot_models):
         return None, None

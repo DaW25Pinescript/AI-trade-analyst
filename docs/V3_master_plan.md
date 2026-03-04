@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.7
+**Version:** 2.8
 **Updated:** 2026-03-04
-**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 in progress (all 4 CRITICALs fixed; HIGH/MED items pending)
+**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed)
 
 ---
 
@@ -22,15 +22,18 @@ fields, regime, risk constraints). A formal integration bridge (Track C) is plan
 G6/v2.0 onwards.
 
 ### Current verification snapshot (2026-03-04)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **109/109 passing**.
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **120/120 passing**.
   - +1 added (2026-03-03): `test_g11_bridge.js` — confirms `analyseViaBridge` uses a 3-minute timeout signal (guards CRITICAL-3).
-- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **278/278 passing**.
-  - +4 added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix (macro_context + overlay flags reaching arbiter in CLI/hybrid path).
-  - +1 added (2026-03-03): `test_macro_context_node.py` — verifies scheduler invoked via `asyncio.to_thread` (guards CRITICAL-2).
-  - +13 added (2026-03-03): `test_overlay_delta_config_alignment.py` + related — guards CRITICAL-4 fix (config alignment after partial Phase 1 failure).
+  - +3 added (2026-03-04): `test_g11_bridge.js` — timeframes match uploaded charts (guards MED-5).
+  - +8 added (2026-03-04): `test_v202_fixes.js` — m15Overlay shape validation replaces null-only guard (guards MED-8).
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **280/280 passing**.
+  - +4 added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix.
+  - +1 added (2026-03-03): `test_macro_context_node.py` — guards CRITICAL-2 fix.
+  - +13 added (2026-03-03): `test_overlay_delta_config_alignment.py` — guards CRITICAL-4 fix.
+  - +2 added (2026-03-04): `test_v202_fixes.py` — HIGH-5 (Grok model string), HIGH-6 (cost ceiling), HIGH-1 (retry logic).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 540 passing, 0 failing** across all three suites.
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.1 complete. All 4 CRITICAL issues from the 2026-03-03 audit are now fixed. Immediate focus: remaining v2.0.2 HIGH items (HIGH-1, HIGH-5, HIGH-6) and MED items (MED-5, MED-8).
+- **Total: 553 passing, 0 failing** across all three suites.
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed). Remaining HIGH items (HIGH-2/3/4/7/8) and MED items (MED-1/2/3/4/6/7) deferred to v2.1.
 
 ---
 
@@ -304,8 +307,8 @@ Architecture components:
   - Response envelope carries both analysis outputs and run-level usage summary so API consumers can correlate decision output with resource footprint.
   - Wrapper remains backward compatible with current manual/hybrid workflow while serving as the future integration surface for UI, automations, and external tooling.
 
-### v2.0.2 — CRITICAL Debt Remediation (IN PROGRESS)
-**Goal:** Close the four CRITICAL correctness and reliability issues identified in the 2026-03-03 audit before v2.1.
+### v2.0.2 — CRITICAL Debt Remediation (COMPLETE)
+**Goal:** Close the four CRITICAL correctness and reliability issues identified in the 2026-03-03 audit, plus HIGH-1/5/6 and MED-5/8, before v2.1.
 
 Issues addressed by priority:
 
@@ -331,12 +334,14 @@ Issues addressed by priority:
   - Fix: added `analyst_configs_used` to `GraphState`; `parallel_analyst_node` tracks configs alongside outputs; `overlay_delta_node` uses tracked configs.
   - Regression test: `test_overlay_delta_config_alignment.py` (TEST-2).
 
-- [ ] **HIGH-5 — Grok model string `grok/grok-4-vision` does not exist**
-  - All ICT_PURIST analyst calls fail silently. Update to verified LiteLLM model ID.
+- [x] **HIGH-5 — Grok model string `grok/grok-4-vision` does not exist** ✅ FIXED 2026-03-04
+  - `analyst_nodes.py` and `api_key_manager.py` updated: `grok/grok-4-vision` → `xai/grok-vision-beta`.
+  - `grok/grok-3` → `xai/grok-3` in `api_key_manager.py` (consistent provider prefix).
 
-- [ ] **HIGH-1 — Retry logic retries non-retriable exceptions with too-short backoff**
-  - `llm_client.py` catches all exceptions; retries `AuthenticationError`; backoff is 0.4 s.
-  - Fix: distinguish retriable vs non-retriable; use exponential backoff with jitter up to 60 s.
+- [x] **HIGH-1 — Retry logic retries non-retriable exceptions with too-short backoff** ✅ FIXED 2026-03-04
+  - `llm_client.py`: added `_is_retriable()` — `AuthenticationError`, `BadRequestError`, etc. fail immediately.
+  - Backoff replaced: was linear 0.4 s; now exponential with full jitter (`uniform(0, min(60, base*2^n))`).
+  - Legacy `retry_backoff_s` param kept for backwards compatibility with existing tests.
 
 ### v2.1 — Multi-Round Deliberation
 **Goal:** Allow analysts to see a summary of other analysts' verdicts and update.
@@ -562,12 +567,12 @@ This track begins at G6/v2.0 when both schema and API are stable.
 
 | ID | Issue | Status | File | Target |
 |----|-------|--------|------|--------|
-| HIGH-1 | Retry catches all exceptions incl. non-retriable (AuthError, ValueError); backoff 0.4 s too short for rate limits | ⬜ pending | `llm_client.py:30` | v2.0.2 |
+| HIGH-1 | Retry catches all exceptions incl. non-retriable (AuthError, ValueError); backoff 0.4 s too short for rate limits | ✅ **FIXED 2026-03-04** | `llm_client.py` (non-retriable guard + exp backoff) | v2.0.2 |
 | HIGH-2 | `datetime.utcnow()` deprecated — will break on Python 3.12+; returns naive datetime | ⬜ pending | `ground_truth.py`, `execution_config.py`, `run_state_manager.py` | v2.1 |
 | HIGH-3 | `FinalVerdict.final_bias` is unvalidated `str` — any freeform value silently produces empty `rawAIReadBias` in ticket draft | ⬜ pending | `arbiter_output.py:27` | v2.1 |
 | HIGH-4 | `MacroScheduler` not thread-safe — thundering herd on cache miss under multi-worker uvicorn | ⬜ pending | `scheduler.py:66` | v2.1 |
-| HIGH-5 | Grok model name `grok/grok-4-vision` does not exist — ICT_PURIST persona always fails | ⬜ pending | `analyst_nodes.py:34`, `api_key_manager.py:29` | v2.0.2 |
-| HIGH-6 | No budget guard — oversized chart inputs can cost $5–$20+ per request; no per-run token cap | ⬜ pending | `api/main.py`, `usage_meter.py` | v2.0.2 |
+| HIGH-5 | Grok model name `grok/grok-4-vision` does not exist — ICT_PURIST persona always fails | ✅ **FIXED 2026-03-04** | `analyst_nodes.py`, `api_key_manager.py` (→ `xai/grok-vision-beta`) | v2.0.2 |
+| HIGH-6 | No budget guard — oversized chart inputs can cost $5–$20+ per request; no per-run token cap | ✅ **FIXED 2026-03-04** | `api/main.py` (image size 422), `usage_meter.py` (`check_run_cost_ceiling`) | v2.0.2 |
 | HIGH-7 | No rate limiting on `/analyse` endpoint — open abuse surface | ⬜ pending | `api/main.py` | v2.1 |
 | HIGH-8 | `_graph` built at module import time — not safe across uvicorn worker restarts; MRO TTL cache is per-process | ⬜ pending | `api/main.py:111` | v2.1 |
 
@@ -579,10 +584,10 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | MED-2 | GDELT artificial `actual=1.0 / forecast=0.0` — removes tone magnitude from surprise calc; always tier-2 | ⬜ pending | `gdelt_client.py:106` | v2.1 |
 | MED-3 | `print()` instead of structured logging in graph nodes | ⬜ pending | `analyst_nodes.py` | v2.1 |
 | MED-4 | `usage_meter.append_usage` swallows all exceptions silently | ⬜ pending | `usage_meter.py:21` | v2.1 |
-| MED-5 | `api_bridge.js` timeframes list hardcoded `['H4','M15','M5']` regardless of uploaded charts | ⬜ pending | `api_bridge.js:14` | v2.0.2 |
+| MED-5 | `api_bridge.js` timeframes list hardcoded `['H4','M15','M5']` regardless of uploaded charts | ✅ **FIXED 2026-03-04** | `api_bridge.js` (built from uploaded files; fallback to defaults) | v2.0.2 |
 | MED-6 | `build_ticket_draft()` missing required ticket fields — non-schema-compliant without `_draft: true` marker | ⬜ pending | `ticket_draft.py` | v2.1 |
 | MED-7 | `is_text_only` routing gap — list-format content with only text blocks incorrectly flagged as multimodal | ⬜ pending | `is_text_only.py:12` | v2.1 |
-| MED-8 | `backup_validation.js` requires `m15Overlay: null` — G11 overlay feature blocked at schema validation level | ⬜ pending | `backup_validation.js:192` | v2.0.2 |
+| MED-8 | `backup_validation.js` requires `m15Overlay: null` — G11 overlay feature blocked at schema validation level | ✅ **FIXED 2026-03-04** | `backup_validation.js` (null-only guard → typed object shape validation) | v2.0.2 |
 
 ### 💡 LOW
 
@@ -608,7 +613,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | TEST-5 | MRO degraded mode end-to-end — all sources fail → valid FinalVerdict | ⬜ pending | v2.1 |
 | TEST-6 | Schema migration chain: v1.1.0 → v4.0.0 in one call | ⬜ pending | v2.1 |
 | TEST-7 | Document JS/Python analyst schema divergence as a known-failing spec test | ⬜ pending | v2.x |
-| TEST-8 | `buildAnalyseFormData` — timeframes match uploaded charts (guards MED-5) | ⬜ pending | v2.0.2 |
+| TEST-8 | `buildAnalyseFormData` — timeframes match uploaded charts (guards MED-5) | ✅ **ADDED 2026-03-04** (`test_g11_bridge.js` — 3 new tests) | v2.0.2 |
 | TEST-9 | Concurrent `/analyse` cache misses call `_refresh()` once with lock (guards HIGH-4) | ⬜ pending | v2.1 |
 | TEST-10 | Unexpected `final_bias` value → ticket draft `rawAIReadBias` empty (guards HIGH-3) | ⬜ pending | v2.1 |
 
@@ -669,36 +674,29 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Next Immediate Steps (Priority Order)
 
-> Last updated: 2026-03-04. All tracks complete through G12 / v2.0.1 / MRO P1–P4. Test suite: 540 passing, 0 failing.
-> Active focus: v2.0.2 — all 4 CRITICALs closed; remaining HIGH and MED debt before v2.1.
+> Last updated: 2026-03-04. All tracks complete through G12 / v2.0.2 / MRO P1–P4. Test suite: 553 passing, 0 failing.
+> v2.0.2 is fully complete. Next focus: v2.1 (remaining HIGH debt) and C4 (unified export).
 
 1. ✅ **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** — DONE 2026-03-03
 2. ✅ **v2.0.2 item: Unblock event loop in async MRO pipeline (CRITICAL-2)** — DONE 2026-03-03
 3. ✅ **v2.0.2 item: Fix overlay delta model alignment (CRITICAL-4)** — DONE 2026-03-03
 4. ✅ **v2.0.2 item: Pass macro_context + overlay to arbiter in CLI/hybrid paths (CRITICAL-1)** — DONE 2026-03-03
+5. ✅ **v2.0.2 item: Fix Grok model string → `xai/grok-vision-beta` (HIGH-5)** — DONE 2026-03-04
+6. ✅ **v2.0.2 item: Add image size guard + per-run cost ceiling (HIGH-6)** — DONE 2026-03-04
+7. ✅ **v2.0.2 item: Fix retry logic — non-retriable exceptions + exp backoff (HIGH-1)** — DONE 2026-03-04
+8. ✅ **v2.0.2 item: Dynamic timeframes from uploaded files (MED-5)** — DONE 2026-03-04
+9. ✅ **v2.0.2 item: m15Overlay shape validation replaces null-only guard (MED-8)** — DONE 2026-03-04
 
-5. **v2.0.2 item: Fix Grok model string + add budget guard (HIGH-5 + HIGH-6)** *(~2–3 h)*
-   Update `grok/grok-4-vision` to the verified LiteLLM model ID (ICT_PURIST currently
-   always fails silently). Add image size validation in `api/main.py`; add per-run cost
-   ceiling env var in `usage_meter.py`.
+10. **v2.1 — Remaining HIGH debt + Multi-Round Deliberation**
+    - HIGH-2: `datetime.utcnow()` → timezone-aware (Python 3.12+ compat)
+    - HIGH-3: `FinalVerdict.final_bias` unvalidated str → Literal enum
+    - HIGH-4: `MacroScheduler` thundering-herd guard on cache miss
+    - HIGH-7: Rate limiting on `/analyse` endpoint
+    - HIGH-8: `_graph` at module import time (not safe for uvicorn worker restarts)
+    - v2.1 multi-round deliberation: optional second-round fan-out; `enable_deliberation: bool = False`
 
-6. **v2.0.2 item: Fix retry logic for non-retriable exceptions (HIGH-1)** *(~1–2 h)*
-   `llm_client.py` — distinguish retriable (RateLimitError, ConnectError, TimeoutError)
-   from non-retriable (AuthenticationError, ValidationError); use exponential backoff
-   with jitter up to 60 s instead of fixed 0.4 s.
+11. **C4 — Unified Export (Track C)**
+    Single `app/` export including ticket + full analyst JSON logs, importable back.
 
-7. **v2.0.2 item: Fix hardcoded timeframes + lift m15Overlay null guard (MED-5 + MED-8)** *(~2 h)*
-   Build timeframes list dynamically from uploaded files in `api_bridge.js`. Define
-   typed overlay metadata shape in `backup_validation.js`; validate object shape
-   rather than requiring null.
-
-8. **v2.1 — Multi-Round Deliberation (Track B)**
-   Optional second-round analyst fan-out; Arbiter weights both rounds.
-   Config flag `enable_deliberation: bool = False`. Independent of v2.0.2 items.
-
-9. **C4 — Unified Export (Track C)**
-   Single `app/` export including ticket + full analyst JSON logs, importable back.
-
-**Completed:** G1–G12, v1.1–v2.0.1, MRO P1–P4, C1–C3, CRITICAL-1, CRITICAL-2, CRITICAL-3, CRITICAL-4
-**In progress:** v2.0.2 (HIGH-1, HIGH-5, HIGH-6, MED-5, MED-8)
+**Completed:** G1–G12, v1.1–v2.0.2, MRO P1–P4, C1–C3
 **Not started:** v2.1, C4, v2.2

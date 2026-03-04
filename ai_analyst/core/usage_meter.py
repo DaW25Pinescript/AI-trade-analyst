@@ -135,6 +135,30 @@ async def acompletion_metered(
         raise
 
 
+def check_run_cost_ceiling(run_dir: Path, max_cost_usd: float) -> None:
+    """
+    Raise ValueError if the total cost for a completed run exceeds max_cost_usd.
+
+    Fail-soft: if the usage file is missing or cost data is unavailable (e.g.
+    provider does not return pricing), the check is skipped — it never blocks
+    a successful analysis result.
+    """
+    try:
+        summary = summarize_usage(run_dir)
+        total = summary.get("total_cost_usd", 0.0)
+        if isinstance(total, (int, float)) and total > max_cost_usd:
+            raise ValueError(
+                f"Run cost ${total:.4f} USD exceeded the configured ceiling of "
+                f"${max_cost_usd:.2f} USD. Set MAX_COST_PER_RUN_USD to a higher value "
+                "or review chart sizes and lens configuration."
+            )
+    except ValueError:
+        raise
+    except Exception:
+        # Missing file, parse error, etc. — do not block the response.
+        return
+
+
 def summarize_usage(run_dir: Path) -> dict:
     path = run_dir / "usage.jsonl"
     summary = {

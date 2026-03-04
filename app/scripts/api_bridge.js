@@ -11,7 +11,20 @@ export function buildAnalyseFormData(doc = document) {
   const fd = new FormData();
   fd.append('instrument', get('asset', 'UNKNOWN'));
   fd.append('session', get('session', 'Unknown'));
-  fd.append('timeframes', JSON.stringify(['H4', 'M15', 'M5']));
+
+  // Resolve chart files first so the timeframes list reflects what is actually uploaded.
+  const chartH4 = maybeFile('upload-htf');
+  const chartM15 = maybeFile('upload-m15');
+  const chartM5 = maybeFile('upload-m5');
+  const chartOverlay = maybeFile('upload-m15overlay');
+
+  // Build the timeframes list from uploaded files; fall back to defaults when no
+  // files have been selected yet (e.g. form-data is assembled before uploads).
+  const _uploadedTFs = [];
+  if (chartH4) _uploadedTFs.push('H4');
+  if (chartM15) _uploadedTFs.push('M15');
+  if (chartM5) _uploadedTFs.push('M5');
+  fd.append('timeframes', JSON.stringify(_uploadedTFs.length > 0 ? _uploadedTFs : ['H4', 'M15', 'M5']));
 
   fd.append('account_balance', String(parseFloat(get('accountBalance', '10000')) || 10000));
   fd.append('min_rr', String(parseFloat(get('minRR', '2')) || 2));
@@ -32,10 +45,6 @@ export function buildAnalyseFormData(doc = document) {
   fd.append('lens_smt', String(parseBool(get('lensSMT', 'false'))));
   fd.append('lens_volume_profile', 'false');
 
-  const chartH4 = maybeFile('upload-htf');
-  const chartM15 = maybeFile('upload-m15');
-  const chartM5 = maybeFile('upload-m5');
-  const chartOverlay = maybeFile('upload-m15overlay');
   if (chartH4) fd.append('chart_h4', chartH4);
   if (chartM15) fd.append('chart_m15', chartM15);
   if (chartM5) fd.append('chart_m5', chartM5);

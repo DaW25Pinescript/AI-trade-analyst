@@ -190,7 +190,20 @@ export function validateTicketPayload(payload) {
     }
 
     if (screenshots.m15Overlay !== undefined && screenshots.m15Overlay !== null) {
-      errors.push('ticket.screenshots.m15Overlay must be null until typed overlay metadata is captured in UI');
+      // Overlay metadata is now supported — validate its shape.
+      if (!isObject(screenshots.m15Overlay)) {
+        errors.push('ticket.screenshots.m15Overlay must be an object or null');
+      } else {
+        const ov = screenshots.m15Overlay;
+        if (ov.timeframe !== 'M15') errors.push('ticket.screenshots.m15Overlay.timeframe must equal M15');
+        expectString(errors, 'ticket.screenshots.m15Overlay.lens', ov.lens, 1);
+        if (ov.evidenceType !== 'indicator_overlay') errors.push('ticket.screenshots.m15Overlay.evidenceType must equal indicator_overlay');
+        if (!Array.isArray(ov.indicatorClaims) || ov.indicatorClaims.length === 0) {
+          errors.push('ticket.screenshots.m15Overlay.indicatorClaims must be a non-empty array');
+        }
+        expectString(errors, 'ticket.screenshots.m15Overlay.indicatorSource', ov.indicatorSource, 1);
+        expectBoolean(errors, 'ticket.screenshots.m15Overlay.settingsLocked', ov.settingsLocked);
+      }
     }
   }
 
