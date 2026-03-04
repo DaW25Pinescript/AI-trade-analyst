@@ -303,16 +303,14 @@ try:
                 "pyyaml>=6.0",
             ]
         )
+        # Bundle the local macro_risk_officer package so the existing client
+        # classes are available inside the Modal container without reinstalling.
+        .add_local_python_source("macro_risk_officer")
     )
-
-    # Mount the local macro_risk_officer package so the existing client
-    # classes are available inside the Modal container without reinstalling.
-    _mro_mount = _modal.Mount.from_local_python_packages("macro_risk_officer")
 
     app = _modal.App(name="mro-macro-feeder", image=_image)
 
     @app.function(
-        mounts=[_mro_mount],
         timeout=60,
     )
     def fetch_macro_payload(instrument: str = DEFAULT_INSTRUMENT) -> dict:
