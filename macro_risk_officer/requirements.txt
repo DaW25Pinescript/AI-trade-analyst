@@ -13,6 +13,12 @@ pydantic>=2.5.0
 # Price outcome fetching (MRO-P4 — soft dependency, YFinanceClient fails gracefully if absent)
 yfinance>=0.2.40
 
+# Modal — remote compute for the macro ingestion feeder worker.
+# Install to run: python -m modal run macro_risk_officer/modal_macro_worker.py
+# Optional for unit tests: pure functions in modal_macro_worker.py are
+# importable without modal (Modal app block is guarded by try/except ImportError).
+modal>=0.68.0
+
 # Testing
 pytest>=8.0.0
 pytest-cov>=4.0.0
