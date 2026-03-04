@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.9
+**Version:** 2.10
 **Updated:** 2026-03-04
-**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10)
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10)
 
 ---
 
@@ -143,6 +143,8 @@ canonical data contract between Track A and Track B.
 - [x] Equity curve simulation based on closed trade history + R values
 - [x] Monthly/quarterly breakdown tables (trades, win rate, avg R, net R)
 - [x] Export analytics as PDF report
+- [x] Plotly integration for dashboard charts (heatmap, equity curve, period tables) with legacy rendering fallback
+- [x] Plotly export capture path (`capturePlotlyChartsForExport`) to preserve rendered chart artifacts in generated reports
 
 ### G11 — API Bridge (Track A → Track B) — COMPLETE
 - [x] Additive Operator Dashboard Mode (Phase A): dashboard shell toggle + responsive card layout
@@ -712,6 +714,7 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 13. **C4 — Unified Export (Track C)**
     Single `app/` export including ticket + full analyst JSON logs, importable back.
+    - Include Plotly-rendered dashboard artifacts when Plotly is available so exported reports retain decision-time analytics visuals.
 
 14. **v2.1b — Multi-Round Deliberation**
     - Optional second-round fan-out after initial results
