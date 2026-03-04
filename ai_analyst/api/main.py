@@ -23,16 +23,20 @@ import asyncio
 import base64
 import collections
 import json
+import logging
 import os
 import time
 import threading
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from ..models.ground_truth import (
     GroundTruthPacket,
@@ -152,6 +156,10 @@ def _check_rate_limit(client_ip: str) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.graph = build_analysis_graph()
+    # Phase 2a: shared feeder state — latest ingested feeder payload + MacroContext
+    app.state.feeder_context = None          # Optional[MacroContext]
+    app.state.feeder_payload_meta = None     # dict with generated_at, source_health, etc.
+    app.state.feeder_ingested_at = None      # datetime when last payload was ingested
     yield
     # Teardown (if needed in future) goes here
 
@@ -190,7 +198,126 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "2.2.0"}
+    return {"status": "ok", "version": "2.3.0"}
+
+
+# ── Phase 2a: Feeder bridge endpoints ────────────────────────────────────────
+# POST /feeder/ingest   — accepts a feeder contract JSON, validates it,
+#                         produces a MacroContext, and caches it in app.state
+#                         so subsequent /analyse calls use live macro data.
+# GET  /feeder/health   — returns the last ingestion metadata + staleness.
+
+_FEEDER_STALE_SECONDS: int = int(os.environ.get("FEEDER_STALE_SECONDS", "3600"))
+
+
+@app.post("/feeder/ingest")
+async def feeder_ingest(request: Request):
+    """
+    Accept a feeder contract JSON payload, validate, and produce a MacroContext.
+
+    The resulting MacroContext is cached in app.state so that subsequent
+    /analyse calls can use the live feeder context instead of falling back
+    to the TTL-cached MacroScheduler.
+
+    Returns the MacroContext as JSON for immediate verification.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=422, detail="Request body must be valid JSON.")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Feeder payload must be a JSON object.")
+
+    instrument = payload.get("instrument_context", "XAUUSD")
+
+    try:
+        from macro_risk_officer.ingestion.feeder_ingest import (
+            ingest_feeder_payload,
+            events_from_feeder,
+        )
+
+        context = await asyncio.to_thread(
+            ingest_feeder_payload, payload, instrument
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Feeder validation error: {exc}")
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="macro_risk_officer package not available — feeder ingestion disabled.",
+        )
+    except Exception as exc:
+        logger.warning("[Feeder] Ingestion failed: %s: %s", type(exc).__name__, exc)
+        raise HTTPException(status_code=500, detail="Feeder ingestion failed. Check server logs.")
+
+    # Cache in app.state for macro_context_node to pick up
+    request.app.state.feeder_context = context
+    request.app.state.feeder_payload_meta = {
+        "contract_version": payload.get("contract_version"),
+        "generated_at": payload.get("generated_at"),
+        "status": payload.get("status"),
+        "warnings": payload.get("warnings", []),
+        "source_health": payload.get("source_health", {}),
+        "event_count": len(payload.get("events", [])),
+        "instrument_context": instrument,
+    }
+    request.app.state.feeder_ingested_at = datetime.now(timezone.utc)
+
+    logger.info(
+        "[Feeder] Ingested: regime=%s vol_bias=%s confidence=%.0f%% events=%d",
+        context.regime,
+        context.vol_bias,
+        context.confidence * 100,
+        len(payload.get("events", [])),
+    )
+
+    return JSONResponse(content={
+        "status": "ok",
+        "macro_context": context.model_dump(),
+        "ingested_at": request.app.state.feeder_ingested_at.isoformat(),
+    })
+
+
+@app.get("/feeder/health")
+async def feeder_health(request: Request):
+    """
+    Return the current feeder ingestion state.
+
+    Reports whether a feeder payload has been ingested, when it was last
+    ingested, whether it is stale, and the source health from the last payload.
+    """
+    ingested_at = getattr(request.app.state, "feeder_ingested_at", None)
+    meta = getattr(request.app.state, "feeder_payload_meta", None)
+    context = getattr(request.app.state, "feeder_context", None)
+
+    if ingested_at is None or meta is None:
+        return JSONResponse(content={
+            "status": "no_data",
+            "message": "No feeder payload has been ingested yet.",
+            "stale": True,
+            "age_seconds": None,
+            "source_health": {},
+        })
+
+    now = datetime.now(timezone.utc)
+    age_seconds = (now - ingested_at).total_seconds()
+    stale = age_seconds > _FEEDER_STALE_SECONDS
+
+    return JSONResponse(content={
+        "status": "stale" if stale else "fresh",
+        "ingested_at": ingested_at.isoformat(),
+        "age_seconds": round(age_seconds, 1),
+        "stale": stale,
+        "stale_threshold_seconds": _FEEDER_STALE_SECONDS,
+        "source_health": meta.get("source_health", {}),
+        "event_count": meta.get("event_count", 0),
+        "contract_version": meta.get("contract_version"),
+        "generated_at": meta.get("generated_at"),
+        "regime": context.regime if context else None,
+        "vol_bias": context.vol_bias if context else None,
+        "confidence": context.confidence if context else None,
+    })
 
 
 @app.get("/runs/{run_id}/usage", response_model=RunUsageResponse)
@@ -413,6 +540,9 @@ async def analyse(
         "error": None,
         "enable_deliberation": enable_deliberation,   # v2.1b
         "deliberation_outputs": [],                   # v2.1b
+        # Phase 2a: inject live feeder context if available
+        "_feeder_context": getattr(request.app.state, "feeder_context", None),
+        "_feeder_ingested_at": getattr(request.app.state, "feeder_ingested_at", None),
     }
 
     try:
@@ -626,6 +756,9 @@ async def analyse_stream(
         "error": None,
         "enable_deliberation": enable_deliberation,
         "deliberation_outputs": [],
+        # Phase 2a: inject live feeder context if available
+        "_feeder_context": getattr(request.app.state, "feeder_context", None),
+        "_feeder_ingested_at": getattr(request.app.state, "feeder_ingested_at", None),
     }
 
     # ── Register progress queue and stream ───────────────────────────────────

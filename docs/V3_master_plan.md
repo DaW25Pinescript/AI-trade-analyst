@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.12
+**Version:** 2.13
 **Updated:** 2026-03-04
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix)**
 
 ---
 
@@ -35,8 +35,17 @@ G6/v2.0 onwards.
   - +2 added (2026-03-04): `test_v202_fixes.py` — HIGH-5 (Grok model string), HIGH-6 (cost ceiling), HIGH-1 (retry logic).
   - +23 added (2026-03-04): `test_v21_fixes.py` — TEST-9 (MacroScheduler thread safety), TEST-10 (FinalVerdict.final_bias Literal), HIGH-2 (timezone-aware datetimes), MED-7 (is_text_only list blocks), LOW-5 (ExecutionConfig.mode Literal).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 589 passing, 0 failing** across all three suites.
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10). C4 complete (Unified Export). Only architectural debt remains.
+  - +15 added (2026-03-04): `test_phase2a_feeder_bridge.js` — Phase 2a feeder bridge helpers (postFeederPayload, getFeederHealth), float fix (formatConfidencePct, formatPrice), verdict card percentage display. 150/150 passing.
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **313/313 passing**.
+  - +4 added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix.
+  - +1 added (2026-03-03): `test_macro_context_node.py` — guards CRITICAL-2 fix.
+  - +13 added (2026-03-03): `test_overlay_delta_config_alignment.py` — guards CRITICAL-4 fix.
+  - +2 added (2026-03-04): `test_v202_fixes.py` — HIGH-5 (Grok model string), HIGH-6 (cost ceiling), HIGH-1 (retry logic).
+  - +23 added (2026-03-04): `test_v21_fixes.py` — TEST-9 (MacroScheduler thread safety), TEST-10 (FinalVerdict.final_bias Literal), HIGH-2 (timezone-aware datetimes), MED-7 (is_text_only list blocks), LOW-5 (ExecutionConfig.mode Literal).
+  - +10 added (2026-03-04): `test_phase2a_feeder_bridge.py` — Phase 2a feeder ingest endpoint, feeder health endpoint, macro_context_node feeder priority, ticket_draft aiEdgeScorePct. 313/313 passing.
+- MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
+- **Total: 616 passing, 0 failing** across all three suites.
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix)**. Phase 2b (UI polish, region display, mobile, next T.R.A.D.E. page) is next.
 
 ---
 
@@ -716,8 +725,8 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Next Immediate Steps (Priority Order)
 
-> Last updated: 2026-03-04 (v2.12). All tracks complete through G12 / v2.1 / MRO P1–P4 / C4. Test suite: 133 browser + 303 AI analyst + 153 MRO = 589 passing, 0 failing.
-> C4 (Unified Export) is now complete. Next focus: v2.1b (multi-round deliberation), v2.2 (streaming).
+> Last updated: 2026-03-04 (v2.13). All tracks complete through G12 / v2.1 / MRO P1–P4 / C4 / Phase 2a. Test suite: 150 browser + 313 AI analyst + 153 MRO = 616 passing, 0 failing.
+> Phase 2a (live feeder bridge + float fix) is now complete. Next focus: Phase 2b (UI polish, region display, mobile, next T.R.A.D.E. page).
 
 1. ✅ **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** — DONE 2026-03-03
 2. ✅ **v2.0.2 item: Unblock event loop in async MRO pipeline (CRITICAL-2)** — DONE 2026-03-03
@@ -734,8 +743,11 @@ base with `main` (predates current repo structure) and can be safely deleted.
 13. ✅ **Audit (v2.11): Plotly regression in `dashboard.js` fixed** — `buildAnalyticsReportHTML` default param `doc = document` → `doc = (typeof document !== 'undefined' ? document : null)`; browser suite restored to 120/120 — DONE 2026-03-04
 14. ✅ **Audit (v2.11): LOW-2 closed** — CI `mro-tests` job already installs `macro_risk_officer/requirements.txt` + CVE scan + coverage gate; tracking entry corrected — DONE 2026-03-04
 15. ✅ **C4 — Unified Export (Track C)** — `export_unified.js`, `import_unified.js`, `buildBackupPayload` exported, `state.bridgeVerdict` persisted, "Export Unified (C4)" button + import card in UI, 13 new tests (133/133 browser suite) — DONE 2026-03-04
+16. ✅ **Phase 2a — Live Feeder Bridge + Float Fix** — `POST /feeder/ingest` endpoint accepts feeder contract JSON and caches MacroContext in `app.state`; `GET /feeder/health` reports staleness + source health; `macro_context_node` now prefers live feeder context (fresh) over TTL-cached scheduler; `verdict_card.js` displays confidence as percentage (`formatConfidencePct`); `ticket_draft.py` adds `aiEdgeScorePct`; `api_bridge.js` gains `postFeederPayload()` + `getFeederHealth()` helpers; 25 new tests (10 Python + 15 JS). 150/150 browser, 313/313 analyst. — DONE 2026-03-04
 
-16. **v2.1b — Multi-Round Deliberation**
+17. **Phase 2b — UI polish, region display, mobile, next T.R.A.D.E. page**
+
+18. **v2.1b — Multi-Round Deliberation**
     - Optional second-round fan-out after initial results
     - Arbiter receives both Round 1 and Round 2 outputs, weighted by round
     - Config flag: `enable_deliberation: bool = False` (off by default)

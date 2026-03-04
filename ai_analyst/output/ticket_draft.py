@@ -107,6 +107,8 @@ def build_ticket_draft(
     draft["rawAIReadBias"] = _BIAS_MAP.get(verdict.final_bias.lower(), "")
     draft["decisionMode"] = _DECISION_MAP.get(verdict.decision, "WAIT")
     draft["aiEdgeScore"] = round(verdict.overall_confidence, 4)
+    # Phase 2a: add display-friendly percentage alongside raw 0.0–1.0 score
+    draft["aiEdgeScorePct"] = round(verdict.overall_confidence * 100, 1)
 
     conviction = _conviction_from_confidence(verdict.overall_confidence)
 
