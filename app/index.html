@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="./styles/theme.css">
 <link rel="stylesheet" href="./styles/dashboard.css">
 <link rel="stylesheet" href="./styles/main.css">
+<link rel="stylesheet" href="./styles/macro.css">
 <link rel="stylesheet" href="./styles/print.css" media="print">
 </head>
 <body>
@@ -24,6 +25,11 @@
 </header>
 
 <main class="main">
+  <div class="top-nav-toggle">
+    <button type="button" class="btn btn-ghost btn-ghost--active" data-view="workflow" onclick="showWorkflowPage()">Workflow</button>
+    <button type="button" class="btn btn-ghost" data-view="macro" onclick="showMacroPage()">Macro</button>
+  </div>
+  <div id="workflowView">
   <div class="page-title">Market Analysis Request</div>
   <h1>Build Your Analysis Brief</h1>
   <p class="subtitle">G9 — Shadow Mode: paper trades with zero capital risk, 24h/48h outcome capture, and AI edge calibration</p>
@@ -1185,6 +1191,46 @@
       </div>
     </div>
   </div>
+  </div>
+
+  <section id="macroView" class="macro-view" style="display:none;">
+    <div class="page-title">T.R.A.D.E.</div>
+    <h1>Macro Intelligence</h1>
+    <p class="subtitle">Technical Reasoning And Decision Engine · Phase 1 MVP shell</p>
+
+    <div class="macro-grid">
+      <article class="card macro-card">
+        <div class="card-label">Macro regime header</div>
+        <div class="macro-kv"><span>Regime</span><strong id="macroRegimeLabel">—</strong></div>
+        <div class="macro-kv"><span>Volatility bias</span><strong id="macroVolBias">—</strong></div>
+        <div class="macro-kv"><span>Directional pressure</span><strong id="macroDirectionalPressure">—</strong></div>
+        <div class="macro-kv"><span>Confidence</span><strong id="macroConfidence">—</strong></div>
+      </article>
+
+      <article class="card macro-card">
+        <div class="card-label">Freshness metadata</div>
+        <div class="macro-kv"><span>Last updated</span><strong id="macroFreshness">—</strong></div>
+        <div class="macro-kv"><span>Feeder status</span><strong id="macroFeederStatus" class="macro-status">unknown</strong></div>
+      </article>
+
+      <article class="card macro-card">
+        <div class="card-label">MRO reasoning / explanation</div>
+        <p id="macroReasoningText">No MRO explanation available.</p>
+        <div class="macro-kv"><span>Top drivers</span><strong id="macroTopDrivers">—</strong></div>
+        <div class="macro-kv"><span>Conflict score</span><strong id="macroConflictScore">—</strong></div>
+      </article>
+
+      <article class="card macro-card">
+        <div class="card-label">Source health panel</div>
+        <ul id="macroSourceHealthList" class="macro-list"></ul>
+      </article>
+
+      <article class="card macro-card macro-card--full">
+        <div class="card-label">Event feed</div>
+        <ul id="macroEventList" class="macro-list"></ul>
+      </article>
+    </div>
+  </section>
 
 </main>
 <script src="https://cdn.plot.ly/plotly-3.4.0.min.js" charset="utf-8"></script>
