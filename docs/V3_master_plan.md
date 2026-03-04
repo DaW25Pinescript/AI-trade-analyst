@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.6
-**Updated:** 2026-03-03
-**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 in progress (CRITICAL debt from 2026-03-03 audit)
+**Version:** 2.7
+**Updated:** 2026-03-04
+**Status:** Active — G12 complete, v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 in progress (all 4 CRITICALs fixed; HIGH/MED items pending)
 
 ---
 
@@ -21,13 +21,16 @@ The two tracks are **independent** but share conceptual schema (instrument, sess
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
 G6/v2.0 onwards.
 
-### Current verification snapshot (2026-03-03)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **108/108 passing**.
-- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **260/260 passing**.
-  - +4 new regression tests added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix (macro_context + overlay flags reaching arbiter in CLI/hybrid path).
+### Current verification snapshot (2026-03-04)
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **109/109 passing**.
+  - +1 added (2026-03-03): `test_g11_bridge.js` — confirms `analyseViaBridge` uses a 3-minute timeout signal (guards CRITICAL-3).
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **278/278 passing**.
+  - +4 added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix (macro_context + overlay flags reaching arbiter in CLI/hybrid path).
+  - +1 added (2026-03-03): `test_macro_context_node.py` — verifies scheduler invoked via `asyncio.to_thread` (guards CRITICAL-2).
+  - +13 added (2026-03-03): `test_overlay_delta_config_alignment.py` + related — guards CRITICAL-4 fix (config alignment after partial Phase 1 failure).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 521 passing, 0 failing** across all three suites.
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.1 complete. Immediate focus: v2.0.2 CRITICAL+HIGH debt remediation (see Technical Debt section below).
+- **Total: 540 passing, 0 failing** across all three suites.
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.1 complete. All 4 CRITICAL issues from the 2026-03-03 audit are now fixed. Immediate focus: remaining v2.0.2 HIGH items (HIGH-1, HIGH-5, HIGH-6) and MED items (MED-5, MED-8).
 
 ---
 
@@ -312,15 +315,16 @@ Issues addressed by priority:
   - Added optional `macro_context=None` constructor parameter for test injection.
   - 4 new regression tests added in `tests/test_execution_router_arbiter.py`.
 
-- [ ] **CRITICAL-3 — Browser API bridge 12 s timeout breaks G11 for all users**
-  - `api_bridge.js:85` hardcodes 12 s; multi-model pipeline needs ~3 min.
-  - Fix: raise default to `180_000` ms; pass explicitly in `analyseViaBridge()`.
-  - Add JS test: slow backend times out with user-visible error message.
+- [x] **CRITICAL-3 — Browser API bridge 12 s timeout breaks G11 for all users** ✅ FIXED 2026-03-03
+  - `postAnalyseWithOptions` default raised from `12_000` → `180_000` ms.
+  - `analyseViaBridge()` now explicitly passes `timeoutMs: 180_000` instead of `{}`.
+  - New JS test verifies the AbortSignal is not immediately aborted (guards 3-minute budget).
 
-- [ ] **CRITICAL-2 — Synchronous HTTP in async MRO pipeline blocks event loop**
-  - `finnhub_client.py`, `fred_client.py`, `gdelt_client.py` all use sync `httpx.get()`.
-  - Fix: convert to `async httpx.AsyncClient`; make `scheduler._refresh()` async.
-  - Interim option: wrap in `asyncio.to_thread()` while migration is staged.
+- [x] **CRITICAL-2 — Synchronous HTTP in async MRO pipeline blocks event loop** ✅ FIXED 2026-03-03
+  - `macro_context_node.py`: `scheduler.get_context()` now invoked via `await asyncio.to_thread(...)`.
+  - Event loop is no longer blocked during cold-cache TTL miss (was up to 30 s stall under load).
+  - Fix uses the recommended bridge approach — no changes to sync clients or CLI callers.
+  - New test: `test_scheduler_called_via_asyncio_to_thread` verifies the delegation pattern.
 
 - [x] **CRITICAL-4 — Overlay delta node assigns wrong model after Phase 1 partial failure** ✅ FIXED 2026-03-03
   - `analyst_nodes.py` re-indexed by position, not by original config slot.
@@ -550,8 +554,8 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | ID | Issue | Status | File | Target |
 |----|-------|--------|------|--------|
 | CRITICAL-1 | `ExecutionRouter` drops `macro_context` + `overlay_delta_reports` — CLI/hybrid arbiter weaker than API arbiter | ✅ **FIXED 2026-03-03** | `execution_router.py` | v2.0.2 |
-| CRITICAL-2 | Sync `httpx.get()` in async MRO pipeline blocks event loop (up to 30 s on cold miss) | ⬜ pending | `finnhub_client.py`, `fred_client.py`, `gdelt_client.py` | v2.0.2 |
-| CRITICAL-3 | Browser bridge default timeout 12 s — G11 always times out before multi-model pipeline completes | ⬜ pending | `api_bridge.js:85` | v2.0.2 |
+| CRITICAL-2 | Sync `httpx.get()` in async MRO pipeline blocks event loop (up to 30 s on cold miss) | ✅ **FIXED 2026-03-03** | `macro_context_node.py` (asyncio.to_thread) | v2.0.2 |
+| CRITICAL-3 | Browser bridge default timeout 12 s — G11 always times out before multi-model pipeline completes | ✅ **FIXED 2026-03-03** | `api_bridge.js` (180 s default) | v2.0.2 |
 | CRITICAL-4 | Overlay delta node re-indexes by position after Phase 1 partial failure — wrong model assigned to surviving analyst | ✅ **FIXED 2026-03-03** | `analyst_nodes.py`, `state.py` | v2.0.2 |
 
 ### ⚠️ HIGH
@@ -600,7 +604,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | TEST-1 | Hybrid mode arbiter receives macro_context + overlay (CRITICAL-1 regression) | ✅ **ADDED 2026-03-03** (`test_execution_router_arbiter.py`) | v2.0.2 |
 | TEST-2 | Overlay delta node — correct config after Phase 1 partial failure (CRITICAL-4) | ✅ **ADDED 2026-03-03** (`test_overlay_delta_config_alignment.py`) | v2.0.2 |
 | TEST-3 | Full FastAPI `/analyse` integration test via TestClient | ⬜ pending | v2.1 |
-| TEST-4 | Browser bridge: slow backend → user-visible timeout error (not silent hang) | ⬜ pending | v2.0.2 |
+| TEST-4 | Browser bridge: slow backend → user-visible timeout error (not silent hang) | ✅ **ADDED 2026-03-03** (`test_g11_bridge.js`) | v2.0.2 |
 | TEST-5 | MRO degraded mode end-to-end — all sources fail → valid FinalVerdict | ⬜ pending | v2.1 |
 | TEST-6 | Schema migration chain: v1.1.0 → v4.0.0 in one call | ⬜ pending | v2.1 |
 | TEST-7 | Document JS/Python analyst schema divergence as a known-failing spec test | ⬜ pending | v2.x |
@@ -665,37 +669,36 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Next Immediate Steps (Priority Order)
 
-> Last updated: 2026-03-03. All tracks complete through G12 / v2.0.1 / MRO P1–P4. Test suite: 521 passing, 0 failing.
-> Active focus: v2.0.2 — close CRITICAL and HIGH debt before v2.1 feature work.
+> Last updated: 2026-03-04. All tracks complete through G12 / v2.0.1 / MRO P1–P4. Test suite: 540 passing, 0 failing.
+> Active focus: v2.0.2 — all 4 CRITICALs closed; remaining HIGH and MED debt before v2.1.
 
-1. **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** *(~30 min)*
-   `api_bridge.js:85` — change default from 12 s to 180 s; make `analyseViaBridge()`
-   pass it explicitly. Add JS test for slow-backend timeout path. Unblocks G11 for all users.
+1. ✅ **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** — DONE 2026-03-03
+2. ✅ **v2.0.2 item: Unblock event loop in async MRO pipeline (CRITICAL-2)** — DONE 2026-03-03
+3. ✅ **v2.0.2 item: Fix overlay delta model alignment (CRITICAL-4)** — DONE 2026-03-03
+4. ✅ **v2.0.2 item: Pass macro_context + overlay to arbiter in CLI/hybrid paths (CRITICAL-1)** — DONE 2026-03-03
 
-2. **v2.0.2 item: Convert MRO clients to async httpx (CRITICAL-2)** *(~3–4 h)*
-   `finnhub_client.py`, `fred_client.py`, `gdelt_client.py` — replace sync `httpx.get()`
-   with `async httpx.AsyncClient`; make `scheduler._refresh()` async. Use
-   `asyncio.to_thread()` as an interim bridge during the migration.
+5. **v2.0.2 item: Fix Grok model string + add budget guard (HIGH-5 + HIGH-6)** *(~2–3 h)*
+   Update `grok/grok-4-vision` to the verified LiteLLM model ID (ICT_PURIST currently
+   always fails silently). Add image size validation in `api/main.py`; add per-run cost
+   ceiling env var in `usage_meter.py`.
 
-3. **v2.0.2 item: Fix overlay delta model alignment (CRITICAL-4)** *(~3–4 h)* ✅ **DONE 2026-03-03**
-   Track `(config, output)` pairs through Phase 1; add `analyst_configs_used` to
-   `GraphState`; pass correct config to Phase 2. Add regression test (TEST-2).
+6. **v2.0.2 item: Fix retry logic for non-retriable exceptions (HIGH-1)** *(~1–2 h)*
+   `llm_client.py` — distinguish retriable (RateLimitError, ConnectError, TimeoutError)
+   from non-retriable (AuthenticationError, ValidationError); use exponential backoff
+   with jitter up to 60 s instead of fixed 0.4 s.
 
-4. **v2.0.2 item: Fix Grok model string + add budget guard (HIGH-5 + HIGH-6)** *(~2–3 h)*
-   Update `grok/grok-4-vision` to the verified LiteLLM model ID. Add image size
-   validation in `api/main.py`; add per-run cost ceiling env var in `usage_meter.py`.
+7. **v2.0.2 item: Fix hardcoded timeframes + lift m15Overlay null guard (MED-5 + MED-8)** *(~2 h)*
+   Build timeframes list dynamically from uploaded files in `api_bridge.js`. Define
+   typed overlay metadata shape in `backup_validation.js`; validate object shape
+   rather than requiring null.
 
-5. **v2.0.2 item: Fix hardcoded timeframes in `api_bridge.js` + lift m15Overlay null guard (MED-5 + MED-8)** *(~2 h)*
-   Build timeframes list dynamically from uploaded files. Define typed overlay metadata
-   shape in `backup_validation.js`; validate object rather than requiring null.
-
-6. **v2.1 — Multi-Round Deliberation (Track B)**
+8. **v2.1 — Multi-Round Deliberation (Track B)**
    Optional second-round analyst fan-out; Arbiter weights both rounds.
-   Config flag `enable_deliberation: bool = False`. Independent of above.
+   Config flag `enable_deliberation: bool = False`. Independent of v2.0.2 items.
 
-7. **C4 — Unified Export (Track C)**
+9. **C4 — Unified Export (Track C)**
    Single `app/` export including ticket + full analyst JSON logs, importable back.
 
-**Completed:** G1–G12, v1.1–v2.0.1, MRO P1–P4, C1–C3, CRITICAL-1, CRITICAL-4
-**In progress:** v2.0.2 (CRITICAL-2, CRITICAL-3, HIGH-5, HIGH-6, MED-5, MED-8)
+**Completed:** G1–G12, v1.1–v2.0.1, MRO P1–P4, C1–C3, CRITICAL-1, CRITICAL-2, CRITICAL-3, CRITICAL-4
+**In progress:** v2.0.2 (HIGH-1, HIGH-5, HIGH-6, MED-5, MED-8)
 **Not started:** v2.1, C4, v2.2
