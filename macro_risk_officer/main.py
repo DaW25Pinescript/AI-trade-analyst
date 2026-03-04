@@ -6,6 +6,8 @@ Usage:
     python -m macro_risk_officer audit
     python -m macro_risk_officer kpi
     python -m macro_risk_officer update-outcomes [--dry-run]
+    python -m macro_risk_officer feeder-run [--instrument XAUUSD]
+    python -m macro_risk_officer feeder-ingest [--instrument XAUUSD] [FILE]
 """
 
 from __future__ import annotations
@@ -78,6 +80,51 @@ def cmd_update_outcomes(dry_run: bool) -> None:
         print("Run `python -m macro_risk_officer audit` to see updated accuracy stats.")
 
 
+def cmd_feeder_run(instrument: str) -> None:
+    """
+    Run the Modal feeder locally (no Modal SDK required) and print the
+    versioned contract JSON to stdout.  Uses build_feeder_payload() directly.
+    """
+    import json
+    import os
+
+    from macro_risk_officer.modal_macro_worker import build_feeder_payload
+
+    finnhub_key = os.environ.get("FINNHUB_API_KEY")
+    fred_key = os.environ.get("FRED_API_KEY")
+    payload = build_feeder_payload(
+        finnhub_key=finnhub_key,
+        fred_key=fred_key,
+        instrument=instrument,
+    )
+    print(json.dumps(payload, indent=2))
+
+
+def cmd_feeder_ingest(instrument: str, file_path: str | None) -> None:
+    """
+    Read a feeder contract JSON (from file or stdin) and produce a
+    MacroContext through the local reasoning pipeline.
+    """
+    import json
+
+    from macro_risk_officer.ingestion.feeder_ingest import ingest_feeder_payload
+
+    if file_path and file_path != "-":
+        with open(file_path) as fh:
+            payload = json.load(fh)
+    else:
+        payload = json.load(sys.stdin)
+
+    try:
+        context = ingest_feeder_payload(payload, instrument=instrument)
+    except ValueError as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)
+
+    print(context.arbiter_block())
+    print(f"\nActive events: {', '.join(context.active_event_ids) or 'none'}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="macro_risk_officer",
@@ -107,6 +154,26 @@ def main() -> None:
         "--dry-run", action="store_true", help="Show how many runs would be updated"
     )
 
+    feeder_run_p = subparsers.add_parser(
+        "feeder-run",
+        help="Run the Modal feeder locally and print contract JSON",
+    )
+    feeder_run_p.add_argument(
+        "--instrument", default="XAUUSD", help="Instrument context (default: XAUUSD)"
+    )
+
+    feeder_ingest_p = subparsers.add_parser(
+        "feeder-ingest",
+        help="Ingest feeder contract JSON and produce MacroContext",
+    )
+    feeder_ingest_p.add_argument(
+        "--instrument", default="XAUUSD", help="Instrument for conflict score"
+    )
+    feeder_ingest_p.add_argument(
+        "file", nargs="?", default=None,
+        help="Path to feeder JSON file (default: read from stdin)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "status":
@@ -117,6 +184,10 @@ def main() -> None:
         cmd_kpi()
     elif args.command == "update-outcomes":
         cmd_update_outcomes(args.dry_run)
+    elif args.command == "feeder-run":
+        cmd_feeder_run(args.instrument)
+    elif args.command == "feeder-ingest":
+        cmd_feeder_ingest(args.instrument, args.file)
 
 
 if __name__ == "__main__":

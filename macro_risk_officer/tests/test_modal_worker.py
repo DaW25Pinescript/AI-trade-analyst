@@ -709,3 +709,266 @@ class TestExistingReasoningPathUnaffected:
         ev = _make_macro_event(event_id="norm-test-001")
         result = normalise_events([ev, ev])
         assert len(result) == 1
+
+
+# ─── 10. CLI: feeder-run and feeder-ingest commands ──────────────────────────
+
+
+class TestFeederRunCLI:
+    """Test the feeder-run CLI command (calls build_feeder_payload directly)."""
+
+    def test_feeder_run_prints_json(self, capsys):
+        from macro_risk_officer.main import cmd_feeder_run
+
+        with (
+            patch("macro_risk_officer.modal_macro_worker._run_finnhub_adapter",
+                  return_value=([_make_feeder_event()],
+                                {"status": "ok", "record_count": 1, "latency_ms": 100})),
+            patch("macro_risk_officer.modal_macro_worker._run_fred_adapter",
+                  return_value=([], {"status": "ok", "record_count": 0, "latency_ms": 50})),
+            patch("macro_risk_officer.modal_macro_worker._run_gdelt_adapter",
+                  return_value=([], {"status": "ok", "record_count": 0, "latency_ms": 50})),
+            patch.dict("os.environ", {"FINNHUB_API_KEY": "test", "FRED_API_KEY": "test"}),
+        ):
+            cmd_feeder_run(instrument="XAUUSD")
+
+        import json
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["contract_version"] == CONTRACT_VERSION
+        assert data["instrument_context"] == "XAUUSD"
+        assert len(data["events"]) == 1
+
+    def test_feeder_run_missing_keys_produces_partial(self, capsys):
+        from macro_risk_officer.main import cmd_feeder_run
+
+        with (
+            patch("macro_risk_officer.modal_macro_worker._run_gdelt_adapter",
+                  return_value=([], {"status": "ok", "record_count": 0, "latency_ms": 50})),
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            # Remove env vars so keys are None
+            import os
+            os.environ.pop("FINNHUB_API_KEY", None)
+            os.environ.pop("FRED_API_KEY", None)
+            cmd_feeder_run(instrument="XAUUSD")
+
+        import json
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["source_health"]["finnhub"]["status"] == "failed"
+        assert data["source_health"]["fred"]["status"] == "failed"
+
+
+class TestFeederIngestCLI:
+    """Test the feeder-ingest CLI command."""
+
+    def test_feeder_ingest_from_file(self, capsys, tmp_path):
+        import json
+        from macro_risk_officer.main import cmd_feeder_ingest
+
+        payload = _make_minimal_payload(
+            events=[
+                _make_feeder_event(
+                    event_id="cli-test-001",
+                    category="monetary_policy",
+                    importance="high",
+                    actual=5.5,
+                    forecast=5.25,
+                    previous=5.25,
+                )
+            ]
+        )
+        fpath = tmp_path / "feeder.json"
+        fpath.write_text(json.dumps(payload))
+
+        cmd_feeder_ingest(instrument="XAUUSD", file_path=str(fpath))
+        captured = capsys.readouterr()
+        assert "MACRO RISK CONTEXT" in captured.out
+        assert "cli-test-001" in captured.out
+
+    def test_feeder_ingest_bad_version_exits(self, capsys, tmp_path):
+        import json
+        from macro_risk_officer.main import cmd_feeder_ingest
+
+        payload = _make_minimal_payload()
+        payload["contract_version"] = "99.0.0"
+        fpath = tmp_path / "bad.json"
+        fpath.write_text(json.dumps(payload))
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_feeder_ingest(instrument="XAUUSD", file_path=str(fpath))
+        assert exc.value.code == 1
+        captured = capsys.readouterr()
+        assert "ERROR" in captured.out
+
+
+class TestCLIHelpIncludesFeeder:
+    """Verify --help lists the new feeder commands."""
+
+    def test_help_mentions_feeder_run(self):
+        import subprocess, sys
+        result = subprocess.run(
+            [sys.executable, "-m", "macro_risk_officer", "--help"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        assert "feeder-run" in result.stdout
+
+    def test_help_mentions_feeder_ingest(self):
+        import subprocess, sys
+        result = subprocess.run(
+            [sys.executable, "-m", "macro_risk_officer", "--help"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        assert "feeder-ingest" in result.stdout
+
+
+# ─── 11. Round-trip determinism ──────────────────────────────────────────────
+
+
+class TestRoundTripDeterminism:
+    """Verify that the same inputs produce the same feeder output."""
+
+    def _fixed_events(self):
+        return [
+            _make_feeder_event(event_id="det-001", actual=0.4, forecast=0.3),
+            _make_feeder_event(event_id="det-002", category="monetary_policy",
+                               actual=5.5, forecast=5.25, importance="high"),
+        ]
+
+    def test_build_feeder_payload_is_deterministic(self):
+        events = self._fixed_events()
+        with (
+            patch("macro_risk_officer.modal_macro_worker._run_finnhub_adapter",
+                  return_value=(events, {"status": "ok", "record_count": 2, "latency_ms": 100})),
+            patch("macro_risk_officer.modal_macro_worker._run_fred_adapter",
+                  return_value=([], {"status": "ok", "record_count": 0, "latency_ms": 50})),
+            patch("macro_risk_officer.modal_macro_worker._run_gdelt_adapter",
+                  return_value=([], {"status": "ok", "record_count": 0, "latency_ms": 50})),
+        ):
+            result1 = build_feeder_payload(
+                finnhub_key="k", fred_key="k",
+                generated_at="2026-03-04T00:00:00Z",
+            )
+            result2 = build_feeder_payload(
+                finnhub_key="k", fred_key="k",
+                generated_at="2026-03-04T00:00:00Z",
+            )
+
+        assert result1 == result2
+
+    def test_macro_event_to_feeder_event_is_deterministic(self):
+        ev = _make_macro_event(event_id="det-macro-001")
+        r1 = _macro_event_to_feeder_event(ev)
+        r2 = _macro_event_to_feeder_event(ev)
+        assert r1 == r2
+
+    def test_ingest_produces_same_context_for_same_payload(self):
+        payload = _make_minimal_payload(
+            events=[
+                _make_feeder_event(
+                    event_id="det-ingest-001",
+                    category="inflation",
+                    importance="high",
+                    actual=3.8,
+                    forecast=3.2,
+                )
+            ]
+        )
+        ctx1 = ingest_feeder_payload(payload)
+        ctx2 = ingest_feeder_payload(payload)
+        assert ctx1.model_dump() == ctx2.model_dump()
+
+
+# ─── 12. Adapter edge cases ─────────────────────────────────────────────────
+
+
+class TestAdapterEdgeCases:
+    """Edge cases for source adapter conversion."""
+
+    def test_none_actual_and_forecast_no_surprise(self):
+        ev = _make_macro_event(actual=None, forecast=None)
+        result = _macro_event_to_feeder_event(ev)
+        assert result["surprise_direction"] is None
+        assert result["actual"] is None
+        assert result["forecast"] is None
+
+    def test_zero_actual_zero_forecast(self):
+        ev = _make_macro_event(actual=0.0, forecast=0.0)
+        result = _macro_event_to_feeder_event(ev)
+        assert result["surprise_direction"] is None  # no directional surprise
+        assert result["actual"] == 0.0
+
+    def test_negative_surprise(self):
+        ev = _make_macro_event(actual=-0.5, forecast=0.3)
+        result = _macro_event_to_feeder_event(ev)
+        assert result["surprise_direction"] == "negative"
+
+    def test_geopolitical_gdelt_event_mapping(self):
+        ev = _make_macro_event(
+            event_id="gdelt-geo-20260304-abc",
+            category="geopolitical",
+            tier=2,
+            actual=0.7,
+            forecast=0.0,
+            description="GDELT geopolitical escalation signal (avg tone -5.2)",
+            source="gdelt",
+        )
+        result = _macro_event_to_feeder_event(ev)
+        assert result["region"] == "global"
+        assert result["importance"] == "medium"
+        assert result["source"] == "gdelt"
+        assert "geopolitical" in result["tags"]
+
+    def test_fred_systemic_risk_event_mapping(self):
+        ev = _make_macro_event(
+            event_id="fred-T10Y2Y-20260301",
+            category="systemic_risk",
+            tier=2,
+            actual=-0.3,
+            forecast=-0.1,
+            description="10Y-2Y Treasury Yield Spread (inversion signal)",
+            source="fred",
+        )
+        result = _macro_event_to_feeder_event(ev)
+        assert result["category"] == "systemic_risk"
+        assert result["surprise_direction"] == "negative"
+        assert "systemic_risk" in result["tags"]
+
+    def test_feeder_event_with_missing_optional_fields(self):
+        """Feeder events with None actual/forecast still map to valid MacroEvent."""
+        ev = _make_feeder_event(
+            event_id="partial-001",
+            actual=None,
+            forecast=None,
+            previous=None,
+            surprise_direction=None,
+        )
+        macro = _feeder_event_to_macro_event(ev)
+        assert macro.actual is None
+        assert macro.forecast is None
+        assert macro.surprise is None
+
+    def test_feeder_event_with_naive_timestamp(self):
+        """Naive timestamp (no TZ) gets UTC assumed."""
+        ev = _make_feeder_event(timestamp="2026-03-04T14:00:00")
+        macro = _feeder_event_to_macro_event(ev)
+        assert macro.timestamp.tzinfo is not None
+
+    def test_multiple_sources_mixed_in_payload(self):
+        """Payload with events from all 3 sources maps correctly."""
+        events = [
+            _make_feeder_event(event_id="fin-001", source="finnhub",
+                               category="inflation"),
+            _make_feeder_event(event_id="fred-001", source="fred",
+                               category="monetary_policy"),
+            _make_feeder_event(event_id="gdelt-001", source="gdelt",
+                               category="geopolitical"),
+        ]
+        payload = _make_minimal_payload(events=events)
+        macro_events = events_from_feeder(payload)
+        assert len(macro_events) == 3
+        sources = {e.source for e in macro_events}
+        assert sources == {"finnhub", "fred", "gdelt"}
