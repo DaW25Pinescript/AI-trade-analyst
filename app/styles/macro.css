@@ -4,6 +4,11 @@
   margin-bottom: 12px;
 }
 
+.top-nav-toggle .btn-ghost--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .macro-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -24,8 +29,9 @@
 }
 
 .macro-list {
+  list-style: none;
   margin: 0;
-  padding-left: 16px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;

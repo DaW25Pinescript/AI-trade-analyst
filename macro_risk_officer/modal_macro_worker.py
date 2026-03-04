@@ -147,6 +147,7 @@ def _run_finnhub_adapter(
             "status": "ok",
             "record_count": len(events),
             "latency_ms": latency_ms,
+            "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
     except Exception as exc:
         return [], {"status": "failed", "error": str(exc)}
@@ -170,6 +171,7 @@ def _run_fred_adapter(api_key: str) -> tuple[list[dict], dict]:
             "status": "ok",
             "record_count": len(events),
             "latency_ms": latency_ms,
+            "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
     except Exception as exc:
         return [], {"status": "failed", "error": str(exc)}
@@ -198,6 +200,7 @@ def _run_gdelt_adapter(lookback_days: int = 3) -> tuple[list[dict], dict]:
             "status": "ok",
             "record_count": len(events),
             "latency_ms": latency_ms,
+            "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
     except Exception as exc:
         return [], {"status": "failed", "error": str(exc)}

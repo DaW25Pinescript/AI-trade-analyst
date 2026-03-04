@@ -53,7 +53,7 @@ export function renderMacroPage() {
 
   document.getElementById('macroRegimeLabel').textContent = safeText(context.regime);
   document.getElementById('macroVolBias').textContent = safeText(context.vol_bias);
-  document.getElementById('macroDirectionalPressure').textContent = safeText(context.directional_pressure, context.regime);
+  document.getElementById('macroDirectionalPressure').textContent = safeText(context.directional_pressure);
   document.getElementById('macroConfidence').textContent = safeText(context.confidence);
   document.getElementById('macroFreshness').textContent = formatTimestamp(macroState.observability.lastUpdated);
   document.getElementById('macroFeederStatus').textContent = safeText(macroState.observability.feederStatus);
@@ -77,12 +77,20 @@ export async function initMacroPage() {
   }
 }
 
+function _setNavActive(activeId) {
+  document.querySelectorAll('.top-nav-toggle .btn-ghost').forEach((btn) => {
+    btn.classList.toggle('btn-ghost--active', btn.dataset.view === activeId);
+  });
+}
+
 export function showMacroPage() {
   document.getElementById('workflowView').style.display = 'none';
   document.getElementById('macroView').style.display = 'block';
+  _setNavActive('macro');
 }
 
 export function showWorkflowPage() {
   document.getElementById('workflowView').style.display = 'block';
   document.getElementById('macroView').style.display = 'none';
+  _setNavActive('workflow');
 }
