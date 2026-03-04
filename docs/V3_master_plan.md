@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.10
+**Version:** 2.11
 **Updated:** 2026-03-04
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10)
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js)
 
 ---
 
@@ -13,7 +13,7 @@ two-track architecture:
 | Track | Directory | Runtime | Current Version |
 |-------|-----------|---------|-----------------|
 | **A — Browser App** | `app/` | Static HTML/JS, IndexedDB | G1–G12 complete |
-| **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0.1 complete, v2.0.2 in progress |
+| **B — AI Pipeline** | `ai_analyst/` | Python 3.11+, LangGraph | v2.0.2 complete, v2.1 complete |
 | **C — Integration** | shared | schema + bridge | C1–C3 complete |
 | **D — Macro Risk Officer** | `macro_risk_officer/` | Python 3.11+, standalone | **ALL COMPLETE (P1–P4)** |
 
@@ -26,6 +26,7 @@ G6/v2.0 onwards.
   - +1 added (2026-03-03): `test_g11_bridge.js` — confirms `analyseViaBridge` uses a 3-minute timeout signal (guards CRITICAL-3).
   - +3 added (2026-03-04): `test_g11_bridge.js` — timeframes match uploaded charts (guards MED-5).
   - +8 added (2026-03-04): `test_v202_fixes.js` — m15Overlay shape validation replaces null-only guard (guards MED-8).
+  - **Regression fix (2026-03-04):** Plotly PR (`b87de35`) introduced `buildAnalyticsReportHTML(exportOverrides, doc = document)` — the `document` default parameter threw `ReferenceError` in Node.js context, silently dropping test 27 to FAIL. Fixed: default changed to `doc = (typeof document !== 'undefined' ? document : null)`. 120/120 now confirmed.
 - AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **303/303 passing**.
   - +4 added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix.
   - +1 added (2026-03-03): `test_macro_context_node.py` — guards CRITICAL-2 fix.
@@ -616,7 +617,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | ID | Issue | Status | File | Target |
 |----|-------|--------|------|--------|
 | LOW-1 | Docker runs as root | ⬜ pending | `Dockerfile` | v2.x |
-| LOW-2 | CI does not install or test `macro_risk_officer/requirements.txt` | ⬜ pending | `.github/workflows/ci.yml` | v2.1 |
+| LOW-2 | CI does not install or test `macro_risk_officer/requirements.txt` | ✅ **FIXED 2026-03-04** | `.github/workflows/ci.yml` (`mro-tests` job installs `macro_risk_officer/requirements.txt` and runs pytest with CVE scan — was already implemented but not tracked) | v2.1 |
 | LOW-3 | `MINIMUM_VALID_ANALYSTS = 2` hardcoded — 50% failure rate appears healthy | ⬜ pending | `analyst_nodes.py:37` | v2.x |
 | LOW-4 | `run_state_manager.py` uses `datetime.utcnow()` outside Pydantic (missed by HIGH-2 sweep) | ✅ **FIXED 2026-03-04** | `run_state_manager.py` (→ `datetime.now(timezone.utc)`) | v2.1 |
 | LOW-5 | `ExecutionConfig.mode` field is `str` not `Literal["manual","hybrid","automated"]` | ✅ **FIXED 2026-03-04** | `execution_config.py` (→ `Literal["manual","hybrid","automated"]`) | v2.1 |
@@ -696,8 +697,8 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Next Immediate Steps (Priority Order)
 
-> Last updated: 2026-03-04. All tracks complete through G12 / v2.1 / MRO P1–P4. Test suite: 576 passing, 0 failing.
-> v2.1 is fully complete. All HIGH and MED debt items resolved. Next focus: C4 (unified export) and v2.1b (multi-round deliberation).
+> Last updated: 2026-03-04 (v2.11). All tracks complete through G12 / v2.1 / MRO P1–P4. Test suite: 120 browser + 303 AI analyst + 153 MRO = 576 passing, 0 failing.
+> Audit session closed LOW-2 (CI already installs MRO deps, now tracked) and fixed a Plotly PR regression in `dashboard.js` (document default param). Next focus: C4 (unified export) and v2.1b (multi-round deliberation).
 
 1. ✅ **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** — DONE 2026-03-03
 2. ✅ **v2.0.2 item: Unblock event loop in async MRO pipeline (CRITICAL-2)** — DONE 2026-03-03
@@ -711,19 +712,21 @@ base with `main` (predates current repo structure) and can be safely deleted.
 10. ✅ **v2.1: All remaining HIGH debt items (HIGH-2/3/4/7/8)** — DONE 2026-03-04
 11. ✅ **v2.1: All remaining MED/LOW debt items (MED-1/2/3/4/6/7 + LOW-4/5/6)** — DONE 2026-03-04
 12. ✅ **v2.1: TEST-9 (thread safety), TEST-10 (bias Literal), TEST-3 (lifespan TestClient) guards added** — DONE 2026-03-04
+13. ✅ **Audit (v2.11): Plotly regression in `dashboard.js` fixed** — `buildAnalyticsReportHTML` default param `doc = document` → `doc = (typeof document !== 'undefined' ? document : null)`; browser suite restored to 120/120 — DONE 2026-03-04
+14. ✅ **Audit (v2.11): LOW-2 closed** — CI `mro-tests` job already installs `macro_risk_officer/requirements.txt` + CVE scan + coverage gate; tracking entry corrected — DONE 2026-03-04
 
-13. **C4 — Unified Export (Track C)**
+15. **C4 — Unified Export (Track C)**
     Single `app/` export including ticket + full analyst JSON logs, importable back.
     - Include Plotly-rendered dashboard artifacts when Plotly is available so exported reports retain decision-time analytics visuals.
 
-14. **v2.1b — Multi-Round Deliberation**
+16. **v2.1b — Multi-Round Deliberation**
     - Optional second-round fan-out after initial results
     - Arbiter receives both Round 1 and Round 2 outputs, weighted by round
     - Config flag: `enable_deliberation: bool = False` (off by default)
 
-15. **v2.2 — Streaming + Real-Time UI**
+17. **v2.2 — Streaming + Real-Time UI**
     - Server-Sent Events from FastAPI as analysts complete
     - CLI live progress display
 
-**Completed:** G1–G12, v1.1–v2.1, MRO P1–P4, C1–C3
+**Completed:** G1–G12, v1.1–v2.1, MRO P1–P4, C1–C3, LOW-2, Plotly regression fix
 **Not started:** C4, v2.1b (deliberation), v2.2 (streaming)

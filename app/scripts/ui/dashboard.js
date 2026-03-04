@@ -11,7 +11,7 @@ import {
 let _loadedEntries = [];
 export function getLoadedEntries() { return _loadedEntries; }
 
-export function buildAnalyticsReportHTML(exportOverrides = null, doc = document) {
+export function buildAnalyticsReportHTML(exportOverrides = null, doc = (typeof document !== 'undefined' ? document : null)) {
   let safeOverrides = exportOverrides;
   let safeDoc = doc;
 
