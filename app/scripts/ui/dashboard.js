@@ -1,11 +1,21 @@
 import { computeMetrics, parseBackupEntries } from '../metrics/metrics_engine.js';
+import {
+  capturePlotlyChartsForExport,
+  isPlotlyAvailable,
+  renderEquityCurvePlotly,
+  renderHeatmapPlotly,
+  renderPeriodBreakdownPlotly,
+} from './plotly_dashboard.js';
 
 // G8: module-level store so the weekly prompt generator can access loaded entries
 let _loadedEntries = [];
 export function getLoadedEntries() { return _loadedEntries; }
 
-export function buildAnalyticsReportHTML(doc = document) {
-  const getHTML = (id) => doc.getElementById(id)?.innerHTML || '<p>No data.</p>';
+export function buildAnalyticsReportHTML(exportOverrides = null, doc = document) {
+  const getChartHTML = (id) => {
+    if (exportOverrides && exportOverrides[id]) return exportOverrides[id];
+    return doc.getElementById(id)?.innerHTML || '<p>No data.</p>';
+  };
   const getText = (id, fallback = '0') => doc.getElementById(id)?.textContent?.trim() || fallback;
 
   return `<!DOCTYPE html>
@@ -30,22 +40,31 @@ svg{border:1px solid #ddd;min-height:140px}
 </div>
 
 <h2>Setup Type × Session Heatmap</h2>
-${getHTML('dashboardHeatmap')}
+${getChartHTML('dashboardHeatmap')}
 
 <h2>Equity Curve (R-Based)</h2>
-${getHTML('dashboardEquityCurve')}
+${getChartHTML('dashboardEquityCurve')}
 
 <h2>Monthly Breakdown</h2>
-${getHTML('dashboardMonthlyBreakdown')}
+${getChartHTML('dashboardMonthlyBreakdown')}
 
 <h2>Quarterly Breakdown</h2>
-${getHTML('dashboardQuarterlyBreakdown')}
+${getChartHTML('dashboardQuarterlyBreakdown')}
 
 </body></html>`;
 }
 
-export function exportAnalyticsPDF() {
-  const report = buildAnalyticsReportHTML();
+export async function exportAnalyticsPDF() {
+  let exportOverrides = null;
+  if (isPlotlyAvailable()) {
+    try {
+      exportOverrides = await capturePlotlyChartsForExport();
+    } catch (err) {
+      console.warn('Plotly export capture failed, continuing without overrides:', err);
+    }
+  }
+
+  const report = buildAnalyticsReportHTML(exportOverrides);
   const w = window.open('', '_blank');
   if (!w) { alert('Popup blocked — please allow popups and try again.'); return; }
   w.document.open();
@@ -70,7 +89,7 @@ function formatNum(n) {
   return Number.isFinite(n) ? n.toFixed(2) : '0.00';
 }
 
-function renderHeatmap(metrics) {
+function renderHeatmapLegacy(metrics) {
   const container = document.getElementById('dashboardHeatmap');
   if (!container) return;
   if (!metrics.heatmap.length) {
@@ -92,7 +111,7 @@ function renderHeatmap(metrics) {
   container.innerHTML = `<table class="heatmap-table">${header}${rows}</table>`;
 }
 
-function renderEquityCurve(metrics) {
+function renderEquityCurveLegacy(metrics) {
   const container = document.getElementById('dashboardEquityCurve');
   if (!container) return;
 
@@ -124,7 +143,7 @@ function renderEquityCurve(metrics) {
   `;
 }
 
-function renderPeriodBreakdown(tableId, rows) {
+function renderPeriodBreakdownLegacy(tableId, rows) {
   const container = document.getElementById(tableId);
   if (!container) return;
 
@@ -159,6 +178,42 @@ function renderPeriodBreakdown(tableId, rows) {
       <tbody>${body}</tbody>
     </table>
   `;
+}
+
+function renderHeatmap(metrics) {
+  if (isPlotlyAvailable()) {
+    try {
+      renderHeatmapPlotly(metrics);
+      return;
+    } catch (err) {
+      console.warn('Plotly heatmap render failed, using legacy fallback:', err);
+    }
+  }
+  renderHeatmapLegacy(metrics);
+}
+
+function renderEquityCurve(metrics) {
+  if (isPlotlyAvailable()) {
+    try {
+      renderEquityCurvePlotly(metrics);
+      return;
+    } catch (err) {
+      console.warn('Plotly equity curve render failed, using legacy fallback:', err);
+    }
+  }
+  renderEquityCurveLegacy(metrics);
+}
+
+function renderPeriodBreakdown(containerId, rows, title) {
+  if (isPlotlyAvailable()) {
+    try {
+      renderPeriodBreakdownPlotly(containerId, rows, title);
+      return;
+    } catch (err) {
+      console.warn(`Plotly ${containerId} render failed, using legacy fallback:`, err);
+    }
+  }
+  renderPeriodBreakdownLegacy(containerId, rows);
 }
 
 function renderStats(metrics) {
@@ -196,8 +251,8 @@ function renderStats(metrics) {
 
   renderHeatmap(metrics);
   renderEquityCurve(metrics);
-  renderPeriodBreakdown('dashboardMonthlyBreakdown', metrics.monthlyBreakdown);
-  renderPeriodBreakdown('dashboardQuarterlyBreakdown', metrics.quarterlyBreakdown);
+  renderPeriodBreakdown('dashboardMonthlyBreakdown', metrics.monthlyBreakdown, 'Monthly Breakdown');
+  renderPeriodBreakdown('dashboardQuarterlyBreakdown', metrics.quarterlyBreakdown, 'Quarterly Breakdown');
 }
 
 export function initDashboard() {
