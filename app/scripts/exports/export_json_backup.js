@@ -166,7 +166,7 @@ function buildAARPayload(ticketId) {
   };
 }
 
-function buildBackupPayload() {
+export function buildBackupPayload() {
   const ticket = buildTicketSnapshot();
   const aar = buildAARPayload(ticket.ticketId);
 

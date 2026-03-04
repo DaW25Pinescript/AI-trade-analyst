@@ -20,6 +20,8 @@ import { initOperatorDashboard, toggleOperatorDashboard, applyBridgeVerdictToDas
 import { analyseViaBridge, checkBridgeHealth, getRunUsage } from './api_bridge.js';
 import { mountAnalysisResults } from './verdict_card.js';
 import { applyTicketDraftToForm } from './ui/ticket_form.js';
+import { exportUnified } from './exports/export_unified.js';
+import { importUnified } from './exports/import_unified.js';
 
 function syncOutputImpl() { if (document.getElementById('section-5')?.classList.contains('active')) buildPrompt(); }
 function buildAndShow() {
@@ -197,6 +199,14 @@ async function runBridgeAnalyse() {
     mountAnalysisResults(resultEl, verdict, response?.usage, response?.run_id);
     applyBridgeVerdictToDashboard(verdict);
     if (response.ticket_draft) applyTicketDraftToForm(response.ticket_draft);
+    // C4: persist verdict so exportUnified() can include it in the unified JSON
+    state.bridgeVerdict = {
+      run_id: response?.run_id || null,
+      analysedAt: new Date().toISOString(),
+      source_ticket_id: response?.source_ticket_id || null,
+      verdict,
+      usage: response?.usage || null,
+    };
     if (response?.run_id) {
       getRunUsage(serverUrl, response.run_id)
         .then((usage) => {
@@ -213,6 +223,13 @@ async function runBridgeAnalyse() {
   }
 }
 
+// C4: import a unified export file selected from a file input
+async function handleImportUnified(input) {
+  const file = input?.files?.[0];
+  const payload = await importUnified(file);
+  if (payload) alert('Unified export imported successfully. Reload or re-generate to update the form.');
+}
+
 Object.assign(window, {
   goTo, goToChartsNext, onAssetInput, setAsset, setBias, triggerUpload, handleUpload,
   toggleOverlaySlot, toggleCheck, selectRadio, onSlider, toggleRRJustification, onDecisionModeChange,
@@ -227,6 +244,9 @@ Object.assign(window, {
   runBridgeAnalyse,
   checkBridgeHealthUI,
   toggleOperatorDashboard,
+  // C4: unified export / import
+  exportUnified,
+  handleImportUnified,
   // G9: Shadow Mode
   onShadowModeChange, onShadowCaptureWindowChange, onShadowOutcomeInput, saveShadowOutcome
 });

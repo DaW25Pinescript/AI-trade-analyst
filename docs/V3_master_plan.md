@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.11
+**Version:** 2.12
 **Updated:** 2026-03-04
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js)
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**
 
 ---
 
@@ -22,11 +22,12 @@ fields, regime, risk constraints). A formal integration bridge (Track C) is plan
 G6/v2.0 onwards.
 
 ### Current verification snapshot (2026-03-04)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **120/120 passing**.
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **133/133 passing**.
   - +1 added (2026-03-03): `test_g11_bridge.js` — confirms `analyseViaBridge` uses a 3-minute timeout signal (guards CRITICAL-3).
   - +3 added (2026-03-04): `test_g11_bridge.js` — timeframes match uploaded charts (guards MED-5).
   - +8 added (2026-03-04): `test_v202_fixes.js` — m15Overlay shape validation replaces null-only guard (guards MED-8).
-  - **Regression fix (2026-03-04):** Plotly PR (`b87de35`) introduced `buildAnalyticsReportHTML(exportOverrides, doc = document)` — the `document` default parameter threw `ReferenceError` in Node.js context, silently dropping test 27 to FAIL. Fixed: default changed to `doc = (typeof document !== 'undefined' ? document : null)`. 120/120 now confirmed.
+  - **Regression fix (2026-03-04):** Plotly PR (`b87de35`) introduced `buildAnalyticsReportHTML(exportOverrides, doc = document)` — the `document` default parameter threw `ReferenceError` in Node.js context, silently dropping test 27 to FAIL. Fixed: default changed to `doc = (typeof document !== 'undefined' ? document : null)`. 120/120 confirmed.
+  - +13 added (2026-03-04): `test_c4_unified_export.js` — C4 unified export version constant, parseUnifiedPayload accept/reject cases, schema migration path, verdict + charts pass-through. 133/133 passing.
 - AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **303/303 passing**.
   - +4 added (2026-03-03): `test_execution_router_arbiter.py` — guards CRITICAL-1 fix.
   - +1 added (2026-03-03): `test_macro_context_node.py` — guards CRITICAL-2 fix.
@@ -34,8 +35,8 @@ G6/v2.0 onwards.
   - +2 added (2026-03-04): `test_v202_fixes.py` — HIGH-5 (Grok model string), HIGH-6 (cost ceiling), HIGH-1 (retry logic).
   - +23 added (2026-03-04): `test_v21_fixes.py` — TEST-9 (MacroScheduler thread safety), TEST-10 (FinalVerdict.final_bias Literal), HIGH-2 (timezone-aware datetimes), MED-7 (is_text_only list blocks), LOW-5 (ExecutionConfig.mode Literal).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 576 passing, 0 failing** across all three suites.
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete; v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10). Only architectural debt and C4 remain.
+- **Total: 589 passing, 0 failing** across all three suites.
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10). C4 complete (Unified Export). Only architectural debt remains.
 
 ---
 
@@ -568,14 +569,32 @@ This track begins at G6/v2.0 when both schema and API are stable.
 - [x] Verdict card populated from API response in UI
 - [x] Graceful degradation UX when server unreachable
 
-### C4 — Unified Export
-- Single export from `app/` includes both ticket data and full analyst JSON logs
-- Importable back into either system
+### C4 — Unified Export (COMPLETE)
+- [x] `app/scripts/exports/export_unified.js` — `buildUnifiedPayload()` + `exportUnified()` (async; Plotly chart capture best-effort)
+- [x] `app/scripts/exports/import_unified.js` — `parseUnifiedPayload()` (pure validation, testable) + `importUnified(file)` (restores verdict state)
+- [x] `app/scripts/exports/export_json_backup.js` — `buildBackupPayload()` exported for reuse
+- [x] `app/scripts/state/model.js` — `bridgeVerdict` field added; populated by `runBridgeAnalyse()` after every successful analysis
+- [x] `app/scripts/main.js` — verdict persisted in state; `exportUnified` + `handleImportUnified` wired to `window`
+- [x] `app/index.html` — "Export Unified (C4)" button added to Output step and AAR step; import card with file chooser
+- [x] `tests/test_c4_unified_export.js` — 13 tests: version constant, reject/accept cases, migration, verdict/charts pass-through
+
+**Unified format `v1`:**
+```json
+{
+  "exportVersion": 1,
+  "exportFormat": "unified",
+  "exportedAt": "<ISO>",
+  "ticket": { /* ticket v4.0.0 */ },
+  "aar":    { /* AAR v1.0.0 */ },
+  "verdict": { "run_id", "analysedAt", "source_ticket_id", "verdict", "usage" } | null,
+  "dashboardCharts": { "<elementId>": "data:image/png;base64,..." } | null
+}
+```
 
 ---
 
 ## Technical Debt Register
-*Last updated 2026-03-04 (v2.1 complete). Severity from audit: 🔥 CRITICAL / ⚠️ HIGH / ℹ️ MEDIUM / 💡 LOW.*
+*Last updated 2026-03-04 (v2.12 — C4 complete). Severity from audit: 🔥 CRITICAL / ⚠️ HIGH / ℹ️ MEDIUM / 💡 LOW.*
 
 ### 🔥 CRITICAL
 
@@ -697,8 +716,8 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Next Immediate Steps (Priority Order)
 
-> Last updated: 2026-03-04 (v2.11). All tracks complete through G12 / v2.1 / MRO P1–P4. Test suite: 120 browser + 303 AI analyst + 153 MRO = 576 passing, 0 failing.
-> Audit session closed LOW-2 (CI already installs MRO deps, now tracked) and fixed a Plotly PR regression in `dashboard.js` (document default param). Next focus: C4 (unified export) and v2.1b (multi-round deliberation).
+> Last updated: 2026-03-04 (v2.12). All tracks complete through G12 / v2.1 / MRO P1–P4 / C4. Test suite: 133 browser + 303 AI analyst + 153 MRO = 589 passing, 0 failing.
+> C4 (Unified Export) is now complete. Next focus: v2.1b (multi-round deliberation), v2.2 (streaming).
 
 1. ✅ **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** — DONE 2026-03-03
 2. ✅ **v2.0.2 item: Unblock event loop in async MRO pipeline (CRITICAL-2)** — DONE 2026-03-03
@@ -714,10 +733,7 @@ base with `main` (predates current repo structure) and can be safely deleted.
 12. ✅ **v2.1: TEST-9 (thread safety), TEST-10 (bias Literal), TEST-3 (lifespan TestClient) guards added** — DONE 2026-03-04
 13. ✅ **Audit (v2.11): Plotly regression in `dashboard.js` fixed** — `buildAnalyticsReportHTML` default param `doc = document` → `doc = (typeof document !== 'undefined' ? document : null)`; browser suite restored to 120/120 — DONE 2026-03-04
 14. ✅ **Audit (v2.11): LOW-2 closed** — CI `mro-tests` job already installs `macro_risk_officer/requirements.txt` + CVE scan + coverage gate; tracking entry corrected — DONE 2026-03-04
-
-15. **C4 — Unified Export (Track C)**
-    Single `app/` export including ticket + full analyst JSON logs, importable back.
-    - Include Plotly-rendered dashboard artifacts when Plotly is available so exported reports retain decision-time analytics visuals.
+15. ✅ **C4 — Unified Export (Track C)** — `export_unified.js`, `import_unified.js`, `buildBackupPayload` exported, `state.bridgeVerdict` persisted, "Export Unified (C4)" button + import card in UI, 13 new tests (133/133 browser suite) — DONE 2026-03-04
 
 16. **v2.1b — Multi-Round Deliberation**
     - Optional second-round fan-out after initial results
@@ -728,5 +744,5 @@ base with `main` (predates current repo structure) and can be safely deleted.
     - Server-Sent Events from FastAPI as analysts complete
     - CLI live progress display
 
-**Completed:** G1–G12, v1.1–v2.1, MRO P1–P4, C1–C3, LOW-2, Plotly regression fix
-**Not started:** C4, v2.1b (deliberation), v2.2 (streaming)
+**Completed:** G1–G12, v1.1–v2.1, MRO P1–P4, C1–C4, LOW-2, Plotly regression fix
+**Not started:** v2.1b (deliberation), v2.2 (streaming)

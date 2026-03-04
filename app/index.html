@@ -804,6 +804,7 @@
             <button type="button" class="export-btn" onclick="exportPDF()">Print / PDF</button>
             <button type="button" class="export-btn" onclick="exportJSONBackup()">Export JSON</button>
             <button type="button" class="export-btn" onclick="exportAnalyticsPDF()">Export Analytics PDF</button>
+            <button type="button" class="export-btn" onclick="exportUnified()" title="Export ticket + AAR + AI verdict + dashboard charts as one file">Export Unified (C4)</button>
           </div>
         </div>
         <div id="outputText">Fill in the form steps to generate your V3 prompt...</div>
@@ -1169,6 +1170,19 @@
       <button type="button" class="btn btn-ghost" onclick="showAARPrompt()">Generate AAR Prompt</button>
       <button type="button" class="btn btn-ghost" onclick="reviseTicket()" title="Start a new ticket linked to this one as a revision">Revise This Ticket</button>
       <button type="button" class="btn btn-primary" onclick="exportJSONBackup()">Export Full JSON (with AAR)</button>
+      <button type="button" class="btn btn-primary" onclick="exportUnified()" title="Export ticket + AAR + AI verdict + dashboard charts as one file">Export Unified (C4)</button>
+    </div>
+
+    <!-- C4: Import Unified Export -->
+    <div class="card" style="margin-top:12px;">
+      <div class="card-label">C4 — Import Unified Export</div>
+      <p class="step-note">Load a previously exported unified file to restore the ticket, AAR, and AI verdict together.</p>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label for="importUnifiedInput" class="btn btn-ghost" style="cursor:pointer;">Choose Unified File</label>
+        <input type="file" id="importUnifiedInput" accept="application/json,.json" style="display:none;"
+               onchange="handleImportUnified(this)" aria-label="Choose unified export file to import" />
+        <span id="importUnifiedStatus" style="font-size:12px;color:var(--muted);">No file selected.</span>
+      </div>
     </div>
   </div>
 
