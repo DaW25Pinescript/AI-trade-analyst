@@ -27,7 +27,9 @@ export const state = {
   revisedFromId: null,
   // G9: shadow mode state
   shadowMode: false,
-  shadowOutcome: null
+  shadowOutcome: null,
+  // C4: AI verdict from the most recent bridge analysis run (persisted for unified export)
+  bridgeVerdict: null
 };
 
 export function generateTicketID() {
