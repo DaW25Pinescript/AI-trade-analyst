@@ -6,6 +6,9 @@ A cheaper text-only model is used here.
 When a 15M overlay was provided, the arbiter also receives the overlay delta reports
 and applies the lens-aware weighting rules (agreement, refinement, contradiction,
 indicator-only, risk override, no-trade priority).
+
+v2.1b: When deliberation ran, the arbiter also receives the Round 2 (deliberation)
+analyst outputs and applies deliberation weighting rules (Round 2 weighted at 1.5x Round 1).
 """
 from ..models.arbiter_output import FinalVerdict
 from ..core.arbiter_prompt_builder import build_arbiter_prompt
@@ -25,12 +28,17 @@ async def arbiter_node(state: GraphState) -> GraphState:
     Injects overlay delta reports when available and sets overlay-related
     fields in the FinalVerdict (overlay_was_provided, indicator_dependent,
     indicator_dependency_notes).
+
+    v2.1b: Injects deliberation_outputs when deliberation ran so the arbiter
+    can apply peer-informed weighting (Round 2 outputs weighted at 1.5x Round 1).
     """
     analyst_outputs = state["analyst_outputs"]
     ground_truth = state["ground_truth"]
     overlay_delta_reports = state.get("overlay_delta_reports") or []
     overlay_was_provided = ground_truth.m15_overlay is not None
     macro_context = state.get("macro_context")
+    # v2.1b — deliberation outputs (None when deliberation was not enabled)
+    deliberation_outputs = state.get("deliberation_outputs") or []
 
     prompt = build_arbiter_prompt(
         analyst_outputs=analyst_outputs,
@@ -39,6 +47,7 @@ async def arbiter_node(state: GraphState) -> GraphState:
         overlay_delta_reports=overlay_delta_reports,
         overlay_was_provided=overlay_was_provided,
         macro_context=macro_context,
+        deliberation_outputs=deliberation_outputs if deliberation_outputs else None,
     )
 
     response = await acompletion_metered(

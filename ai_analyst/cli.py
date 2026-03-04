@@ -120,6 +120,18 @@ def run(
     lens_of:    bool  = typer.Option(False, "--lens-orderflow/--no-orderflow", help="Orderflow Lite lens"),
     lens_tl:    bool  = typer.Option(False, "--lens-trendlines/--no-trendlines", help="Trendlines lens"),
     lens_smt:   bool  = typer.Option(False, "--lens-smt/--no-smt",            help="SMT Divergence lens"),
+    # v2.1b deliberation
+    deliberation: bool = typer.Option(
+        False,
+        "--deliberation/--no-deliberation",
+        help="v2.1b: Run optional second analyst round (peer deliberation) before arbiter.",
+    ),
+    # v2.2 live progress
+    live: bool = typer.Option(
+        False,
+        "--live/--no-live",
+        help="v2.2: Print live progress as each analyst completes.",
+    ),
 ):
     """Start a new analysis run."""
     from .models.ground_truth import (
@@ -226,11 +238,76 @@ def run(
     typer.echo(f"  Analysts:   {len(execution_config.analysts)} "
                f"({sum(1 for a in execution_config.analysts if a.delivery.value == 'api')} API, "
                f"{sum(1 for a in execution_config.analysts if a.delivery.value == 'manual')} manual)")
+    if deliberation:
+        typer.echo(f"  Deliberation: ENABLED (second analyst round before arbiter)")
+    if live:
+        typer.echo(f"  Live progress: ON")
     typer.echo(_SEP)
 
-    router = ExecutionRouter(execution_config, ground_truth, lens_config, run_state)
+    router = ExecutionRouter(
+        execution_config, ground_truth, lens_config, run_state,
+        enable_deliberation=deliberation,
+    )
 
-    verdict = asyncio.run(router.start())
+    if live:
+        # v2.2 — register a progress queue and print events as analysts complete
+        from .core import progress_store as _ps
+
+        async def _run_with_live_progress() -> Optional[FinalVerdict]:
+            queue = _ps.register(ground_truth.run_id)
+
+            stop = asyncio.Event()
+
+            async def _drain():
+                """Read progress events from the queue until the pipeline is done."""
+                while not stop.is_set():
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=0.3)
+                        stage = event.get("stage", "?")
+                        persona = event.get("persona", "?")
+                        if stage in ("phase1", "deliberation"):
+                            action = event.get("action", "?")
+                            conf = event.get("confidence", 0.0)
+                            typer.echo(
+                                f"  [{stage}] {persona}: {action} "
+                                f"(confidence: {conf:.0%})"
+                            )
+                        elif stage == "phase2_overlay":
+                            contradictions = event.get("contradictions", 0)
+                            typer.echo(
+                                f"  [overlay] {persona}: delta complete "
+                                f"({contradictions} contradiction(s))"
+                            )
+                    except asyncio.TimeoutError:
+                        pass  # re-check stop flag
+                # Drain any remaining events that arrived just before stop was set
+                while True:
+                    try:
+                        event = queue.get_nowait()
+                        stage = event.get("stage", "?")
+                        persona = event.get("persona", "?")
+                        if stage in ("phase1", "deliberation"):
+                            action = event.get("action", "?")
+                            conf = event.get("confidence", 0.0)
+                            typer.echo(
+                                f"  [{stage}] {persona}: {action} "
+                                f"(confidence: {conf:.0%})"
+                            )
+                    except asyncio.QueueEmpty:
+                        break
+
+            drain_task = asyncio.create_task(_drain())
+            try:
+                verdict = await router.start()
+            finally:
+                stop.set()
+                await drain_task
+                _ps.unregister(ground_truth.run_id)
+            return verdict
+
+        verdict = asyncio.run(_run_with_live_progress())
+    else:
+        verdict = asyncio.run(router.start())
 
     if verdict is None:
         pack_dir = run_state.prompt_pack_dir or f"output/runs/{ground_truth.run_id}/manual_prompts/"

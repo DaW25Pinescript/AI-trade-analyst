@@ -19,3 +19,6 @@ class GraphState(TypedDict):
     macro_context: Optional[MacroContext]           # MRO Phase 2 — injected before chart analysis, advisory only
     final_verdict: Optional[FinalVerdict]
     error: Optional[str]
+    # v2.1b — Multi-Round Deliberation
+    enable_deliberation: bool                       # when True, run a second analyst round before arbiter
+    deliberation_outputs: list[AnalystOutput]       # Round 2 peer-informed analyst outputs

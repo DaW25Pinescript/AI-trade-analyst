@@ -62,7 +62,7 @@ from ..models.execution_config import (
 from ..models.analyst_output import AnalystOutput
 from ..models.arbiter_output import FinalVerdict
 from ..models.persona import PersonaType
-from ..graph.analyst_nodes import run_analyst, MINIMUM_VALID_ANALYSTS
+from ..graph.analyst_nodes import run_analyst, run_deliberation_round, MINIMUM_VALID_ANALYSTS
 from .analyst_prompt_builder import build_analyst_prompt
 from .arbiter_prompt_builder import build_arbiter_prompt
 from .prompt_pack_generator import PromptPackGenerator
@@ -86,6 +86,7 @@ class ExecutionRouter:
         lens_config: LensConfig,
         run_state: RunState,
         macro_context: Optional["MacroContext"] = None,
+        enable_deliberation: bool = False,
     ) -> None:
         self.config = config
         self.ground_truth = ground_truth
@@ -93,6 +94,7 @@ class ExecutionRouter:
         self.run_state = run_state
         self.run_id = ground_truth.run_id
         self.macro_context = macro_context
+        self.enable_deliberation = enable_deliberation   # v2.1b
         self.analyst_outputs_dir = OUTPUT_BASE / self.run_id / "analyst_outputs"
         self.analyst_outputs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -126,7 +128,7 @@ class ExecutionRouter:
             )
             return None  # caller waits for manual responses
 
-        # Fully automated — run arbiter immediately
+        # Fully automated — optionally run deliberation, then arbiter
         all_outputs = api_outputs
         return await self._run_arbiter_and_finalise(all_outputs)
 
@@ -236,6 +238,38 @@ class ExecutionRouter:
                 print(f"  [WARN] Could not reload saved API output {path.name}: {e}")
         return outputs
 
+    async def _run_deliberation(
+        self,
+        all_outputs: list[AnalystOutput],
+        configs: list[dict],
+    ) -> list[AnalystOutput]:
+        """
+        v2.1b — Run a deliberation round for all API analysts.
+        Returns the Round 2 outputs. On individual failures, logs a warning and
+        falls back to an empty list so the arbiter can proceed with Round 1 only.
+        """
+        from pydantic import ValidationError as _VE
+        tasks = [
+            run_deliberation_round(
+                config=configs[i],
+                own_output=all_outputs[i],
+                peer_outputs=[all_outputs[j] for j in range(len(all_outputs)) if j != i],
+                run_id=self.run_id,
+            )
+            for i in range(len(all_outputs))
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        delib: list[AnalystOutput] = []
+        for i, result in enumerate(results):
+            model = configs[i].get("model", "unknown") if isinstance(configs[i], dict) else "unknown"
+            if isinstance(result, AnalystOutput):
+                delib.append(result)
+            elif isinstance(result, _VE):
+                logger.warning("Deliberation '%s' returned schema-invalid output: %s", model, result)
+            else:
+                logger.warning("Deliberation '%s' failed: %s", model, result)
+        return delib
+
     async def _run_arbiter_and_finalise(
         self, all_outputs: list[AnalystOutput]
     ) -> FinalVerdict:
@@ -245,6 +279,20 @@ class ExecutionRouter:
 
         overlay_was_provided = bool(self.ground_truth.m15_overlay)
 
+        # v2.1b — run deliberation round if enabled (automated/API analysts only)
+        deliberation_outputs: list[AnalystOutput] | None = None
+        if self.enable_deliberation and all_outputs:
+            # Build configs list from api_analysts so run_deliberation_round gets model names
+            api_configs = [
+                {"model": a.model, "persona": a.persona}
+                for a in self.config.api_analysts
+            ]
+            # Align with all_outputs (which are the validated API outputs in order)
+            configs_for_delib = api_configs[: len(all_outputs)]
+            deliberation_outputs = await self._run_deliberation(all_outputs, configs_for_delib)
+            if deliberation_outputs:
+                print(f"  Deliberation complete: {len(deliberation_outputs)} Round 2 outputs.")
+
         # Generate and optionally write the arbiter prompt to disk
         arbiter_prompt = build_arbiter_prompt(
             analyst_outputs=all_outputs,
@@ -253,6 +301,7 @@ class ExecutionRouter:
             overlay_delta_reports=[],
             overlay_was_provided=overlay_was_provided,
             macro_context=self.macro_context,
+            deliberation_outputs=deliberation_outputs,
         )
 
         # Write arbiter_prompt.txt if prompt pack exists
