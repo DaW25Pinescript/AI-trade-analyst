@@ -107,10 +107,13 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     valid_outputs: list[AnalystOutput] = []
+    configs_used: list[dict] = []
     for i, result in enumerate(results):
-        model = ANALYST_CONFIGS[i]["model"]
+        config = ANALYST_CONFIGS[i]
+        model = config["model"]
         if isinstance(result, AnalystOutput):
             valid_outputs.append(result)
+            configs_used.append(config)
         elif isinstance(result, ValidationError):
             print(f"[WARN] Analyst '{model}' Phase 1 returned schema-invalid output: {result}")
         else:
@@ -123,6 +126,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
         )
 
     state["analyst_outputs"] = valid_outputs
+    state["analyst_configs_used"] = configs_used
     return state
 
 
@@ -143,6 +147,7 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
     """
     ground_truth = state["ground_truth"]
     analyst_outputs = state["analyst_outputs"]
+    configs_used = state["analyst_configs_used"]
 
     if not ground_truth.m15_overlay:
         # Should not happen — pipeline only routes here when overlay is present
@@ -154,7 +159,7 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
 
     tasks = [
         run_overlay_delta(
-            ANALYST_CONFIGS[i % len(ANALYST_CONFIGS)],
+            configs_used[i],
             build_overlay_delta_prompt(ground_truth, analyst_output),
             ground_truth.run_id,
         )
@@ -165,7 +170,7 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
 
     delta_reports: list[OverlayDeltaReport] = []
     for i, result in enumerate(results):
-        model = ANALYST_CONFIGS[i % len(ANALYST_CONFIGS)]["model"]
+        model = configs_used[i]["model"]
         if isinstance(result, OverlayDeltaReport):
             delta_reports.append(result)
         elif isinstance(result, ValidationError):

@@ -322,10 +322,10 @@ Issues addressed by priority:
   - Fix: convert to `async httpx.AsyncClient`; make `scheduler._refresh()` async.
   - Interim option: wrap in `asyncio.to_thread()` while migration is staged.
 
-- [ ] **CRITICAL-4 — Overlay delta node assigns wrong model after Phase 1 partial failure**
-  - `analyst_nodes.py:155` re-indexes by position, not by original config slot.
-  - Fix: track `(config, output)` pairs through Phase 1; pass config directly to Phase 2.
-  - Add `analyst_configs_used` field to `GraphState`; update overlay delta node.
+- [x] **CRITICAL-4 — Overlay delta node assigns wrong model after Phase 1 partial failure** ✅ FIXED 2026-03-03
+  - `analyst_nodes.py` re-indexed by position, not by original config slot.
+  - Fix: added `analyst_configs_used` to `GraphState`; `parallel_analyst_node` tracks configs alongside outputs; `overlay_delta_node` uses tracked configs.
+  - Regression test: `test_overlay_delta_config_alignment.py` (TEST-2).
 
 - [ ] **HIGH-5 — Grok model string `grok/grok-4-vision` does not exist**
   - All ICT_PURIST analyst calls fail silently. Update to verified LiteLLM model ID.
@@ -552,7 +552,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | CRITICAL-1 | `ExecutionRouter` drops `macro_context` + `overlay_delta_reports` — CLI/hybrid arbiter weaker than API arbiter | ✅ **FIXED 2026-03-03** | `execution_router.py` | v2.0.2 |
 | CRITICAL-2 | Sync `httpx.get()` in async MRO pipeline blocks event loop (up to 30 s on cold miss) | ⬜ pending | `finnhub_client.py`, `fred_client.py`, `gdelt_client.py` | v2.0.2 |
 | CRITICAL-3 | Browser bridge default timeout 12 s — G11 always times out before multi-model pipeline completes | ⬜ pending | `api_bridge.js:85` | v2.0.2 |
-| CRITICAL-4 | Overlay delta node re-indexes by position after Phase 1 partial failure — wrong model assigned to surviving analyst | ⬜ pending | `analyst_nodes.py:155` | v2.0.2 |
+| CRITICAL-4 | Overlay delta node re-indexes by position after Phase 1 partial failure — wrong model assigned to surviving analyst | ✅ **FIXED 2026-03-03** | `analyst_nodes.py`, `state.py` | v2.0.2 |
 
 ### ⚠️ HIGH
 
@@ -598,7 +598,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | ID | Test needed | Status | Target |
 |----|------------|--------|--------|
 | TEST-1 | Hybrid mode arbiter receives macro_context + overlay (CRITICAL-1 regression) | ✅ **ADDED 2026-03-03** (`test_execution_router_arbiter.py`) | v2.0.2 |
-| TEST-2 | Overlay delta node — correct config after Phase 1 partial failure (CRITICAL-4) | ⬜ pending | v2.0.2 |
+| TEST-2 | Overlay delta node — correct config after Phase 1 partial failure (CRITICAL-4) | ✅ **ADDED 2026-03-03** (`test_overlay_delta_config_alignment.py`) | v2.0.2 |
 | TEST-3 | Full FastAPI `/analyse` integration test via TestClient | ⬜ pending | v2.1 |
 | TEST-4 | Browser bridge: slow backend → user-visible timeout error (not silent hang) | ⬜ pending | v2.0.2 |
 | TEST-5 | MRO degraded mode end-to-end — all sources fail → valid FinalVerdict | ⬜ pending | v2.1 |
@@ -677,7 +677,7 @@ base with `main` (predates current repo structure) and can be safely deleted.
    with `async httpx.AsyncClient`; make `scheduler._refresh()` async. Use
    `asyncio.to_thread()` as an interim bridge during the migration.
 
-3. **v2.0.2 item: Fix overlay delta model alignment (CRITICAL-4)** *(~3–4 h)*
+3. **v2.0.2 item: Fix overlay delta model alignment (CRITICAL-4)** *(~3–4 h)* ✅ **DONE 2026-03-03**
    Track `(config, output)` pairs through Phase 1; add `analyst_configs_used` to
    `GraphState`; pass correct config to Phase 2. Add regression test (TEST-2).
 
@@ -696,6 +696,6 @@ base with `main` (predates current repo structure) and can be safely deleted.
 7. **C4 — Unified Export (Track C)**
    Single `app/` export including ticket + full analyst JSON logs, importable back.
 
-**Completed:** G1–G12, v1.1–v2.0.1, MRO P1–P4, C1–C3, CRITICAL-1
-**In progress:** v2.0.2 (CRITICAL-2, CRITICAL-3, CRITICAL-4, HIGH-5, HIGH-6, MED-5, MED-8)
+**Completed:** G1–G12, v1.1–v2.0.1, MRO P1–P4, C1–C3, CRITICAL-1, CRITICAL-4
+**In progress:** v2.0.2 (CRITICAL-2, CRITICAL-3, HIGH-5, HIGH-6, MED-5, MED-8)
 **Not started:** v2.1, C4, v2.2
