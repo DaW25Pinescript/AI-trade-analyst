@@ -135,7 +135,7 @@ class TestMacroContextNode:
         assert result["macro_context"] is None
 
     async def test_other_state_keys_unchanged(self):
-        """Node must not mutate any state keys other than macro_context."""
+        """Node returns only the macro_context key (partial state dict, Phase 4)."""
         from ai_analyst.graph import macro_context_node as module
         ctx = _sample_macro_context()
         mock_scheduler = MagicMock()
@@ -143,12 +143,13 @@ class TestMacroContextNode:
 
         with patch.object(module, "_scheduler", mock_scheduler):
             state = _make_state()
-            original_gt = state["ground_truth"]
             result = await module.macro_context_node(state)
 
-        assert result["ground_truth"] is original_gt
-        assert result["analyst_outputs"] == []
-        assert result["final_verdict"] is None
+        # Phase 4: macro_context_node returns a partial dict — only macro_context key.
+        assert set(result.keys()) == {"macro_context"}, (
+            f"macro_context_node must return only the 'macro_context' key, got {set(result.keys())}"
+        )
+        assert result["macro_context"] is ctx
 
     async def test_scheduler_called_via_asyncio_to_thread(self):
         """

@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Optional, Tuple
 
 from macro_risk_officer.config.loader import load_thresholds, load_weights
 from macro_risk_officer.core.models import MacroContext
@@ -94,45 +95,49 @@ class MacroScheduler:
 
         return self._cache
 
-    def _refresh(self, instrument: str) -> tuple[MacroContext, str, int]:
+    def _refresh(self, instrument: str) -> Tuple[MacroContext, str, int]:
         """
         Fetch fresh events from all available sources and compute MacroContext.
+
+        Phase 4: data source fetches run in parallel (ThreadPoolExecutor) to
+        reduce cold-start latency from ~3× slowest source to ~1× slowest source.
 
         Returns (context, source_mask, event_count) where source_mask is a
         comma-separated list of sources that contributed events (e.g. "fred,gdelt").
         """
-        raw_events = []
+
+        def _fetch_finnhub() -> Tuple[str, list]:
+            events = FinnhubClient().fetch_calendar(lookback_days=14, lookahead_days=2)
+            return "finnhub", events or []
+
+        def _fetch_fred() -> Tuple[str, list]:
+            events = FredClient().to_macro_events()
+            return "fred", events or []
+
+        def _fetch_gdelt() -> Tuple[str, list]:
+            events = GdeltClient().fetch_geopolitical_events(lookback_days=3)
+            return "gdelt", events or []
+
+        raw_events: list = []
         active_sources: List[str] = []
 
-        # Finnhub: scheduled event calendar (actual vs forecast surprises)
-        try:
-            finnhub = FinnhubClient()
-            fetched = finnhub.fetch_calendar(lookback_days=14, lookahead_days=2)
-            if fetched:
-                raw_events.extend(fetched)
-                active_sources.append("finnhub")
-        except Exception:
-            pass  # Continue with FRED-only context if Finnhub unavailable
-
-        # FRED: macro series momentum (current vs prior reading)
-        try:
-            fred = FredClient()
-            fetched = fred.to_macro_events()
-            if fetched:
-                raw_events.extend(fetched)
-                active_sources.append("fred")
-        except Exception:
-            pass  # Continue with Finnhub-only context if FRED unavailable
-
-        # GDELT: geopolitical sentiment (no API key required)
-        try:
-            gdelt = GdeltClient()
-            fetched = gdelt.fetch_geopolitical_events(lookback_days=3)
-            if fetched:
-                raw_events.extend(fetched)
-                active_sources.append("gdelt")
-        except Exception:
-            pass  # Non-critical — continue without geopolitical signal
+        # Fan out all three data-source fetches concurrently; each is I/O-bound
+        # so a thread pool is appropriate. Failures are silently swallowed so
+        # that any live source still produces a valid MacroContext.
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [
+                executor.submit(_fetch_finnhub),
+                executor.submit(_fetch_fred),
+                executor.submit(_fetch_gdelt),
+            ]
+            for future in as_completed(futures):
+                try:
+                    source, events = future.result()
+                    if events:
+                        raw_events.extend(events)
+                        active_sources.append(source)
+                except Exception:
+                    pass  # Individual source failure is non-blocking
 
         if not raw_events:
             raise RuntimeError("No events retrieved from any data source.")
@@ -140,7 +145,7 @@ class MacroScheduler:
         events = normalise_events(raw_events)
         exposures = self._instrument_exposures.get(instrument, {})
         context = self._engine.generate_context(events, exposures)
-        return context, ",".join(active_sources), len(events)
+        return context, ",".join(sorted(active_sources)), len(events)
 
     def invalidate(self) -> None:
         """Force a refresh on next get_context() call."""

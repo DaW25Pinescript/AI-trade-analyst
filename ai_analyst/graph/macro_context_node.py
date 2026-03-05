@@ -87,7 +87,7 @@ def _try_feeder_context(state: GraphState) -> Optional[object]:
     return feeder_ctx
 
 
-async def macro_context_node(state: GraphState) -> GraphState:
+async def macro_context_node(state: GraphState) -> dict:
     """
     Populate state["macro_context"] with a MacroContext.
 
@@ -98,24 +98,24 @@ async def macro_context_node(state: GraphState) -> GraphState:
     On any failure (missing API keys, network error, import error) sets
     macro_context to None and logs a warning. The pipeline continues
     with clean price-only analysis.
+
+    Phase 4: returns a partial state dict (only "macro_context") so this node
+    can run in parallel with the chart setup branch without merge conflicts.
     """
     # Phase 2a: prefer live feeder context
     feeder_ctx = _try_feeder_context(state)
     if feeder_ctx is not None:
-        state["macro_context"] = feeder_ctx
-        return state
+        return {"macro_context": feeder_ctx}
 
     # Fallback: TTL-cached scheduler
     instrument: str = state["ground_truth"].instrument
     scheduler = _get_scheduler()
 
     if scheduler is None:
-        state["macro_context"] = None
-        return state
+        return {"macro_context": None}
 
     try:
         ctx = await asyncio.to_thread(scheduler.get_context, instrument=instrument)
-        state["macro_context"] = ctx
         if ctx is None:
             logger.warning(
                 "[MRO] No macro context available for instrument=%s "
@@ -132,6 +132,7 @@ async def macro_context_node(state: GraphState) -> GraphState:
                 ctx.confidence * 100,
                 ctx.time_horizon_days,
             )
+        return {"macro_context": ctx}
     except Exception as exc:
         logger.warning(
             "[MRO] MacroContext fetch raised unexpectedly (%s: %s) — "
@@ -139,6 +140,4 @@ async def macro_context_node(state: GraphState) -> GraphState:
             type(exc).__name__,
             exc,
         )
-        state["macro_context"] = None
-
-    return state
+        return {"macro_context": None}

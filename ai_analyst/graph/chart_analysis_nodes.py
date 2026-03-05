@@ -6,24 +6,55 @@ from .state import GraphState
 from ..core.chart_analysis_runtime import resolve_chart_lenses
 
 
-async def chart_base_node(state: GraphState) -> GraphState:
-    """Stage marker for loading chart-analysis base contract."""
-    state["chart_analysis_runtime"] = {
-        "base_loaded": True,
-        "auto_detect_ran": False,
+async def chart_base_node(state: GraphState) -> dict:
+    """
+    Stage marker for loading chart-analysis base contract.
+
+    Returns a partial state dict (Phase 4: parallel fan-out safe — only writes
+    chart_analysis_runtime so it does not conflict with macro_context_node).
+    """
+    return {
+        "chart_analysis_runtime": {
+            "base_loaded": True,
+            "auto_detect_ran": False,
+        }
     }
-    return state
 
 
-async def chart_auto_detect_node(state: GraphState) -> GraphState:
-    """Resolve the runtime lens set while respecting explicit CLI overrides."""
-    runtime = state.get("chart_analysis_runtime") or {}
+async def chart_auto_detect_node(state: GraphState) -> dict:
+    """
+    Resolve the runtime lens set while respecting explicit CLI overrides.
+
+    Returns a partial state dict (Phase 4: only writes chart_analysis_runtime).
+    """
+    runtime = dict(state.get("chart_analysis_runtime") or {})
     runtime["auto_detect_ran"] = True
     runtime["selected_lenses"] = resolve_chart_lenses(
         state["ground_truth"], state["lens_config"]
     )
-    state["chart_analysis_runtime"] = runtime
-    return state
+    return {"chart_analysis_runtime": runtime}
+
+
+async def chart_setup_node(state: GraphState) -> dict:
+    """
+    Phase 4 combined chart-setup node used in the parallel pipeline.
+
+    Merges chart_base_node and chart_auto_detect_node into a single atomic
+    node so that the parallel fan-out (macro_context ∥ chart_setup) writes to
+    different state keys — no LangGraph merge conflict.
+
+    Returns a partial state dict (only chart_analysis_runtime).
+    """
+    selected_lenses = resolve_chart_lenses(
+        state["ground_truth"], state["lens_config"]
+    )
+    return {
+        "chart_analysis_runtime": {
+            "base_loaded": True,
+            "auto_detect_ran": True,
+            "selected_lenses": selected_lenses,
+        }
+    }
 
 
 async def chart_lenses_node(state: GraphState) -> GraphState:

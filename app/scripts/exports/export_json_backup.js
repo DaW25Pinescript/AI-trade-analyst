@@ -1,5 +1,6 @@
 import { state } from '../state/model.js';
 import { TICKET_SCHEMA_VERSION, AAR_SCHEMA_VERSION, validateTicketPayload, validateAARPayload } from '../schema/backup_validation.js';
+import { saveTradeEntry } from '../state/storage_indexeddb.js';
 
 function readTextInput(id, fallback = '') {
   const el = document.getElementById(id);
@@ -213,6 +214,11 @@ export function exportJSONBackup({ silent = false, filenamePrefix = 'AI_Trade_Ba
   a.download = `${filenamePrefix}_${state.ticketID || 'draft'}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  // Phase 4: auto-persist to IndexedDB so the dashboard can load without re-uploading.
+  saveTradeEntry(payload.ticket, payload.aar).catch(() => {
+    // Fail silently — IndexedDB is an optimistic cache; the file export is authoritative.
+  });
 
   return payload;
 }

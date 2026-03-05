@@ -1,4 +1,5 @@
 import { computeMetrics, parseBackupEntries } from '../metrics/metrics_engine.js';
+import { loadAllTradeHistory, getTradeCount } from '../state/storage_indexeddb.js';
 import {
   capturePlotlyChartsForExport,
   isPlotlyAvailable,
@@ -264,6 +265,35 @@ function renderStats(metrics) {
   renderPeriodBreakdown('dashboardQuarterlyBreakdown', metrics.quarterlyBreakdown, 'Quarterly Breakdown');
 }
 
+/**
+ * Phase 4: load all trades from IndexedDB (auto-saved on export) and render
+ * the dashboard. Falls back gracefully if IndexedDB is unavailable.
+ */
+export async function loadDashboardFromStorage() {
+  const statusEl = document.getElementById('dashboardStatus');
+  try {
+    const count = await getTradeCount();
+    if (count === 0) {
+      if (statusEl) statusEl.textContent = 'No trades in local storage yet — export a trade to populate it.';
+      return;
+    }
+
+    if (statusEl) statusEl.textContent = `Loading ${count} trade(s) from local storage…`;
+
+    const rawEntries = await loadAllTradeHistory();
+    // rawEntries: [{ticketId, createdAt, asset, ticket, aar}]
+    const payloads  = rawEntries.map((e) => ({ ticket: e.ticket, aar: e.aar }));
+    const normalized = parseBackupEntries(payloads);
+    _loadedEntries = normalized;
+    const tickets = normalized.map(({ ticket }) => ticket);
+    const aars    = normalized.map(({ aar }) => aar);
+    const metrics = computeMetrics(tickets, aars);
+    renderStats(metrics);
+  } catch {
+    if (statusEl) statusEl.textContent = 'Could not load from local storage — try uploading JSON files instead.';
+  }
+}
+
 export function initDashboard() {
   const input = document.getElementById('dashboardJsonFiles');
   if (!input) return;
@@ -295,4 +325,10 @@ export function initDashboard() {
     const metrics = computeMetrics(tickets, aars);
     renderStats(metrics);
   });
+
+  // Phase 4: wire up "Load from storage" button if present
+  const storageBtn = document.getElementById('dashboardLoadFromStorage');
+  if (storageBtn) {
+    storageBtn.addEventListener('click', () => loadDashboardFromStorage());
+  }
 }
