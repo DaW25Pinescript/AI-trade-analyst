@@ -38,6 +38,32 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+
+async def _read_upload_bounded(upload: UploadFile, max_bytes: int, label: str) -> bytes:
+    """Read an upload in chunks, raising 413 as soon as the limit is exceeded.
+
+    This avoids loading an arbitrarily large file into memory before
+    rejecting it — the server stops reading at max_bytes + 1.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    chunk_size = 64 * 1024  # 64 KB
+    while True:
+        chunk = await upload.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"{label} exceeds the {max_bytes // (1024 * 1024)} MB "
+                    "per-image size limit. Resize or compress the image before uploading."
+                ),
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
 from ..models.ground_truth import (
     GroundTruthPacket,
     RiskConstraints,
@@ -429,15 +455,9 @@ async def analyse(
 
     for tf_label, upload in clean_chart_uploads.items():
         if upload is not None:
-            raw_bytes = await upload.read()
-            if len(raw_bytes) > _MAX_IMAGE_BYTES:
-                raise HTTPException(
-                    status_code=422,
-                    detail=(
-                        f"Chart {tf_label} exceeds the {_MAX_IMAGE_BYTES // (1024 * 1024)} MB "
-                        "per-image size limit. Resize or compress the image before uploading."
-                    ),
-                )
+            raw_bytes = await _read_upload_bounded(
+                upload, _MAX_IMAGE_BYTES, f"Chart {tf_label}"
+            )
             charts[tf_label] = base64.b64encode(raw_bytes).decode("utf-8")
             screenshot_metadata.append(
                 ScreenshotMetadata(
@@ -467,15 +487,9 @@ async def analyse(
                 status_code=422,
                 detail="overlay_indicator_claims must not be empty when overlay is provided.",
             )
-        raw_bytes = await chart_m15_overlay.read()
-        if len(raw_bytes) > _MAX_IMAGE_BYTES:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Overlay image exceeds the {_MAX_IMAGE_BYTES // (1024 * 1024)} MB "
-                    "per-image size limit. Resize or compress the image before uploading."
-                ),
-            )
+        raw_bytes = await _read_upload_bounded(
+            chart_m15_overlay, _MAX_IMAGE_BYTES, "Overlay image"
+        )
         m15_overlay_b64 = base64.b64encode(raw_bytes).decode("utf-8")
         m15_overlay_meta = ScreenshotMetadata(
             timeframe=OVERLAY_TIMEFRAME,
@@ -673,12 +687,9 @@ async def analyse_stream(
 
     for tf_label, upload in clean_chart_uploads.items():
         if upload is not None:
-            raw_bytes = await upload.read()
-            if len(raw_bytes) > _MAX_IMAGE_BYTES:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Chart {tf_label} exceeds the {_MAX_IMAGE_BYTES // (1024*1024)} MB size limit.",
-                )
+            raw_bytes = await _read_upload_bounded(
+                upload, _MAX_IMAGE_BYTES, f"Chart {tf_label}"
+            )
             charts[tf_label] = base64.b64encode(raw_bytes).decode("utf-8")
             screenshot_metadata.append(
                 ScreenshotMetadata(timeframe=tf_label, lens="NONE", evidence_type="price_only")
@@ -697,12 +708,9 @@ async def analyse_stream(
                 status_code=422,
                 detail="overlay_indicator_claims must not be empty when overlay is provided.",
             )
-        raw_bytes = await chart_m15_overlay.read()
-        if len(raw_bytes) > _MAX_IMAGE_BYTES:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Overlay image exceeds the {_MAX_IMAGE_BYTES // (1024*1024)} MB size limit.",
-            )
+        raw_bytes = await _read_upload_bounded(
+            chart_m15_overlay, _MAX_IMAGE_BYTES, "Overlay image"
+        )
         m15_overlay_b64 = base64.b64encode(raw_bytes).decode("utf-8")
         m15_overlay_meta = ScreenshotMetadata(
             timeframe=OVERLAY_TIMEFRAME,

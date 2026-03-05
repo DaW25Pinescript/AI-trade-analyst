@@ -24,6 +24,22 @@ No trade is ever blocked solely due to MRO unavailability.
 
 ---
 
+## Key Timing Parameters
+
+| Parameter | Default | Config location | Description |
+|-----------|---------|-----------------|-------------|
+| `scheduler.ttl_seconds` | 1800 (30 min) | `macro_risk_officer/config/thresholds.yaml` | How long a cached MacroContext is reused before re-fetching |
+| `scheduler.stale_threshold_seconds` | 3600 (60 min) | `macro_risk_officer/config/thresholds.yaml` | Age after which context is flagged as STALE in `kpi` report |
+| `FEEDER_STALE_SECONDS` | 3600 (60 min) | Environment variable | Age after which the `/feeder/health` endpoint reports `stale: true` |
+
+**Expected polling cadence:** The scheduler refreshes context every 30 minutes (TTL).
+The feeder bridge (`POST /feeder/ingest`) should be called by an external cron job or
+monitoring script at a similar or faster interval (e.g. every 15–30 minutes) to keep
+`/feeder/health` fresh. If no feeder payload is ingested within `FEEDER_STALE_SECONDS`,
+the health endpoint returns `stale: true` and the operator dashboard shows a yellow warning.
+
+---
+
 ## Diagnosis
 
 ### Step 1 — Check KPI report
