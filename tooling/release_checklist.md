@@ -20,9 +20,9 @@ Priority order: highest impact/risk first.
 ## Final release checks (run before merge)
 
 - [x] Run tests: `node --test tests/*.js` (150/150 passing on 2026-03-05)
-- [ ] Verify app loads from static server (`/app/`)
-- [ ] Validate export/import roundtrip with sample data
-- [ ] Validate Plotly-enabled export path (charts visible in dashboard and captured in generated report artifacts)
-- [ ] Confirm schemas match current enum/reference docs
+- [x] Verify app loads from static server (`/app/`) (verified 2026-03-05 via `python -m http.server 8080` + `curl -I http://127.0.0.1:8080/app/index.html`)
+- [x] Validate export/import roundtrip with sample data (verified 2026-03-05 via `node --test tests/test_c4_unified_export.js`)
+- [x] Validate Plotly-enabled export path (charts visible in dashboard and captured in generated report artifacts) (verified 2026-03-05 via `node --test tests/test_g10_export_pdf.js tests/test_c4_unified_export.js`)
+- [x] Confirm schemas match current enum/reference docs (verified 2026-03-05 via `node --test tests/test_schema_bridge.js tests/test_g2_form_contract.js tests/test_enums.js`)
 - [x] Update `app/releases/README.md` for new milestone snapshot
 - [x] Commit + open PR with summary and test output

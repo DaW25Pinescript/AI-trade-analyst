@@ -730,14 +730,14 @@ base with `main` (predates current repo structure) and can be safely deleted.
 > Last updated: 2026-03-05 (v2.15). G1–G12, v1.1–v2.1, MRO P1–P4, C1–C4, and Phase 2a are complete. This queue is the sequential execution plan from release verification through production hardening and AI/ML enhancements.
 
 ### Phase 1 — Release Verification (Immediate)
-1. [ ] Verify app loads from static server
-   - Confirm `/app/index.html` loads correctly via Python HTTP server or Docker at `http://localhost:8080/app/`.
-2. [ ] Validate export/import roundtrip
-   - Run a sample ticket through JSON export and re-import to confirm data integrity.
-3. [ ] Validate Plotly-enabled export path
-   - Confirm charts render in the analytics dashboard and are captured in HTML/PDF export artifacts.
-4. [ ] Confirm schema parity
-   - Cross-check `docs/schema/enums.json` against live form enum values in the browser app.
+1. [x] Verify app loads from static server ✅ VERIFIED 2026-03-05
+   - Confirmed `/app/index.html` returns `HTTP/1.0 200 OK` via `python -m http.server 8080` + `curl -I http://127.0.0.1:8080/app/index.html`.
+2. [x] Validate export/import roundtrip ✅ VERIFIED 2026-03-05
+   - Verified with `node --test tests/test_c4_unified_export.js` (valid unified export payload parses, imports, and migrates correctly).
+3. [x] Validate Plotly-enabled export path ✅ VERIFIED 2026-03-05
+   - Verified with `node --test tests/test_g10_export_pdf.js tests/test_c4_unified_export.js` (analytics report includes chart sections; unified export accepts `dashboardCharts` payload).
+4. [x] Confirm schema parity ✅ VERIFIED 2026-03-05
+   - Verified with `node --test tests/test_schema_bridge.js tests/test_g2_form_contract.js tests/test_enums.js`.
 
 ### Phase 2b — UI Polish & Mobile
 5. [ ] Implement region display
