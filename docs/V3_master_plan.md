@@ -1,5 +1,5 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.14
+**Version:** 2.15
 **Updated:** 2026-03-05
 **Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**
 
@@ -727,36 +727,66 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Next Immediate Steps (Priority Order)
 
-> Last updated: 2026-03-04 (v2.13). All tracks complete through G12 / v2.1 / MRO P1–P4 / C4 / Phase 2a. Test suite: 150 browser + 313 AI analyst + 153 MRO = 616 passing, 0 failing.
-> Phase 2a (live feeder bridge + float fix) is now complete. Next focus: Phase 2b (UI polish, region display, mobile, next T.R.A.D.E. page).
+> Last updated: 2026-03-05 (v2.15). G1–G12, v1.1–v2.1, MRO P1–P4, C1–C4, and Phase 2a are complete. This queue is the sequential execution plan from release verification through production hardening and AI/ML enhancements.
 
-1. ✅ **v2.0.2 item: Raise browser bridge timeout to 180 s (CRITICAL-3)** — DONE 2026-03-03
-2. ✅ **v2.0.2 item: Unblock event loop in async MRO pipeline (CRITICAL-2)** — DONE 2026-03-03
-3. ✅ **v2.0.2 item: Fix overlay delta model alignment (CRITICAL-4)** — DONE 2026-03-03
-4. ✅ **v2.0.2 item: Pass macro_context + overlay to arbiter in CLI/hybrid paths (CRITICAL-1)** — DONE 2026-03-03
-5. ✅ **v2.0.2 item: Fix Grok model string → `xai/grok-vision-beta` (HIGH-5)** — DONE 2026-03-04
-6. ✅ **v2.0.2 item: Add image size guard + per-run cost ceiling (HIGH-6)** — DONE 2026-03-04
-7. ✅ **v2.0.2 item: Fix retry logic — non-retriable exceptions + exp backoff (HIGH-1)** — DONE 2026-03-04
-8. ✅ **v2.0.2 item: Dynamic timeframes from uploaded files (MED-5)** — DONE 2026-03-04
-9. ✅ **v2.0.2 item: m15Overlay shape validation replaces null-only guard (MED-8)** — DONE 2026-03-04
-10. ✅ **v2.1: All remaining HIGH debt items (HIGH-2/3/4/7/8)** — DONE 2026-03-04
-11. ✅ **v2.1: All remaining MED/LOW debt items (MED-1/2/3/4/6/7 + LOW-4/5/6)** — DONE 2026-03-04
-12. ✅ **v2.1: TEST-9 (thread safety), TEST-10 (bias Literal), TEST-3 (lifespan TestClient) guards added** — DONE 2026-03-04
-13. ✅ **Audit (v2.11): Plotly regression in `dashboard.js` fixed** — `buildAnalyticsReportHTML` default param `doc = document` → `doc = (typeof document !== 'undefined' ? document : null)`; browser suite restored to 120/120 — DONE 2026-03-04
-14. ✅ **Audit (v2.11): LOW-2 closed** — CI `mro-tests` job already installs `macro_risk_officer/requirements.txt` + CVE scan + coverage gate; tracking entry corrected — DONE 2026-03-04
-15. ✅ **C4 — Unified Export (Track C)** — `export_unified.js`, `import_unified.js`, `buildBackupPayload` exported, `state.bridgeVerdict` persisted, "Export Unified (C4)" button + import card in UI, 13 new tests (133/133 browser suite) — DONE 2026-03-04
-16. ✅ **Phase 2a — Live Feeder Bridge + Float Fix** — `POST /feeder/ingest` endpoint accepts feeder contract JSON and caches MacroContext in `app.state`; `GET /feeder/health` reports staleness + source health; `macro_context_node` now prefers live feeder context (fresh) over TTL-cached scheduler; `verdict_card.js` displays confidence as percentage (`formatConfidencePct`); `ticket_draft.py` adds `aiEdgeScorePct`; `api_bridge.js` gains `postFeederPayload()` + `getFeederHealth()` helpers; 25 new tests (10 Python + 15 JS). 150/150 browser, 313/313 analyst. — DONE 2026-03-04
+### Phase 1 — Release Verification (Immediate)
+1. [ ] Verify app loads from static server
+   - Confirm `/app/index.html` loads correctly via Python HTTP server or Docker at `http://localhost:8080/app/`.
+2. [ ] Validate export/import roundtrip
+   - Run a sample ticket through JSON export and re-import to confirm data integrity.
+3. [ ] Validate Plotly-enabled export path
+   - Confirm charts render in the analytics dashboard and are captured in HTML/PDF export artifacts.
+4. [ ] Confirm schema parity
+   - Cross-check `docs/schema/enums.json` against live form enum values in the browser app.
 
-17. **Phase 2b — UI polish, region display, mobile, next T.R.A.D.E. page**
+### Phase 2b — UI Polish & Mobile
+5. [ ] Implement region display
+   - Add geographic/session region visualization to the operator dashboard.
+6. [ ] Mobile layout optimization
+   - Audit and fix responsive breakpoints in `app/styles/` for small-screen usability.
+7. [ ] UI polish pass
+   - Refine spacing, typography, and component alignment per Phase 2b spec.
 
-18. **v2.1b — Multi-Round Deliberation**
-    - Optional second-round fan-out after initial results
-    - Arbiter receives both Round 1 and Round 2 outputs, weighted by round
-    - Config flag: `enable_deliberation: bool = False` (off by default)
+### Phase 3 — Monitoring & Observability
+8. [ ] Add structured logging with correlation IDs
+   - Thread a `run_id` through all LangGraph nodes and API responses for end-to-end traceability.
+9. [ ] Add pipeline metrics collection
+   - Instrument LLM cost per run, pipeline latency, and analyst agreement rate; emit to JSONL or a metrics endpoint.
+10. [ ] Build operator health dashboard
+   - Expose `/metrics` or a simple HTML dashboard showing API health, cost usage, and feeder staleness.
 
-17. **v2.2 — Streaming + Real-Time UI**
-    - Server-Sent Events from FastAPI as analysts complete
-    - CLI live progress display
+### Phase 4 — Performance
+11. [ ] Cache macro context responses
+   - Add TTL-based caching in `macro_risk_officer/` to avoid redundant data-source fetches.
+12. [ ] Parallelize analyst image analysis
+   - Refactor LangGraph nodes to fan out chart analysis steps concurrently where possible.
+13. [ ] Audit browser IndexedDB query performance
+   - Profile ticket history queries and add pagination or indexed lookups for large trade histories.
 
-**Completed:** G1–G12, v1.1–v2.1, MRO P1–P4, C1–C4, LOW-2, Plotly regression fix
-**Not started:** v2.1b (deliberation), v2.2 (streaming)
+### Phase 5 — Operational Tooling
+14. [ ] CLI: audit trail export
+   - Add a `cli.py export-audit` command that dumps all runs, verdicts, and outcomes to CSV/JSON.
+15. [ ] CLI: bulk AAR import
+   - Add a `cli.py import-aar` command for batch after-action review updates from CSV.
+16. [ ] Analytics CSV export
+   - Wire the analytics dashboard export button to produce a CSV compatible with external tools.
+
+### Phase 6 — Production Hardening
+17. [ ] Configure CORS origin whitelist
+   - Replace wildcard `*` with explicit allowed origins via `.env` `ALLOWED_ORIGINS`.
+18. [ ] Set up reverse proxy (Caddy/nginx)
+   - Add a `caddy/` or `nginx/` config for HTTPS termination in the Docker Compose setup.
+19. [ ] Harden Docker runtime
+   - Switch to a non-root user in Dockerfile, add `read_only: true` and `tmpfs: /tmp` in `docker-compose.yml`.
+20. [ ] Secrets manager integration
+   - Document (or implement) AWS/GCP/Vault secret injection as an alternative to `.env` files.
+
+### Phase 7 — AI/ML Enhancement
+21. [ ] Feedback loop: outcomes → prompt refinement
+   - Build a script that reads AAR outcome data from SQLite and surfaces patterns for prompt improvement.
+22. [ ] Bias detection in analyst outputs
+   - Add a post-processing step to the arbiter that flags low-diversity consensus or single-persona dominance.
+23. [ ] Fallback model routing
+   - Add logic to `core/api_client.py` to retry with a secondary model if the primary API errors or exceeds a cost ceiling.
+
+**Rationale for sequencing:** start with low-risk release verification, then UI fit-and-finish, then observability/performance/tooling, and finish with operational hardening and AI enhancements on top of a stable baseline.
