@@ -271,7 +271,7 @@ def test_macro_context_node_prefers_feeder():
         "_feeder_ingested_at": datetime.now(timezone.utc),
     }
 
-    result = asyncio.get_event_loop().run_until_complete(macro_context_node(state))
+    result = asyncio.run(macro_context_node(state))
     assert result["macro_context"] is not None
     assert result["macro_context"].regime == "risk_off"
     assert result["macro_context"].conflict_score == -0.3

@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.13
-**Updated:** 2026-03-04
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix)**
+**Version:** 2.14
+**Updated:** 2026-03-05
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**
 
 ---
 
@@ -21,8 +21,8 @@ The two tracks are **independent** but share conceptual schema (instrument, sess
 fields, regime, risk constraints). A formal integration bridge (Track C) is planned from
 G6/v2.0 onwards.
 
-### Current verification snapshot (2026-03-04)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **133/133 passing**.
+### Current verification snapshot (2026-03-05)
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **150/150 passing**.
   - +1 added (2026-03-03): `test_g11_bridge.js` — confirms `analyseViaBridge` uses a 3-minute timeout signal (guards CRITICAL-3).
   - +3 added (2026-03-04): `test_g11_bridge.js` — timeframes match uploaded charts (guards MED-5).
   - +8 added (2026-03-04): `test_v202_fixes.js` — m15Overlay shape validation replaces null-only guard (guards MED-8).
@@ -43,9 +43,10 @@ G6/v2.0 onwards.
   - +2 added (2026-03-04): `test_v202_fixes.py` — HIGH-5 (Grok model string), HIGH-6 (cost ceiling), HIGH-1 (retry logic).
   - +23 added (2026-03-04): `test_v21_fixes.py` — TEST-9 (MacroScheduler thread safety), TEST-10 (FinalVerdict.final_bias Literal), HIGH-2 (timezone-aware datetimes), MED-7 (is_text_only list blocks), LOW-5 (ExecutionConfig.mode Literal).
   - +10 added (2026-03-04): `test_phase2a_feeder_bridge.py` — Phase 2a feeder ingest endpoint, feeder health endpoint, macro_context_node feeder priority, ticket_draft aiEdgeScorePct. 313/313 passing.
+  - +1 stability fix (2026-03-05): `test_phase2a_feeder_bridge.py` now uses `asyncio.run(...)` for Python 3.10+ compatibility (avoids missing default-loop RuntimeError).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 616 passing, 0 failing** across all three suites.
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix)**. Phase 2b (UI polish, region display, mobile, next T.R.A.D.E. page) is next.
+- **Total: 700 passing, 0 failing** across all three suites (plus 13 intentional MRO skips).
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. Phase 2b (UI polish, region display, mobile, next T.R.A.D.E. page) is next.
 
 ---
 
@@ -653,7 +654,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | LOW-7 | `storage_indexeddb.js` is a localStorage stub — 5–10 MB ceiling as journal grows | ⬜ pending | `storage_indexeddb.js` | v2.x |
 | LOW-8 | CORS `allow_headers=["*"]` overly permissive | ⬜ pending | `api/main.py:108` | v2.x |
 
-### Testing Gaps (from audit TEST-1 through TEST-10)
+### Testing Gaps (from audit TEST-1 through TEST-11)
 
 | ID | Test needed | Status | Target |
 |----|------------|--------|--------|
@@ -667,6 +668,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | TEST-8 | `buildAnalyseFormData` — timeframes match uploaded charts (guards MED-5) | ✅ **ADDED 2026-03-04** (`test_g11_bridge.js` — 3 new tests) | v2.0.2 |
 | TEST-9 | Concurrent `/analyse` cache misses call `_refresh()` once with lock (guards HIGH-4) | ✅ **ADDED 2026-03-04** (`test_v21_fixes.py` — 2 tests) | v2.1 |
 | TEST-10 | Unexpected `final_bias` value → ticket draft `rawAIReadBias` empty (guards HIGH-3) | ✅ **ADDED 2026-03-04** (`test_v21_fixes.py` — 4 tests; ValidationError now raised) | v2.1 |
+| TEST-11 | Flaky strict-equality determinism check in feeder ingest due to time-decay micro-drift | ✅ **FIXED 2026-03-05** (`test_modal_worker.py` — field-level assertions + `pytest.approx` for asset pressure floats) | v2.1 |
 
 ### Architectural Debt (long-term, no immediate target)
 
