@@ -969,6 +969,80 @@ def feedback():
 
 
 # ---------------------------------------------------------------------------
+# backtest command (Phase 8b)
+# ---------------------------------------------------------------------------
+
+@app.command()
+def backtest(
+    instrument: Optional[str] = typer.Option(
+        None, "--instrument", "-i",
+        help="Filter by instrument (e.g. XAUUSD). Default: all.",
+    ),
+    regime: Optional[str] = typer.Option(
+        None, "--regime", "-r",
+        help="Filter by macro regime (e.g. risk_on, risk_off, neutral).",
+    ),
+    session: Optional[str] = typer.Option(
+        None, "--session", "-s",
+        help="Filter by session (e.g. NY, London).",
+    ),
+    min_confidence: float = typer.Option(
+        0.0, "--min-confidence",
+        help="Minimum arbiter confidence threshold (0.0-1.0).",
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o",
+        help="Export backtest results to JSON file.",
+    ),
+):
+    """Phase 8b — Run strategy backtest over historical outcomes."""
+    from .core.backtester import run_backtest, BacktestConfig
+
+    config = BacktestConfig(
+        instrument_filter=instrument,
+        regime_filter=regime,
+        session_filter=session,
+        min_confidence=min_confidence,
+    )
+    report = run_backtest(config)
+    typer.echo(report.format())
+
+    if output:
+        output.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+        typer.echo(f"  Results exported to: {output}")
+
+
+# ---------------------------------------------------------------------------
+# e2e command (Phase 8c)
+# ---------------------------------------------------------------------------
+
+@app.command()
+def e2e():
+    """Phase 8c — Run end-to-end integration validation checks."""
+    from .core.e2e_validator import run_e2e_validation
+
+    report = run_e2e_validation()
+    typer.echo(report.format())
+
+    if not report.all_passed:
+        raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
+# plugins command (Phase 8d)
+# ---------------------------------------------------------------------------
+
+@app.command()
+def plugins():
+    """Phase 8d — List all registered plugins (personas, data sources, hooks)."""
+    from .core.plugin_registry import registry
+
+    registry.discover_builtins()
+    registry.discover_plugins()
+    typer.echo(registry.format_summary())
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

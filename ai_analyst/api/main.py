@@ -1109,3 +1109,108 @@ async def analytics_csv_export():
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=analytics_export.csv"},
     )
+
+
+# ── Phase 8a: Advanced Analytics Dashboard ─────────────────────────────────
+
+@app.get("/analytics/dashboard")
+async def analytics_dashboard():
+    """
+    Phase 8a — Advanced Analytics Dashboard.
+
+    Returns a self-contained HTML page with Chart.js visualizations:
+    regime accuracy, confidence calibration, persona heatmap, outcome trends,
+    decision distribution, and instrument breakdown.
+    """
+    from ..core.analytics_dashboard import build_analytics_data, render_analytics_dashboard
+    from fastapi.responses import HTMLResponse
+
+    data = build_analytics_data()
+    html = render_analytics_dashboard(data)
+    return HTMLResponse(content=html)
+
+
+# ── Phase 8b: Backtesting endpoint ─────────────────────────────────────────
+
+@app.get("/backtest")
+async def backtest_endpoint(
+    instrument: Optional[str] = None,
+    regime: Optional[str] = None,
+    min_confidence: float = 0.0,
+):
+    """
+    Phase 8b — Run a strategy backtest over historical outcomes.
+
+    Query parameters:
+        instrument: Filter by instrument (e.g. XAUUSD)
+        regime: Filter by macro regime (e.g. risk_on, risk_off, neutral)
+        min_confidence: Minimum arbiter confidence threshold (0.0-1.0)
+
+    Returns JSON with strategy-level metrics (Sharpe, drawdown, win rate, etc.)
+    """
+    from ..core.backtester import run_backtest, BacktestConfig
+
+    config = BacktestConfig(
+        instrument_filter=instrument,
+        regime_filter=regime,
+        min_confidence=min_confidence,
+    )
+    report = run_backtest(config)
+    return JSONResponse(content={"status": "ok", "backtest": report.to_dict()})
+
+
+# ── Phase 8c: E2E validation endpoint ──────────────────────────────────────
+
+@app.get("/e2e")
+async def e2e_validation():
+    """
+    Phase 8c — Run end-to-end integration validation checks.
+
+    Returns a structured report of all validation results.
+    """
+    from ..core.e2e_validator import run_e2e_validation
+    from dataclasses import asdict
+
+    report = run_e2e_validation()
+    return JSONResponse(content={
+        "status": "ok" if report.all_passed else "degraded",
+        "total_checks": report.total_checks,
+        "passed": report.passed,
+        "failed": report.failed,
+        "duration_ms": report.duration_ms,
+        "checks": [asdict(c) for c in report.checks],
+    })
+
+
+# ── Phase 8d: Plugin registry endpoint ─────────────────────────────────────
+
+@app.get("/plugins")
+async def plugins_endpoint():
+    """
+    Phase 8d — List all registered plugins (personas, data sources, hooks).
+    """
+    from ..core.plugin_registry import registry
+    from dataclasses import asdict
+
+    registry.discover_builtins()
+    registry.discover_plugins()
+
+    return JSONResponse(content={
+        "status": "ok",
+        "total_plugins": registry.total_plugins,
+        "personas": [
+            {"name": p.name, "version": p.version, "description": p.description,
+             "specialization": p.specialization, "enabled": p.enabled}
+            for p in registry.list_personas()
+        ],
+        "data_sources": [
+            {"name": s.name, "version": s.version, "description": s.description,
+             "source_type": s.source_type, "enabled": s.enabled}
+            for s in registry.list_data_sources()
+        ],
+        "hooks": [
+            {"name": h.name, "version": h.version, "description": h.description,
+             "events": [e.value for e in h.events], "enabled": h.enabled}
+            for h in registry.list_hooks()
+        ],
+    })
