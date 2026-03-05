@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.17
+**Version:** 2.18
 **Updated:** 2026-03-05
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**, **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**
 
 ---
 
@@ -22,7 +22,8 @@ fields, regime, risk constraints). A formal integration bridge (Track C) is plan
 G6/v2.0 onwards.
 
 ### Current verification snapshot (2026-03-05)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **166/166 passing**.
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **189/189 passing**.
+  - +13 added (2026-03-05): `test_phase4_performance.js` — Phase 4 IndexedDB adapter logic, cursor pagination, asset extraction, parallel source fetch contract, dashboard storage integration. 189/189 passing.
   - +1 added (2026-03-03): `test_g11_bridge.js` — confirms `analyseViaBridge` uses a 3-minute timeout signal (guards CRITICAL-3).
   - +3 added (2026-03-04): `test_g11_bridge.js` — timeframes match uploaded charts (guards MED-5).
   - +8 added (2026-03-04): `test_v202_fixes.js` — m15Overlay shape validation replaces null-only guard (guards MED-8).
@@ -47,10 +48,11 @@ G6/v2.0 onwards.
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
   - +16 added (2026-03-05): `test_phase2b_completion.js` — Phase 2b region display on operator dashboard, mobile breakpoints, UI polish, session clock unit tests. 166/166 passing.
   - +10 added (2026-03-05): `test_phase3_monitoring.js` — Phase 3 metrics response shape, RunMetrics entry validation, decision distribution, correlation ID in audit log, cost/latency bounds, dashboard structure. 176/176 passing.
-- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **336/336 passing**.
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **347/347 passing**.
   - +23 added (2026-03-05): `test_phase3_monitoring.py` — CorrelationContext (set/get/reset/filter/idempotent logging), RunMetrics (fields/roundtrip/serialization), MetricsStore (empty/record/aggregate/bounded/error_rate/instruments/thread_safety/recent_limit), global singleton, audit log correlation_id, MetricsSnapshot serialization. 336/336 passing.
+  - +11 added (2026-03-05): `test_phase4_performance.py` — chart_setup_node partial dict, macro_context_node partial dict, scheduler ThreadPoolExecutor use, all-sources-fail graceful degradation, pipeline topology (chart_setup present, chart_base/auto_detect removed), parallel fan-in invariant. 347/347 passing.
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **234 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 746 passing, 0 failing** across all three suites (plus 16 intentional MRO skips).
+- **Total: 770 passing, 0 failing** across all three suites (plus 16 intentional MRO skips).
 - Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. **Phase 2b complete (region display on operator dashboard, mobile layout optimization, UI polish pass)**. **Phase 3 complete (monitoring & observability — structured logging with correlation IDs, pipeline metrics collection, operator health dashboard)**. Phase 4 (Performance) is next.
 
 ---
@@ -775,12 +777,16 @@ base with `main` (predates current repo structure) and can be safely deleted.
    - API version bumped to v2.3.0.
 
 ### Phase 4 — Performance
-11. [ ] Cache macro context responses
-   - Add TTL-based caching in `macro_risk_officer/` to avoid redundant data-source fetches.
-12. [ ] Parallelize analyst image analysis
-   - Refactor LangGraph nodes to fan out chart analysis steps concurrently where possible.
-13. [ ] Audit browser IndexedDB query performance
-   - Profile ticket history queries and add pagination or indexed lookups for large trade histories.
+11. [x] Cache macro context responses
+   - TTL-based caching already implemented in `MacroScheduler` with thread-safe double-checked locking, SchedulerMetrics, and FetchLog (SQLite KPI store).
+   - Phase 4 addition: `_refresh()` now fans out all three data-source fetches (Finnhub, FRED, GDELT) in parallel via `ThreadPoolExecutor`, cutting cold-start latency to ~1× the slowest source (was 3× sequential).
+12. [x] Parallelize analyst image analysis
+   - Analyst fan-out already used `asyncio.gather` within each node (Phase 1–3).
+   - Phase 4 addition: `macro_context_node` and `chart_setup_node` (combined base+auto_detect) now run as a **parallel LangGraph fan-out** after `validate_input`. Both write to different state keys (no merge conflict). Eliminates MRO I/O wait from the pipeline hot path.
+13. [x] Audit browser IndexedDB query performance
+   - `storage_indexeddb.js` upgraded from a localStorage stub to a **real IndexedDB adapter** with a `trades` object store, `createdAt` and `asset` indexes, and cursor-based pagination (`loadTradeHistoryPage`).
+   - `exportJSONBackup` auto-saves each trade to IndexedDB so the dashboard can load history without re-uploading files.
+   - `initDashboard` wires a new "Load from storage" button to `loadDashboardFromStorage()` (reads all IndexedDB entries, passes to `computeMetrics`).
 
 ### Phase 5 — Operational Tooling
 14. [ ] CLI: audit trail export

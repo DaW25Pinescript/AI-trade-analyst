@@ -2,23 +2,29 @@
 LangGraph pipeline definition.
 
 Graph flow (no overlay, no deliberation):
-  validate_input → macro_context → chart_base → chart_auto_detect → chart_lenses
+  validate_input → {macro_context ∥ chart_setup} → chart_lenses
   → run_arbiter → pinekraft_bridge (optional no-op) → log_and_emit → END
 
 Graph flow (with 15M overlay, no deliberation):
-  validate_input → macro_context → chart_base → chart_auto_detect → chart_lenses
+  validate_input → {macro_context ∥ chart_setup} → chart_lenses
   → fan_out_overlay_delta → run_arbiter → pinekraft_bridge → log_and_emit → END
 
 Graph flow (deliberation enabled, no overlay):
-  validate_input → macro_context → chart_base → chart_auto_detect → chart_lenses
+  validate_input → {macro_context ∥ chart_setup} → chart_lenses
   → deliberation → run_arbiter → pinekraft_bridge → log_and_emit → END
 
 Graph flow (deliberation + overlay):
-  validate_input → macro_context → chart_base → chart_auto_detect → chart_lenses
+  validate_input → {macro_context ∥ chart_setup} → chart_lenses
   → deliberation → fan_out_overlay_delta → run_arbiter → pinekraft_bridge → log_and_emit → END
 
-macro_context runs before chart analysis and is advisory-only. It fails silently
-(sets macro_context=None) so macro data outages never block the pipeline.
+Phase 4 (performance): macro_context and chart_setup run in parallel after validate_input.
+  - macro_context_node: network I/O call (TTL-cached scheduler); returns {"macro_context": ...}
+  - chart_setup_node: pure CPU (lens resolution); returns {"chart_analysis_runtime": ...}
+  Both nodes write to DIFFERENT state keys so LangGraph's fan-in merge is conflict-free.
+  chart_lenses_node runs only after BOTH parallel branches have completed (fan-in).
+
+macro_context is advisory-only and fails silently (sets macro_context=None) so macro
+data outages never block the pipeline.
 
 The conditional branch after chart_lenses checks enable_deliberation first, then
 ground_truth.m15_overlay. The branch after deliberation checks only m15_overlay.
@@ -31,8 +37,7 @@ from langgraph.graph import StateGraph, END
 from .state import GraphState
 from .analyst_nodes import overlay_delta_node, deliberation_node
 from .chart_analysis_nodes import (
-    chart_base_node,
-    chart_auto_detect_node,
+    chart_setup_node,
     chart_lenses_node,
     pinekraft_bridge_node,
 )
@@ -112,20 +117,23 @@ def build_analysis_graph() -> StateGraph:
 
     graph.add_node("validate_input",        validate_input_node)
     graph.add_node("macro_context",         macro_context_node)
-    graph.add_node("chart_base",            chart_base_node)
-    graph.add_node("chart_auto_detect",     chart_auto_detect_node)
+    graph.add_node("chart_setup",           chart_setup_node)    # Phase 4: combined base+auto_detect
     graph.add_node("chart_lenses",          chart_lenses_node)
-    graph.add_node("deliberation",          deliberation_node)       # v2.1b
+    graph.add_node("deliberation",          deliberation_node)   # v2.1b
     graph.add_node("fan_out_overlay_delta", overlay_delta_node)
     graph.add_node("run_arbiter",           arbiter_node)
     graph.add_node("pinekraft_bridge",      pinekraft_bridge_node)
     graph.add_node("log_and_emit",          logging_node)
 
     graph.set_entry_point("validate_input")
-    graph.add_edge("validate_input", "macro_context")
-    graph.add_edge("macro_context",  "chart_base")
-    graph.add_edge("chart_base", "chart_auto_detect")
-    graph.add_edge("chart_auto_detect", "chart_lenses")
+
+    # Phase 4: parallel fan-out — macro_context_node and chart_setup_node run concurrently.
+    # Each writes to a DIFFERENT state key (macro_context vs chart_analysis_runtime) so
+    # LangGraph's fan-in merge at chart_lenses is conflict-free.
+    graph.add_edge("validate_input",  "macro_context")   # branch 1: MRO I/O fetch
+    graph.add_edge("validate_input",  "chart_setup")     # branch 2: lens resolution
+    graph.add_edge("macro_context",   "chart_lenses")    # branch 1 fan-in
+    graph.add_edge("chart_setup",     "chart_lenses")    # branch 2 fan-in
 
     # After Phase 1: deliberation (v2.1b) > overlay delta > arbiter
     graph.add_conditional_edges(
