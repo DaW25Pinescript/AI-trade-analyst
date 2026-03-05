@@ -19,10 +19,10 @@ Priority order: highest impact/risk first.
 
 ## Final release checks (run before merge)
 
-- [x] Run tests: `node --test tests/*.js` (108/108 passing on 2026-03-03)
+- [x] Run tests: `node --test tests/*.js` (150/150 passing on 2026-03-05)
 - [ ] Verify app loads from static server (`/app/`)
 - [ ] Validate export/import roundtrip with sample data
 - [ ] Validate Plotly-enabled export path (charts visible in dashboard and captured in generated report artifacts)
 - [ ] Confirm schemas match current enum/reference docs
 - [x] Update `app/releases/README.md` for new milestone snapshot
-- [ ] Commit + open PR with summary and test output
+- [x] Commit + open PR with summary and test output

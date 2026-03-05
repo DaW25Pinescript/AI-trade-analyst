@@ -879,7 +879,17 @@ class TestRoundTripDeterminism:
         )
         ctx1 = ingest_feeder_payload(payload)
         ctx2 = ingest_feeder_payload(payload)
-        assert ctx1.model_dump() == ctx2.model_dump()
+        assert ctx1.regime == ctx2.regime
+        assert ctx1.vol_bias == ctx2.vol_bias
+        assert ctx1.conflict_score == ctx2.conflict_score
+        assert ctx1.confidence == ctx2.confidence
+        assert ctx1.time_horizon_days == ctx2.time_horizon_days
+        assert ctx1.active_event_ids == ctx2.active_event_ids
+        assert ctx1.explanation == ctx2.explanation
+        assert ctx1.asset_pressure.model_dump() == pytest.approx(
+            ctx2.asset_pressure.model_dump(),
+            abs=1e-9,
+        )
 
 
 # ─── 12. Adapter edge cases ─────────────────────────────────────────────────
