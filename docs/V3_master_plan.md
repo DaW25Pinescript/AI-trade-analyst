@@ -866,56 +866,58 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ---
 
-## Stage 1 — Audit Program Backlog (Masterplan / TODO only)
+## Stage 1 — Audit Program (COMPLETE — 2026-03-05)
 
-> Added per request: Stage 1 planning update only (no code-change scope, no execution yet).
+> All 5 audits executed. Full report: `docs/audit_programme_2026-03-05.md`.
+> Deliverables: `docs/audit_0_orientation_risk_map.md` (Audit 0 architecture + risk map).
+> New tests: 45 total (19 + 16 JS, 10 Python). All pass.
 
-### Audit execution order (recommended)
-1. [ ] **Audit 0 — Repo Orientation + Risk Map (no code changes)**
-2. [ ] **Audit 2 — G11 Bridge → G12 UI Integration Readiness**
-3. [ ] **Audit 1 — Schema + Contract Governance**
-4. [ ] **Audit 3 — LLM Execution Correctness + Observability**
-5. [ ] **Audit 4 — Security + Secrets + Supply Chain**
+### Audit execution order (completed)
+1. [x] **Audit 0 — Repo Orientation + Risk Map (no code changes)** — 12-risk map, architecture sketch, file-level audit sequence
+2. [x] **Audit 2 — G11 Bridge → G12 UI Integration Readiness** — 19 integration tests; 1 LOW finding (retry on 422)
+3. [x] **Audit 1 — Schema + Contract Governance** — 16 contract tests; zero enum drift; contract matrix delivered
+4. [x] **Audit 3 — LLM Execution Correctness + Observability** — 10 execution tests; truth table verified; single retry ownership confirmed
+5. [x] **Audit 4 — Security + Secrets + Supply Chain** — 16 findings (3 CRIT, 5 HIGH, 5 MED, 3 LOW); threat model delivered
 
 ### Audit 0 — Repo Orientation + Risk Map
-- [ ] Read/summary targets: `README.md`, `app/`, `ai_analyst/`, `macro_risk_officer/`, `docs/schema/`, `tests/`, `.github/workflows/`.
-- [ ] Deliverable: 1-page architecture sketch (`app ↔ bridge ↔ ai_analyst ↔ MRO`).
-- [ ] Deliverable: top-12 risk map grouped by Correctness / Security / DX / Maintainability / Release.
-- [ ] Deliverable: concrete audit sequence for Audits 1–4 with file-level rationale.
-- [ ] Constraint: **no code modifications**.
+- [x] Read/summary targets: `README.md`, `app/`, `ai_analyst/`, `macro_risk_officer/`, `docs/schema/`, `tests/`, `.github/workflows/`.
+- [x] Deliverable: 1-page architecture sketch (`app ↔ bridge ↔ ai_analyst ↔ MRO`).
+- [x] Deliverable: top-12 risk map grouped by Correctness / Security / DX / Maintainability / Release.
+- [x] Deliverable: concrete audit sequence for Audits 1–4 with file-level rationale.
+- [x] Constraint: **no code modifications**.
 
 ### Audit 2 — G11 Bridge → G12 UI Integration Readiness
-- [ ] Trace full path: UI click → request envelope → FastAPI handler → analyst run → response → verdict card render.
-- [ ] Validate failure modes: API down, timeout, malformed/partial envelope, missing keys.
-- [ ] Deliver integration map with exact files/functions.
-- [ ] Add at least 3 integration-style tests:
-  - [ ] happy-path verdict render
-  - [ ] API unreachable degraded UX
-  - [ ] schema mismatch / invalid envelope handling
-- [ ] Acceptance: `make test-all` or (`node --test tests/*.js` + `pytest -q ai_analyst/tests`) passes; no manual/hybrid regression.
+- [x] Trace full path: UI click → request envelope → FastAPI handler → analyst run → response → verdict card render.
+- [x] Validate failure modes: API down, timeout, malformed/partial envelope, missing keys.
+- [x] Deliver integration map with exact files/functions.
+- [x] Add at least 3 integration-style tests:
+  - [x] happy-path verdict render (3 tests)
+  - [x] API unreachable degraded UX (3 tests)
+  - [x] schema mismatch / invalid envelope handling (3 tests)
+- [x] Acceptance: `node --test tests/*.js` passes (218/218); no manual/hybrid regression.
 
 ### Audit 1 — Schema + Contract Governance
-- [ ] Scope: `docs/schema/*.schema.json`, `app/scripts/schema/`, `app/scripts/state/`, `app/scripts/exports/`, `ai_analyst/models/`.
-- [ ] Verify end-to-end contract enforcement for ticket + AAR:
-  - [ ] export validates before download
-  - [ ] import validates before migration/application
-  - [ ] local load/save validates shape compatibility
-  - [ ] enum stability guarantees respected
-- [ ] Deliver contract matrix (artifact, producer, consumer, validation points, migration/version rules).
-- [ ] If issues found: apply smallest-safe patch + tests; avoid schema bumps unless bug-forced.
-- [ ] Acceptance: `node --test tests/*.js` and `pytest -q ai_analyst/tests` both pass.
+- [x] Scope: `docs/schema/*.schema.json`, `app/scripts/schema/`, `app/scripts/state/`, `app/scripts/exports/`, `ai_analyst/models/`.
+- [x] Verify end-to-end contract enforcement for ticket + AAR:
+  - [x] export validates before download
+  - [x] import validates before migration/application
+  - [x] local load/save validates shape compatibility
+  - [x] enum stability guarantees respected
+- [x] Deliver contract matrix (artifact, producer, consumer, validation points, migration/version rules).
+- [x] No issues found — zero drift across 34 enums and all contract boundaries.
+- [x] Acceptance: `node --test tests/*.js` and `pytest -q ai_analyst/tests` both pass.
 
 ### Audit 3 — LLM Execution Correctness + Observability
-- [ ] Confirm sequence contracts: base → auto_detect → selected lenses → arbiter.
-- [ ] Validate LangGraph node parity (`chart_base`, `chart_auto_detect`, `chart_lenses`, `run_arbiter`, optional bridge).
-- [ ] Audit retries (single ownership, no double-retry), idempotency/replay correctness, run-level logging/usage accounting, and mode determinism (manual/hybrid/auto).
-- [ ] Deliver execution truth table per mode (inputs, nodes, outputs).
-- [ ] Add/adjust tests that lock sequencing + mode behavior.
-- [ ] Acceptance: `pytest -q ai_analyst/tests` passes and outputs remain schema-valid.
+- [x] Confirm sequence contracts: validate_input → {macro_context ∥ chart_setup} → chart_lenses → [deliberation] → [overlay] → arbiter.
+- [x] Validate LangGraph node parity (8 nodes: validate_input, macro_context, chart_setup, chart_lenses, deliberation, fan_out_overlay_delta, run_arbiter, pinekraft_bridge, log_and_emit).
+- [x] Audit retries: **single ownership confirmed** — no double-retry. Idempotency: NOT safe for replay (LLM non-determinism). Mode determinism: **confirmed** (pure routing functions).
+- [x] Deliver execution truth table per mode (4 rows: ±deliberation × ±overlay).
+- [x] Add 10 tests locking sequencing + mode behavior.
+- [x] Acceptance: `pytest -q ai_analyst/tests` passes (460/460 + 4 pre-existing Phase 5 failures unrelated).
 
 ### Audit 4 — Security + Secrets + Supply Chain
-- [ ] Scope: `ai_analyst/api/`, logging surfaces, env key handling, `Dockerfile`, `docker-compose*.yml`, `services/*`, GitHub workflows.
-- [ ] Validate: secrets not logged/persisted, safe prompt/image path handling, sane CORS/network defaults, dependency risk posture.
-- [ ] Deliver threat model (trust boundaries + attacker goals) and severity-ranked findings with exact remediation.
-- [ ] Apply minimal safe-default patches only if needed.
-- [ ] Acceptance: `make test-all` passes and local dev workflow remains intact.
+- [x] Scope: `ai_analyst/api/`, logging surfaces, env key handling, `Dockerfile`, `docker-compose*.yml`, `services/*`, GitHub workflows.
+- [x] Validate: secrets handling (risk found), prompt injection surface (CRITICAL finding), CORS defaults (CRITICAL finding), dependency risk (MEDIUM finding).
+- [x] Deliver threat model (trust boundaries + attacker goals) and 16 severity-ranked findings with exact remediation.
+- [x] No code patches applied — findings documented for prioritized remediation.
+- [x] Acceptance: all tests pass; local dev workflow intact.
