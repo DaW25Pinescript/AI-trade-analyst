@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Optional
 from ..models.analyst_output import AnalystOutput, OverlayDeltaReport
 from ..models.ground_truth import RiskConstraints
 from .lens_loader import load_arbiter_template
+from .bias_detector import detect_bias
 
 if TYPE_CHECKING:
     from macro_risk_officer.core.models import MacroContext
@@ -41,6 +42,7 @@ def build_arbiter_prompt(
       - overlay_section         : overlay delta reports + weighting rules (if overlay provided)
       - macro_section           : MacroContext arbiter block, or MRO-unavailable notice
       - deliberation_section    : v2.1b Round 2 outputs + weighting rules (if deliberation ran)
+      - bias_section            : Phase 7 bias detection advisory (always present)
     """
     template = load_arbiter_template()
 
@@ -56,6 +58,7 @@ def build_arbiter_prompt(
     overlay_section = _build_overlay_section(overlay_delta_reports, overlay_was_provided)
     macro_section = _build_macro_section(macro_context)
     deliberation_section = _build_deliberation_section(deliberation_outputs)
+    bias_section = _build_bias_section(analyst_outputs)
 
     return template.format(
         N=len(analyst_outputs),
@@ -67,6 +70,7 @@ def build_arbiter_prompt(
         overlay_was_provided=str(overlay_was_provided).lower(),
         macro_section=macro_section,
         deliberation_section=deliberation_section,
+        bias_section=bias_section,
     )
 
 
@@ -179,3 +183,11 @@ round2_analysts_received: {len(deliberation_outputs)}
 5. NO-TRADE PRIORITY: If the majority of Round 2 outputs recommend NO_TRADE,
    prefer NO_TRADE in the final verdict even if Round 1 was directional,
    unless Round 2 reasoning is clearly weaker than Round 1."""
+
+
+def _build_bias_section(analyst_outputs: list[AnalystOutput]) -> str:
+    """
+    Phase 7 — Run bias detection on analyst outputs and format for arbiter injection.
+    """
+    bias_report = detect_bias(analyst_outputs)
+    return bias_report.format_for_arbiter()
