@@ -630,6 +630,332 @@ def usage(
 
 
 # ---------------------------------------------------------------------------
+# export-audit command (Phase 5)
+# ---------------------------------------------------------------------------
+
+@app.command("export-audit")
+def export_audit(
+    fmt: str = typer.Option(
+        "csv", "--format", "-f",
+        help="Output format: csv | json",
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o",
+        help="Output file path (default: audit_trail.<format> in cwd)",
+    ),
+):
+    """Phase 5 — Export full audit trail (runs, verdicts, usage) to CSV or JSON."""
+    from .core.run_state_manager import list_all_runs
+    from .core.usage_meter import summarize_usage
+
+    if fmt not in ("csv", "json"):
+        typer.echo("[ERROR] --format must be 'csv' or 'json'.")
+        raise typer.Exit(1)
+
+    runs = list_all_runs()
+    if not runs:
+        typer.echo("No runs found. Nothing to export.")
+        raise typer.Exit(0)
+
+    OUTPUT_BASE = Path(__file__).parent / "output" / "runs"
+    records: list[dict] = []
+
+    for state in runs:
+        run_dir = OUTPUT_BASE / state.run_id
+        # Load verdict if available
+        verdict_data: dict = {}
+        verdict_path = run_dir / "final_verdict.json"
+        if verdict_path.exists():
+            try:
+                verdict_data = json.loads(verdict_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        # Load usage summary
+        usage = {}
+        try:
+            from .core.usage_meter import summarize_usage as _su
+            usage = _su(run_dir)
+        except Exception:
+            pass
+
+        record = {
+            "run_id": state.run_id,
+            "instrument": state.instrument,
+            "session": state.session,
+            "mode": state.mode,
+            "status": state.status.value if hasattr(state.status, "value") else str(state.status),
+            "created_at": state.created_at.isoformat(),
+            "updated_at": state.updated_at.isoformat(),
+            # Verdict fields
+            "decision": verdict_data.get("decision", ""),
+            "final_bias": verdict_data.get("final_bias", ""),
+            "overall_confidence": verdict_data.get("overall_confidence", ""),
+            "analyst_agreement_pct": verdict_data.get("analyst_agreement_pct", ""),
+            "risk_override_applied": verdict_data.get("risk_override_applied", ""),
+            "arbiter_notes": verdict_data.get("arbiter_notes", ""),
+            # Usage fields
+            "total_llm_calls": usage.get("total_calls", 0),
+            "successful_calls": usage.get("successful_calls", 0),
+            "failed_calls": usage.get("failed_calls", 0),
+            "total_cost_usd": usage.get("total_cost_usd", 0.0),
+            "prompt_tokens": usage.get("tokens", {}).get("prompt_tokens", 0),
+            "completion_tokens": usage.get("tokens", {}).get("completion_tokens", 0),
+        }
+        records.append(record)
+
+    if output is None:
+        output = Path(f"audit_trail.{fmt}")
+
+    if fmt == "json":
+        output.write_text(json.dumps(records, indent=2), encoding="utf-8")
+    else:
+        import csv as csv_mod
+        if records:
+            fieldnames = list(records[0].keys())
+            with output.open("w", newline="", encoding="utf-8") as f:
+                writer = csv_mod.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(records)
+
+    typer.echo(f"\n{_SEP}")
+    typer.echo(f"AUDIT TRAIL EXPORT")
+    typer.echo(_SEP)
+    typer.echo(f"  Runs exported: {len(records)}")
+    typer.echo(f"  Format:        {fmt.upper()}")
+    typer.echo(f"  Output:        {output}")
+    typer.echo(_SEP + "\n")
+
+
+# ---------------------------------------------------------------------------
+# import-aar command (Phase 5)
+# ---------------------------------------------------------------------------
+
+@app.command("import-aar")
+def import_aar(
+    source: Path = typer.Argument(..., help="Path to AAR file (CSV or JSON)"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Validate without writing. Shows what would be imported.",
+    ),
+):
+    """Phase 5 — Bulk import after-action reviews from a CSV or JSON file."""
+    if not source.exists():
+        typer.echo(f"[ERROR] File not found: {source}")
+        raise typer.Exit(1)
+
+    suffix = source.suffix.lower()
+    aar_records: list[dict] = []
+
+    if suffix == ".json":
+        try:
+            raw = json.loads(source.read_text(encoding="utf-8"))
+            if isinstance(raw, list):
+                aar_records = raw
+            elif isinstance(raw, dict):
+                aar_records = [raw]
+            else:
+                typer.echo("[ERROR] JSON must be an array of AAR objects or a single AAR object.")
+                raise typer.Exit(1)
+        except json.JSONDecodeError as e:
+            typer.echo(f"[ERROR] Invalid JSON: {e}")
+            raise typer.Exit(1)
+    elif suffix == ".csv":
+        import csv as csv_mod
+        try:
+            with source.open("r", encoding="utf-8") as f:
+                reader = csv_mod.DictReader(f)
+                for row in reader:
+                    # Coerce numeric fields
+                    for key in ("actualEntry", "actualExit", "rAchieved"):
+                        if key in row and row[key]:
+                            try:
+                                row[key] = float(row[key])
+                            except ValueError:
+                                pass
+                    for key in ("revisedConfidence",):
+                        if key in row and row[key]:
+                            try:
+                                row[key] = int(row[key])
+                            except ValueError:
+                                pass
+                    for key in ("firstTouch", "wouldHaveWon", "killSwitchTriggered"):
+                        if key in row:
+                            row[key] = row[key].lower() in ("true", "1", "yes")
+                    if "failureReasonCodes" in row and isinstance(row["failureReasonCodes"], str):
+                        codes = row["failureReasonCodes"].strip()
+                        if codes:
+                            row["failureReasonCodes"] = [c.strip() for c in codes.split("|")]
+                        else:
+                            row["failureReasonCodes"] = []
+                    aar_records = aar_records  # already appending below
+                    aar_records.append(row)
+        except Exception as e:
+            typer.echo(f"[ERROR] Failed to read CSV: {e}")
+            raise typer.Exit(1)
+    else:
+        typer.echo(f"[ERROR] Unsupported file type '{suffix}'. Use .json or .csv.")
+        raise typer.Exit(1)
+
+    if not aar_records:
+        typer.echo("No AAR records found in file.")
+        raise typer.Exit(0)
+
+    # Validate required fields
+    REQUIRED_FIELDS = {"ticketId", "outcomeEnum", "reviewedAt"}
+    OUTPUT_BASE = Path(__file__).parent / "output" / "aars"
+
+    valid = 0
+    errors = 0
+    for i, aar in enumerate(aar_records):
+        missing = REQUIRED_FIELDS - set(aar.keys())
+        if missing:
+            typer.echo(f"  [SKIP] Record {i+1}: missing required fields: {', '.join(sorted(missing))}")
+            errors += 1
+            continue
+
+        ticket_id = aar["ticketId"]
+
+        if dry_run:
+            typer.echo(f"  [DRY-RUN] Record {i+1}: ticketId={ticket_id} outcome={aar.get('outcomeEnum', '?')}")
+            valid += 1
+            continue
+
+        # Write AAR to output directory
+        aar_dir = OUTPUT_BASE / ticket_id
+        aar_dir.mkdir(parents=True, exist_ok=True)
+        aar_path = aar_dir / "aar.json"
+
+        # Set schemaVersion if not present
+        if "schemaVersion" not in aar:
+            aar["schemaVersion"] = "1.0.0"
+
+        aar_path.write_text(json.dumps(aar, indent=2), encoding="utf-8")
+        valid += 1
+
+    typer.echo(f"\n{_SEP}")
+    typer.echo(f"BULK AAR IMPORT {'(DRY RUN)' if dry_run else ''}")
+    typer.echo(_SEP)
+    typer.echo(f"  Source:     {source}")
+    typer.echo(f"  Records:   {len(aar_records)} total")
+    typer.echo(f"  Imported:  {valid}")
+    typer.echo(f"  Errors:    {errors}")
+    if not dry_run and valid > 0:
+        typer.echo(f"  Output:    {OUTPUT_BASE}")
+    typer.echo(_SEP + "\n")
+
+
+# ---------------------------------------------------------------------------
+# export-analytics command (Phase 5)
+# ---------------------------------------------------------------------------
+
+@app.command("export-analytics")
+def export_analytics(
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o",
+        help="Output CSV file path (default: analytics_export.csv in cwd)",
+    ),
+):
+    """Phase 5 — Export analytics data (all runs with verdicts) to CSV for external tools."""
+    from .core.run_state_manager import list_all_runs
+    from .core.usage_meter import summarize_usage
+
+    runs = list_all_runs()
+    if not runs:
+        typer.echo("No runs found. Nothing to export.")
+        raise typer.Exit(0)
+
+    OUTPUT_BASE = Path(__file__).parent / "output" / "runs"
+    rows: list[dict] = []
+
+    for state in runs:
+        run_dir = OUTPUT_BASE / state.run_id
+
+        # Load verdict
+        verdict_data: dict = {}
+        verdict_path = run_dir / "final_verdict.json"
+        if verdict_path.exists():
+            try:
+                verdict_data = json.loads(verdict_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        # Load usage
+        usage = {}
+        try:
+            usage = summarize_usage(run_dir)
+        except Exception:
+            pass
+
+        # Load AAR if linked
+        aar_data: dict = {}
+        aar_dir = Path(__file__).parent / "output" / "aars" / state.run_id
+        aar_path = aar_dir / "aar.json"
+        if aar_path.exists():
+            try:
+                aar_data = json.loads(aar_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        # Build setups summary
+        setups = verdict_data.get("approved_setups", [])
+        setup_types = "; ".join(s.get("type", "") for s in setups) if setups else ""
+        avg_rr = ""
+        if setups:
+            rrs = [s.get("rr_estimate", 0) for s in setups if s.get("rr_estimate")]
+            avg_rr = f"{sum(rrs) / len(rrs):.2f}" if rrs else ""
+
+        row = {
+            "run_id": state.run_id,
+            "instrument": state.instrument,
+            "session": state.session,
+            "mode": state.mode,
+            "status": state.status.value if hasattr(state.status, "value") else str(state.status),
+            "created_at": state.created_at.isoformat(),
+            # Verdict
+            "decision": verdict_data.get("decision", ""),
+            "final_bias": verdict_data.get("final_bias", ""),
+            "overall_confidence": verdict_data.get("overall_confidence", ""),
+            "analyst_agreement_pct": verdict_data.get("analyst_agreement_pct", ""),
+            "risk_override_applied": verdict_data.get("risk_override_applied", ""),
+            "setup_types": setup_types,
+            "avg_rr_estimate": avg_rr,
+            "no_trade_conditions": "; ".join(verdict_data.get("no_trade_conditions", [])),
+            # Usage
+            "total_cost_usd": usage.get("total_cost_usd", 0.0),
+            "total_llm_calls": usage.get("total_calls", 0),
+            "prompt_tokens": usage.get("tokens", {}).get("prompt_tokens", 0),
+            "completion_tokens": usage.get("tokens", {}).get("completion_tokens", 0),
+            # AAR (if present)
+            "aar_outcome": aar_data.get("outcomeEnum", ""),
+            "aar_verdict": aar_data.get("verdictEnum", ""),
+            "aar_r_achieved": aar_data.get("rAchieved", ""),
+            "aar_exit_reason": aar_data.get("exitReasonEnum", ""),
+            "aar_psychological_tag": aar_data.get("psychologicalTag", ""),
+        }
+        rows.append(row)
+
+    if output is None:
+        output = Path("analytics_export.csv")
+
+    import csv as csv_mod
+    if rows:
+        fieldnames = list(rows[0].keys())
+        with output.open("w", newline="", encoding="utf-8") as f:
+            writer = csv_mod.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    typer.echo(f"\n{_SEP}")
+    typer.echo(f"ANALYTICS CSV EXPORT")
+    typer.echo(_SEP)
+    typer.echo(f"  Runs exported: {len(rows)}")
+    typer.echo(f"  Output:        {output}")
+    typer.echo(f"  Columns:       {len(rows[0]) if rows else 0}")
+    typer.echo(_SEP + "\n")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

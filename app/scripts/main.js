@@ -15,7 +15,7 @@ import { runSenateArbiter } from './generators/senateArbiter.js';
 import { generateAnalystPromptTemplate } from './generators/promptGenerator.js';
 import { initSenatePanel, renderSenatePanel, clearSenatePanel } from './ui/arbiterPanel.js';
 import { initDashboard, getLoadedEntries } from './ui/dashboard.js';
-import { exportAnalyticsPDF } from './ui/dashboard.js';
+import { exportAnalyticsPDF, exportAnalyticsCSV } from './ui/dashboard.js';
 import { initOperatorDashboard, toggleOperatorDashboard, applyBridgeVerdictToDashboard } from './ui/dashboard_shell.js';
 import { analyseViaBridge, checkBridgeHealth, getRunUsage } from './api_bridge.js';
 import { mountAnalysisResults } from './verdict_card.js';
@@ -242,6 +242,7 @@ Object.assign(window, {
   runSenateArbiter, generateAnalystPromptTemplate, renderSenatePanel,
   reviseTicket,
   exportAnalyticsPDF,
+  exportAnalyticsCSV,
   runBridgeAnalyse,
   checkBridgeHealthUI,
   toggleOperatorDashboard,

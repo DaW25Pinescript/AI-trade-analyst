@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
 **Version:** 2.20
 **Updated:** 2026-03-05
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**, **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**, **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**, **Phase 5 complete (operational tooling — CLI audit trail export, bulk AAR import, analytics CSV export)**
 
 ---
 
@@ -789,13 +789,23 @@ base with `main` (predates current repo structure) and can be safely deleted.
    - `exportJSONBackup` auto-saves each trade to IndexedDB so the dashboard can load history without re-uploading files.
    - `initDashboard` wires a new "Load from storage" button to `loadDashboardFromStorage()` (reads all IndexedDB entries, passes to `computeMetrics`).
 
-### Phase 5 — Operational Tooling
-14. [ ] CLI: audit trail export
-   - Add a `cli.py export-audit` command that dumps all runs, verdicts, and outcomes to CSV/JSON.
-15. [ ] CLI: bulk AAR import
-   - Add a `cli.py import-aar` command for batch after-action review updates from CSV.
-16. [ ] Analytics CSV export
-   - Wire the analytics dashboard export button to produce a CSV compatible with external tools.
+### Phase 5 — Operational Tooling (COMPLETE)
+14. [x] CLI: audit trail export
+   - Added `cli.py export-audit` command that dumps all runs, verdicts, and usage to CSV or JSON.
+   - Supports `--format csv|json` and `--output <path>` flags.
+   - Exports run metadata, verdict fields (decision, bias, confidence, agreement), and usage metrics (cost, tokens, call counts).
+15. [x] CLI: bulk AAR import
+   - Added `cli.py import-aar` command for batch after-action review imports from JSON or CSV.
+   - Supports `--dry-run` flag for validation-only mode.
+   - CSV format supports pipe-delimited `failureReasonCodes` and automatic type coercion for numeric/boolean fields.
+   - Validates required fields (`ticketId`, `outcomeEnum`, `reviewedAt`); skips invalid records with clear error reporting.
+   - AARs stored in `output/aars/{ticketId}/aar.json`.
+16. [x] Analytics CSV export
+   - Added `cli.py export-analytics` command producing CSV with verdict, usage, setup, and AAR columns.
+   - Added `GET /analytics/csv` API endpoint returning a downloadable CSV attachment.
+   - Added `exportAnalyticsCSV()` browser function in `dashboard.js` — builds CSV from loaded dashboard entries with ticket + AAR fields.
+   - Added "Export Analytics CSV" button to `index.html` alongside existing PDF export.
+   - Wired through `main.js` to `window` for global access.
 
 ### Phase 6 — Production Hardening
 17. [ ] Configure CORS origin whitelist

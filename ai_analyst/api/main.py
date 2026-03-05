@@ -1001,3 +1001,106 @@ async def operator_dashboard(request: Request):
 def _esc(s: str) -> str:
     """Minimal HTML escaping for dashboard values."""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+# ── Phase 5: Analytics CSV export endpoint ─────────────────────────────────
+
+@app.get("/analytics/csv")
+async def analytics_csv_export():
+    """
+    Phase 5 — Export all pipeline runs with verdicts and usage as a CSV download.
+
+    Produces a CSV file containing one row per run with verdict details, usage
+    metrics, and AAR data (if linked). Compatible with spreadsheet tools and
+    external analytics platforms.
+    """
+    import csv as csv_mod
+    import io
+
+    from ..core.run_state_manager import list_all_runs
+
+    runs = list_all_runs()
+
+    fieldnames = [
+        "run_id", "instrument", "session", "mode", "status", "created_at",
+        "decision", "final_bias", "overall_confidence", "analyst_agreement_pct",
+        "risk_override_applied", "setup_types", "avg_rr_estimate",
+        "no_trade_conditions", "total_cost_usd", "total_llm_calls",
+        "prompt_tokens", "completion_tokens",
+        "aar_outcome", "aar_verdict", "aar_r_achieved", "aar_exit_reason",
+        "aar_psychological_tag",
+    ]
+
+    output = io.StringIO()
+    writer = csv_mod.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+
+    from pathlib import Path as _Path
+
+    OUTPUT_BASE = _Path(__file__).parent.parent / "output" / "runs"
+    AAR_BASE = _Path(__file__).parent.parent / "output" / "aars"
+
+    for run_state in runs:
+        run_dir = OUTPUT_BASE / run_state.run_id
+
+        verdict_data: dict = {}
+        verdict_path = run_dir / "final_verdict.json"
+        if verdict_path.exists():
+            try:
+                verdict_data = json.loads(verdict_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        usage: dict = {}
+        try:
+            usage = summarize_usage(run_dir)
+        except Exception:
+            pass
+
+        aar_data: dict = {}
+        aar_path = AAR_BASE / run_state.run_id / "aar.json"
+        if aar_path.exists():
+            try:
+                aar_data = json.loads(aar_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        setups = verdict_data.get("approved_setups", [])
+        setup_types = "; ".join(s.get("type", "") for s in setups) if setups else ""
+        avg_rr = ""
+        if setups:
+            rrs = [s.get("rr_estimate", 0) for s in setups if s.get("rr_estimate")]
+            avg_rr = f"{sum(rrs) / len(rrs):.2f}" if rrs else ""
+
+        writer.writerow({
+            "run_id": run_state.run_id,
+            "instrument": run_state.instrument,
+            "session": run_state.session,
+            "mode": run_state.mode,
+            "status": run_state.status.value if hasattr(run_state.status, "value") else str(run_state.status),
+            "created_at": run_state.created_at.isoformat(),
+            "decision": verdict_data.get("decision", ""),
+            "final_bias": verdict_data.get("final_bias", ""),
+            "overall_confidence": verdict_data.get("overall_confidence", ""),
+            "analyst_agreement_pct": verdict_data.get("analyst_agreement_pct", ""),
+            "risk_override_applied": verdict_data.get("risk_override_applied", ""),
+            "setup_types": setup_types,
+            "avg_rr_estimate": avg_rr,
+            "no_trade_conditions": "; ".join(verdict_data.get("no_trade_conditions", [])),
+            "total_cost_usd": usage.get("total_cost_usd", 0.0),
+            "total_llm_calls": usage.get("total_calls", 0),
+            "prompt_tokens": usage.get("tokens", {}).get("prompt_tokens", 0),
+            "completion_tokens": usage.get("tokens", {}).get("completion_tokens", 0),
+            "aar_outcome": aar_data.get("outcomeEnum", ""),
+            "aar_verdict": aar_data.get("verdictEnum", ""),
+            "aar_r_achieved": aar_data.get("rAchieved", ""),
+            "aar_exit_reason": aar_data.get("exitReasonEnum", ""),
+            "aar_psychological_tag": aar_data.get("psychologicalTag", ""),
+        })
+
+    csv_content = output.getvalue()
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=analytics_export.csv"},
+    )

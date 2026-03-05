@@ -147,6 +147,7 @@ venv/
 ai_analyst/logs/runs/*.jsonl
 ai_analyst/data/charts/*/
 ai_analyst/output/runs/*/
+ai_analyst/output/aars/*/
 ai_analyst/.env
 # Nested output path produced when pytest runs from the ai_analyst/ subdirectory
 ai_analyst/ai_analyst/
