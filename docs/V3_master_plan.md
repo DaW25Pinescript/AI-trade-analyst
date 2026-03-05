@@ -863,3 +863,59 @@ base with `main` (predates current repo structure) and can be safely deleted.
    - 56 new tests in `tests/test_phase8_advanced.py` — all passing.
 
 **Rationale for sequencing:** start with low-risk release verification, then UI fit-and-finish, then observability/performance/tooling, and finish with operational hardening and AI enhancements on top of a stable baseline. Phase 8 leverages the feedback loop and outcome data from Phase 7 to provide actionable analytics and backtesting capabilities.
+
+---
+
+## Stage 1 — Audit Program Backlog (Masterplan / TODO only)
+
+> Added per request: Stage 1 planning update only (no code-change scope, no execution yet).
+
+### Audit execution order (recommended)
+1. [ ] **Audit 0 — Repo Orientation + Risk Map (no code changes)**
+2. [ ] **Audit 2 — G11 Bridge → G12 UI Integration Readiness**
+3. [ ] **Audit 1 — Schema + Contract Governance**
+4. [ ] **Audit 3 — LLM Execution Correctness + Observability**
+5. [ ] **Audit 4 — Security + Secrets + Supply Chain**
+
+### Audit 0 — Repo Orientation + Risk Map
+- [ ] Read/summary targets: `README.md`, `app/`, `ai_analyst/`, `macro_risk_officer/`, `docs/schema/`, `tests/`, `.github/workflows/`.
+- [ ] Deliverable: 1-page architecture sketch (`app ↔ bridge ↔ ai_analyst ↔ MRO`).
+- [ ] Deliverable: top-12 risk map grouped by Correctness / Security / DX / Maintainability / Release.
+- [ ] Deliverable: concrete audit sequence for Audits 1–4 with file-level rationale.
+- [ ] Constraint: **no code modifications**.
+
+### Audit 2 — G11 Bridge → G12 UI Integration Readiness
+- [ ] Trace full path: UI click → request envelope → FastAPI handler → analyst run → response → verdict card render.
+- [ ] Validate failure modes: API down, timeout, malformed/partial envelope, missing keys.
+- [ ] Deliver integration map with exact files/functions.
+- [ ] Add at least 3 integration-style tests:
+  - [ ] happy-path verdict render
+  - [ ] API unreachable degraded UX
+  - [ ] schema mismatch / invalid envelope handling
+- [ ] Acceptance: `make test-all` or (`node --test tests/*.js` + `pytest -q ai_analyst/tests`) passes; no manual/hybrid regression.
+
+### Audit 1 — Schema + Contract Governance
+- [ ] Scope: `docs/schema/*.schema.json`, `app/scripts/schema/`, `app/scripts/state/`, `app/scripts/exports/`, `ai_analyst/models/`.
+- [ ] Verify end-to-end contract enforcement for ticket + AAR:
+  - [ ] export validates before download
+  - [ ] import validates before migration/application
+  - [ ] local load/save validates shape compatibility
+  - [ ] enum stability guarantees respected
+- [ ] Deliver contract matrix (artifact, producer, consumer, validation points, migration/version rules).
+- [ ] If issues found: apply smallest-safe patch + tests; avoid schema bumps unless bug-forced.
+- [ ] Acceptance: `node --test tests/*.js` and `pytest -q ai_analyst/tests` both pass.
+
+### Audit 3 — LLM Execution Correctness + Observability
+- [ ] Confirm sequence contracts: base → auto_detect → selected lenses → arbiter.
+- [ ] Validate LangGraph node parity (`chart_base`, `chart_auto_detect`, `chart_lenses`, `run_arbiter`, optional bridge).
+- [ ] Audit retries (single ownership, no double-retry), idempotency/replay correctness, run-level logging/usage accounting, and mode determinism (manual/hybrid/auto).
+- [ ] Deliver execution truth table per mode (inputs, nodes, outputs).
+- [ ] Add/adjust tests that lock sequencing + mode behavior.
+- [ ] Acceptance: `pytest -q ai_analyst/tests` passes and outputs remain schema-valid.
+
+### Audit 4 — Security + Secrets + Supply Chain
+- [ ] Scope: `ai_analyst/api/`, logging surfaces, env key handling, `Dockerfile`, `docker-compose*.yml`, `services/*`, GitHub workflows.
+- [ ] Validate: secrets not logged/persisted, safe prompt/image path handling, sane CORS/network defaults, dependency risk posture.
+- [ ] Deliver threat model (trust boundaries + attacker goals) and severity-ranked findings with exact remediation.
+- [ ] Apply minimal safe-default patches only if needed.
+- [ ] Acceptance: `make test-all` passes and local dev workflow remains intact.
