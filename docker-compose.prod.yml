@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Trade Analyst — Production Docker Compose Override
+#
+# Layers on top of docker-compose.yml with:
+#   - Caddy reverse proxy (automatic HTTPS)
+#   - Container hardening (non-root, read-only, no-new-privileges)
+#   - Internal network isolation (only Caddy is exposed)
+#   - Loopback-only service ports
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Prerequisites:
+#   - Set DOMAIN env var or edit caddy/Caddyfile with your domain
+#   - DNS A record pointing to this host
+#   - ai_analyst/.env with ALLOWED_ORIGINS=https://your-domain.com
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Caddy reverse proxy — the only internet-facing service ────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # TLS certificates
+      - caddy_config:/config    # Caddy runtime config
+      - caddy_logs:/var/log/caddy
+    environment:
+      - DOMAIN=${DOMAIN:-analyst.example.com}
+    networks:
+      - internal
+    depends_on:
+      ai-analyst-api:
+        condition: service_healthy
+
+  # ── FastAPI — hardened, internal-only ──────────────────────────────────────
+  ai-analyst-api:
+    ports:
+      - "127.0.0.1:8000:8000"   # loopback only — not exposed to internet
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+    networks:
+      - internal
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+
+  # ── Static app — removed in production ────────────────────────────────────
+  # In production, serve static files through Caddy or nginx directly.
+  # The app-static service is disabled by setting scale=0 or removing it.
+  app-static:
+    profiles:
+      - dev-only   # only starts with: docker compose --profile dev-only up
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  caddy_logs:

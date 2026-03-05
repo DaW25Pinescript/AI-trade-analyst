@@ -219,11 +219,17 @@ _default_origins = ["http://localhost:8080", "http://127.0.0.1:8080"]
 _env_origins = os.environ.get("ALLOWED_ORIGINS", "")
 _allow_origins = [o.strip() for o in _env_origins.split(",") if o.strip()] or _default_origins
 
+if not _env_origins:
+    logger.warning(
+        "ALLOWED_ORIGINS not set — using localhost defaults. "
+        "Set ALLOWED_ORIGINS in .env for production deployments."
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allow_origins,
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 
 
@@ -1035,10 +1041,9 @@ async def analytics_csv_export():
     writer = csv_mod.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
 
-    from pathlib import Path as _Path
+    from ..core.run_state_manager import OUTPUT_BASE
 
-    OUTPUT_BASE = _Path(__file__).parent.parent / "output" / "runs"
-    AAR_BASE = _Path(__file__).parent.parent / "output" / "aars"
+    AAR_BASE = OUTPUT_BASE.parent / "aars"
 
     for run_state in runs:
         run_dir = OUTPUT_BASE / run_state.run_id

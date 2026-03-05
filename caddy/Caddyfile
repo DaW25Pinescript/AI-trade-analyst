@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Trade Analyst — Production Caddyfile
+#
+# Caddy handles automatic HTTPS via Let's Encrypt, HTTP→HTTPS redirect,
+# and reverse-proxying to the internal Docker services.
+#
+# Usage:
+#   1. Replace {$DOMAIN} with your actual domain (or set env var DOMAIN).
+#   2. Ensure DNS A/AAAA records point to this host.
+#   3. Run via docker-compose.prod.yml which includes the caddy service.
+#
+# Caddy will automatically obtain and renew TLS certificates.
+# ─────────────────────────────────────────────────────────────────────────────
+
+{$DOMAIN:analyst.example.com} {
+	# API — all /analyse, /health, /metrics, /dashboard, /feeder, /analytics
+	# endpoints are proxied to the FastAPI service on the internal network.
+	reverse_proxy ai-analyst-api:8000
+
+	# Security headers
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# Rate limiting on the analysis endpoint (10 req/min per client IP).
+	# This supplements the in-app Python rate limiter.
+	@analyse path /analyse /analyse/stream
+	rate_limit @analyse {
+		zone analyse_zone {
+			key {remote_host}
+			events 10
+			window 60s
+		}
+	}
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+	}
+}

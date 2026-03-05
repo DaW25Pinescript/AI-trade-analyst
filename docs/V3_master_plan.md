@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.20
+**Version:** 2.21
 **Updated:** 2026-03-05
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**, **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**, **Phase 5 complete (operational tooling — CLI audit trail export, bulk AAR import, analytics CSV export)**
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**, **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**, **Phase 5 complete (operational tooling — CLI audit trail export, bulk AAR import, analytics CSV export)**, **Phase 6 complete (production hardening — CORS whitelist, Caddy reverse proxy, Docker non-root + read-only, secrets manager docs)**
 
 ---
 
@@ -52,8 +52,9 @@ G6/v2.0 onwards.
   - +23 added (2026-03-05): `test_phase3_monitoring.py` — CorrelationContext (set/get/reset/filter/idempotent logging), RunMetrics (fields/roundtrip/serialization), MetricsStore (empty/record/aggregate/bounded/error_rate/instruments/thread_safety/recent_limit), global singleton, audit log correlation_id, MetricsSnapshot serialization. 336/336 passing.
   - +11 added (2026-03-05): `test_phase4_performance.py` — chart_setup_node partial dict, macro_context_node partial dict, scheduler ThreadPoolExecutor use, all-sources-fail graceful degradation, pipeline topology (chart_setup present, chart_base/auto_detect removed), parallel fan-in invariant. 347/347 passing.
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **234 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 770 passing, 0 failing** across all three suites (plus 16 intentional MRO skips).
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. **Phase 2b complete (region display on operator dashboard, mobile layout optimization, UI polish pass)**. **Phase 3 complete (monitoring & observability — structured logging with correlation IDs, pipeline metrics collection, operator health dashboard)**. Phase 4 (Performance) is next.
+- **Total: 806 passing, 0 failing** across all three suites (plus 16 intentional MRO skips).
+  - +1 fix (2026-03-05): `analytics_csv_export` endpoint now imports `OUTPUT_BASE` from `run_state_manager` instead of computing its own path, fixing CSV verdict column population.
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. **Phase 2b complete (region display on operator dashboard, mobile layout optimization, UI polish pass)**. **Phase 3 complete (monitoring & observability — structured logging with correlation IDs, pipeline metrics collection, operator health dashboard)**. **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**. **Phase 5 complete (operational tooling — CLI audit trail export, bulk AAR import, analytics CSV export)**. **Phase 6 complete (production hardening — CORS whitelist, Caddy reverse proxy, Docker hardening, secrets manager docs)**. Phase 7 (AI/ML Enhancement) is next.
 
 ---
 
@@ -807,15 +808,21 @@ base with `main` (predates current repo structure) and can be safely deleted.
    - Added "Export Analytics CSV" button to `index.html` alongside existing PDF export.
    - Wired through `main.js` to `window` for global access.
 
-### Phase 6 — Production Hardening
-17. [ ] Configure CORS origin whitelist
-   - Replace wildcard `*` with explicit allowed origins via `.env` `ALLOWED_ORIGINS`.
-18. [ ] Set up reverse proxy (Caddy/nginx)
-   - Add a `caddy/` or `nginx/` config for HTTPS termination in the Docker Compose setup.
-19. [ ] Harden Docker runtime
-   - Switch to a non-root user in Dockerfile, add `read_only: true` and `tmpfs: /tmp` in `docker-compose.yml`.
-20. [ ] Secrets manager integration
-   - Document (or implement) AWS/GCP/Vault secret injection as an alternative to `.env` files.
+### Phase 6 — Production Hardening (COMPLETE)
+17. [x] Configure CORS origin whitelist
+   - Tightened `allow_headers` from wildcard `["*"]` to explicit `["Content-Type", "Authorization", "X-API-Key"]`.
+   - Added startup warning when `ALLOWED_ORIGINS` is not set (alerts operators to configure for production).
+   - Added `ALLOWED_ORIGINS` to `.env.example` with documentation.
+18. [x] Set up reverse proxy (Caddy)
+   - Added `caddy/Caddyfile` with automatic HTTPS, security headers (`X-Content-Type-Options`, `X-Frame-Options`, `HSTS`, `Referrer-Policy`), and rate limiting on `/analyse` endpoints.
+   - Added `docker-compose.prod.yml` production overlay: Caddy service as the only internet-facing container, internal Docker network isolation, loopback-only ports for backend services, `app-static` disabled via profile.
+19. [x] Harden Docker runtime
+   - Dockerfile: added non-root `appuser` with `USER appuser` directive.
+   - `docker-compose.prod.yml`: `security_opt: no-new-privileges:true`, `read_only: true`, `tmpfs: /tmp:size=100M`, `PYTHONDONTWRITEBYTECODE=1`.
+20. [x] Secrets manager integration
+   - Added `docs/secrets_manager.md` with detailed setup for AWS Secrets Manager (ECS task definition + entrypoint injection), GCP Secret Manager (Cloud Run + GKE), and HashiCorp Vault (Agent sidecar + entrypoint injection).
+   - Added key rotation guide and injection verification steps.
+   - Updated `.env.example` header with quick-reference injection commands for all three platforms.
 
 ### Phase 7 — AI/ML Enhancement
 21. [ ] Feedback loop: outcomes → prompt refinement
