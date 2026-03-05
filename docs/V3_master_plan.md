@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.16
+**Version:** 2.17
 **Updated:** 2026-03-05
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**
 
 ---
 
@@ -46,8 +46,12 @@ G6/v2.0 onwards.
   - +1 stability fix (2026-03-05): `test_phase2a_feeder_bridge.py` now uses `asyncio.run(...)` for Python 3.10+ compatibility (avoids missing default-loop RuntimeError).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
   - +16 added (2026-03-05): `test_phase2b_completion.js` — Phase 2b region display on operator dashboard, mobile breakpoints, UI polish, session clock unit tests. 166/166 passing.
-- **Total: 716 passing, 0 failing** across all three suites (plus 13 intentional MRO skips).
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. **Phase 2b complete (region display on operator dashboard, mobile layout optimization, UI polish pass)**. Phase 3 (Monitoring & Observability) is next.
+  - +10 added (2026-03-05): `test_phase3_monitoring.js` — Phase 3 metrics response shape, RunMetrics entry validation, decision distribution, correlation ID in audit log, cost/latency bounds, dashboard structure. 176/176 passing.
+- AI analyst regression suite: **PASS** (`pytest -q ai_analyst/tests`) with **336/336 passing**.
+  - +23 added (2026-03-05): `test_phase3_monitoring.py` — CorrelationContext (set/get/reset/filter/idempotent logging), RunMetrics (fields/roundtrip/serialization), MetricsStore (empty/record/aggregate/bounded/error_rate/instruments/thread_safety/recent_limit), global singleton, audit log correlation_id, MetricsSnapshot serialization. 336/336 passing.
+- MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **234 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
+- **Total: 746 passing, 0 failing** across all three suites (plus 16 intentional MRO skips).
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. **Phase 2b complete (region display on operator dashboard, mobile layout optimization, UI polish pass)**. **Phase 3 complete (monitoring & observability — structured logging with correlation IDs, pipeline metrics collection, operator health dashboard)**. Phase 4 (Performance) is next.
 
 ---
 
@@ -754,13 +758,21 @@ base with `main` (predates current repo structure) and can be safely deleted.
    - Added consistent typography for dashboard metric rows (IBM Plex Mono, 11px labels).
    - Added macro card padding refinements at mobile breakpoints.
 
-### Phase 3 — Monitoring & Observability
-8. [ ] Add structured logging with correlation IDs
-   - Thread a `run_id` through all LangGraph nodes and API responses for end-to-end traceability.
-9. [ ] Add pipeline metrics collection
-   - Instrument LLM cost per run, pipeline latency, and analyst agreement rate; emit to JSONL or a metrics endpoint.
-10. [ ] Build operator health dashboard
-   - Expose `/metrics` or a simple HTML dashboard showing API health, cost usage, and feeder staleness.
+### Phase 3 — Monitoring & Observability (COMPLETE)
+8. [x] Add structured logging with correlation IDs
+   - `ai_analyst/core/correlation.py`: `ContextVar`-based `correlation_ctx` propagated through all async pipeline nodes.
+   - `CorrelationFilter` injects `run_id` into every Python log record; `setup_structured_logging()` wires it at server startup.
+   - `validate_input_node` sets the correlation context at pipeline entry; `/analyse` endpoint sets/resets it around invocation.
+   - Audit log (`core/logger.py`) now emits `correlation_id` field in every JSONL entry.
+9. [x] Add pipeline metrics collection
+   - `ai_analyst/core/pipeline_metrics.py`: `RunMetrics` dataclass capturing per-run cost, latency, analyst agreement, decision, overlay/deliberation/macro flags.
+   - `MetricsStore`: thread-safe, bounded in-memory store (default 500 entries) with `record_run()` and `snapshot()`.
+   - `logging_node` records `RunMetrics` after every pipeline completion (fail-silent, never blocks the pipeline).
+   - Pipeline wall-clock timing via `_pipeline_start_ts` / `_node_timings` fields in `GraphState`.
+10. [x] Build operator health dashboard
+   - `GET /metrics`: JSON endpoint returning aggregated `MetricsSnapshot` (total runs, cost, latency, agreement, decision/instrument distributions, error rate, recent runs).
+   - `GET /dashboard`: Self-contained dark-theme HTML operator dashboard with auto-refresh (30s), metric cards, decision distribution bars, recent runs table, feeder status, API health.
+   - API version bumped to v2.3.0.
 
 ### Phase 4 — Performance
 11. [ ] Cache macro context responses

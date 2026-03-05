@@ -56,6 +56,8 @@ from ..output.ticket_draft import build_ticket_draft
 from ..core.run_paths import get_run_dir
 from ..core.usage_meter import summarize_usage, check_run_cost_ceiling
 from ..core import progress_store
+from ..core.correlation import correlation_ctx, setup_structured_logging
+from ..core.pipeline_metrics import metrics_store
 
 
 class AnalysisResponse(BaseModel):
@@ -155,6 +157,8 @@ def _check_rate_limit(client_ip: str) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Phase 3: structured logging with correlation IDs
+    setup_structured_logging()
     app.state.graph = build_analysis_graph()
     # Phase 2a: shared feeder state — latest ingested feeder payload + MacroContext
     app.state.feeder_context = None          # Optional[MacroContext]
@@ -166,7 +170,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AI Trade Analyst — Multi-Model Pipeline",
-    version="2.2.0",
+    version="2.3.0",
     description=(
         "Deterministic, auditable multi-AI trade analysis. "
         "Multiple independent analyst models feed a single Arbiter verdict. "
@@ -176,7 +180,8 @@ app = FastAPI(
         "a ticket_draft block for direct browser app import. "
         "v2.1b: enable_deliberation=true triggers an optional second analyst round "
         "where peers review each other's blinded Round 1 outputs before the arbiter. "
-        "v2.2: POST /analyse/stream returns SSE events as each analyst completes."
+        "v2.2: POST /analyse/stream returns SSE events as each analyst completes. "
+        "v2.3: GET /metrics + /dashboard for operator monitoring and observability."
     ),
     lifespan=lifespan,
 )
@@ -543,8 +548,13 @@ async def analyse(
         # Phase 2a: inject live feeder context if available
         "_feeder_context": getattr(request.app.state, "feeder_context", None),
         "_feeder_ingested_at": getattr(request.app.state, "feeder_ingested_at", None),
+        # Phase 3: timing fields (populated by validate_input_node)
+        "_pipeline_start_ts": None,
+        "_node_timings": None,
     }
 
+    # Phase 3: set correlation context for structured logging
+    ctx_token = correlation_ctx.set(ground_truth.run_id)
     try:
         final_state = await request.app.state.graph.ainvoke(initial_state)
     except RuntimeError as e:
@@ -552,6 +562,8 @@ async def analyse(
         raise HTTPException(status_code=503, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Internal pipeline error. Check server logs.")
+    finally:
+        correlation_ctx.reset(ctx_token)
 
     verdict: FinalVerdict = final_state["final_verdict"]
     ticket_draft = build_ticket_draft(verdict, ground_truth)
@@ -759,7 +771,13 @@ async def analyse_stream(
         # Phase 2a: inject live feeder context if available
         "_feeder_context": getattr(request.app.state, "feeder_context", None),
         "_feeder_ingested_at": getattr(request.app.state, "feeder_ingested_at", None),
+        # Phase 3: timing fields (populated by validate_input_node)
+        "_pipeline_start_ts": None,
+        "_node_timings": None,
     }
+
+    # Phase 3: set correlation context for structured logging
+    correlation_ctx.set(ground_truth.run_id)
 
     # ── Register progress queue and stream ───────────────────────────────────
     run_id = ground_truth.run_id
@@ -800,3 +818,178 @@ async def analyse_stream(
             progress_store.unregister(run_id)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ── Phase 3: Monitoring & Observability endpoints ─────────────────────────────
+
+@app.get("/metrics")
+async def get_metrics():
+    """
+    Phase 3 — Pipeline metrics endpoint.
+
+    Returns aggregated metrics for all recorded pipeline runs including:
+    cost, latency, analyst agreement, decision distribution, and recent runs.
+    """
+    from dataclasses import asdict
+    snapshot = metrics_store.snapshot()
+    return JSONResponse(content={
+        "status": "ok",
+        "server_started_at": metrics_store.started_at,
+        "metrics": asdict(snapshot),
+    })
+
+
+@app.get("/dashboard")
+async def operator_dashboard(request: Request):
+    """
+    Phase 3 — Operator health dashboard.
+
+    Returns a self-contained HTML page showing pipeline health, cost tracking,
+    and recent run summaries. Auto-refreshes every 30 seconds.
+    """
+    from dataclasses import asdict
+    snapshot = metrics_store.snapshot()
+    feeder_ingested_at = getattr(request.app.state, "feeder_ingested_at", None)
+    feeder_meta = getattr(request.app.state, "feeder_payload_meta", None)
+    feeder_context = getattr(request.app.state, "feeder_context", None)
+
+    feeder_stale = True
+    feeder_age = None
+    if feeder_ingested_at is not None:
+        age = (datetime.now(timezone.utc) - feeder_ingested_at).total_seconds()
+        feeder_age = round(age, 1)
+        feeder_stale = age > _FEEDER_STALE_SECONDS
+
+    # Build recent runs table rows
+    recent_rows = ""
+    for run in reversed(snapshot.recent_runs):
+        recent_rows += (
+            f"<tr>"
+            f"<td>{_esc(run.get('run_id', '')[:12])}...</td>"
+            f"<td>{_esc(run.get('instrument', ''))}</td>"
+            f"<td>{_esc(run.get('session', ''))}</td>"
+            f"<td>{_esc(run.get('decision', ''))}</td>"
+            f"<td>{run.get('analyst_agreement_pct', 0)}%</td>"
+            f"<td>{run.get('overall_confidence', 0):.2f}</td>"
+            f"<td>${run.get('llm_cost_usd', 0):.4f}</td>"
+            f"<td>{run.get('total_latency_ms', 0):,}ms</td>"
+            f"<td>{_esc(run.get('timestamp', '')[:19])}</td>"
+            f"</tr>"
+        )
+
+    # Decision distribution
+    decision_bars = ""
+    total_runs = snapshot.total_runs or 1
+    for dec, count in sorted(snapshot.decision_distribution.items(), key=lambda x: -x[1]):
+        pct = round(count / total_runs * 100, 1)
+        color = {"ENTER_LONG": "#22c55e", "ENTER_SHORT": "#ef4444", "NO_TRADE": "#6b7280"}.get(dec, "#3b82f6")
+        decision_bars += (
+            f'<div style="margin:4px 0">'
+            f'<span style="display:inline-block;width:180px">{_esc(dec)}</span>'
+            f'<span style="display:inline-block;width:40px;text-align:right">{count}</span>'
+            f'<span style="display:inline-block;background:{color};height:16px;width:{pct*2}px;'
+            f'margin-left:8px;border-radius:2px"></span>'
+            f'<span style="margin-left:6px;color:#9ca3af">{pct}%</span>'
+            f'</div>'
+        )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="30">
+<title>AI Trade Analyst — Operator Dashboard</title>
+<style>
+  body {{ font-family: 'IBM Plex Mono', monospace; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }}
+  h1 {{ color: #38bdf8; font-size: 1.4rem; margin-bottom: 4px; }}
+  .subtitle {{ color: #64748b; font-size: 0.85rem; margin-bottom: 24px; }}
+  .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }}
+  .card {{ background: #1e293b; border-radius: 8px; padding: 16px; border: 1px solid #334155; }}
+  .card .label {{ color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }}
+  .card .value {{ color: #f1f5f9; font-size: 1.5rem; font-weight: 700; margin-top: 4px; }}
+  .card .sub {{ color: #64748b; font-size: 0.75rem; margin-top: 4px; }}
+  .section {{ margin-bottom: 24px; }}
+  .section h2 {{ color: #94a3b8; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 0.8rem; }}
+  th {{ text-align: left; color: #64748b; padding: 8px 12px; border-bottom: 1px solid #334155; font-weight: 500; }}
+  td {{ padding: 8px 12px; border-bottom: 1px solid #1e293b; }}
+  tr:hover {{ background: #1e293b; }}
+  .status-ok {{ color: #22c55e; }} .status-warn {{ color: #f59e0b; }} .status-err {{ color: #ef4444; }}
+  .feeder-bar {{ display: flex; gap: 16px; align-items: center; }}
+</style>
+</head>
+<body>
+<h1>AI Trade Analyst — Operator Dashboard</h1>
+<div class="subtitle">Phase 3 Monitoring &amp; Observability | Server started {_esc(metrics_store.started_at[:19])} | Auto-refresh 30s</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="label">Total Runs</div>
+    <div class="value">{snapshot.total_runs}</div>
+    <div class="sub">{snapshot.runs_last_hour} last hour | {snapshot.runs_last_24h} last 24h</div>
+  </div>
+  <div class="card">
+    <div class="label">Total LLM Cost</div>
+    <div class="value">${snapshot.total_cost_usd:.4f}</div>
+    <div class="sub">Avg ${snapshot.avg_cost_per_run_usd:.4f}/run</div>
+  </div>
+  <div class="card">
+    <div class="label">Avg Latency</div>
+    <div class="value">{snapshot.avg_latency_ms:,.0f}ms</div>
+    <div class="sub">End-to-end pipeline</div>
+  </div>
+  <div class="card">
+    <div class="label">Avg Agreement</div>
+    <div class="value">{snapshot.avg_analyst_agreement_pct:.0f}%</div>
+    <div class="sub">Analyst consensus</div>
+  </div>
+  <div class="card">
+    <div class="label">Error Rate</div>
+    <div class="value {'status-ok' if snapshot.error_rate < 0.05 else 'status-warn' if snapshot.error_rate < 0.2 else 'status-err'}">{snapshot.error_rate:.1%}</div>
+    <div class="sub">LLM call failures</div>
+  </div>
+  <div class="card">
+    <div class="label">Feeder Status</div>
+    <div class="value {'status-ok' if not feeder_stale and feeder_age is not None else 'status-warn' if feeder_age is not None else 'status-err'}">{'Fresh' if not feeder_stale and feeder_age is not None else 'Stale' if feeder_age is not None else 'No Data'}</div>
+    <div class="sub">{'Age: ' + str(feeder_age) + 's' if feeder_age is not None else 'No feeder payload ingested'}</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Decision Distribution</h2>
+  <div class="card">{decision_bars if decision_bars else '<span style="color:#64748b">No runs recorded yet.</span>'}</div>
+</div>
+
+<div class="section">
+  <h2>Recent Runs (Last 10)</h2>
+  <div style="overflow-x:auto">
+  <table>
+    <thead>
+      <tr><th>Run ID</th><th>Instrument</th><th>Session</th><th>Decision</th><th>Agreement</th><th>Confidence</th><th>Cost</th><th>Latency</th><th>Time</th></tr>
+    </thead>
+    <tbody>{recent_rows if recent_rows else '<tr><td colspan="9" style="color:#64748b">No runs recorded yet.</td></tr>'}</tbody>
+  </table>
+  </div>
+</div>
+
+<div class="section">
+  <h2>API Health</h2>
+  <div class="card">
+    <div class="feeder-bar">
+      <span class="status-ok">Pipeline: OK</span>
+      <span>| Version: 2.3.0</span>
+      <span>| Last run: {_esc(snapshot.last_run_at[:19]) if snapshot.last_run_at else 'N/A'}</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html)
+
+
+def _esc(s: str) -> str:
+    """Minimal HTML escaping for dashboard values."""
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
