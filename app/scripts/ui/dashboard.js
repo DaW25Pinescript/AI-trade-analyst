@@ -64,6 +64,55 @@ ${getChartHTML('dashboardQuarterlyBreakdown')}
 </body></html>`;
 }
 
+/**
+ * Phase 5 — Export analytics data as a CSV file.
+ *
+ * Uses the loaded dashboard entries to build a CSV with one row per trade,
+ * including ticket data and AAR outcome fields. Downloads directly in the browser.
+ */
+export function exportAnalyticsCSV() {
+  const entries = getLoadedEntries();
+  if (!entries.length) {
+    alert('No trade data loaded. Load trades into the dashboard first.');
+    return;
+  }
+
+  const headers = [
+    'ticketId', 'createdAt', 'asset', 'session', 'decisionMode',
+    'entryType', 'entryPriceMin', 'entryPriceMax', 'stopPrice',
+    'tp1Price', 'tp2Price', 'confluenceScore', 'gateStatus',
+    'outcomeEnum', 'verdictEnum', 'rAchieved', 'exitReasonEnum',
+    'psychologicalTag', 'firstTouch', 'wouldHaveWon',
+  ];
+
+  const csvCell = (v) => {
+    const s = String(v ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const rows = entries.map(({ ticket, aar }) => {
+    const t = ticket || {};
+    const a = aar || {};
+    return [
+      t.ticketId, t.createdAt, t.asset, t.session, t.decisionMode,
+      t.entryType, t.entryPriceMin, t.entryPriceMax, t.stopPrice,
+      t.tp1Price, t.tp2Price, t.confluenceScore, t.gateStatus,
+      a.outcomeEnum, a.verdictEnum, a.rAchieved, a.exitReasonEnum,
+      a.psychologicalTag, a.firstTouch, a.wouldHaveWon,
+    ].map(csvCell);
+  });
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `analytics_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export async function exportAnalyticsPDF() {
   let exportOverrides = null;
   if (isPlotlyAvailable()) {
