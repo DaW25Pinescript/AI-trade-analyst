@@ -1,11 +1,45 @@
 import asyncio
+import logging
+import os
 import random
 from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_LLM_TIMEOUT_S = 45.0
 DEFAULT_LLM_MAX_RETRIES = 2
 DEFAULT_BASE_BACKOFF_S = 1.0
 DEFAULT_MAX_BACKOFF_S = 60.0
+
+# Phase 7 — Fallback model routing.
+# Maps primary models to fallback alternatives tried when the primary exhausts retries.
+# Configurable via FALLBACK_MODEL_MAP env var (JSON), otherwise uses sensible defaults.
+_DEFAULT_FALLBACK_MAP: dict[str, list[str]] = {
+    "claude-sonnet-4-20250514": ["claude-haiku-4-5-20251001", "gpt-4o-mini"],
+    "claude-opus-4-20250514": ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"],
+    "gpt-4o": ["gpt-4o-mini", "claude-haiku-4-5-20251001"],
+    "gpt-4o-mini": ["claude-haiku-4-5-20251001"],
+    "claude-haiku-4-5-20251001": ["gpt-4o-mini"],
+}
+
+
+def get_fallback_models(primary_model: str) -> list[str]:
+    """
+    Return the ordered list of fallback models for a given primary model.
+
+    Reads from FALLBACK_MODEL_MAP env var (JSON dict) if set, otherwise
+    uses _DEFAULT_FALLBACK_MAP. Returns empty list if no fallbacks defined.
+    """
+    env_map = os.getenv("FALLBACK_MODEL_MAP")
+    if env_map:
+        try:
+            import json
+            custom_map = json.loads(env_map)
+            if isinstance(custom_map, dict):
+                return list(custom_map.get(primary_model, []))
+        except (ValueError, TypeError):
+            logger.warning("FALLBACK_MODEL_MAP env var is not valid JSON — using defaults.")
+    return list(_DEFAULT_FALLBACK_MAP.get(primary_model, []))
 
 # Exception class names that should never be retried — the same request will
 # always fail, and retrying only wastes quota or compounds authentication debt.
@@ -91,4 +125,81 @@ async def acompletion_with_retry(
 
     raise RuntimeError(
         f"LLM call failed after {attempts} attempt(s): {last_error}"
+    ) from last_error
+
+
+async def acompletion_with_fallback(
+    acompletion_func: Callable[..., Any],
+    *,
+    timeout_s: float = DEFAULT_LLM_TIMEOUT_S,
+    max_retries: int = DEFAULT_LLM_MAX_RETRIES,
+    retry_backoff_s: float | None = None,
+    base_backoff_s: float = DEFAULT_BASE_BACKOFF_S,
+    max_backoff_s: float = DEFAULT_MAX_BACKOFF_S,
+    **kwargs,
+) -> tuple[Any, int, str]:
+    """
+    Phase 7 — Execute an LLM call with automatic fallback to secondary models.
+
+    Tries the primary model first via acompletion_with_retry. If all retries
+    fail, iterates through fallback models (each with their own retry cycle).
+
+    Returns (response, total_attempts, model_used).
+    """
+    primary_model = kwargs.get("model", "")
+    fallbacks = get_fallback_models(primary_model)
+    total_attempts = 0
+    last_error: Exception | None = None
+
+    # Try primary model
+    try:
+        response, attempts = await acompletion_with_retry(
+            acompletion_func,
+            timeout_s=timeout_s,
+            max_retries=max_retries,
+            retry_backoff_s=retry_backoff_s,
+            base_backoff_s=base_backoff_s,
+            max_backoff_s=max_backoff_s,
+            **kwargs,
+        )
+        return response, attempts, primary_model
+    except RuntimeError as primary_err:
+        last_error = primary_err
+        total_attempts += max(1, max_retries + 1)
+        if not fallbacks:
+            raise
+        logger.warning(
+            "Primary model '%s' failed after retries: %s. Trying fallbacks: %s",
+            primary_model, primary_err, fallbacks,
+        )
+
+    # Try each fallback model
+    for fb_model in fallbacks:
+        fb_kwargs = {**kwargs, "model": fb_model}
+        try:
+            response, attempts = await acompletion_with_retry(
+                acompletion_func,
+                timeout_s=timeout_s,
+                max_retries=max_retries,
+                retry_backoff_s=retry_backoff_s,
+                base_backoff_s=base_backoff_s,
+                max_backoff_s=max_backoff_s,
+                **fb_kwargs,
+            )
+            total_attempts += attempts
+            logger.info(
+                "Fallback model '%s' succeeded after %d total attempts.",
+                fb_model, total_attempts,
+            )
+            return response, total_attempts, fb_model
+        except RuntimeError as fb_err:
+            total_attempts += max(1, max_retries + 1)
+            last_error = fb_err
+            logger.warning(
+                "Fallback model '%s' also failed: %s", fb_model, fb_err,
+            )
+
+    raise RuntimeError(
+        f"All models failed (primary '{primary_model}' + {len(fallbacks)} fallbacks). "
+        f"Total attempts: {total_attempts}. Last error: {last_error}"
     ) from last_error

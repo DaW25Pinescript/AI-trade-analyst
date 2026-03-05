@@ -824,12 +824,17 @@ base with `main` (predates current repo structure) and can be safely deleted.
    - Added key rotation guide and injection verification steps.
    - Updated `.env.example` header with quick-reference injection commands for all three platforms.
 
-### Phase 7 — AI/ML Enhancement
-21. [ ] Feedback loop: outcomes → prompt refinement
-   - Build a script that reads AAR outcome data from SQLite and surfaces patterns for prompt improvement.
-22. [ ] Bias detection in analyst outputs
-   - Add a post-processing step to the arbiter that flags low-diversity consensus or single-persona dominance.
-23. [ ] Fallback model routing
-   - Add logic to `core/api_client.py` to retry with a secondary model if the primary API errors or exceeds a cost ceiling.
+### Phase 7 — AI/ML Enhancement ✅
+21. [x] Feedback loop: outcomes → prompt refinement
+   - Built `core/feedback_loop.py`: reads AAR outcome data from SQLite, computes regime accuracy, confidence calibration, persona dominance, and generates actionable recommendations for prompt improvement.
+   - Added `feedback` CLI command for interactive report generation.
+22. [x] Bias detection in analyst outputs
+   - Built `core/bias_detector.py`: post-processing step that flags unanimous high-confidence consensus (groupthink), low HTF-bias diversity, confidence clustering, and single-dissenter patterns.
+   - Integrated into arbiter prompt builder — `{bias_section}` is injected into every arbiter prompt with mitigation rules.
+23. [x] Fallback model routing
+   - Added `acompletion_with_fallback()` to `core/llm_client.py`: tries primary model, then iterates through configurable fallback models on failure.
+   - Default fallback map covers Claude, GPT-4o, and Grok models. Override via `FALLBACK_MODEL_MAP` env var (JSON).
+   - Integrated into `usage_meter.py` — enabled via `ENABLE_FALLBACK_ROUTING=1` env var.
+   - 25 new tests in `tests/test_phase7_ai_ml.py` — all passing.
 
 **Rationale for sequencing:** start with low-risk release verification, then UI fit-and-finish, then observability/performance/tooling, and finish with operational hardening and AI enhancements on top of a stable baseline.

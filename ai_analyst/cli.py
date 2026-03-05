@@ -956,6 +956,19 @@ def export_analytics(
 
 
 # ---------------------------------------------------------------------------
+# feedback command (Phase 7)
+# ---------------------------------------------------------------------------
+
+@app.command()
+def feedback():
+    """Phase 7 — Generate feedback loop report from AAR outcomes for prompt refinement."""
+    from .core.feedback_loop import build_feedback_report
+
+    report = build_feedback_report()
+    typer.echo(report.format())
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
