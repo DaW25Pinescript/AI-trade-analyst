@@ -23,6 +23,9 @@ macro_context runs before chart analysis and is advisory-only. It fails silently
 The conditional branch after chart_lenses checks enable_deliberation first, then
 ground_truth.m15_overlay. The branch after deliberation checks only m15_overlay.
 """
+import logging
+from time import perf_counter
+
 from langgraph.graph import StateGraph, END
 
 from .state import GraphState
@@ -36,12 +39,17 @@ from .chart_analysis_nodes import (
 from .arbiter_node import arbiter_node
 from .logging_node import logging_node
 from .macro_context_node import macro_context_node
+from ..core.correlation import correlation_ctx
+
+logger = logging.getLogger(__name__)
 
 
 async def validate_input_node(state: GraphState) -> GraphState:
     """
     Basic sanity checks on the Ground Truth Packet before the expensive fan-out.
     Raises ValueError if the packet is structurally incomplete.
+
+    Phase 3: Sets the correlation context (run_id) and starts pipeline timing.
     """
     gt = state.get("ground_truth")
     if gt is None:
@@ -59,6 +67,14 @@ async def validate_input_node(state: GraphState) -> GraphState:
         )
     if state.get("lens_config") is None:
         raise ValueError("GraphState is missing 'lens_config'.")
+
+    # Phase 3: set correlation context and start pipeline timer
+    correlation_ctx.set(gt.run_id)
+    state["_pipeline_start_ts"] = perf_counter()
+    state["_node_timings"] = {}
+    logger.info("[Pipeline] Run started: instrument=%s session=%s run_id=%s",
+                gt.instrument, gt.session, gt.run_id)
+
     return state
 
 

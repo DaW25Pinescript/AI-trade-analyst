@@ -22,3 +22,6 @@ class GraphState(TypedDict):
     # v2.1b — Multi-Round Deliberation
     enable_deliberation: bool                       # when True, run a second analyst round before arbiter
     deliberation_outputs: list[AnalystOutput]       # Round 2 peer-informed analyst outputs
+    # Phase 3 — Monitoring & Observability
+    _pipeline_start_ts: Optional[float]             # perf_counter() at pipeline entry (for total latency)
+    _node_timings: Optional[dict]                   # node_name → elapsed_ms

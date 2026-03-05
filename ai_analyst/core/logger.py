@@ -1,9 +1,10 @@
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from ..models.ground_truth import GroundTruthPacket
 from ..models.analyst_output import AnalystOutput
 from ..models.arbiter_output import FinalVerdict
+from .correlation import get_correlation_id
 
 LOG_DIR = Path(__file__).parent.parent / "logs" / "runs"
 PROMPT_VERSION = "v1.2"
@@ -18,11 +19,14 @@ def log_run(
     Write a full audit log entry for a completed run.
     Returns the path of the log file written.
     Every run is logged — no exceptions (design rule #8).
+
+    Phase 3: includes correlation_id for end-to-end traceability.
     """
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "correlation_id": get_correlation_id() or ground_truth.run_id,
         "run_id": ground_truth.run_id,
         "instrument": ground_truth.instrument,
         "session": ground_truth.session,
