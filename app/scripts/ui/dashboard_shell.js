@@ -1,4 +1,5 @@
 import { state } from '../state/model.js';
+import { renderDashboardSessions } from './macro_page.js';
 
 const phaseAState = {
   verdict: {
@@ -119,6 +120,7 @@ function renderPhaseA(nextState = phaseAState) {
   renderChips(nextState.evidence);
   renderAgents(nextState.agents);
   renderChartState(nextState.chart);
+  renderDashboardSessions();
 }
 
 function renderChartState(chartState = phaseAState.chart) {

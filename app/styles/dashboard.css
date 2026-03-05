@@ -25,7 +25,8 @@
   grid-template-areas:
     "chart ruling"
     "context plan"
-    "evidence agents";
+    "evidence agents"
+    "sessions sessions";
 }
 
 body.operator-dashboard-mode .operator-dashboard {
@@ -45,6 +46,10 @@ body.operator-dashboard-mode .section {
   background: linear-gradient(180deg, rgba(15, 24, 38, 0.9), rgba(11, 18, 30, 0.96));
   border-radius: 8px;
   padding: 14px;
+  transition: border-color 0.2s;
+}
+.dash-card:hover {
+  border-color: rgba(135, 155, 190, 0.35);
 }
 
 .dash-chart-card { grid-area: chart; }
@@ -53,6 +58,7 @@ body.operator-dashboard-mode .section {
 .dash-plan-card { grid-area: plan; }
 .dash-evidence-card { grid-area: evidence; }
 .dash-agent-card { grid-area: agents; }
+.dash-session-card { grid-area: sessions; }
 
 .dash-card-header {
   display: flex;
@@ -153,6 +159,15 @@ body.operator-dashboard-mode .section {
   justify-content: space-between;
   gap: 10px;
   align-items: baseline;
+  font-size: 12px;
+}
+
+.dash-metric-row span,
+.dash-agent-row span {
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
 }
 
 .dash-progress {
@@ -247,6 +262,23 @@ body.operator-dashboard-mode .section {
       "context"
       "plan"
       "evidence"
-      "agents";
+      "agents"
+      "sessions";
   }
+}
+
+@media (max-width: 620px) {
+  .dash-plan-grid { grid-template-columns: 1fr; }
+  .dash-plan-box.wide { grid-column: auto; }
+  .dash-card { padding: 12px; }
+  .dash-chart-stage { min-height: 200px; }
+  .dash-card-header h2 { font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  .operator-dashboard { gap: 10px; margin: 10px 0 14px; }
+  .dash-card { padding: 10px; }
+  .dash-chart-stage { min-height: 160px; }
+  .dash-toolbar { gap: 4px; }
+  .dash-tab, .dash-chip-btn { font-size: 9px; padding: 5px 8px; }
 }

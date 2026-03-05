@@ -21,6 +21,7 @@ function makeElement(value = '') {
   return {
     value,
     textContent: '',
+    innerHTML: '',
     hidden: false,
     style: {},
     classList: classList(),
@@ -37,7 +38,8 @@ function installDashboardDom() {
     'dashArbiterState', 'dashRiskState', 'dashConfluenceScore', 'dashVerdictBadge',
     'dashConfidenceFill', 'dashEvidenceChips', 'dashAgentRows', 'dashChartPlaceholder',
     'operatorModeBtn', 'operatorDashboard', 'asset', 'session', 'regime', 'entryPriceMin',
-    'entryPriceMax', 'stopPrice', 'tp1Price', 'tp2Price', 'minRR', 'decisionMode'
+    'entryPriceMax', 'stopPrice', 'tp1Price', 'tp2Price', 'minRR', 'decisionMode',
+    'dashSessionClock', 'dashSessionUtcClock'
   ];
 
   const store = new Map(ids.map((id) => [id, makeElement('')]));
