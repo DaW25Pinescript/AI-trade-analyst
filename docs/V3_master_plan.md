@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.21
+**Version:** 2.22
 **Updated:** 2026-03-05
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**, **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**, **Phase 5 complete (operational tooling — CLI audit trail export, bulk AAR import, analytics CSV export)**, **Phase 6 complete (production hardening — CORS whitelist, Caddy reverse proxy, Docker non-root + read-only, secrets manager docs)**
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**, **Phase 3 complete (monitoring & observability — correlation IDs, pipeline metrics, operator dashboard)**, **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**, **Phase 5 complete (operational tooling — CLI audit trail export, bulk AAR import, analytics CSV export)**, **Phase 6 complete (production hardening — CORS whitelist, Caddy reverse proxy, Docker non-root + read-only, secrets manager docs)**, **Phase 7 complete (AI/ML Enhancement — feedback loop, bias detection, fallback routing)**, **Phase 8 complete (Advanced Analytics, Backtesting, E2E Validation, Plugin Architecture)**
 
 ---
 
@@ -54,7 +54,7 @@ G6/v2.0 onwards.
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **234 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
 - **Total: 806 passing, 0 failing** across all three suites (plus 16 intentional MRO skips).
   - +1 fix (2026-03-05): `analytics_csv_export` endpoint now imports `OUTPUT_BASE` from `run_state_manager` instead of computing its own path, fixing CSV verdict column population.
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. **Phase 2b complete (region display on operator dashboard, mobile layout optimization, UI polish pass)**. **Phase 3 complete (monitoring & observability — structured logging with correlation IDs, pipeline metrics collection, operator health dashboard)**. **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**. **Phase 5 complete (operational tooling — CLI audit trail export, bulk AAR import, analytics CSV export)**. **Phase 6 complete (production hardening — CORS whitelist, Caddy reverse proxy, Docker hardening, secrets manager docs)**. Phase 7 (AI/ML Enhancement) is next.
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. **Phase 2b complete (region display on operator dashboard, mobile layout optimization, UI polish pass)**. **Phase 3 complete (monitoring & observability — structured logging with correlation IDs, pipeline metrics collection, operator health dashboard)**. **Phase 4 complete (performance — TTL cache, parallel pipeline fan-out, real IndexedDB adapter)**. **Phase 5 complete (operational tooling — CLI audit trail export, bulk AAR import, analytics CSV export)**. **Phase 6 complete (production hardening — CORS whitelist, Caddy reverse proxy, Docker hardening, secrets manager docs)**. **Phase 7 complete (AI/ML Enhancement — feedback loop, bias detection, fallback model routing)**. **Phase 8 complete (Advanced Analytics Dashboard, Strategy Backtesting Engine, E2E Validation, Plugin/Extension Architecture)**.
 
 ---
 
@@ -837,4 +837,29 @@ base with `main` (predates current repo structure) and can be safely deleted.
    - Integrated into `usage_meter.py` — enabled via `ENABLE_FALLBACK_ROUTING=1` env var.
    - 25 new tests in `tests/test_phase7_ai_ml.py` — all passing.
 
-**Rationale for sequencing:** start with low-risk release verification, then UI fit-and-finish, then observability/performance/tooling, and finish with operational hardening and AI enhancements on top of a stable baseline.
+### Phase 8 — Advanced Analytics, Backtesting, E2E Validation & Plugin Architecture ✅
+24. [x] Advanced Analytics Dashboard (Phase 8a)
+   - Built `core/analytics_dashboard.py`: rich HTML dashboard with Chart.js visualizations.
+   - Regime accuracy bar chart, confidence calibration curve, persona dominance heatmap, outcome trends (cumulative P&L + rolling win rate), decision distribution donut, instrument breakdown.
+   - API endpoint: `GET /analytics/dashboard` — self-contained HTML page with auto-refresh.
+25. [x] Strategy Backtesting Engine (Phase 8b)
+   - Built `core/backtester.py`: replays historical outcomes, computes strategy-level metrics.
+   - Sharpe ratio (annualized), max drawdown, win rate, profit factor, consecutive streaks.
+   - Per-regime performance breakdown. Equity curve generation.
+   - CLI command: `python cli.py backtest [--instrument X] [--regime R] [--min-confidence C] [--output FILE]`.
+   - API endpoint: `GET /backtest?instrument=&regime=&min_confidence=` — JSON metrics.
+26. [x] E2E Integration Validation (Phase 8c)
+   - Built `core/e2e_validator.py`: 7-check smoke-test framework (GroundTruth, Arbiter, Feedback, Bias, Backtester, Dashboard, Plugins).
+   - Runs deterministically without API keys using in-memory test DB.
+   - CLI command: `python cli.py e2e` — prints structured validation report, exits 1 on failure.
+   - API endpoint: `GET /e2e` — JSON validation report.
+27. [x] Plugin/Extension Architecture (Phase 8d)
+   - Built `core/plugin_registry.py`: central registry for Personas, Data Sources, and Hooks.
+   - Built-in discovery: 4 personas (default_analyst, risk_officer, prosecutor, ict_purist) + 3 data sources (Finnhub, FRED, GDELT).
+   - JSON manifest discovery from `plugins/` directory and `AI_ANALYST_PLUGINS_DIR` env var.
+   - Hook events: `post_verdict`, `post_aar`, `post_backtest`, `pipeline_error`.
+   - CLI command: `python cli.py plugins` — lists all registered plugins.
+   - API endpoint: `GET /plugins` — JSON plugin registry.
+   - 56 new tests in `tests/test_phase8_advanced.py` — all passing.
+
+**Rationale for sequencing:** start with low-risk release verification, then UI fit-and-finish, then observability/performance/tooling, and finish with operational hardening and AI enhancements on top of a stable baseline. Phase 8 leverages the feedback loop and outcome data from Phase 7 to provide actionable analytics and backtesting capabilities.
