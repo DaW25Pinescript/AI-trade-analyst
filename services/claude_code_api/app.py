@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import time
 import uuid
@@ -6,6 +7,8 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Claude Code API Wrapper", version="0.1.0")
 
@@ -57,10 +60,18 @@ async def chat_completions(
     err_text = stderr.decode("utf-8", errors="replace").strip()
 
     if proc.returncode != 0:
+        logger.error(
+            "claude subprocess failed (exit=%d): %s",
+            proc.returncode,
+            err_text,
+        )
         raise HTTPException(
             status_code=502,
-            detail={"message": "claude subprocess failed", "stderr": err_text, "exit_code": proc.returncode},
+            detail={"message": "claude subprocess failed", "exit_code": proc.returncode},
         )
+
+    if err_text:
+        logger.warning("claude subprocess stderr: %s", err_text)
 
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex}",
@@ -78,7 +89,6 @@ async def chat_completions(
         "meta": {
             "backend": "claude_code_api",
             "latency_ms": latency_ms,
-            "stderr": err_text,
             "exit_code": proc.returncode,
         },
     }
