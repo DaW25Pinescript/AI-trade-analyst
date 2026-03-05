@@ -1,7 +1,7 @@
 # AI Trade Analyst — Master Development Plan
-**Version:** 2.15
+**Version:** 2.16
 **Updated:** 2026-03-05
-**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**
+**Status:** Active — G12 complete (including Plotly dashboard integration), v2.0 complete, MRO fully complete (P1–P4), v2.0.1 complete, v2.0.2 complete (all 4 CRITICALs + HIGH-1/5/6 + MED-5/8 fixed), v2.1 complete (HIGH-2/3/4/7/8 + MED-1/2/3/4/6/7 + LOW-5/6 + TEST-9/10), LOW-2 closed, Plotly regression fix (dashboard.js), **C4 complete (Unified Export)**, **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**, **Phase 2b complete (region display, mobile optimization, UI polish)**
 
 ---
 
@@ -22,7 +22,7 @@ fields, regime, risk constraints). A formal integration bridge (Track C) is plan
 G6/v2.0 onwards.
 
 ### Current verification snapshot (2026-03-05)
-- Browser regression suite: **PASS** (`node --test tests/*.js`) with **150/150 passing**.
+- Browser regression suite: **PASS** (`node --test tests/*.js`) with **166/166 passing**.
   - +1 added (2026-03-03): `test_g11_bridge.js` — confirms `analyseViaBridge` uses a 3-minute timeout signal (guards CRITICAL-3).
   - +3 added (2026-03-04): `test_g11_bridge.js` — timeframes match uploaded charts (guards MED-5).
   - +8 added (2026-03-04): `test_v202_fixes.js` — m15Overlay shape validation replaces null-only guard (guards MED-8).
@@ -45,8 +45,9 @@ G6/v2.0 onwards.
   - +10 added (2026-03-04): `test_phase2a_feeder_bridge.py` — Phase 2a feeder ingest endpoint, feeder health endpoint, macro_context_node feeder priority, ticket_draft aiEdgeScorePct. 313/313 passing.
   - +1 stability fix (2026-03-05): `test_phase2a_feeder_bridge.py` now uses `asyncio.run(...)` for Python 3.10+ compatibility (avoids missing default-loop RuntimeError).
 - MRO regression suite: **PASS** (`pytest -q macro_risk_officer/tests`) with **153 passed, 16 skipped** (skips = live smoke tests requiring `MRO_SMOKE_TESTS=1` + real API keys — by design).
-- **Total: 700 passing, 0 failing** across all three suites (plus 13 intentional MRO skips).
-- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. Phase 2b (UI polish, region display, mobile, next T.R.A.D.E. page) is next.
+  - +16 added (2026-03-05): `test_phase2b_completion.js` — Phase 2b region display on operator dashboard, mobile breakpoints, UI polish, session clock unit tests. 166/166 passing.
+- **Total: 716 passing, 0 failing** across all three suites (plus 13 intentional MRO skips).
+- Operational call: Tracks A (G1–G12) and D (MRO P1–P4) are complete. Track B v2.0.2 complete, v2.1 complete. C4 complete (Unified Export). **Phase 2a complete (live feeder bridge + float fix), stability hotfixes complete (asyncio + deterministic ingest tests)**. **Phase 2b complete (region display on operator dashboard, mobile layout optimization, UI polish pass)**. Phase 3 (Monitoring & Observability) is next.
 
 ---
 
@@ -739,13 +740,19 @@ base with `main` (predates current repo structure) and can be safely deleted.
 4. [ ] Confirm schema parity
    - Cross-check `docs/schema/enums.json` against live form enum values in the browser app.
 
-### Phase 2b — UI Polish & Mobile
-5. [ ] Implement region display
-   - Add geographic/session region visualization to the operator dashboard.
-6. [ ] Mobile layout optimization
-   - Audit and fix responsive breakpoints in `app/styles/` for small-screen usability.
-7. [ ] UI polish pass
-   - Refine spacing, typography, and component alignment per Phase 2b spec.
+### Phase 2b — UI Polish & Mobile ✅
+5. [x] Implement region display
+   - Added Market Sessions card with live session clock (Sydney, Tokyo, London, New York) to the operator dashboard, reusing session renderer from T.R.A.D.E. page.
+6. [x] Mobile layout optimization
+   - Added responsive breakpoints at 620px/480px for operator dashboard (plan grid, card padding, chart stage, toolbar).
+   - Enhanced macro/scout mobile styles: asset table column hiding, touch-friendly radio/bias controls, output panel compaction.
+   - Touch-friendly form controls at 480px: larger tap targets for radio-opt, bias-btn, checkboxes, and buttons.
+7. [x] UI polish pass
+   - Updated version pill from G9 to G12 and subtitle to match current generation.
+   - Added hover transitions to macro cards and dashboard cards for visual feedback.
+   - Refined macro grid gap (14px → 16px) for consistent spacing.
+   - Added consistent typography for dashboard metric rows (IBM Plex Mono, 11px labels).
+   - Added macro card padding refinements at mobile breakpoints.
 
 ### Phase 3 — Monitoring & Observability
 8. [ ] Add structured logging with correlation IDs

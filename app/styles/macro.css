@@ -20,7 +20,7 @@
 .macro-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .macro-card--full {
@@ -370,6 +370,14 @@
   padding: 10px 0;
 }
 
+/* ── MACRO CARD HOVER ── */
+.macro-card {
+  transition: border-color 0.2s;
+}
+.macro-card:hover {
+  border-color: var(--border2);
+}
+
 /* ── SCOUT NO-DATA STATE ── */
 .scout-no-macro {
   display: flex;
@@ -391,9 +399,20 @@
   .macro-grid { grid-template-columns: 1fr; }
   .playbook-grid { grid-template-columns: 1fr; }
   .asset-align-table .asset-class-col { display: none; }
+  .asset-align-table { font-size: 11px; }
+  .asset-align-table th,
+  .asset-align-table td { padding: 7px 6px; }
+  .macro-card { padding: 16px; }
 }
 
 @media (max-width: 480px) {
   .session-clock { grid-template-columns: 1fr; }
   .top-nav-toggle .btn-ghost { font-size: 9px; padding: 7px 12px; }
+  .top-nav-toggle { gap: 4px; }
+  /* Stack the asset table for very small screens */
+  .asset-align-table th:last-child,
+  .asset-align-table td:last-child { display: none; }
+  .macro-card { padding: 14px 12px; }
+  .macro-kv { font-size: 11px; }
+  .playbook-rules li { font-size: 11px; }
 }

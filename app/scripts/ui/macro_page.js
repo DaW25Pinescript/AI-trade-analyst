@@ -329,6 +329,12 @@ export async function initMacroPage() {
   }
 }
 
+export function renderDashboardSessions() {
+  const clock = document.getElementById('dashSessionClock');
+  const utc = document.getElementById('dashSessionUtcClock');
+  if (clock) renderSessionItems(clock, utc);
+}
+
 export function initScoutPage() {
   // Scout renders from macroState which may already be loaded
   renderScoutPage();

@@ -582,6 +582,17 @@
     h1 { font-size: 20px; }
     .card { padding: 16px 14px; }
     .step { min-width: 64px; padding: 9px 10px; }
+
+    /* Output panel mobile */
+    .output-panel { padding: 14px; }
+    #outputText { font-size: 10.5px; line-height: 1.6; }
+    .output-header { gap: 6px; }
+
+    /* Touch-friendly form controls */
+    .radio-opt { padding: 10px 14px; font-size: 13px; }
+    .bias-btn { padding: 12px; }
+    .btn { padding: 13px 20px; }
+    .checkbox-item { padding: 11px 13px; }
   }
 
   /* ── PRINT / PDF ── */
