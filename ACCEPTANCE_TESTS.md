@@ -1,345 +1,362 @@
-# ACCEPTANCE_TESTS.md — Market Data Officer Phase 2 Exit Criteria
+# ACCEPTANCE_TESTS.md — Phase 1B Exit Criteria
 
 ## How to use this file
 
-Run each test group in order. Phase 2 is not complete until every criterion passes. Implement tests in `market_data_officer/tests/` and run via `pytest`.
-
-Prerequisite: Phase 1A feed pipeline has run successfully and hot packages exist in `market_data/packages/latest/`.
+Run all test groups. Phase 1B is not complete until every criterion passes — including the full Phase 1A regression suite. Report pass/fail per group.
 
 ---
 
-## Group 1 — Loader
+## Group 0 — Phase 1A regression (must still pass)
 
-### T1.1 — Manifest loads and parses correctly
+Before running any XAUUSD tests, confirm Phase 1A is unbroken.
 
-```python
-from officer.loader import load_manifest
+### T0.1 — EURUSD end-to-end run still completes
 
-manifest = load_manifest("EURUSD")
-
-assert manifest["instrument"] == "EURUSD"
-assert "as_of_utc" in manifest
-assert "windows" in manifest
-assert "1m" in manifest["windows"]
-assert "1d" in manifest["windows"]
+```bash
+python run_feed.py --instrument EURUSD --start-date 2025-01-13 --end-date 2025-01-15
+# Must complete without exception
 ```
 
-### T1.2 — All six timeframe DataFrames load with correct schema
-
-```python
-from officer.loader import load_timeframe
-
-for tf in ["1m", "5m", "15m", "1h", "4h", "1d"]:
-    df = load_timeframe("EURUSD", tf)
-    assert not df.empty, f"{tf} DataFrame is empty"
-    assert set(df.columns) >= {"open", "high", "low", "close", "volume"}
-    assert df.index.tzinfo is not None, f"{tf} index is not UTC-aware"
-    assert df.index.is_monotonic_increasing, f"{tf} index is not monotonic"
-```
-
-### T1.3 — Loader does not read raw Parquet
-
-```python
-# Grep check — must return no matches
-# grep -rn "read_parquet" market_data_officer/officer/loader.py
-# Expected: no output
-```
-
-### T1.4 — Missing manifest raises FileNotFoundError
-
-```python
-import pytest
-with pytest.raises(FileNotFoundError):
-    load_manifest("FAKEINSTRUMENT")
-```
-
----
-
-## Group 2 — Quality checks
-
-### T2.1 — Valid package passes all quality checks
-
-```python
-from officer.quality import check_package_quality
-
-result = check_package_quality("EURUSD")
-
-assert result.manifest_valid is True
-assert result.all_timeframes_present is True
-assert result.partial is False
-assert result.flags == []
-```
-
-### T2.2 — Stale package is flagged, not crashed
-
-```python
-# Simulate: modify manifest as_of_utc to be 3 hours ago
-# Re-run quality check
-result = check_package_quality("EURUSD")
-assert result.stale is True
-assert result.staleness_minutes > 60
-assert "stale" in result.flags or result.stale is True
-```
-
-### T2.3 — Partial package degrades gracefully
-
-```python
-# Simulate: rename EURUSD_4h_latest.csv temporarily
-result = check_package_quality("EURUSD")
-assert result.partial is True
-assert any("4h" in f for f in result.flags)
-```
-
-### T2.4 — Unverified instrument returns unverified quality, not crash
-
-```python
-from officer.service import build_market_packet
-
-packet = build_market_packet("XAUUSD")  # provisional instrument
-assert packet.quality.flags  # must have at least one flag
-assert packet.state_summary.data_quality in ("unverified", "partial")
-# Must NOT raise an exception
-```
-
----
-
-## Group 3 — Core features
-
-### T3.1 — All core feature fields are present and non-null
-
-```python
-from officer.features import compute_core_features
-from officer.loader import load_timeframe
-
-df_1h = load_timeframe("EURUSD", "1h")
-features = compute_core_features(df_1h)
-
-assert features.atr_14 > 0
-assert features.volatility_regime in ("low", "normal", "expanding")
-assert features.momentum is not None
-assert features.ma_50 > 0
-assert features.ma_200 > 0
-assert features.swing_high > 0
-assert features.swing_low > 0
-assert features.rolling_range > 0
-assert features.session_context in ("asian", "london", "new_york", "overlap")
-```
-
-### T3.2 — ATR is positive and plausible for EURUSD
-
-```python
-# EURUSD ATR on 1h should be in range 0.0001 to 0.02
-assert 0.0001 < features.atr_14 < 0.02, f"ATR out of plausible range: {features.atr_14}"
-```
-
-### T3.3 — MA values are plausible for EURUSD
-
-```python
-assert 0.8 < features.ma_50 < 1.5
-assert 0.8 < features.ma_200 < 1.5
-```
-
-### T3.4 — Feature computation is deterministic
-
-```python
-features_a = compute_core_features(df_1h)
-features_b = compute_core_features(df_1h)
-assert features_a.atr_14 == features_b.atr_14
-assert features_a.ma_50 == features_b.ma_50
-```
-
-### T3.5 — Insufficient data returns graceful result, not crash
+### T0.2 — EURUSD canonical archive is intact
 
 ```python
 import pandas as pd
-tiny_df = df_1h.head(10)  # only 10 bars, not enough for MA200
-features = compute_core_features(tiny_df)
-# Should not raise — ma_200 may be None or 0.0, not an exception
-assert features is not None
+
+df = pd.read_parquet("market_data/canonical/EURUSD_1m.parquet")
+assert not df.empty
+assert not df.index.duplicated().any()
+assert df.index.tzinfo is not None
+assert df["close"].between(0.8, 1.5).all()
 ```
 
----
-
-## Group 4 — Advanced feature stubs
-
-### T4.1 — All stub modules exist
+### T0.3 — All original Phase 1A pytest tests pass
 
 ```bash
-# Each of these files must exist:
-ls market_data_officer/officer/structure/bos_detector.py
-ls market_data_officer/officer/structure/fvg_detector.py
-ls market_data_officer/officer/structure/compression_detector.py
-ls market_data_officer/officer/structure/imbalance_detector.py
-```
-
-### T4.2 — All stubs return None without raising
-
-```python
-from officer.structure.bos_detector import detect_bos
-from officer.structure.fvg_detector import detect_fvg
-from officer.structure.compression_detector import detect_compression
-from officer.structure.imbalance_detector import detect_imbalance
-
-df_1h = load_timeframe("EURUSD", "1h")
-
-assert detect_bos(df_1h) is None
-assert detect_fvg(df_1h) is None
-assert detect_compression(df_1h) is None
-assert detect_imbalance(df_1h) is None
-```
-
-### T4.3 — All stubs have docstrings explaining Phase 3/4 intent
-
-```python
-import inspect
-from officer.structure import bos_detector
-
-assert bos_detector.detect_bos.__doc__ is not None
-assert len(bos_detector.detect_bos.__doc__) > 20
+pytest market_data_officer/tests/test_validate.py
+pytest market_data_officer/tests/test_resample.py
+pytest market_data_officer/tests/test_decode.py
+# All must pass with zero failures
 ```
 
 ---
 
-## Group 5 — State summary
+## Group 1 — Verification gate (must pass before any other XAUUSD tests)
 
-### T5.1 — All state summary fields present
+This group cannot be automated. It requires human confirmation. Claude Code must produce the verification artefacts and you must review them before sign-off.
+
+### T1.1 — Verification note exists in config.py
 
 ```python
-from officer.summarizer import build_state_summary
-
-summary = build_state_summary(features, timeframes)
-
-assert summary.trend_1h in ("bullish", "bearish", "neutral")
-assert summary.trend_4h in ("bullish", "bearish", "neutral")
-assert summary.trend_1d in ("bullish", "bearish", "neutral")
-assert summary.volatility_regime in ("low", "normal", "expanding")
-assert summary.momentum_state in ("expanding", "contracting", "flat")
-assert summary.session_context in ("asian", "london", "new_york", "overlap")
-assert summary.data_quality in ("validated", "partial", "stale", "unverified")
+# grep check
+grep -A 10 "XAUUSD Verification" market_data_officer/feed/config.py
+# Must return the full comment block including date, sources, bars compared, scale, status
 ```
 
-### T5.2 — Trend derivation is consistent with MA relationship
+### T1.2 — At least 5 bars documented in verification output
+
+The verification note or accompanying output must show a comparison table with at least 5 rows containing:
+- Timestamp UTC
+- Decoded OHLC
+- TradingView OHLC
+- CMC Markets OHLC
+- Delta
+
+### T1.3 — Price scale is explicitly stated and justified
+
+The comment block must contain a line like:
+```
+# Price scale confirmed: 1000
+```
+Not "assumed" or "likely". Confirmed.
+
+### T1.4 — Volume semantics are explicitly documented
+
+The comment block must contain a volume semantics line. Acceptable values:
+```
+# Volume semantics: raw tick count, no divisor needed
+# Volume semantics: divisor=1000 applied to normalise lot units
+# Volume semantics: volume absent/zero for XAUUSD, set to 0.0
+```
+Absence of this line is a test failure.
+
+### T1.5 — Verification status is not UNRESOLVED
 
 ```python
-# If close > ma_50 > ma_200 on 1h, trend_1h must be "bullish"
-# Construct a synthetic DataFrame to verify this deterministically
+# grep check
+grep "Status:" market_data_officer/feed/config.py
+# Must return: VERIFIED or PARTIALLY VERIFIED
+# Must NOT return: UNRESOLVED
+```
+
+If status is UNRESOLVED, Phase 1B cannot proceed. Document findings and pause for human review.
+
+---
+
+## Group 2 — XAUUSD fetch layer
+
+### T2.1 — XAUUSD URL construction uses zero-based month
+
+```python
+from feed.fetch import build_bi5_url
+from datetime import datetime, timezone
+
+dt = datetime(2025, 3, 15, 9, 0, 0, tzinfo=timezone.utc)
+url = build_bi5_url("XAUUSD", dt)
+
+assert "XAUUSD" in url
+assert "/2025/02/15/09h_ticks.bi5" in url  # month 3 → zero-based index 02
+```
+
+### T2.2 — Empty or 404 response returns empty bytes without crashing
+
+```python
+from feed.fetch import fetch_bi5
+from datetime import datetime, timezone
+
+far_future = datetime(2099, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+result = fetch_bi5("XAUUSD", far_future, save_raw=False)
+assert result == b""
 ```
 
 ---
 
-## Group 6 — Market Packet assembly
+## Group 3 — XAUUSD decode layer
 
-### T6.1 — Full packet builds without exception
+### T3.1 — Decoded XAUUSD mid prices are in plausible gold range
 
 ```python
-from officer.service import build_market_packet
+from feed.decode import decode_dukascopy_ticks
+from feed.config import INSTRUMENTS
+from datetime import datetime, timezone
 
-packet = build_market_packet("EURUSD")
-assert packet is not None
+meta = INSTRUMENTS["XAUUSD"]
+hour_start = datetime(2025, 1, 15, 9, 0, 0, tzinfo=timezone.utc)
+
+df = decode_dukascopy_ticks(raw_bytes, hour_start, meta)
+
+assert not df.empty
+assert df["mid"].between(1_500.0, 3_500.0).all(), \
+    f"XAUUSD mid prices out of plausible range: {df['mid'].describe()}"
 ```
 
-### T6.2 — Packet serialises to valid JSON matching v1 schema
+### T3.2 — XAUUSD uses its own InstrumentMeta, not EURUSD's
+
+```python
+from feed.config import INSTRUMENTS
+
+eurusd_meta = INSTRUMENTS["EURUSD"]
+xauusd_meta = INSTRUMENTS["XAUUSD"]
+
+assert xauusd_meta.price_scale != eurusd_meta.price_scale, \
+    "XAUUSD and EURUSD should not share the same price scale"
+```
+
+### T3.3 — Corrupt or empty bytes return empty DataFrame
+
+```python
+result = decode_dukascopy_ticks(b"", hour_start, meta)
+assert result.empty
+
+result = decode_dukascopy_ticks(b"invalid", hour_start, meta)
+assert result.empty
+```
+
+---
+
+## Group 4 — XAUUSD aggregation and validation
+
+### T4.1 — 1m OHLCV schema is correct
+
+```python
+from feed.aggregate import ticks_to_1m_ohlcv
+
+m1 = ticks_to_1m_ohlcv(xauusd_tick_df)
+
+assert set(m1.columns) >= {"open", "high", "low", "close", "volume"}
+assert m1.index.tzinfo is not None
+assert m1.index.is_monotonic_increasing
+```
+
+### T4.2 — XAUUSD canonical archive price range is valid
+
+```python
+import pandas as pd
+
+df = pd.read_parquet("market_data/canonical/XAUUSD_1m.parquet")
+
+assert not df.empty
+assert df["close"].between(1_500.0, 3_500.0).all(), \
+    f"XAUUSD canonical prices out of range: {df['close'].describe()}"
+```
+
+### T4.3 — XAUUSD canonical archive has no duplicate timestamps
+
+```python
+assert not df.index.duplicated().any()
+```
+
+### T4.4 — XAUUSD canonical archive is UTC-aware
+
+```python
+assert df.index.tzinfo is not None
+```
+
+### T4.5 — No `mid` column in XAUUSD canonical archive
+
+```python
+assert "mid" not in df.columns
+```
+
+---
+
+## Group 5 — XAUUSD derived timeframes
+
+### T5.1 — All derived files exist
+
+```python
+import os
+for tf in ["5m", "15m", "1h", "4h", "1d"]:
+    assert os.path.exists(f"market_data/derived/XAUUSD_{tf}.parquet"), f"Missing: XAUUSD_{tf}.parquet"
+    assert os.path.exists(f"market_data/derived/XAUUSD_{tf}.csv"), f"Missing: XAUUSD_{tf}.csv"
+```
+
+### T5.2 — Derived timeframes have plausible price range
+
+```python
+import pandas as pd
+
+df_1h = pd.read_parquet("market_data/derived/XAUUSD_1h.parquet")
+assert df_1h["close"].between(1_500.0, 3_500.0).all()
+```
+
+### T5.3 — Validation ran on all derived outputs (no mid column reference)
+
+```bash
+grep -rn "mid" market_data_officer/feed/resample.py
+# Must return no matches
+```
+
+---
+
+## Group 6 — XAUUSD hot packages
+
+### T6.1 — Hot package files exist
+
+```python
+import os
+for tf in ["1m", "5m", "15m", "1h", "4h", "1d"]:
+    assert os.path.exists(f"market_data/packages/latest/XAUUSD_{tf}_latest.csv")
+assert os.path.exists("market_data/packages/latest/XAUUSD_hot.json")
+```
+
+### T6.2 — Hot package manifest is valid
 
 ```python
 import json
 
-d = packet.to_dict()
-json_str = json.dumps(d)  # must not raise
-parsed = json.loads(json_str)
+with open("market_data/packages/latest/XAUUSD_hot.json") as f:
+    manifest = json.load(f)
 
-# Top-level keys
-assert set(parsed.keys()) >= {"instrument", "as_of_utc", "source", "timeframes", "features", "state_summary", "quality"}
-
-# All four feature keys present
-assert set(parsed["features"].keys()) == {"core", "structure", "imbalance", "compression"}
-
-# Advanced features are null
-assert parsed["features"]["structure"] is None
-assert parsed["features"]["imbalance"] is None
-assert parsed["features"]["compression"] is None
-
-# Core features populated
-assert parsed["features"]["core"]["atr_14"] > 0
+assert manifest["instrument"] == "XAUUSD"
+assert "as_of_utc" in manifest
+assert "1m" in manifest["windows"]
+assert "1d" in manifest["windows"]
+assert manifest["windows"]["1m"]["count"] > 0
 ```
 
-### T6.3 — All six timeframes present in packet
+### T6.3 — Hot CSV row counts are within window limits
 
 ```python
-d = packet.to_dict()
-for tf in ["1m", "5m", "15m", "1h", "4h", "1d"]:
-    assert tf in d["timeframes"], f"Missing timeframe: {tf}"
-    assert d["timeframes"][tf]["count"] > 0
+import pandas as pd
+
+limits = {"1m": 3000, "5m": 1200, "15m": 600, "1h": 240, "4h": 120, "1d": 30}
+
+for tf, limit in limits.items():
+    df = pd.read_csv(f"market_data/packages/latest/XAUUSD_{tf}_latest.csv", index_col=0)
+    assert len(df) <= limit, f"{tf} hot package exceeds limit: {len(df)} > {limit}"
 ```
 
-### T6.4 — Timestamps in packet are UTC ISO8601 strings
+---
+
+## Group 7 — Incremental update
+
+### T7.1 — XAUUSD re-run produces no duplicates
 
 ```python
-from datetime import datetime, timezone
-
-as_of = datetime.fromisoformat(packet.as_of_utc.replace("Z", "+00:00"))
-assert as_of.tzinfo is not None
+# Run pipeline twice on same date range
+# Then check:
+df = pd.read_parquet("market_data/canonical/XAUUSD_1m.parquet")
+assert not df.index.duplicated().any()
 ```
 
-### T6.5 — `is_trusted()` returns True for clean EURUSD packet
+### T7.2 — EURUSD canonical archive unaffected by XAUUSD run
 
 ```python
+eurusd_before = pd.read_parquet("market_data/canonical/EURUSD_1m.parquet")
+# Run XAUUSD pipeline
+eurusd_after = pd.read_parquet("market_data/canonical/EURUSD_1m.parquet")
+
+assert len(eurusd_before) == len(eurusd_after)
+assert eurusd_before.index.equals(eurusd_after.index)
+```
+
+---
+
+## Group 8 — Officer instrument status
+
+### T8.1 — Officer emits `trusted` quality for XAUUSD after Phase 1B sign-off
+
+```python
+from officer.service import build_market_packet
+
+packet = build_market_packet("XAUUSD")
+assert packet.source["quality"] == "validated"
+assert packet.state_summary.data_quality == "validated"
 assert packet.is_trusted() is True
 ```
 
-### T6.6 — Packet written to correct output path
+### T8.2 — Officer EURUSD packet still valid after update
 
 ```python
-import os
-packet_path = "market_data_officer/state/packets/EURUSD_market_packet.json"
-# After run_officer.py --instrument EURUSD
-assert os.path.exists(packet_path)
+eurusd_packet = build_market_packet("EURUSD")
+assert eurusd_packet.is_trusted() is True
 ```
 
 ---
 
-## Group 7 — CLI entry point
+## Group 9 — End-to-end smoke test
 
-### T7.1 — Help flag works
-
-```bash
-python run_officer.py --help
-# Must exit 0 and show usage
-```
-
-### T7.2 — Full run completes without exception
+### T9.1 — Full XAUUSD pipeline run completes without exception
 
 ```bash
-python run_officer.py --instrument EURUSD
-# Expected: no unhandled exceptions, packet file written
+python run_feed.py --instrument XAUUSD --start-date 2025-01-13 --end-date 2025-01-15
+# Must complete without unhandled exceptions
 ```
 
-### T7.3 — Output confirms packet quality in terminal
-
-The CLI must print something like:
+### T9.2 — All output files exist
 
 ```
-Market packet built: EURUSD
-  as_of_utc: 2026-03-06T12:00:00Z
-  data_quality: validated
-  stale: False
-  partial: False
-  flags: []
+market_data/canonical/XAUUSD_1m.parquet          ✓
+market_data/derived/XAUUSD_5m.parquet            ✓
+market_data/derived/XAUUSD_1h.parquet            ✓
+market_data/derived/XAUUSD_1d.parquet            ✓
+market_data/packages/latest/XAUUSD_hot.json      ✓
 ```
 
 ---
 
-## Phase 2 sign-off checklist
+## Phase 1B sign-off checklist
 
-Before marking Phase 2 complete, confirm:
+Before marking Phase 1B complete, confirm:
 
-- [ ] All 7 test groups pass
-- [ ] `features.structure`, `features.imbalance`, `features.compression` are all `null` in serialized packet
-- [ ] No raw Parquet reads in `officer/loader.py`
-- [ ] No feed pipeline calls anywhere in `officer/`
-- [ ] All four stub files exist and return `None`
-- [ ] All stubs have docstrings
-- [ ] Market Packet JSON validates against v1 schema
-- [ ] `is_trusted()` returns `True` for clean EURUSD packet
-- [ ] `run_officer.py --instrument EURUSD` completes end-to-end
-- [ ] Packet file written to `state/packets/EURUSD_market_packet.json`
-- [ ] XAUUSD handled gracefully as `unverified` without crashing
+- [ ] Group 0 (Phase 1A regression) — all pass
+- [ ] Group 1 (verification gate) — human reviewed and confirmed
+- [ ] Verification note in `config.py` with date, sources, 5+ bars, scale, volume, status
+- [ ] `InstrumentMeta` for XAUUSD populated with confirmed (not assumed) values
+- [ ] XAUUSD canonical archive prices in range 1,500–3,500 USD
+- [ ] No `mid` column in XAUUSD canonical archive or derived files
+- [ ] All XAUUSD hot package files exist
+- [ ] Officer emits `trusted` quality for XAUUSD
+- [ ] Officer EURUSD packet unaffected
+- [ ] XAUUSD re-run produces zero duplicates
+- [ ] `run_feed.py --instrument XAUUSD` completes end-to-end on 3-day range

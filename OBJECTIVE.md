@@ -1,154 +1,103 @@
-# OBJECTIVE.md — Market Data Officer: What It Must Do and Why
+# OBJECTIVE.md — Phase 1B: XAUUSD Extension
 
-## Strategic framing
+## Why Phase 1B is a separate phase
 
-Think of the feed as a verified database. The Market Data Officer is the query layer — it reads from that database and assembles a structured briefing that every downstream AI agent can reason over directly.
+XAUUSD is not simply "EURUSD with a different symbol." Gold has specific properties that make silent parsing errors highly likely if assumptions are carried over from FX:
 
-Without the Officer, downstream agents would need to read raw CSVs, compute their own features, handle their own quality checks, and make their own decisions about what "the market" looks like. That is duplicated logic, fragile, and untestable.
+| Property | EURUSD | XAUUSD | Risk |
+|---|---|---|---|
+| Price scale | 100,000 (5 decimal places) | Unknown — likely 1,000 but must be verified | 10x price error if wrong |
+| Price range | ~0.80–1.50 | ~1,800–2,800 | Out-of-range check values differ entirely |
+| Volume semantics | Tick volume, additive | May differ — lots, units, or absent | Silent volume corruption |
+| Decimal precision | Pips at 4th decimal | Different pip structure | Misaligned OHLC spread |
+| Session behaviour | 24h FX | Metals may have session gaps | Gap handling differences |
 
-With the Officer, every agent gets a single consistent market packet — same schema, same provenance, same quality signals — every time.
+A 10x price scaling error on gold produces bars that look structurally valid — monotonic, positive, internally consistent — but are completely wrong numerically. The validation layer will not catch it because it cannot know what gold "should" be worth. Only external comparison catches it.
+
+This is why Phase 1B exists as an isolated phase with an explicit verification gate.
 
 ---
 
-## What the Officer must deliver
+## What Phase 1B must deliver
 
-### 1. Package loader
+### 1. XAUUSD verification report
 
-Read the feed's validated hot package exports:
-- Load hot CSV files per timeframe
-- Parse the JSON manifest
-- Validate manifest integrity before loading data
-- Return typed, UTC-aware DataFrames
+Before any code is committed to `config.py`, produce a written verification note (as a code comment block or a `docs/` markdown file) documenting:
 
-The Officer reads from `market_data/packages/latest/`. It does **not** read raw Parquet directly. Hot packages are the contract surface between feed and Officer.
+- Raw Dukascopy bi5 source bytes decoded for at least one sample hour
+- Decoded `ask_raw` and `bid_raw` integer values (before scaling)
+- Applied `price_scale` and resulting `mid` price
+- Comparison against TradingView XAUUSD for same timestamp: open, high, low, close
+- Comparison against CMC Markets XAUUSD for same timestamp: open, high, low, close
+- Assessment of volume: what does `ask_vol_raw + bid_vol_raw` represent? Is a divisor needed?
+- Explicit conclusion: verified / partially verified / needs further investigation
+- At least 5 bars compared, not just 1
 
-### 2. Read-side quality checks
+This note is a required deliverable. It is not optional documentation.
 
-Before building any packet, the Officer must verify:
-- Manifest file exists
-- All expected timeframe CSVs exist
-- Row counts meet minimum thresholds
-- Timestamps are monotonic ascending per timeframe
-- Last bar timestamps are reasonably current (staleness check)
-- No duplicate timestamps within a timeframe
-- `quality_flag` values are acceptable
+### 2. Verified `InstrumentMeta` for XAUUSD
 
-If checks fail, degrade gracefully — emit a `partial` or `stale` packet with a quality marker. Do not crash. Do not silently continue.
-
-### 3. Core feature computation
-
-Compute deterministic, numerically stable features from loaded timeframe data:
-
-| Feature | Description |
-|---|---|
-| `atr_14` | Average True Range, 14-period, on 1h bars |
-| `volatility_regime` | `low` / `normal` / `expanding` based on ATR vs rolling ATR |
-| `momentum` | Rate-of-change of close, 14-period, on 1h bars |
-| `ma_50` | 50-period SMA of close on 1h bars |
-| `ma_200` | 200-period SMA of close on 1h bars |
-| `swing_high` | Most recent swing high (pivot high) on 1h bars |
-| `swing_low` | Most recent swing low (pivot low) on 1h bars |
-| `rolling_range` | High-Low range over last 20 bars on 1h |
-| `session_context` | `asian` / `london` / `new_york` / `overlap` based on `as_of_utc` |
-
-These features must be deterministic — same input data always produces same feature values.
-
-### 4. Advanced feature stubs
-
-Create empty module files for future structure/liquidity logic. Each stub must:
-- Exist as a real Python file
-- Contain a properly typed function signature
-- Return `None` or `{}` explicitly
-- Include a docstring explaining what Phase 3/4 will implement
-
-Stubs required:
-- `bos_detector.py` → `detect_bos(df: pd.DataFrame) -> None`
-- `fvg_detector.py` → `detect_fvg(df: pd.DataFrame) -> None`
-- `compression_detector.py` → `detect_compression(df: pd.DataFrame) -> None`
-- `imbalance_detector.py` → `detect_imbalance(df: pd.DataFrame) -> None`
-
-### 5. Market Packet assembly
-
-Assemble the canonical Market Packet v1. Full schema is in `CONTRACTS.md`.
-
-The packet includes:
-- Instrument and timestamp metadata
-- Source provenance (vendor, canonical TF, quality)
-- Timeframe windows (rows as dicts, not DataFrames)
-- Core features (populated)
-- Structure/imbalance/compression fields (`null` — stubs)
-- State summary (trend per TF, volatility regime, momentum state)
-
-### 6. State summary builder
-
-Derive a compact summary from features:
+Only after the verification report is produced:
 
 ```python
-{
-  "trend_1h": "bullish" | "bearish" | "neutral",
-  "trend_4h": "bullish" | "bearish" | "neutral",
-  "trend_1d": "bullish" | "bearish" | "neutral",
-  "volatility_regime": "low" | "normal" | "expanding",
-  "momentum_state": "expanding" | "contracting" | "flat",
-  "session_context": "asian" | "london" | "new_york" | "overlap",
-  "data_quality": "validated" | "partial" | "stale"
+"XAUUSD": InstrumentMeta(
+    symbol="XAUUSD",
+    price_scale=????,        # confirmed value from verification
+    volume_divisor=????,     # confirmed value or None
+    # verification_note: "Verified YYYY-MM-DD against TradingView + CMC, 5 bars"
+)
+```
+
+If verification is incomplete or ambiguous, leave the stub and document exactly what remains unresolved. Do not guess.
+
+### 3. End-to-end XAUUSD ingestion
+
+With verified metadata:
+- Dukascopy fetch for XAUUSD
+- Tick decode using verified price scale
+- Canonical 1m OHLCV archive: `market_data/canonical/XAUUSD_1m.parquet`
+- Derived timeframes: 5m, 15m, 1h, 4h, 1d
+- Hot package export
+- Incremental update logic
+
+### 4. Officer instrument status update
+
+After XAUUSD canonical archive is validated, update the Officer's instrument policy from `provisional_until_verified` to `trusted`:
+
+In `officer/contracts.py` or equivalent instrument registry:
+
+```python
+INSTRUMENT_STATUS = {
+    "EURUSD": "trusted",
+    "XAUUSD": "trusted",  # update only after Phase 1B sign-off
 }
 ```
 
-Trend is derived from MA relationship: close > ma_50 > ma_200 = bullish, inverse = bearish, else neutral.
+### 5. Phase 1A regression
 
-This summary is derivative and non-authoritative. It summarises; it does not replace raw bars.
-
-### 7. Officer service / entry point
-
-`service.py` provides the top-level orchestrator:
-
-```python
-def build_market_packet(instrument: str) -> MarketPacket:
-    ...
-
-def refresh_from_latest_exports(instrument: str) -> MarketPacket:
-    ...
-
-def validate_package_manifest(instrument: str) -> ValidationResult:
-    ...
-```
-
-`run_officer.py` is the CLI entry point:
-
-```bash
-python run_officer.py --instrument EURUSD
-python run_officer.py --instrument EURUSD --output-path state/packets/
-```
+All Phase 1A acceptance tests must continue to pass after Phase 1B changes. EURUSD ingestion must be unaffected.
 
 ---
 
-## What the Officer explicitly does NOT do
+## What Phase 1B explicitly does NOT include
 
-| Out of scope | Owner |
+| Out of scope | Reason |
 |---|---|
-| Vendor HTTP fetch | `feed/fetch.py` |
-| bi5 decode | `feed/decode.py` |
-| Canonical archive writes | `feed/pipeline.py` |
-| Resampling truth rules | `feed/resample.py` |
-| BOS / FVG / structure logic | Phase 3 (`structure/`) |
-| Imbalance / liquidity sweep | Phase 4 |
-| Analyst reasoning | Analyst engine |
-| Arbiter verdicts | Senate / Arbiter layer |
-| Chart screenshot ingestion | Optional human adjunct only |
+| HistData seeding | Phase 1E |
+| Incremental updater hardening | Phase 1C |
+| Raw cache diagnostics | Phase 1D |
+| New Officer features | Phase 2 is complete — do not modify |
+| Any new instrument beyond XAUUSD | Future phase |
 
 ---
 
 ## Definition of done
 
-Phase 2 is complete when:
-
-- The Officer reads validated feed outputs without touching vendor-fetch logic
-- It constructs deterministic market packets per instrument
-- It exposes rolling windows by timeframe
-- It computes the full core feature set
-- It emits auditable summaries with provenance and quality context
-- It fails safely on stale, partial, or corrupt data
-- Advanced feature stubs exist with correct signatures returning `None`
-- Downstream agents can consume a market packet without needing screenshots or raw CSVs
-- All acceptance criteria in `ACCEPTANCE_TESTS.md` pass
+Phase 1B is complete when:
+- Verification report exists with at least 5 bars compared against both TradingView and CMC
+- `InstrumentMeta` for XAUUSD is populated with confirmed values
+- XAUUSD canonical archive builds cleanly
+- XAUUSD prices are in plausible gold range (1,500–3,500 USD)
+- All Phase 1B acceptance tests pass
+- All Phase 1A acceptance tests still pass
+- Officer emits `trusted` quality packets for XAUUSD

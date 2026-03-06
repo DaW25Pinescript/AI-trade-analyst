@@ -1,186 +1,166 @@
-# CONSTRAINTS.md — Hard Rules, Module Boundaries, Failure Handling
+# CONSTRAINTS.md — Phase 1B Hard Rules and Verification Protocol
 
-## Non-negotiable rules
+## The verification gate is non-negotiable
+
+This is the single most important constraint in Phase 1B.
+
+**Do not populate `XAUUSD` in `INSTRUMENTS` dict until all of the following are true:**
+
+1. At least 5 decoded XAUUSD bars have been compared against TradingView XAUUSD
+2. At least 5 decoded XAUUSD bars have been compared against CMC Markets XAUUSD
+3. Price scale has been confirmed — not assumed
+4. Volume semantics have been explicitly documented
+5. A written verification note exists in the codebase
+
+This gate cannot be bypassed by:
+- Assuming XAUUSD uses the same scale as EURUSD (it does not)
+- Assuming a "likely" value of 1000 without confirmation
+- Producing bars that look internally consistent but were never externally compared
+- Declaring "close enough" without documenting the delta
+
+If verification produces ambiguous results, the correct action is to document the ambiguity and leave the stub — not to guess and proceed.
 
 ---
 
-### RULE 1 — The Officer does not fetch, decode, or write canonical data
+## Verification protocol — step by step
 
-The Officer is a **read layer only**. It must not:
-- Make HTTP requests to Dukascopy or any vendor
-- Decompress bi5 files
-- Write to `market_data/canonical/`
-- Write to `market_data/derived/`
-- Call any function in `feed/fetch.py`, `feed/decode.py`, or `feed/pipeline.py`
+### Step 1 — Fetch a sample hour
 
-If the feed hasn't run, the Officer should detect that via missing manifests and degrade gracefully — not attempt to fill the gap itself.
+Choose a recent trading hour with known market activity (avoid weekends, holidays).
 
----
+Fetch the raw bi5 file for that hour:
+```
+https://www.dukascopy.com/datafeed/XAUUSD/{year}/{month_zero_based}/{day}/{hour}h_ticks.bi5
+```
 
-### RULE 2 — Read from hot packages, not raw Parquet
+### Step 2 — Decode raw integers before scaling
 
-The Officer reads from `market_data/packages/latest/` only.
+Print the first 5 rows of decoded data showing:
+- `time_ms` offset
+- `ask_raw` (raw integer, before division)
+- `bid_raw` (raw integer, before division)
+- `ask_vol_raw`
+- `bid_vol_raw`
 
-It must not read `market_data/canonical/EURUSD_1m.parquet` directly. Hot packages are the contract surface between feed and Officer. Raw Parquet is the feed's internal truth, not the Officer's input.
+Do not apply price scale yet. First understand the raw values.
+
+### Step 3 — Derive candidate mid price
+
+Try candidate scales and compute mid:
+```python
+for candidate_scale in [100, 1000, 10000, 100000]:
+    mid = ((ask_raw / candidate_scale) + (bid_raw / candidate_scale)) / 2
+    print(f"scale={candidate_scale}: mid={mid:.4f}")
+```
+
+One of these should produce a value in the 1,500–3,500 USD range. That is the confirmed scale.
+
+### Step 4 — Aggregate to 1m OHLCV
+
+Using the confirmed scale, aggregate the sample hour to 1-minute OHLCV bars.
+
+### Step 5 — Compare against TradingView
+
+Open TradingView. Navigate to XAUUSD on the 1-minute chart. Find the same timestamp.
+
+For at least 5 bars, record:
+
+| Timestamp UTC | Decoded O | Decoded H | Decoded L | Decoded C | TV O | TV H | TV L | TV C | Delta |
+|---|---|---|---|---|---|---|---|---|---|
+| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+
+Acceptable parity: within 0.50 USD on gold (minor spread/source differences are expected).
+
+### Step 6 — Compare against CMC Markets
+
+Repeat the same comparison using CMC Markets XAUUSD chart.
+
+### Step 7 — Document volume semantics
+
+Examine `ask_vol_raw + bid_vol_raw` values. Determine:
+- Are they in units that make sense as tick volume?
+- Is a divisor needed to normalise?
+- Are they zero or absent for some bars?
+- Document conclusion explicitly
+
+### Step 8 — Write verification note
+
+Produce this comment block in `feed/config.py` above the XAUUSD entry:
 
 ```python
-# Correct
-loader.load_hot_package("EURUSD", "1h")
-
-# Wrong
-pd.read_parquet("market_data/canonical/EURUSD_1m.parquet")
+# XAUUSD Verification — [DATE]
+# Verified by: [your name or "Phase 1B automated check"]
+# Reference sources: TradingView XAUUSD, CMC Markets XAUUSD
+# Bars compared: [N]
+# Price scale confirmed: [value]
+# Volume semantics: [description]
+# Max OHLC delta vs TradingView: [value] USD
+# Max OHLC delta vs CMC: [value] USD
+# Status: VERIFIED / PARTIALLY VERIFIED / UNRESOLVED
+# Notes: [any caveats]
 ```
 
 ---
 
-### RULE 3 — Validate before building
+## All Phase 1A rules carry forward
 
-The Officer must run `quality.py` checks before assembling any packet. If validation fails:
+Every constraint from Phase 1A `CONSTRAINTS.md` applies to XAUUSD:
 
-- Set `quality.partial = True` or `quality.stale = True`
-- Populate `quality.flags` with specific failure reasons
-- Set `state_summary.data_quality` to `"partial"` or `"stale"`
-- Still return a packet (do not crash)
-- Log warnings for every flag raised
+- UTC everywhere
+- Canonical truth is 1m OHLCV
+- Higher timeframes derived only, never fetched
+- Validation before every write
+- Instrument metadata controls all parsing assumptions
+- Source abstraction boundary maintained
+- Incremental append is idempotent
+- No framework bloat
 
-Never silently continue past a quality failure.
-
----
-
-### RULE 4 — Features are computed from loaded DataFrames, not re-fetched data
-
-All feature computation happens on the DataFrames already loaded from hot packages. Features must not trigger additional file reads, HTTP calls, or feed pipeline runs.
+Do not relax any of these for XAUUSD.
 
 ---
 
-### RULE 5 — Advanced feature stubs return None, not partial logic
+## XAUUSD-specific additional constraints
 
-The structure stubs in `officer/structure/` must:
+### RULE X1 — Price range guard for XAUUSD
+
+After decoding, all XAUUSD close prices must pass a plausibility check:
 
 ```python
-def detect_bos(df: pd.DataFrame) -> None:
-    """
-    Phase 3: Detect Break of Structure events.
-    Will require: pivot detection rules, break confirmation logic,
-    close vs wick interpretation, timeframe interaction model.
-    Not implemented in Phase 2.
-    """
-    return None
+XAUUSD_PRICE_RANGE = (1_500.0, 3_500.0)
+
+def validate_xauusd_price_range(df: pd.DataFrame) -> None:
+    out_of_range = ~df["close"].between(*XAUUSD_PRICE_RANGE)
+    if out_of_range.any():
+        raise ValueError(
+            f"XAUUSD close prices out of plausible range "
+            f"{XAUUSD_PRICE_RANGE}: {df.loc[out_of_range, 'close'].describe()}"
+        )
 ```
 
-Do not implement partial BOS, FVG, or compression logic. Partial implementations are worse than explicit stubs because they create false confidence. Return `None`. Reserve the field in the packet. Move on.
+This catches scale errors that pass structural validation.
+
+### RULE X2 — Do not reuse EURUSD price range guards for XAUUSD
+
+Phase 1A has a plausibility check that EURUSD closes are between 0.8 and 1.5. That check must not be applied to XAUUSD. Each instrument needs its own range constants. Centralise these in `config.py`.
+
+### RULE X3 — Session gap behaviour must be documented
+
+Gold may exhibit different session gap behaviour vs FX. If gaps are observed in the canonical archive at specific hours, document them rather than treating as errors. The validation layer should distinguish between:
+- Genuine data gaps (missing bi5 files = no activity or source gap)
+- Expected session gaps (if gold has thinner overnight hours)
+
+### RULE X4 — Do not modify Officer internals to accommodate XAUUSD parsing
+
+If the Officer needs updating for XAUUSD, it should be limited to the instrument status registry (`trusted` / `provisional`). No parsing logic, no new feature thresholds, no special-casing XAUUSD inside Officer modules.
 
 ---
 
-### RULE 6 — Market Packet schema is fixed at v1
+## What "verified" means vs "assumed"
 
-The packet schema defined in `CONTRACTS.md` is the contract. Do not add, remove, or rename fields during Phase 2 implementation without explicit instruction.
-
-Fields present: `instrument`, `as_of_utc`, `source`, `timeframes`, `features`, `state_summary`, `quality`.
-
-Feature sub-keys present: `core`, `structure`, `imbalance`, `compression`.
-
-All four feature keys must always be present, even if value is `null`.
-
----
-
-### RULE 7 — UTC everywhere
-
-All timestamps in the packet must be UTC-aware ISO8601 strings.
-
-```python
-# Correct
-"as_of_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-# Wrong
-"as_of_utc": datetime.utcnow().isoformat()
-```
-
----
-
-### RULE 8 — Instrument policy must be enforced
-
-Only emit `quality: "validated"` for instruments that have passed Phase 1A/1B verification.
-
-Current trusted list: `EURUSD`
-Current provisional list: `XAUUSD` (until Phase 1B sign-off)
-
-If an unverified instrument is requested, set quality to `"unverified"` and add flag `"instrument_not_verified"`. Do not crash. Do not silently emit validated quality for unverified instruments.
-
----
-
-## Module boundary map
-
-| Module | Owns | Must not touch |
+| State | Meaning | Action |
 |---|---|---|
-| `loader.py` | Read hot CSVs, parse manifest, return DataFrames | feed pipeline, raw Parquet, vendor fetch |
-| `features.py` | Compute core features from loaded DataFrames | file I/O, HTTP, feed internals |
-| `summarizer.py` | Build StateSummary from features + timeframe DFs | raw bar calculations |
-| `quality.py` | Read-side sanity checks, staleness, manifest validation | feature computation |
-| `contracts.py` | Dataclass definitions, `to_dict()`, `is_trusted()` | computation logic |
-| `service.py` | Orchestrate loader → quality → features → summarizer → packet | implement any of the above directly |
-| `structure/*.py` | Stubs only, return None | any real logic |
+| Verified | Decoded bars match TradingView + CMC within tolerance, scale confirmed, volume documented | Populate `InstrumentMeta`, proceed |
+| Partially verified | Price scale confirmed, volume ambiguous | Populate with `volume_divisor=None` and explicit note, proceed with caution |
+| Unresolved | Price scale produces values outside plausible range, or bars don't match references | Leave stub, document findings, do not proceed |
 
----
-
-## Failure mode handling
-
-### Stale package
-
-Staleness threshold: 60 minutes during assumed market hours.
-
-```python
-staleness_minutes = (now_utc - last_bar_utc).total_seconds() / 60
-stale = staleness_minutes > 60
-```
-
-Emit packet with `quality.stale = True`, `data_quality = "stale"`.
-
-### Partial package
-
-One or more timeframe CSVs missing but manifest exists.
-
-Emit packet with available timeframes only. Set `quality.partial = True`. Add specific flags e.g. `"4h_missing"`, `"1d_missing"`.
-
-### Corrupt package
-
-CSV schema mismatch, unparseable timestamps, duplicate rows detected.
-
-Raise a warning. Skip the corrupt timeframe. Treat as partial. Do not crash.
-
-### Missing manifest
-
-`EURUSD_hot.json` does not exist.
-
-```python
-raise FileNotFoundError(f"Hot package manifest not found for {instrument}. Has the feed pipeline run?")
-```
-
-This is the one case where a hard raise is acceptable — the Officer cannot function without the manifest.
-
-### Unverified instrument
-
-Set quality fields as specified in RULE 8. Return packet. Do not raise.
-
----
-
-## Code quality standards
-
-- All public functions must have docstrings
-- Type hints on all function signatures
-- No magic numbers — use named constants for thresholds (e.g. `STALENESS_THRESHOLD_MINUTES = 60`)
-- `print()` is acceptable for CLI logging; structured logging is Phase 3
-- No silent failures on quality issues — always log and flag
-
----
-
-## Dependencies
-
-Phase 2 requires no new external dependencies beyond Phase 1:
-
-```
-pandas>=2.0
-pyarrow>=14.0
-```
-
-No ML libraries, no HTTP clients, no task frameworks needed in the Officer layer.
+Partial verification is acceptable if documented. Silent assumption is never acceptable.
