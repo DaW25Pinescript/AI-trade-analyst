@@ -49,6 +49,24 @@ export CLAUDE_PROXY_BASE_URL="http://your-host:port/v1"
 
 The env var takes precedence over the YAML value.
 
+## 3b. Analyst Roster
+
+The analyst fan-out roster (which models + personas are used for parallel analysis) is also defined in `llm_routing.yaml`:
+
+```yaml
+analyst_roster:
+  - model: "gpt-4o"
+    persona: "default_analyst"
+  - model: "claude-sonnet-4-6"
+    persona: "risk_officer"
+  - model: "gemini/gemini-1.5-pro"
+    persona: "prosecutor"
+  - model: "xai/grok-vision-beta"
+    persona: "ict_purist"
+```
+
+To change the analyst models, edit this section. The persona values must match `PersonaType` enum values in `ai_analyst/models/persona.py`. If the `analyst_roster` key is absent, hardcoded defaults matching the above are used.
+
 ## 4. Why Chart Work Is Split Into Two Phases
 
 Chart analysis is split into **extract** and **interpret** — two separate LLM calls that are never collapsed into one. The analogy:

@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "ai-trade-analyst"
+version = "2.1.0"
+description = "Multi-model AI trade analysis system with task-based LLM routing"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+dependencies = [
+    # Orchestration
+    "langgraph>=1.0.10",
+    # Multi-provider LLM abstraction
+    "litellm>=1.82.0",
+    # Data validation
+    "pydantic>=2.12.0",
+    # API server
+    "fastapi>=0.135.0",
+    "uvicorn[standard]>=0.41.0",
+    "python-multipart>=0.0.22",
+    # CLI
+    "typer>=0.24.0",
+    "python-dotenv>=1.2.0",
+    "httpx>=0.28.0",
+    # YAML config parsing
+    "PyYAML>=6.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=7.0.0",
+]
+mro = [
+    "yfinance>=0.2.40",
+    "modal>=0.68.0",
+]
+
+[project.scripts]
+ai-analyst = "ai_analyst.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["ai_analyst*"]
+
+[tool.pytest.ini_options]
+testpaths = ["ai_analyst/tests"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["ai_analyst"]
+omit = ["ai_analyst/tests/*"]
+
+[tool.coverage.report]
+fail_under = 70

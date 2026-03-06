@@ -69,8 +69,19 @@ async def acompletion_metered(
     messages: list[dict],
     **kwargs,
 ):
+    # Backend selection: litellm (default, production) or claude_code_api (experimental).
+    # claude_code_api shells out to `claude -p` via services/claude_code_api/ — it only
+    # supports text-only messages (no images) and provides no token usage data.
+    # Prefer litellm + local Claude proxy for production use.
     backend_pref = os.getenv("AI_ANALYST_LLM_BACKEND", "litellm").strip().lower()
     use_claude_wrapper = backend_pref == "claude_code_api" and is_text_only(messages)
+
+    if use_claude_wrapper:
+        logger.warning(
+            "Using experimental claude_code_api backend (AI_ANALYST_LLM_BACKEND=claude_code_api). "
+            "This backend does not support images and provides no token usage. "
+            "Prefer the default litellm backend with local Claude proxy."
+        )
 
     backend = "claude_code_api" if use_claude_wrapper else "litellm"
     acompletion_func = chat_completions if use_claude_wrapper else None
