@@ -17,9 +17,12 @@ from ..models.arbiter_output import FinalVerdict
 from ..core.arbiter_prompt_builder import build_arbiter_prompt
 from ..core.run_paths import get_run_dir
 from ..core.usage_meter import acompletion_metered
+from ..llm_router import router
+from ..llm_router.task_types import ARBITER_DECISION
 from .state import GraphState
 
-# Text-only model for the Arbiter — cheaper, no vision needed
+# Text-only model for the Arbiter — now resolved via the LLM router.
+# Legacy constant kept for reference; runtime uses router.resolve().
 ARBITER_MODEL = "claude-haiku-4-5-20251001"
 logger = logging.getLogger(__name__)
 
@@ -80,16 +83,20 @@ async def arbiter_node(state: GraphState) -> GraphState:
         deliberation_outputs=deliberation_outputs if deliberation_outputs else None,
     )
 
+    route = router.resolve(ARBITER_DECISION)
+
     response = await acompletion_metered(
         run_dir=get_run_dir(ground_truth.run_id),
         run_id=ground_truth.run_id,
         stage="arbiter",
         node="arbiter_node",
-        model=ARBITER_MODEL,
+        model=route["model"],
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.1,
         max_tokens=2000,
+        api_base=route["base_url"],
+        api_key=route["api_key"],
     )
 
     raw: str = response.choices[0].message.content
