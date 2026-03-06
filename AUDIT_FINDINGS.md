@@ -1,111 +1,101 @@
 # Audit Findings — 2026-03-06
 
+> **Last updated:** 2026-03-06 — resolution pass complete.
+
 ## Critical (blocks testing)
 
-- **CRIT-1: CLI replay command bypasses router and has no proxy support**
-  `ai_analyst/cli.py:567-590` — The `replay` command imports `litellm.acompletion` directly,
-  uses a hardcoded `ARBITER_MODEL = "claude-haiku-4-5-20251001"`, and passes **no `api_base`
-  or `api_key`**. When the local Claude proxy is the only available backend, this call will
-  fail because LiteLLM defaults to the Anthropic API (which requires a real API key).
-  **Fix:** Use `router.resolve(ARBITER_DECISION)` and pass `api_base`/`api_key`.
+- **CRIT-1: CLI replay command bypasses router and has no proxy support** — **RESOLVED** ✅
+  `ai_analyst/cli.py` — Was using hardcoded `ARBITER_MODEL` and direct `litellm.acompletion`
+  with no `api_base` or `api_key`.
+  **Resolution:** Now uses `router.resolve(ARBITER_DECISION)` and passes `api_base`/`api_key`.
+  Fixed in `a5dabac`, `8d519a3`.
 
-- **CRIT-2: ExecutionRouter arbiter call uses hardcoded model, no proxy routing**
-  `ai_analyst/core/execution_router.py:78,343-353` — `ARBITER_MODEL` is hardcoded to
-  `"claude-haiku-4-5-20251001"` and `acompletion_metered()` is called without `api_base`
-  or `api_key`. This means the ExecutionRouter path (used in hybrid/manual modes) cannot
-  route through the local proxy.
-  **Fix:** Use `router.resolve(ARBITER_DECISION)` and pass route params.
+- **CRIT-2: ExecutionRouter arbiter call uses hardcoded model, no proxy routing** — **RESOLVED** ✅
+  `ai_analyst/core/execution_router.py` — Was hardcoded to `"claude-haiku-4-5-20251001"` with
+  no proxy support.
+  **Resolution:** Now uses `router.resolve(ARBITER_DECISION)` and passes route params.
+  Fixed in `a5dabac`, `8d519a3`.
 
-- **CRIT-3: Stale placeholder `main.py` at repo root**
-  `main.py` — 8-line FastAPI "Hello World" stub. The real entry point is
-  `ai_analyst/api/main.py`. A developer running `uvicorn main:app` from the repo root will
-  get a dummy server instead of the actual application. This will cause confusion during
-  first-time setup and live testing.
-  **Fix:** Delete the file.
+- **CRIT-3: Stale placeholder `main.py` at repo root** — **RESOLVED** ✅
+  8-line FastAPI stub that shadowed the real entry point.
+  **Resolution:** File deleted. Fixed in `cc72c1c`.
 
 ## Moderate (degrades reliability)
 
-- **MOD-1: ARBITER_MODEL constant duplicated in 3 files**
-  The same `"claude-haiku-4-5-20251001"` string is defined in:
-  - `ai_analyst/graph/arbiter_node.py:26` (legacy, commented as kept for reference)
-  - `ai_analyst/core/execution_router.py:78` (active, used in runtime)
-  - `ai_analyst/cli.py:569` (active, used in replay)
-  Changing the arbiter model requires editing multiple files. Single source of truth violated.
-  **Fix:** Remove inline constants; use `router.resolve()` in all locations.
+- **MOD-1: ARBITER_MODEL constant duplicated in 3 files** — **RESOLVED** ✅
+  Was defined in `arbiter_node.py`, `execution_router.py`, and `cli.py`.
+  **Resolution:** Legacy constant removed from `arbiter_node.py` (`c1b3a61`). Both
+  `execution_router.py` and `cli.py` now use `router.resolve()` instead of inline constants.
 
-- **MOD-2: `.vscode/launch.json` contains hardcoded Windows path**
-  `.vscode/launch.json:11` — Absolute path `c:\Users\david\OneDrive\...\index.html`.
-  This breaks for any other developer and leaks the repo owner's local filesystem layout.
-  **Fix:** Use `${workspaceFolder}/app/index.html` instead.
+- **MOD-2: `.vscode/launch.json` contains hardcoded Windows path** — **RESOLVED** ✅
+  Was an absolute `c:\Users\...` path.
+  **Resolution:** Replaced with `${workspaceFolder}/app/index.html`. Fixed in `59e002b`.
 
-- **MOD-3: Analyst model names hardcoded in `ANALYST_CONFIGS`**
+- **MOD-3: Analyst model names hardcoded in `ANALYST_CONFIGS`** — **DEFERRED**
   `ai_analyst/graph/analyst_nodes.py:45-50` — Four analyst models are inline string literals.
-  While these are routed through `acompletion_metered()` at runtime, changing the model roster
-  requires a code change rather than a config change.
-  **Deferred:** This is a design decision that belongs in the full router integration pass
-  (out of scope for this stabilisation audit). Documented here for v2 planning.
+  **Rationale:** Design decision for full router integration pass (out of scope for
+  stabilisation audit). Documented for v2 planning.
 
-- **MOD-4: `pytest-asyncio` version pinned to 1.3.0 (very old)**
-  `ai_analyst/requirements.txt:28` — Current stable is 0.23+. Version 1.3.0 appears to be a
-  non-standard version. The auto-mode annotation is working but generates 5 warnings about
-  non-async functions marked with `@pytest.mark.asyncio`.
-  **Deferred:** Tests pass; no runtime impact. Revisit during dependency update pass.
+- **MOD-4: `pytest-asyncio` version pinned to 1.3.0 (very old)** — **DEFERRED**
+  Generates 5 cosmetic warnings but all tests pass. No runtime impact.
+  **Rationale:** Revisit during dependency update pass.
 
-- **MOD-5: README status section outdated**
-  `README.md` describes G11 as in-progress, but `tooling/release_checklist.md` shows G12
-  complete. Creates ambiguity about current project phase.
-  **Deferred:** Documentation-only; no runtime impact.
+- **MOD-5: README status section outdated** — **RESOLVED** ✅
+  `README.md` described G11 as in-progress and showed stale test counts.
+  **Resolution:** Updated to reflect G12 complete and current test counts (703+).
 
 ## Minor (cosmetic or low risk)
 
-- **MIN-1: No `.dockerignore` file**
-  `COPY . .` in Dockerfile copies `.git/`, `tests/`, `docs/`, `*.bat` files into the image.
-  Wastes ~10-20% container storage. No functional impact.
+- **MIN-1: No `.dockerignore` file** — **RESOLVED** ✅
+  `COPY . .` in Dockerfile was copying `.git/`, `tests/`, `docs/` into the image.
+  **Resolution:** `.dockerignore` added. Fixed in `69172ff`.
 
-- **MIN-2: Stale audit snapshot files in `docs/`**
-  8 audit files dated Feb 24 – Mar 5 exist in `docs/`. No clear versioning or archival
-  strategy.
+- **MIN-2: Stale audit snapshot files in `docs/`** — **ACCEPTED**
+  8 audit files from Feb 24–Mar 5 exist in `docs/`. No runtime impact. Retained as
+  historical audit trail.
 
-- **MIN-3: `services/claude_code_api/` status unclear**
-  Marked as "experimental" in comments but actively imported in production code
-  (`claude_code_api_client.py`). Role vs. the main API path is undocumented.
+- **MIN-3: `services/claude_code_api/` status unclear** — **DEFERRED**
+  Gated behind `AI_ANALYST_LLM_BACKEND=claude_code_api`. Requires clarification (see Q2 below).
 
-- **MIN-4: Bridge retry constants hardcoded in JS**
-  `app/scripts/api_bridge.js` — Timeout (180s), retry count (1), retry delay (400ms) are
-  code constants, not user-configurable. Acceptable for current use but worth noting.
+- **MIN-4: Bridge retry constants hardcoded in JS** — **ACCEPTED**
+  Timeout (180s), retry count (1), retry delay (400ms) are reasonable defaults.
+  Acceptable for current use.
 
-- **MIN-5: Overlay indicator keys hardcoded in JS**
-  `app/scripts/ui/form_bindings.js:64` — `['m15overlay', 'm15structure', 'm15trendline',
-  'customoverlay']` — Would require code change to add new overlay types.
+- **MIN-5: Overlay indicator keys hardcoded in JS** — **ACCEPTED**
+  Would require code change to add new overlay types. Acceptable for current scope.
 
-## LiteLLM call map
+## Resolution summary
 
-| File | Line | Model string or call | Centralised or inline? |
-|------|------|----------------------|------------------------|
-| `ai_analyst/llm_router/router.py` | 76,84,112 | `litellm.acompletion` via `router.call_with_fallback()` | Centralised (router) |
-| `ai_analyst/core/usage_meter.py` | 86 | `litellm.acompletion` lazy import in `acompletion_metered()` | Centralised (metering wrapper) |
-| `ai_analyst/core/usage_meter.py` | 55 | `litellm.completion_cost` for cost extraction | Centralised (metering) |
-| `ai_analyst/cli.py` | 567,584 | `litellm.acompletion` direct import, `ARBITER_MODEL` hardcoded | **Inline — bypasses router** |
-| `ai_analyst/graph/analyst_nodes.py` | 63-74 | Via `acompletion_metered()` + `router.resolve(ANALYST_REASONING)` | Centralised |
-| `ai_analyst/graph/arbiter_node.py` | 88-99 | Via `acompletion_metered()` + `router.resolve(ARBITER_DECISION)` | Centralised |
-| `ai_analyst/core/chart_two_step.py` | 125-136 | Via `acompletion_metered()` + `router.resolve(CHART_EXTRACT)` | Centralised |
-| `ai_analyst/core/chart_two_step.py` | 183-194 | Via `acompletion_metered()` + `router.resolve(CHART_INTERPRET)` | Centralised |
-| `ai_analyst/core/execution_router.py` | 343-353 | Via `acompletion_metered()`, `ARBITER_MODEL` hardcoded, **no `api_base`/`api_key`** | **Inline — bypasses router** |
+| Severity | Total | Resolved | Deferred | Accepted |
+|----------|-------|----------|----------|----------|
+| Critical | 3 | 3 | 0 | 0 |
+| Moderate | 5 | 3 | 2 | 0 |
+| Minor | 5 | 1 | 1 | 3 |
+| **Total** | **13** | **7** | **3** | **3** |
+
+## LiteLLM call map (current state)
+
+| File | Model resolution | Status |
+|------|-----------------|--------|
+| `ai_analyst/llm_router/router.py` | `litellm.acompletion` via `router.call_with_fallback()` | Centralised |
+| `ai_analyst/core/usage_meter.py` | `litellm.acompletion` in `acompletion_metered()` | Centralised (metering) |
+| `ai_analyst/core/usage_meter.py` | `litellm.completion_cost` for cost extraction | Centralised (metering) |
+| `ai_analyst/cli.py` | Via `acompletion` + `router.resolve(ARBITER_DECISION)` | **Centralised** |
+| `ai_analyst/graph/analyst_nodes.py` | Via `acompletion_metered()` + `router.resolve(ANALYST_REASONING)` | Centralised |
+| `ai_analyst/graph/arbiter_node.py` | Via `acompletion_metered()` + `router.resolve(ARBITER_DECISION)` | Centralised |
+| `ai_analyst/core/chart_two_step.py` | Via `acompletion_metered()` + `router.resolve(CHART_EXTRACT/CHART_INTERPRET)` | Centralised |
+| `ai_analyst/core/execution_router.py` | Via `acompletion_metered()` + `router.resolve(ARBITER_DECISION)` | **Centralised** |
+
+All LLM calls now route through `llm_router/router.py`. No inline model bypasses remain.
 
 ### Model name string literals in Python code
 
-| File | Line | String | Context |
-|------|------|--------|---------|
-| `ai_analyst/cli.py` | 569 | `"claude-haiku-4-5-20251001"` | ARBITER_MODEL constant |
-| `ai_analyst/core/execution_router.py` | 78 | `"claude-haiku-4-5-20251001"` | ARBITER_MODEL constant |
-| `ai_analyst/graph/arbiter_node.py` | 26 | `"claude-haiku-4-5-20251001"` | Legacy constant (comment says kept for reference) |
-| `ai_analyst/graph/analyst_nodes.py` | 46 | `"gpt-4o"` | ANALYST_CONFIGS |
-| `ai_analyst/graph/analyst_nodes.py` | 47 | `"claude-sonnet-4-6"` | ANALYST_CONFIGS |
-| `ai_analyst/graph/analyst_nodes.py` | 48 | `"gemini/gemini-1.5-pro"` | ANALYST_CONFIGS |
-| `ai_analyst/graph/analyst_nodes.py` | 49 | `"xai/grok-vision-beta"` | ANALYST_CONFIGS |
-| `ai_analyst/core/api_key_manager.py` | 24-30 | 7 model IDs | SUPPORTED_MODELS lookup (appropriate) |
-| `ai_analyst/core/llm_client.py` | 18-22 | 5 model IDs | Fallback chain defaults (appropriate) |
-| `config/llm_routing.example.yaml` | 8-30 | claude-sonnet, claude-opus | YAML config (correct location) |
+| File | String | Context | Status |
+|------|--------|---------|--------|
+| `ai_analyst/graph/analyst_nodes.py` | `"gpt-4o"`, `"claude-sonnet-4-6"`, `"gemini/gemini-1.5-pro"`, `"xai/grok-vision-beta"` | ANALYST_CONFIGS | Deferred (MOD-3) |
+| `ai_analyst/core/api_key_manager.py` | 7 model IDs | SUPPORTED_MODELS lookup | Appropriate |
+| `ai_analyst/core/llm_client.py` | 5 model IDs | Fallback chain defaults | Appropriate |
+| `config/llm_routing.example.yaml` | claude-sonnet, claude-opus | YAML config | Correct location |
 
 ## Questions / ambiguities (do not fix without clarification)
 
@@ -123,14 +113,9 @@
 
 ## Dead code / orphaned files
 
-- **`main.py` (repo root):** 8-line FastAPI stub. Not imported anywhere. The real entry
-  point is `ai_analyst/api/main.py`. → **Delete.**
-
-- **`ARBITER_MODEL` in `graph/arbiter_node.py:26`:** Constant kept "for reference" per
-  comment, but runtime now uses `router.resolve()`. → **Remove constant.**
-
-- **Stale audit snapshots in `docs/`:** 8 files from previous audits (Feb 24–Mar 5). Not
-  actively referenced. → **Archive or leave (no runtime impact).**
+- **`main.py` (repo root):** Deleted. ✅
+- **`ARBITER_MODEL` in `graph/arbiter_node.py`:** Removed. ✅
+- **Stale audit snapshots in `docs/`:** Retained as historical audit trail (no runtime impact).
 
 ## TODOs found in codebase
 
