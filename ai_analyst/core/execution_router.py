@@ -78,6 +78,32 @@ OUTPUT_BASE = Path(__file__).parent.parent / "output" / "runs"
 ARBITER_MODEL = "claude-haiku-4-5-20251001"
 
 
+def _safe_excerpt(raw: str, max_chars: int = 256) -> str:
+    excerpt = (raw or "").replace("\n", " ").strip()
+    return excerpt[:max_chars]
+
+
+def _fallback_verdict(run_id: str, reason: str) -> FinalVerdict:
+    return FinalVerdict.model_validate({
+        "final_bias": "neutral",
+        "decision": "NO_TRADE",
+        "approved_setups": [],
+        "no_trade_conditions": [reason],
+        "overall_confidence": 0.0,
+        "analyst_agreement_pct": 0,
+        "risk_override_applied": False,
+        "arbiter_notes": reason,
+        "audit_log": {
+            "run_id": run_id,
+            "analysts_received": 0,
+            "analysts_valid": 0,
+            "htf_consensus": False,
+            "setup_consensus": False,
+            "risk_override": False,
+        },
+    })
+
+
 class ExecutionRouter:
     def __init__(
         self,
@@ -326,7 +352,40 @@ class ExecutionRouter:
             max_tokens=2000,
         )
         raw: str = response.choices[0].message.content
-        verdict = FinalVerdict.model_validate_json(raw)
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            error_obj = {
+                "error_type": "JSON_DECODE_ERROR",
+                "code": "ARBITER_MALFORMED_JSON",
+                "response_excerpt": _safe_excerpt(raw),
+            }
+            logger.warning("ExecutionRouter arbiter malformed JSON: %s", error_obj)
+            verdict = _fallback_verdict(
+                run_id=self.run_id,
+                reason="Arbiter response malformed; defaulting to NO_TRADE.",
+            )
+        else:
+            if not payload.get("decision"):
+                logger.warning(
+                    "ExecutionRouter arbiter verdict missing/empty decision; defaulting to NO_TRADE run_id=%s",
+                    self.run_id,
+                )
+                payload["decision"] = "NO_TRADE"
+
+            try:
+                verdict = FinalVerdict.model_validate(payload)
+            except Exception:
+                error_obj = {
+                    "error_type": "VERDICT_SCHEMA_ERROR",
+                    "code": "ARBITER_INVALID_SCHEMA",
+                    "response_excerpt": _safe_excerpt(raw),
+                }
+                logger.warning("ExecutionRouter arbiter schema validation failed: %s", error_obj)
+                verdict = _fallback_verdict(
+                    run_id=self.run_id,
+                    reason="Arbiter response invalid; defaulting to NO_TRADE.",
+                )
 
         # Save final verdict to disk
         verdict_path = OUTPUT_BASE / self.run_id / "final_verdict.json"

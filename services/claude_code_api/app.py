@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -9,6 +10,31 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+MAX_PROMPT_LENGTH = 65536
+MAX_LOG_BYTES = 2048
+
+
+_SECRET_PATTERNS = [
+    re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"),
+    re.compile(r"\bkey-[A-Za-z0-9_-]{8,}\b", re.IGNORECASE),
+    re.compile(r"\bBearer\s+[A-Za-z0-9._\-+/=]{8,}\b", re.IGNORECASE),
+    re.compile(r"\bOPENAI_API_KEY\s*[=:]\s*[^\s'\"]+\b", re.IGNORECASE),
+    re.compile(r"\bANTHROPIC_API_KEY\s*[=:]\s*[^\s'\"]+\b", re.IGNORECASE),
+    re.compile(r"\b[A-Za-z0-9_]*API_KEY\s*[=:]\s*[^\s'\"]+\b", re.IGNORECASE),
+]
+
+
+def _sanitize_stderr_for_log(err_text: str) -> str:
+    sanitized = err_text or ""
+    for pattern in _SECRET_PATTERNS:
+        sanitized = pattern.sub("[REDACTED]", sanitized)
+
+    raw_bytes = sanitized.encode("utf-8", errors="replace")
+    if len(raw_bytes) > MAX_LOG_BYTES:
+        clipped = raw_bytes[:MAX_LOG_BYTES].decode("utf-8", errors="ignore")
+        return f"{clipped}… [truncated]"
+    return sanitized
 
 app = FastAPI(title="Claude Code API Wrapper", version="0.1.0")
 
@@ -37,6 +63,16 @@ async def chat_completions(
     prompt = "\n".join(
         f"{msg.get('role', 'user')}: {msg.get('content', '')}" for msg in req.messages
     )
+    prompt_bytes = len(prompt.encode("utf-8", errors="replace"))
+    if prompt_bytes > MAX_PROMPT_LENGTH:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "message": "prompt exceeds maximum allowed length",
+                "code": "PROMPT_TOO_LONG",
+                "max_prompt_length_bytes": MAX_PROMPT_LENGTH,
+            },
+        )
 
     started = time.perf_counter()
     proc = await asyncio.create_subprocess_exec(
@@ -58,12 +94,13 @@ async def chat_completions(
     latency_ms = int((time.perf_counter() - started) * 1000)
     out_text = stdout.decode("utf-8", errors="replace").strip()
     err_text = stderr.decode("utf-8", errors="replace").strip()
+    safe_err_text = _sanitize_stderr_for_log(err_text)
 
     if proc.returncode != 0:
         logger.error(
             "claude subprocess failed (exit=%d): %s",
             proc.returncode,
-            err_text,
+            safe_err_text,
         )
         raise HTTPException(
             status_code=502,
@@ -71,7 +108,7 @@ async def chat_completions(
         )
 
     if err_text:
-        logger.warning("claude subprocess stderr: %s", err_text)
+        logger.warning("claude subprocess stderr: %s", safe_err_text)
 
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex}",

@@ -136,6 +136,19 @@ def test_feeder_ingest_rejects_non_json():
     assert response.status_code == 422
 
 
+def test_feeder_ingest_rejects_invalid_schema_with_safe_error():
+    """POST /feeder/ingest rejects invalid schema with safe error details."""
+    with TestClient(api_main.app) as client:
+        payload = {"instrument_context": "XAUUSD"}  # missing required contract fields
+        response = client.post("/feeder/ingest", json=payload)
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["code"] == "FEEDER_PAYLOAD_INVALID"
+    assert "traceback" not in json.dumps(detail).lower()
+    assert "instrument_context" not in json.dumps(detail)
+
+
 # ── /feeder/health endpoint tests ─────────────────────────────────────────────
 
 def test_feeder_health_returns_no_data_initially():

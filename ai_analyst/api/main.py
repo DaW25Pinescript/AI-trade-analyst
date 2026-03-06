@@ -34,7 +34,7 @@ from typing import Optional
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +247,17 @@ async def health():
 _FEEDER_STALE_SECONDS: int = int(os.environ.get("FEEDER_STALE_SECONDS", "3600"))
 
 
+class FeederIngestPayload(BaseModel):
+    contract_version: str
+    generated_at: str
+    instrument_context: str = "XAUUSD"
+    sources_queried: list[str] = Field(default_factory=list)
+    status: str
+    warnings: list = Field(default_factory=list)
+    events: list
+    source_health: dict = Field(default_factory=dict)
+
+
 @app.post("/feeder/ingest")
 async def feeder_ingest(request: Request):
     """
@@ -266,6 +277,18 @@ async def feeder_ingest(request: Request):
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="Feeder payload must be a JSON object.")
 
+    try:
+        validated_payload = FeederIngestPayload.model_validate(payload)
+    except ValidationError:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Invalid feeder payload schema.",
+                "code": "FEEDER_PAYLOAD_INVALID",
+            },
+        )
+
+    payload = validated_payload.model_dump()
     instrument = payload.get("instrument_context", "XAUUSD")
 
     try:
