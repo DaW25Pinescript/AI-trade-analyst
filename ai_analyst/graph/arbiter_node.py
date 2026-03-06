@@ -21,9 +21,6 @@ from ..llm_router import router
 from ..llm_router.task_types import ARBITER_DECISION
 from .state import GraphState
 
-# Text-only model for the Arbiter — now resolved via the LLM router.
-# Legacy constant kept for reference; runtime uses router.resolve().
-ARBITER_MODEL = "claude-haiku-4-5-20251001"
 logger = logging.getLogger(__name__)
 
 

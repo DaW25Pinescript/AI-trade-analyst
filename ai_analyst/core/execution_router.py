@@ -71,11 +71,10 @@ from .run_state_manager import transition, save_run_state
 from .logger import log_run
 from .run_paths import get_run_dir
 from .usage_meter import acompletion_metered
+from ..llm_router import router
+from ..llm_router.task_types import ARBITER_DECISION
 
 OUTPUT_BASE = Path(__file__).parent.parent / "output" / "runs"
-
-# Arbiter model — text-only, cheaper (same as graph/arbiter_node.py)
-ARBITER_MODEL = "claude-haiku-4-5-20251001"
 
 
 def _safe_excerpt(raw: str, max_chars: int = 256) -> str:
@@ -340,16 +339,19 @@ class ExecutionRouter:
 
         self.run_state = transition(self.run_state, RunStatus.ARBITER_COMPLETE)
 
+        route = router.resolve(ARBITER_DECISION)
         response = await acompletion_metered(
             run_dir=get_run_dir(self.run_id),
             run_id=self.run_id,
             stage="arbiter",
             node="execution_router",
-            model=ARBITER_MODEL,
+            model=route["model"],
             messages=[{"role": "user", "content": arbiter_prompt}],
             response_format={"type": "json_object"},
             temperature=0.1,
             max_tokens=2000,
+            api_base=route["base_url"],
+            api_key=route["api_key"],
         )
         raw: str = response.choices[0].message.content
         try:
