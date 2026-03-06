@@ -143,5 +143,120 @@ class TestGroupG_Output_EURUSD:
         assert "regime" in data
         assert "diagnostics" in data
         assert "build" in data
-        assert data["build"]["engine_version"] == "phase_3a"
+        assert data["build"]["engine_version"] == "phase_3b"
         assert data["build"]["bos_confirmation"] == "close"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3B — EURUSD cross-instrument tests (Groups F, G)
+# ---------------------------------------------------------------------------
+
+class TestGroup3B_F1_EURUSD:
+    """TF.1 — EURUSD passes all 3B Groups A–E."""
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_eurusd_liquidity_scope_populated(self, config, tf):
+        """3B F.1 — All EURUSD liquidity levels have liquidity_scope."""
+        bars = generate_eurusd_bars(tf)
+        packet = compute_structure_packet("EURUSD", tf, config, bars=bars)
+
+        for level in packet.liquidity:
+            assert level.liquidity_scope is not None, \
+                f"Level {level.id} missing liquidity_scope"
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_eurusd_prior_levels_external(self, config, tf):
+        """3B F.1 — Prior day/week levels tagged external for EURUSD."""
+        bars = generate_eurusd_bars(tf)
+        packet = compute_structure_packet("EURUSD", tf, config, bars=bars)
+
+        for level in packet.liquidity:
+            if level.type in ("prior_day_high", "prior_day_low",
+                              "prior_week_high", "prior_week_low"):
+                assert level.liquidity_scope == "external_liquidity"
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_eurusd_sweep_outcome_consistency(self, config, tf):
+        """3B F.1 — Sweep outcome mirrors level outcome for EURUSD."""
+        bars = generate_eurusd_bars(tf)
+        packet = compute_structure_packet("EURUSD", tf, config, bars=bars)
+
+        level_map = {l.id: l for l in packet.liquidity}
+        for sw in packet.sweep_events:
+            linked = level_map.get(sw.linked_liquidity_id)
+            if linked:
+                assert sw.outcome == linked.outcome
+                assert sw.reclaim_time == linked.reclaim_time
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_eurusd_classification_valid(self, config, tf):
+        """3B F.1 — All swept EURUSD levels have valid outcome."""
+        bars = generate_eurusd_bars(tf)
+        packet = compute_structure_packet("EURUSD", tf, config, bars=bars)
+
+        for level in packet.liquidity:
+            if level.outcome is not None:
+                assert level.outcome in ("reclaimed", "accepted_beyond", "unresolved")
+
+
+class TestGroup3B_G_EURUSD:
+    """TG — JSON output 3B schema completeness for EURUSD."""
+
+    def test_3b_tg1_liquidity_fields_complete(self, config, tmp_path):
+        """TG.1 — JSON liquidity objects have all 3B required fields."""
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+
+        bars = generate_eurusd_bars("1h")
+        packet = compute_structure_packet("EURUSD", "1h", config, bars=bars)
+        path = get_output_path("EURUSD", "1h", output_dir=output_dir)
+        write_packet_atomic(packet.to_dict(), path)
+
+        with open(path) as f:
+            data = json.load(f)
+
+        required_liquidity_fields = {
+            "id", "type", "price", "origin_time", "timeframe", "status",
+            "swept_time",
+            "liquidity_scope", "outcome", "reclaim_time", "reclaim_window_bars",
+        }
+        for level in data["liquidity"]:
+            assert required_liquidity_fields.issubset(level.keys()), \
+                f"Level {level['id']} missing fields: {required_liquidity_fields - set(level.keys())}"
+
+    def test_3b_tg1_sweep_fields_complete(self, config, tmp_path):
+        """TG.1 — JSON sweep objects have all 3B required fields."""
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+
+        bars = generate_eurusd_bars("1h")
+        packet = compute_structure_packet("EURUSD", "1h", config, bars=bars)
+        path = get_output_path("EURUSD", "1h", output_dir=output_dir)
+        write_packet_atomic(packet.to_dict(), path)
+
+        with open(path) as f:
+            data = json.load(f)
+
+        required_sweep_fields = {
+            "id", "type", "time", "timeframe", "sweep_price", "linked_liquidity_id",
+            "post_sweep_close", "reclaim_time", "outcome", "reclaim_window_bars",
+        }
+        for sweep in data["sweep_events"]:
+            if sweep["type"] in ("sweep_high", "sweep_low"):
+                assert required_sweep_fields.issubset(sweep.keys()), \
+                    f"Sweep {sweep['id']} missing fields: {required_sweep_fields - set(sweep.keys())}"
+
+    def test_3b_tg4_engine_version(self, config, tmp_path):
+        """TG.4 — engine_version is phase_3b in EURUSD output."""
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+
+        for tf in ["15m", "1h", "4h"]:
+            bars = generate_eurusd_bars(tf)
+            packet = compute_structure_packet("EURUSD", tf, config, bars=bars)
+            path = get_output_path("EURUSD", tf, output_dir=output_dir)
+            write_packet_atomic(packet.to_dict(), path)
+
+            with open(path) as f:
+                data = json.load(f)
+            assert data["build"]["engine_version"] == "phase_3b"

@@ -1,19 +1,32 @@
-"""Prior period liquidity levels, EQH/EQL detection, and sweep events.
+"""Prior period liquidity levels, EQH/EQL detection, sweep events, and 3B refinement.
 
 Computes:
 - Prior day high/low from completed sessions
 - Prior week high/low from completed weeks
 - Equal highs/equal lows from confirmed swing clusters
 - Sweep events when price trades through liquidity levels
+- Phase 3B: Reclaim detection, post-sweep classification, internal/external tagging
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import pandas as pd
 
 from .config import StructureConfig
 from .schemas import LiquidityLevel, SweepEvent, SwingPoint
+
+
+# Phase 3B — Terminal states that must not transition further (except to archived)
+_TERMINAL_STATES = {"reclaimed", "accepted_beyond", "invalidated"}
+
+# Phase 3B — Level types that are always external liquidity
+_EXTERNAL_LEVEL_TYPES = {
+    "prior_day_high",
+    "prior_day_low",
+    "prior_week_high",
+    "prior_week_low",
+}
 
 
 def _get_session_boundaries(
@@ -94,6 +107,80 @@ def _get_week_boundaries(
         current += timedelta(weeks=1)
 
     return weeks
+
+
+def classify_liquidity_scope(
+    level_type: str,
+    level_price: float,
+    confirmed_swings: List[SwingPoint],
+) -> str:
+    """Classify a liquidity level as external, internal, or unclassified.
+
+    Prior day/week H/L are always external.
+    EQH/EQL are classified relative to the most recent confirmed swing of the same side.
+    If no relevant confirmed swing exists, return 'unclassified'.
+    """
+    if level_type in _EXTERNAL_LEVEL_TYPES:
+        return "external_liquidity"
+
+    if level_type == "equal_highs":
+        relevant = [s for s in confirmed_swings if s.type == "swing_high"]
+        if not relevant:
+            return "unclassified"
+        most_recent_swing_high = max(relevant, key=lambda s: s.anchor_time)
+        if level_price > most_recent_swing_high.price:
+            return "external_liquidity"
+        return "internal_liquidity"
+
+    if level_type == "equal_lows":
+        relevant = [s for s in confirmed_swings if s.type == "swing_low"]
+        if not relevant:
+            return "unclassified"
+        most_recent_swing_low = min(relevant, key=lambda s: s.anchor_time)
+        if level_price < most_recent_swing_low.price:
+            return "external_liquidity"
+        return "internal_liquidity"
+
+    return "unclassified"
+
+
+def _detect_reclaim(
+    level_price: float,
+    level_type: str,
+    sweep_bar_index: int,
+    bars: pd.DataFrame,
+    config: StructureConfig,
+) -> Tuple[str, Optional[datetime], Optional[float]]:
+    """Detect whether a swept level was reclaimed.
+
+    Returns (outcome, reclaim_time, post_sweep_close).
+    outcome: 'reclaimed' | 'accepted_beyond' | 'unresolved'
+    """
+    is_high_side = level_type in {
+        "prior_day_high", "prior_week_high", "equal_highs"
+    }
+
+    # Window: sweep bar + reclaim_window_bars subsequent bars
+    window_start = sweep_bar_index if config.allow_same_bar_reclaim else sweep_bar_index + 1
+    window_end = sweep_bar_index + config.reclaim_window_bars + 1
+
+    window_bars = bars.iloc[window_start:window_end]
+
+    if window_bars.empty:
+        return "unresolved", None, None
+
+    for _, bar in window_bars.iterrows():
+        if is_high_side and bar["close"] < level_price:
+            return "reclaimed", bar.name.to_pydatetime(), float(bar["close"])
+        if not is_high_side and bar["close"] > level_price:
+            return "reclaimed", bar.name.to_pydatetime(), float(bar["close"])
+
+    # Window exhausted, check if we have enough bars to resolve
+    if len(bars) > window_end:
+        post_sweep_close = float(bars.iloc[window_end - 1]["close"])
+        return "accepted_beyond", None, post_sweep_close
+
+    return "unresolved", None, None
 
 
 def _detect_prior_period_levels(
@@ -256,6 +343,7 @@ def _detect_sweeps(
     bars: pd.DataFrame,
     levels: List[LiquidityLevel],
     timeframe: str,
+    config: StructureConfig,
 ) -> List[SweepEvent]:
     """Detect sweep events where price trades through liquidity levels.
 
@@ -263,10 +351,14 @@ def _detect_sweeps(
     trade through the level. This is distinct from BOS which requires
     close confirmation.
 
+    Phase 3B: Also populates linked_liquidity_id and reclaim_window_bars
+    on sweep events, and runs reclaim detection.
+
     Args:
         bars: DataFrame with DatetimeIndex and OHLCV columns.
         levels: List of LiquidityLevel objects to check for sweeps.
         timeframe: Timeframe label for ID generation.
+        config: Structure engine configuration.
 
     Returns:
         List of SweepEvent objects for detected sweeps.
@@ -326,6 +418,21 @@ def _detect_sweeps(
                 level.status = "swept"
                 level.swept_time = bar_time
                 level.sweep_type = sweep_type_str
+                level.reclaim_window_bars = config.reclaim_window_bars
+
+                # Phase 3B — Reclaim detection
+                outcome, reclaim_time, post_sweep_close = _detect_reclaim(
+                    level.price, level.type, bar_idx, bars, config,
+                )
+                level.outcome = outcome
+                level.reclaim_time = reclaim_time
+
+                # Update level status based on outcome
+                if outcome == "reclaimed":
+                    level.status = "reclaimed"
+                elif outcome == "accepted_beyond":
+                    level.status = "accepted_beyond"
+                # swept stays as-is for unresolved
 
                 compact_time = bar_time.strftime("%Y%m%dT%H%M")
                 # Extract abbreviation from level id for sweep id
@@ -341,10 +448,71 @@ def _detect_sweeps(
                     sweep_price=sweep_price,
                     sweep_type=sweep_type_str,
                     status="confirmed",
+                    linked_liquidity_id=level.id,
+                    post_sweep_close=post_sweep_close,
+                    reclaim_time=reclaim_time,
+                    outcome=outcome,
+                    reclaim_window_bars=config.reclaim_window_bars,
                 ))
                 break  # Level is swept, move to next level
 
     return sweep_events
+
+
+def _resolve_unresolved_levels(
+    bars: pd.DataFrame,
+    levels: List[LiquidityLevel],
+    sweep_events: List[SweepEvent],
+    config: StructureConfig,
+) -> None:
+    """Re-check unresolved swept levels as new bars arrive.
+
+    This ensures that previously unresolved outcomes get resolved
+    when sufficient bars are available. Already-resolved outcomes
+    are never mutated.
+    """
+    # Build sweep lookup by linked level id
+    sweep_by_level = {}
+    for sw in sweep_events:
+        lid = sw.linked_liquidity_id
+        if lid:
+            sweep_by_level[lid] = sw
+
+    for level in levels:
+        if level.status != "swept" or level.outcome != "unresolved":
+            continue
+        if level.swept_time is None:
+            continue
+
+        # Find the bar index of the sweep
+        try:
+            sweep_idx = bars.index.get_loc(
+                pd.Timestamp(level.swept_time, tz=bars.index.tz)
+            )
+        except KeyError:
+            continue
+
+        outcome, reclaim_time, post_sweep_close = _detect_reclaim(
+            level.price, level.type, sweep_idx, bars, config,
+        )
+
+        if outcome == "unresolved":
+            continue
+
+        # Update level
+        level.outcome = outcome
+        level.reclaim_time = reclaim_time
+        if outcome == "reclaimed":
+            level.status = "reclaimed"
+        elif outcome == "accepted_beyond":
+            level.status = "accepted_beyond"
+
+        # Sync sweep event
+        sw = sweep_by_level.get(level.id)
+        if sw:
+            sw.outcome = outcome
+            sw.reclaim_time = reclaim_time
+            sw.post_sweep_close = post_sweep_close
 
 
 def detect_liquidity(
@@ -385,7 +553,16 @@ def detect_liquidity(
     eq_levels = _detect_equal_levels(swings, tolerance, timeframe)
     levels.extend(eq_levels)
 
-    # Detect sweeps against all levels
-    sweep_events = _detect_sweeps(bars, levels, timeframe)
+    # Phase 3B — Tag liquidity scope at creation time
+    for level in levels:
+        level.liquidity_scope = classify_liquidity_scope(
+            level.type, level.price, swings,
+        )
+
+    # Detect sweeps against all levels (includes 3B reclaim detection)
+    sweep_events = _detect_sweeps(bars, levels, timeframe, config)
+
+    # Phase 3B — Resolve any previously unresolved levels
+    _resolve_unresolved_levels(bars, levels, sweep_events, config)
 
     return levels, sweep_events

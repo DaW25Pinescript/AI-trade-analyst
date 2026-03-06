@@ -73,7 +73,7 @@ def compute_structure_packet(
     # Step 6: Assemble packet
     tolerance = config.eqh_eql_tolerance.get(instrument, 0.00010)
     build_info = {
-        "engine_version": "phase_3a",
+        "engine_version": "phase_3b",
         "source": f"hot_package_{timeframe}_csv",
         "quality_flag": "trusted",
         "pivot_left_bars": config.pivot_left_bars,

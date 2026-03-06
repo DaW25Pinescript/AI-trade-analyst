@@ -86,6 +86,11 @@ class LiquidityLevel:
     sweep_type: Optional[str] = None
     member_swing_ids: list = field(default_factory=list)
     tolerance_used: Optional[float] = None
+    # Phase 3B additions
+    liquidity_scope: Optional[str] = None  # "external_liquidity" | "internal_liquidity" | "unclassified"
+    outcome: Optional[str] = None  # "reclaimed" | "accepted_beyond" | "unresolved"
+    reclaim_time: Optional[datetime] = None
+    reclaim_window_bars: Optional[int] = None
 
     def to_dict(self) -> dict:
         """Serialize to JSON-safe dictionary."""
@@ -98,6 +103,10 @@ class LiquidityLevel:
             "status": self.status,
             "swept_time": self.swept_time.isoformat() if self.swept_time else None,
             "sweep_type": self.sweep_type,
+            "liquidity_scope": self.liquidity_scope,
+            "outcome": self.outcome,
+            "reclaim_time": self.reclaim_time.isoformat() if self.reclaim_time else None,
+            "reclaim_window_bars": self.reclaim_window_bars,
         }
         if self.member_swing_ids:
             d["member_swing_ids"] = list(self.member_swing_ids)
@@ -117,6 +126,12 @@ class SweepEvent:
     sweep_price: float
     sweep_type: str  # "wick_sweep" | "close_sweep"
     status: str = "confirmed"
+    # Phase 3B additions
+    linked_liquidity_id: Optional[str] = None
+    post_sweep_close: Optional[float] = None
+    reclaim_time: Optional[datetime] = None
+    outcome: Optional[str] = None  # "reclaimed" | "accepted_beyond" | "unresolved"
+    reclaim_window_bars: Optional[int] = None
 
     def to_dict(self) -> dict:
         """Serialize to JSON-safe dictionary."""
@@ -129,6 +144,11 @@ class SweepEvent:
             "sweep_price": self.sweep_price,
             "sweep_type": self.sweep_type,
             "status": self.status,
+            "linked_liquidity_id": self.linked_liquidity_id,
+            "post_sweep_close": self.post_sweep_close,
+            "reclaim_time": self.reclaim_time.isoformat() if self.reclaim_time else None,
+            "outcome": self.outcome,
+            "reclaim_window_bars": self.reclaim_window_bars,
         }
 
 
