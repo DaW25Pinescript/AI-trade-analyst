@@ -563,8 +563,9 @@ def replay(
     )
 
     from .core.arbiter_prompt_builder import build_arbiter_prompt
+    from .core.run_paths import get_run_dir
+    from .core.usage_meter import acompletion_metered
     from .models.arbiter_output import FinalVerdict
-    from litellm import acompletion
     from .llm_router import router
     from .llm_router.task_types import ARBITER_DECISION
 
@@ -582,7 +583,12 @@ def replay(
             macro_context=macro_context,
         )
         route = router.resolve(ARBITER_DECISION)
-        response = await acompletion(
+        replay_run_id = f"{run_id}-replay"
+        response = await acompletion_metered(
+            run_dir=get_run_dir(replay_run_id),
+            run_id=replay_run_id,
+            stage="replay_arbiter",
+            node="arbiter",
             model=route["model"],
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},

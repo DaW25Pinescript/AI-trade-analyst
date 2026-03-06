@@ -40,14 +40,10 @@ from ..llm_router import router
 from ..llm_router.task_types import ANALYST_REASONING
 from .state import GraphState
 
-# Analyst roster — model names routed through LiteLLM.
-# Update model identifiers here as new versions become available.
-ANALYST_CONFIGS: list[dict] = [
-    {"model": "gpt-4o",                     "persona": PersonaType.DEFAULT_ANALYST},
-    {"model": "claude-sonnet-4-6",           "persona": PersonaType.RISK_OFFICER},
-    {"model": "gemini/gemini-1.5-pro",       "persona": PersonaType.PROSECUTOR},
-    {"model": "xai/grok-vision-beta",         "persona": PersonaType.ICT_PURIST},
-]
+# Analyst roster — loaded from config/llm_routing.yaml (analyst_roster section).
+# Falls back to hardcoded defaults if the YAML key is absent.
+# To change models, edit the YAML — no code changes needed.
+ANALYST_CONFIGS: list[dict] = router.get_analyst_roster()
 
 MINIMUM_VALID_ANALYSTS = 2   # design rule #6
 
