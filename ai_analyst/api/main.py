@@ -38,12 +38,50 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+# ── Secret masking for log messages (audit #3 — CWE-209) ─────────────────
+import re as _re
+
+_SECRET_PATTERNS = _re.compile(
+    r"(sk-[A-Za-z0-9]{8,})"           # OpenAI / Anthropic style keys
+    r"|(key-[A-Za-z0-9]{8,})"         # generic key- prefixed tokens
+    r"|(xai-[A-Za-z0-9]{8,})"         # Grok/xAI keys
+    r"|(AIza[A-Za-z0-9_-]{30,})"      # Google API keys
+    r"|([A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,})"  # JWT-like tokens
+    , _re.ASCII,
+)
+
+
+def _mask_secrets(text: str) -> str:
+    """Replace API-key-like patterns in text with <REDACTED>."""
+    return _SECRET_PATTERNS.sub("<REDACTED>", text)
+
+
+_IMAGE_MAGIC = {
+    b"\x89PNG\r\n\x1a\n": "PNG",
+    b"\xff\xd8\xff": "JPEG",
+}
+
+
+def _validate_image_magic(data: bytes, label: str) -> None:
+    """Verify the file starts with a known image magic number (audit #8 — CWE-434)."""
+    for magic, fmt in _IMAGE_MAGIC.items():
+        if data[:len(magic)] == magic:
+            return
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"{label} is not a valid PNG or JPEG image. "
+            "Upload a chart screenshot in PNG or JPEG format."
+        ),
+    )
+
 
 async def _read_upload_bounded(upload: UploadFile, max_bytes: int, label: str) -> bytes:
     """Read an upload in chunks, raising 413 as soon as the limit is exceeded.
 
     This avoids loading an arbitrarily large file into memory before
     rejecting it — the server stops reading at max_bytes + 1.
+    Validates the file is a PNG or JPEG image via magic-number check.
     """
     chunks: list[bytes] = []
     total = 0
@@ -62,7 +100,10 @@ async def _read_upload_bounded(upload: UploadFile, max_bytes: int, label: str) -
                 ),
             )
         chunks.append(chunk)
-    return b"".join(chunks)
+    data = b"".join(chunks)
+    if data:
+        _validate_image_magic(data, label)
+    return data
 
 from ..models.ground_truth import (
     GroundTruthPacket,
@@ -84,6 +125,14 @@ from ..core.usage_meter import summarize_usage, check_run_cost_ceiling
 from ..core import progress_store
 from ..core.correlation import correlation_ctx, setup_structured_logging
 from ..core.pipeline_metrics import metrics_store
+from ..core.input_sanitiser import (
+    sanitise_instrument,
+    sanitise_session,
+    sanitise_market_regime,
+    sanitise_news_risk,
+    sanitise_no_trade_windows,
+    sanitise_open_positions,
+)
 
 
 class AnalysisResponse(BaseModel):
@@ -212,12 +261,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow the browser app to reach the API.
+# ── CORS configuration (audit #4 — HTTPS enforcement) ────────────────────
 # Override ALLOWED_ORIGINS (comma-separated) for non-localhost deployments.
 # Defaults to localhost:8080 / 127.0.0.1:8080 for local development.
 _default_origins = ["http://localhost:8080", "http://127.0.0.1:8080"]
 _env_origins = os.environ.get("ALLOWED_ORIGINS", "")
 _allow_origins = [o.strip() for o in _env_origins.split(",") if o.strip()] or _default_origins
+
+_is_production = os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod")
 
 if not _env_origins:
     logger.warning(
@@ -225,12 +276,52 @@ if not _env_origins:
         "Set ALLOWED_ORIGINS in .env for production deployments."
     )
 
+if _is_production:
+    _insecure = [o for o in _allow_origins if o.startswith("http://")]
+    if _insecure:
+        logger.error(
+            "SECURITY: ALLOWED_ORIGINS contains http:// origins in production: %s. "
+            "Only https:// origins are permitted. Removing insecure origins.",
+            _insecure,
+        )
+        _allow_origins = [o for o in _allow_origins if not o.startswith("http://")]
+        if not _allow_origins:
+            logger.error(
+                "SECURITY: No valid https:// origins remain. "
+                "API will reject all cross-origin requests."
+            )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allow_origins,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
+
+
+# ── Security headers middleware (audit #12 — CWE-693) ─────────────────────
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import Response as StarletteResponse
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add standard security headers to every response."""
+
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response: StarletteResponse = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if _is_production:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.get("/health")
@@ -285,7 +376,7 @@ async def feeder_ingest(request: Request):
             detail="macro_risk_officer package not available — feeder ingestion disabled.",
         )
     except Exception as exc:
-        logger.warning("[Feeder] Ingestion failed: %s: %s", type(exc).__name__, exc)
+        logger.warning("[Feeder] Ingestion failed: %s: %s", type(exc).__name__, _mask_secrets(str(exc)))
         raise HTTPException(status_code=500, detail="Feeder ingestion failed. Check server logs.")
 
     # Cache in app.state for macro_context_node to pick up
@@ -449,6 +540,17 @@ async def analyse(
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=422, detail=f"JSON parse error in form field: {e}")
 
+    # ── Sanitise user inputs before they reach LLM prompts (audit #2) ─────
+    try:
+        instrument = sanitise_instrument(instrument)
+        session = sanitise_session(session)
+        market_regime = sanitise_market_regime(market_regime)
+        news_risk = sanitise_news_risk(news_risk)
+        no_trade_list = sanitise_no_trade_windows(no_trade_list)
+        open_pos_list = sanitise_open_positions(open_pos_list)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Input validation error: {e}")
+
     # ── Build clean chart base64 map ─────────────────────────────────────────
     clean_chart_uploads: dict[str, Optional[UploadFile]] = {
         "H4": chart_h4,
@@ -579,8 +681,9 @@ async def analyse(
         final_state = await request.app.state.graph.ainvoke(initial_state)
     except RuntimeError as e:
         # Propagate pipeline failures (e.g. insufficient analysts) as 503
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception:
+        raise HTTPException(status_code=503, detail=_mask_secrets(str(e)))
+    except Exception as exc:
+        logger.error("Pipeline error: %s: %s", type(exc).__name__, _mask_secrets(str(exc)))
         raise HTTPException(status_code=500, detail="Internal pipeline error. Check server logs.")
     finally:
         correlation_ctx.reset(ctx_token)
@@ -683,6 +786,17 @@ async def analyse_stream(
         overlay_claims_list: list[str] = json.loads(overlay_indicator_claims)
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=422, detail=f"JSON parse error in form field: {e}")
+
+    # ── Sanitise user inputs before they reach LLM prompts (audit #2) ─────
+    try:
+        instrument = sanitise_instrument(instrument)
+        session = sanitise_session(session)
+        market_regime = sanitise_market_regime(market_regime)
+        news_risk = sanitise_news_risk(news_risk)
+        no_trade_list = sanitise_no_trade_windows(no_trade_list)
+        open_pos_list = sanitise_open_positions(open_pos_list)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Input validation error: {e}")
 
     # ── Build clean chart base64 map ─────────────────────────────────────────
     clean_chart_uploads: dict[str, Optional[UploadFile]] = {
