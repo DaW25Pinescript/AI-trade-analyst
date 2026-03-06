@@ -36,6 +36,8 @@ from ..core.analyst_prompt_builder import (
 from ..core.run_paths import get_run_dir
 from ..core.usage_meter import acompletion_metered
 from ..core import progress_store
+from ..llm_router import router
+from ..llm_router.task_types import ANALYST_REASONING
 from .state import GraphState
 
 # Analyst roster — model names routed through LiteLLM.
@@ -56,6 +58,7 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
     Pushes a progress event to the run's queue (if registered) on completion.
     Raises on model error or schema validation failure — caller handles exceptions.
     """
+    route = router.resolve(ANALYST_REASONING)
     messages = build_messages(prompt)
     response = await acompletion_metered(
         run_dir=get_run_dir(run_id),
@@ -67,6 +70,8 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
         response_format={"type": "json_object"},
         temperature=0.1,   # low temperature for determinism
         max_tokens=1500,
+        api_base=route["base_url"],
+        api_key=route["api_key"],
     )
     raw: str = response.choices[0].message.content
     result = AnalystOutput.model_validate_json(raw)
