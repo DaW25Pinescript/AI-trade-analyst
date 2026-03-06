@@ -11,6 +11,9 @@ Usage:
     route = router.resolve("chart_extract")
     # route = {"model": "...", "fallback_model": "...", "retries": 1,
     #          "base_url": "...", "api_key": "..."}
+
+    # Or use the fallback-aware helper:
+    response = await router.call_with_fallback("chart_extract", messages=[...])
 """
 import logging
 from typing import Any
@@ -53,3 +56,76 @@ def resolve(task_type: str) -> dict[str, Any]:
     )
 
     return route
+
+
+async def call_with_fallback(task_type: str, messages: list, **kwargs) -> Any:
+    """Execute an LLM call with router-resolved model and automatic fallback.
+
+    Retries the primary model N times (as configured in llm_routing.yaml),
+    then falls back to the secondary Claude model. Fallbacks are NEVER silent —
+    every fallback produces a WARNING log entry.
+
+    Args:
+        task_type: One of the task type constants from task_types.py.
+        messages: The messages list to send to the LLM.
+        **kwargs: Additional keyword arguments passed to litellm.completion.
+
+    Returns:
+        The LLM completion response.
+    """
+    from litellm import acompletion
+
+    route = resolve(task_type)
+
+    # Try primary model with configured retries
+    last_error: Exception | None = None
+    for attempt in range(route["retries"] + 1):
+        try:
+            response = await acompletion(
+                model=route["model"],
+                messages=messages,
+                api_base=route["base_url"],
+                api_key=route["api_key"],
+                **kwargs,
+            )
+            return response
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                "[router] %s primary model %s failed (attempt %d/%d): %s",
+                task_type,
+                route["model"],
+                attempt + 1,
+                route["retries"] + 1,
+                e,
+            )
+
+    # Fallback to secondary model
+    logger.warning(
+        "[router] %s falling back from %s to %s after %d failed attempt(s)",
+        task_type,
+        route["model"],
+        route["fallback_model"],
+        route["retries"] + 1,
+    )
+    try:
+        response = await acompletion(
+            model=route["fallback_model"],
+            messages=messages,
+            api_base=route["base_url"],
+            api_key=route["api_key"],
+            **kwargs,
+        )
+        return response
+    except Exception as fallback_error:
+        logger.warning(
+            "[router] %s fallback model %s also failed: %s",
+            task_type,
+            route["fallback_model"],
+            fallback_error,
+        )
+        raise RuntimeError(
+            f"[router] {task_type}: both primary ({route['model']}) and "
+            f"fallback ({route['fallback_model']}) failed. "
+            f"Primary error: {last_error}. Fallback error: {fallback_error}"
+        ) from fallback_error
