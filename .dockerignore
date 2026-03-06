@@ -1,0 +1,51 @@
+# Version control
+.git/
+.gitignore
+
+# Documentation
+docs/
+*.md
+
+# Tests
+**/tests/
+**/*_test.py
+**/test_*.py
+.pytest_cache/
+coverage/
+*.lcov
+
+# Development tooling
+.vscode/
+.vscode-test/
+.eslintcache
+.stylelintcache
+
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Node artefacts
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+
+# Runtime output (rebuilt at container start)
+ai_analyst/logs/
+ai_analyst/output/
+ai_analyst/data/charts/
+macro_risk_officer/data/*.db
+
+# Docker files (no recursive COPY)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# CI / config
+.github/
+scripts/*.ps1

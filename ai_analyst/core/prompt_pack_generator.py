@@ -23,9 +23,12 @@ Output layout:
 """
 import base64
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from ..models.ground_truth import GroundTruthPacket
 from ..models.execution_config import AnalystConfig, ExecutionConfig
@@ -334,4 +337,4 @@ class PromptPackGenerator:
                 filename = f"{timeframe}_screenshot.png"
                 (self.charts_dir / filename).write_bytes(img_bytes)
             except Exception as e:
-                print(f"[WARN] Could not save chart '{timeframe}': {e}")
+                logger.warning("Could not save chart '%s': %s", timeframe, e)
