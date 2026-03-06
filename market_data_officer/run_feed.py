@@ -46,6 +46,12 @@ def main() -> None:
         default=False,
         help="Skip fetching — rebuild derived timeframes and hot packages from existing canonical",
     )
+    parser.add_argument(
+        "--diagnostics",
+        action="store_true",
+        default=False,
+        help="Generate cache diagnostics report (per-hour fetch/decode audit trail)",
+    )
 
     args = parser.parse_args()
 
@@ -70,6 +76,7 @@ def main() -> None:
         save_raw=args.save_raw,
         gap_report=args.gap_report,
         hot_only=args.hot_only,
+        diagnostics=args.diagnostics,
     )
 
 

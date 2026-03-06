@@ -1,5 +1,6 @@
 """Dukascopy bi5 fetch layer — downloads hourly tick archives."""
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -7,6 +8,17 @@ from typing import Optional
 import requests
 
 from .config import DUKASCOPY_BASE_URL, RAW_DIR
+
+
+@dataclass
+class FetchResult:
+    """Result of a bi5 fetch with diagnostic metadata."""
+
+    data: bytes
+    url: str
+    http_status: int  # 0 = network error
+    cached_path: str  # relative path if saved, empty string otherwise
+    error: str  # empty string if no error
 
 # Dukascopy requires a browser-like User-Agent to avoid Cloudflare 403 blocks
 _HEADERS = {
@@ -77,3 +89,69 @@ def fetch_bi5(
         file_path.write_bytes(data)
 
     return data
+
+
+def fetch_bi5_detailed(
+    symbol: str,
+    hour_dt: datetime,
+    save_raw: bool = False,
+    raw_dir: Optional[Path] = None,
+    timeout: int = 30,
+) -> FetchResult:
+    """Fetch a bi5 tick archive with full diagnostic metadata.
+
+    Like fetch_bi5 but returns a FetchResult with HTTP status, URL,
+    cached path, and error info for the diagnostics layer.
+    """
+    if hour_dt.tzinfo is None:
+        raise ValueError("hour_dt must be timezone-aware (UTC)")
+
+    url = build_bi5_url(symbol, hour_dt)
+    cached_path = ""
+
+    try:
+        resp = requests.get(url, timeout=timeout, headers=_HEADERS)
+    except requests.exceptions.SSLError:
+        try:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            resp = requests.get(url, timeout=timeout, headers=_HEADERS, verify=False)
+        except requests.RequestException as exc:
+            return FetchResult(
+                data=b"", url=url, http_status=0,
+                cached_path="", error=f"network_error:{exc}",
+            )
+    except requests.RequestException as exc:
+        return FetchResult(
+            data=b"", url=url, http_status=0,
+            cached_path="", error=f"network_error:{exc}",
+        )
+
+    status = resp.status_code
+
+    if status == 404 or status >= 400:
+        return FetchResult(
+            data=b"", url=url, http_status=status,
+            cached_path="", error=f"http_{status}",
+        )
+
+    data = resp.content
+    if not data:
+        return FetchResult(
+            data=b"", url=url, http_status=status,
+            cached_path="", error="empty_response",
+        )
+
+    if save_raw:
+        out_dir = (raw_dir or RAW_DIR) / symbol
+        month_zero = hour_dt.month - 1
+        file_dir = out_dir / str(hour_dt.year) / f"{month_zero:02d}" / f"{hour_dt.day:02d}"
+        file_dir.mkdir(parents=True, exist_ok=True)
+        file_path = file_dir / f"{hour_dt.hour:02d}h_ticks.bi5"
+        file_path.write_bytes(data)
+        cached_path = str(file_path)
+
+    return FetchResult(
+        data=data, url=url, http_status=status,
+        cached_path=cached_path, error="",
+    )
