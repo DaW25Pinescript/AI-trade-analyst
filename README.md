@@ -1,174 +1,320 @@
 # AI Trade Analyst
 
-AI Trade Analyst is a two-part system for discretionary trade planning and review:
+![AI Trade Analyst](docs/assets/ai-trade-analyst-banner.svg)
 
-1. **Static browser app** (`app/`) — a client-side workflow for structured ticket generation, gate evaluation, export/import, and after-action review (AAR).
-2. **Python AI analyst** (`ai_analyst/`) — a multi-model, multi-persona analysis pipeline that accepts chart images and produces structured trade verdicts via CLI.
+AI Trade Analyst is a data-first AI trading analysis system designed to assist discretionary traders with structured trade planning, multi-model analysis, and post-trade review.
 
----
+The system combines:
 
-## Project purpose and current status
+- A structured browser workflow for discretionary trading decisions
+- A multi-model AI analysis engine
+- A canonical market data pipeline used as the primary analytical substrate
 
-### Purpose
+Unlike screenshot-driven AI trading tools, AI Trade Analyst prioritizes structured numerical market data. Chart screenshots remain optional supporting evidence, not the system’s core input.
 
-- Standardize trade planning with enum-driven, schema-backed form inputs.
-- Generate consistent AI-ready prompts and human-readable reports from the same source state.
-- Preserve an auditable lifecycle across ticket creation, gate evaluation, export/import backups, and post-trade review.
-- Run multi-model AI analysis (manual, hybrid, or fully automated) with a structured Arbiter verdict.
+## System Architecture
 
-### Current status
+AI Trade Analyst is organized into three cooperating layers.
 
-- The repository ships a runnable static app in `app/` plus milestone snapshots in `app/releases/`.
-- The Python AI analyst (`ai_analyst/`) is at **v2.1** and supports manual, hybrid, and automated execution modes, plus a `ticket_draft` bridge response for app integration. Task-based LLM routing via `llm_router/` centralises model selection and proxy support.
-- The Macro Risk Officer (`macro_risk_officer/`) is **fully complete** (MRO-P1 through P4): standalone context CLI, Arbiter prompt injection, SQLite outcome tracking, KPI telemetry, price outcome accuracy, and degraded-mode runbook.
-- V3 of the browser app milestones G1–G12 are **all complete**. The static app ships with full ticket workflow, gate evaluation, AI bridge integration, verdict display, export/import, and release hardening.
-- Test suite status (2026-03-06): **703+ passing, 0 failing** across browser (234 JS), AI analyst (469 Python), and MRO (153 + 16 intentional skips).
-- JSON schema definitions for ticket and AAR payloads are present and used for compatibility validation in import/export and local storage flows.
+```text
+Market Data Layer
+        │
+        ▼
+AI Analysis Layer
+        │
+        ▼
+Trader Workflow Layer
+```
 
----
+### Market Data Layer
 
-## Directory map
+Maintains canonical price data and derived timeframes.
+
+Responsibilities:
+
+- Tick ingestion
+- Candle generation
+- Derived timeframe generation
+- Gap detection
+- Incremental updates
+- Market data packaging for AI agents
+
+### AI Analysis Layer
+
+Runs multi-persona AI analysis over structured market state.
+
+Responsibilities:
+
+- AI model orchestration
+- Persona-based analysis
+- Arbiter decision synthesis
+- Macro context injection
+- Trade verdict generation
+
+### Trader Workflow Layer
+
+Provides the human interface for structured trade planning and review.
+
+Responsibilities:
+
+- Ticket generation
+- Gate evaluation
+- Structured prompts
+- AI analysis bridge
+- Post-trade review (AAR)
+
+## Data-First Design Doctrine
+
+Earlier versions of AI Trade Analyst centered on chart screenshots as the primary input to AI analysis.
+
+This repository now formally adopts a data-first architecture.
+
+### Primary input
+
+Structured market data:
+
+- OHLCV candles
+- Multi-timeframe price history
+- Derived indicators
+- Computed market features
+
+### Secondary input
+
+Trader context:
+
+- Trade thesis
+- Session
+- Risk parameters
+- Setup classification
+
+### Supporting evidence
+
+Chart screenshots:
+
+- Optional confirmation
+- Visual sanity check
+- Discretionary annotation
+- Audit artifact
+
+Screenshots are therefore evidence, not the analytical substrate.
+
+## Project Purpose
+
+AI Trade Analyst exists to:
+
+- Standardize discretionary trade planning
+- Preserve a structured lifecycle for trade decisions
+- Combine human judgment with multi-model AI analysis
+- Provide repeatable analysis workflows
+- Create auditable trade decision records
+
+## Current Status
+
+### Browser App
+
+The repository ships a runnable static web application under:
+
+```text
+app/
+```
+
+Capabilities:
+
+- Structured ticket workflow
+- Gate evaluation
+- AI analysis integration
+- Verdict display
+- Export/import backups
+- After-action review (AAR)
+
+### Python AI Analyst
+
+Location:
+
+```text
+ai_analyst/
+```
+
+Current version: v2.1
+
+Capabilities:
+
+- Multi-model analysis
+- Multi-persona reasoning
+- Arbiter synthesis
+- Manual / hybrid / automated execution modes
+- CLI execution and replay
+
+Model routing is centralized under:
+
+```text
+llm_router/
+```
+
+### Macro Risk Officer
+
+Location:
+
+```text
+macro_risk_officer/
+```
+
+Status: complete
+
+Features:
+
+- Macro regime classification
+- Volatility bias assessment
+- Cross-asset pressure context
+- SQLite outcome tracking
+- KPI telemetry
+
+The MRO is advisory only.
+
+It provides macro context to the Arbiter but never generates trade signals or overrides price-structure conclusions.
+
+## Test Suite Status
+
+As of 2026-03-06:
+
+- 703+ tests passing
+- 0 failing
+
+Breakdown:
+
+| Component | Tests |
+| --- | --- |
+| Browser app | 234 JS |
+| AI analyst | 469 Python |
+| Macro Risk Officer | 153 |
+| Intentional skips | 16 |
+
+## Directory Map
 
 ```text
 .
-├── ai_analyst/                     # Python multi-model AI analyst (v2.0)
-│   ├── cli.py                      # CLI entrypoint (run, status, arbiter, history, replay)
-│   ├── requirements.txt            # Python dependencies
-│   ├── pytest.ini                  # Pytest config
-│   ├── api/                        # FastAPI server (optional HTTP interface)
-│   ├── core/                       # Execution router, prompt builders, API key manager
-│   ├── graph/                      # LangGraph pipeline and node definitions
-│   ├── models/                     # Pydantic models (ground truth, personas, output, config)
-│   ├── output/                     # Generated run output (gitignored)
-│   ├── prompt_library/             # Versioned lens and analyst prompt files
-│   ├── data/                       # Sample chart images for testing
-│   └── tests/                      # Pytest suite for analyst pipeline
+├── ai_analyst/
+│   ├── cli.py
+│   ├── requirements.txt
+│   ├── pytest.ini
+│   ├── api/
+│   ├── core/
+│   ├── graph/
+│   ├── models/
+│   ├── output/
+│   ├── prompt_library/
+│   ├── data/
+│   └── tests/
+│
 ├── app/
-│   ├── index.html                  # Main static entrypoint
+│   ├── index.html
 │   ├── scripts/
-│   │   ├── exports/                # Export + import backup logic
-│   │   ├── generators/             # Prompt/report generators
-│   │   ├── schema/                 # Runtime validation helpers
-│   │   ├── state/                  # State model, migration, local storage
-│   │   └── ui/                     # UI logic (stepper, gates, bindings)
-│   ├── styles/                     # Theme + print styles
-│   └── releases/                   # Standalone milestone HTML snapshots
+│   │   ├── exports/
+│   │   ├── generators/
+│   │   ├── schema/
+│   │   ├── state/
+│   │   └── ui/
+│   ├── styles/
+│   └── releases/
+│
 ├── docs/
-│   ├── schema/                     # Canonical JSON schemas (ticket + AAR)
-│   ├── scoring/                    # Deterministic scoring references
-│   └── V3_*.md                     # V3 planning and design notes
-├── macro_risk_officer/             # Macro Risk Officer (advisory macro-context engine)
-│   ├── core/                       # Context models + decision engine
-│   ├── ingestion/                  # Macro/event data ingestion + normalization
-│   ├── config/                     # Scenario + regime configuration
-│   ├── history/                    # Historical context snapshots/artifacts
-│   ├── data/                       # Local datasets/test fixtures
-│   └── tests/                      # MRO unit/integration tests
-├── examples/                       # Example ticket/AAR/report artifacts
-├── tests/                          # Node test suite + fixtures (browser app)
-├── tooling/                        # Helper scripts and tooling notes
-├── run_ai_trade_analyst_python.bat # Windows one-click launcher (static app)
+│   ├── schema/
+│   ├── scoring/
+│   ├── architecture/
+│   └── V3_*.md
+│
+├── macro_risk_officer/
+│   ├── core/
+│   ├── ingestion/
+│   ├── config/
+│   ├── history/
+│   ├── data/
+│   └── tests/
+│
+├── examples/
+├── tests/
+├── tooling/
+├── run_ai_trade_analyst_python.bat
 ├── LICENSE
 └── README.md
 ```
 
----
+## Static Browser App
 
-## Static browser app
+### Running Locally
 
-### Running locally
-
-Because this is a static app, use any local static file server from the repository root.
-
-**Option A: Python (no install required)**
+#### Option A — Python
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000/app/`
+Open:
 
-**Option B: Node**
+```text
+http://localhost:8000/app/
+```
+
+#### Option B — Node
 
 ```bash
 npx serve .
 ```
 
-Then navigate to `/app/` at the URL printed by `serve`.
+Navigate to `/app`.
 
-**Option C: Windows launcher**
+#### Option C — Windows Launcher
 
-Double-click `run_ai_trade_analyst_python.bat` — it auto-detects Python, starts the server, and opens the browser.
+Double click:
 
-### Option D: Docker Compose (app + API bridge)
+```text
+run_ai_trade_analyst_python.bat
+```
+
+#### Option D — Docker
 
 ```bash
 docker compose up
 ```
 
-Then open:
-- Static app: `http://localhost:8080/app/`
-- AI Analyst API health: `http://localhost:8000/health`
+Open:
 
-This is the fastest way to run the G11 bridge locally with both services up together.
+```text
+http://localhost:8080/app/
+```
 
-### Testing (Node)
+## Testing
 
-Run the Node test suite from the repo root:
+### Browser Tests
 
 ```bash
 node --test tests/*.js
 ```
 
-This covers deterministic gate/scoring behavior, schema enum stability, and core metrics/calibration fixture expectations.
-
-### Contributor pre-push checklist
-
-Before opening or updating a PR, run the same checks that CI enforces:
+### AI Analyst Tests
 
 ```bash
-node --test tests/*.js
 pytest -q ai_analyst/tests
 ```
 
-Or use the Makefile shorthand (requires `make`):
+### Full Test Suite
 
 ```bash
-make test-all   # runs both suites in sequence
-make test-web   # Node suite only
-make test-ai    # pytest suite only
+make test-all
 ```
 
-If either command fails, fix the issue before pushing so branch status stays merge-ready.
+## Makefile Reference
 
-### Makefile quick reference
+| Command | Purpose |
+| --- | --- |
+| make test-web | run browser tests |
+| make test-ai | run AI analyst tests |
+| make test-all | run both suites |
+| make run-web | start static server |
+| make run-api | run FastAPI interface |
+| make run-docker | run full stack |
 
-| Target | Command equivalent |
-|---|---|
-| `make test-web` | `node --test tests/*.js` |
-| `make test-ai` | `cd ai_analyst && pytest -q` |
-| `make test-all` | both of the above |
-| `make run-web` | `python3 -m http.server 8080` → `http://localhost:8080/app/` |
-| `make run-api` | `python3 -m uvicorn ai_analyst.api.main:app --host 0.0.0.0 --port 8000` |
-| `make run-docker` | `docker compose up` |
-
----
-
-## Python AI analyst
-
-### Macro Risk Officer (MRO) and intended role
-
-The MRO is a **parallel, advisory-only macro context engine** that helps answer:
-_"What type of market environment is currently in play?"_
-
-Its role in this system is intentionally constrained:
-
-- It produces a single structured `MacroContext` object (for example regime, volatility bias, and cross-asset pressure).
-- That context is injected into the **Arbiter prompt** as supporting evidence.
-- It does **not** generate entries/exits, does **not** emit trade signals, and does **not** override price-structure conclusions from analyst personas.
-- Final trade decisions remain Arbiter-owned, with MRO acting only as contextual risk framing.
-
-This design keeps macro influence explicit and auditable while preserving the analyst pipeline's price-action-first decision model.
+## Python AI Analyst
 
 ### Setup
 
@@ -176,33 +322,37 @@ This design keeps macro influence explicit and auditable while preserving the an
 pip install -r ai_analyst/requirements.txt
 ```
 
-API keys go in `ai_analyst/.env`:
+Create:
 
-```
-ANTHROPIC_API_KEY=...
-OPENAI_API_KEY=...
-GEMINI_API_KEY=...
+```text
+ai_analyst/.env
 ```
 
-Any key that is absent causes that analyst to fall back to manual mode.
+```dotenv
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+GEMINI_API_KEY=
+```
 
-### Execution modes
+Missing keys automatically trigger manual mode.
+
+### Execution Modes
 
 | Mode | Behavior |
-|---|---|
-| `manual` | Generates prompt packs for all analysts; you paste prompts into any AI and paste responses back |
-| `hybrid` | Uses available API keys for automated analysts; remaining analysts run manually |
-| `automated` | All analysts run via API — requires all keys to be set |
+| --- | --- |
+| manual | generates prompt packs for external AI |
+| hybrid | uses available API keys |
+| automated | full API execution |
 
-### CLI commands
+### CLI Commands
 
-**Check API key status and recommended mode**
+#### Check model availability
 
 ```bash
 python ai_analyst/cli.py status
 ```
 
-**Start a new analysis run**
+#### Run analysis
 
 ```bash
 python ai_analyst/cli.py run \
@@ -215,130 +365,133 @@ python ai_analyst/cli.py run \
   --m15 charts/m15.png
 ```
 
-Key options:
-
-| Flag | Default | Description |
-|---|---|---|
-| `--instrument` | required | e.g. `XAUUSD`, `EURUSD` |
-| `--session` | required | `NY`, `London`, `Asia` |
-| `--mode` | `hybrid` | `manual`, `hybrid`, `automated` |
-| `--d1/--h4/--h1/--m15/--m5` | — | Chart image paths |
-| `--balance` | `10000` | Account balance |
-| `--min-rr` | `2.0` | Minimum R:R threshold |
-| `--max-risk` | `0.5` | Max risk per trade (%) |
-| `--regime` | `unknown` | `trending`, `ranging`, `unknown` |
-| `--news-risk` | `none_noted` | `none_noted`, `elevated`, `critical` |
-
-**Lens toggles** (all default off except ICT and Market Structure):
-
-```
---lens-ict / --no-ict
---lens-ms / --no-ms
---lens-orderflow / --no-orderflow
---lens-trendlines / --no-trendlines
---lens-smt / --no-smt
-```
-
-**After filling in manual response files, run the Arbiter**
+#### Arbiter synthesis
 
 ```bash
 python ai_analyst/cli.py arbiter --run-id <run-id>
 ```
 
-**List all past runs**
+#### List history
 
 ```bash
 python ai_analyst/cli.py history
 ```
 
-**Replay a past run (re-runs Arbiter with same analyst outputs)**
+#### Replay run
 
 ```bash
 python ai_analyst/cli.py replay --run-id <run-id>
 ```
 
-Useful for testing prompt changes without re-running analysts.
+Useful for prompt development and regression testing.
 
-### Analyst personas
+## Analyst Personas
 
-Each run dispatches four analyst personas:
+Each run dispatches four analysts.
 
-- `DEFAULT_ANALYST` — balanced multi-timeframe assessment
-- `RISK_OFFICER` — risk and invalidation focus
-- `PROSECUTOR` — adversarial bias, looks for reasons not to trade
-- `ICT_PURIST` — ICT/SMC methodology specialist
+### DEFAULT_ANALYST
 
-An Arbiter node synthesizes all analyst outputs into a `FinalVerdict` with a trade decision, approved setups, confidence score, and no-trade conditions.
+Balanced multi-timeframe analysis.
 
-### AI Analysis Pipeline
+### RISK_OFFICER
 
-The chart-analysis runtime now includes a modular orchestration layer under `ai_analyst/prompt_library/chart_analysis/`:
+Focuses on invalidation and downside.
 
-- `runtime.orchestrator.md` defines the mandatory sequence: `base → auto_detect → selected lenses → arbiter`.
-- LangGraph wiring mirrors this sequence with nodes `chart_base`, `chart_auto_detect`, `chart_lenses`, `run_arbiter`, plus optional `pinekraft_bridge`.
-- Existing CLI lens toggles (for example `--lens-ict`, `--lens-ms`, `--lens-trendlines`) remain authoritative user overrides.
-- User-facing synthesis remains arbiter-first; raw lens-level outputs are treated as internal analysis context.
+### PROSECUTOR
 
-### Testing (pytest)
+Attempts to disprove the trade thesis.
 
-```bash
-cd ai_analyst
-pytest
+### ICT_PURIST
+
+ICT / Smart Money Concepts specialist.
+
+## Arbiter Node
+
+The Arbiter synthesizes analyst outputs into:
+
+`FinalVerdict`
+
+Includes:
+
+- Trade decision
+- Approved setups
+- Confidence score
+- No-trade conditions
+- Reasoning summary
+
+## Market Data Pipeline (New)
+
+AI Trade Analyst now includes a Market Data Officer responsible for maintaining canonical price data.
+
+Responsibilities:
+
+- Tick ingestion
+- Tick → 1m candle generation
+- Derived timeframe generation
+- Gap detection
+- Incremental updates
+- AI-ready data packaging
+
+Example structure:
+
+```text
+market_data/
+   XAUUSD/
+      canonical/
+         1m.parquet
+
+      derived/
+         5m.parquet
+         15m.parquet
+         1h.parquet
+         4h.parquet
+         1d.parquet
+
+      reports/
+         gap_report.json
 ```
 
-Covers arbiter rules, lens contracts, prompt builder contracts, and Pydantic schema validation.
+This pipeline allows the AI system to reason over true numerical market state instead of visual inference from screenshots.
 
----
+## V3 Browser App Phase Plan
 
-## V3 browser app phase plan (G1–G12)
+`G1 → G2 → G3 → G4 → G5 → G6 → G7 → G8 → G9 → G10 → G11 → G12`
 
-Primary build order:
+All phases are now complete.
 
-`G1 → G2 → G3 → G4 (A1 + A4) → G5 → G6 → G7 → G8 → G9 → G10 → G11 → G12`
+## Import / Export Schema Contracts
 
-Milestone summary:
+Ticket and AAR payloads are governed by JSON schemas.
 
-| Group | Scope |
-|---|---|
-| G1 | Baseline redesign — multi-step V3 UI foundation |
-| G2 | Test/prediction mode, richer ticket enums, conditional scenario flow |
-| G3–G4 | Core model/logic consolidation + enhancement set A1/A4 |
-| G5–G8 | Persistence hardening, export robustness, operational workflow refinement |
-| G9–G10 | Dashboard/reporting depth and calibration loops |
-| G11–G12 | Final polish, release hardening, production-readiness checks |
+Location:
 
-Reference planning docs:
+```text
+docs/schema/
+```
 
-- `docs/V3_master_plan.md`
-- `docs/V3_G1_draft.md`
-- `docs/V3_G2_notes.md`
-- `docs/V3_G3_notes.md`
+Compatibility rules:
 
----
+- Additive changes preferred
+- Breaking changes require version bump
 
-## Import/export compatibility and schema versioning
+Migrations implemented in:
 
-### Compatibility guarantees
+```text
+app/scripts/state/migrations.js
+```
 
-- Ticket and AAR payloads are treated as schema-governed contracts (`docs/schema/*.schema.json`).
-- Exported backup JSON is validated before download.
-- Imported backup JSON is validated before migration/application.
-- Local storage load/save paths also validate payload shape compatibility.
+## License
 
-### Schema versioning notes
+MIT License.
 
-- Both ticket and AAR contracts include `schemaVersion` metadata (currently `1.0.0`).
-- Backward-compatible changes should be additive and preserve required enum/value semantics where possible.
-- Breaking changes require:
-  1. a schema version bump,
-  2. migration logic updates in `app/scripts/state/migrations.js`, and
-  3. fixture/test updates in `tests/` to lock expected behavior.
+## Contribution Philosophy
 
----
+This project prioritizes:
 
-## Release checklist references
+- Deterministic workflows
+- Schema-backed state
+- Auditable trade decisions
+- Modular AI orchestration
+- Reproducible analysis pipelines
 
-- `app/releases/README.md` — snapshot inventory and version-to-version deltas.
-- `docs/V3_master_plan.md` — planned milestone ordering and scope.
-- `tests/` Node suite — minimum regression gate before snapshot updates.
-- `ai_analyst/tests/` pytest suite — minimum regression gate for the AI pipeline.
+Future contributors should assume that structured market data is the primary analytical substrate, with visual chart artifacts treated as optional supporting context.
