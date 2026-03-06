@@ -1,338 +1,239 @@
-# CONTRACTS.md — Phase 3A Structure Object Schemas
+# CONTRACTS.md — Phase 3B Schema Additions
 
-## Why this file matters
+## Schema evolution policy
 
-Every downstream consumer — analyst agents, Senate, future replay tools — reads structure packets. The schemas defined here are the contract. Field names, types, and lifecycle values must be stable across 3A/3B/3C or downstream consumers break.
+Add fields only. Do not rename or remove any Phase 3A fields. Downstream consumers depending on existing field names must not break.
 
-Fields may be **added** in later phases. Fields must never be **removed or renamed** without a versioned migration.
-
----
-
-## ICT vocabulary standard
-
-Use ICT vocabulary directly in all external schemas. Do not substitute generic names.
-
-| ICT term | Use in schema |
-|---|---|
-| Break of Structure | `bos_bull`, `bos_bear` |
-| Market Structure Shift / CHoCH | `mss_bull`, `mss_bear` |
-| Swing High | `swing_high` |
-| Swing Low | `swing_low` |
-| Equal Highs | `equal_highs` |
-| Equal Lows | `equal_lows` |
-| Prior Day High | `prior_day_high` |
-| Prior Day Low | `prior_day_low` |
-| Prior Week High | `prior_week_high` |
-| Prior Week Low | `prior_week_low` |
-| Liquidity Sweep | `sweep_high`, `sweep_low` |
-
-Internal helper variable names may stay neutral. Output objects use ICT-native terms.
+New fields added in 3B are nullable where resolution is pending. Once resolved, they become immutable.
 
 ---
 
-## Structure Packet v1
+## LiquidityLevel — 3B additions
 
-Top-level packet written per instrument per timeframe:
+### Full 3B schema
+
+```json
+{
+  "id": "liq_001",
+  "type": "prior_day_high",
+  "price": 1.08720,
+  "origin_time": "2026-03-06T21:00:00Z",
+  "timeframe": "1h",
+  "status": "swept",
+
+  "swept_time": "2026-03-07T10:15:00Z",
+
+  "liquidity_scope": "external_liquidity",
+
+  "outcome": "reclaimed",
+  "reclaim_time": "2026-03-07T10:30:00Z",
+  "reclaim_window_bars": 1
+}
+```
+
+### New fields
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `liquidity_scope` | `str \| None` | `external_liquidity` \| `internal_liquidity` \| `unclassified` | Set at level creation time, not post-sweep |
+| `outcome` | `str \| None` | `reclaimed` \| `accepted_beyond` \| `unresolved` \| `null` | `null` until swept, then resolves |
+| `reclaim_time` | `ISO8601 str \| null` | UTC timestamp | Set when reclaim is confirmed, else `null` |
+| `reclaim_window_bars` | `int \| null` | positive int | Config value in effect when sweep occurred |
+
+### Allowed status transitions (full lifecycle)
+
+```
+active
+  → swept          (sweep detected)
+  → invalidated    (structural invalidation)
+
+swept
+  → reclaimed      (reclaim confirmed within window)
+  → accepted_beyond (window closed, no reclaim)
+
+invalidated → archived
+reclaimed   → archived
+accepted_beyond → archived
+```
+
+No backward transitions. No skipped states.
+
+---
+
+## SweepEvent — 3B additions
+
+### Full 3B schema
+
+```json
+{
+  "id": "sw_ev_001",
+  "type": "sweep_high",
+  "time": "2026-03-07T10:15:00Z",
+  "timeframe": "1h",
+  "sweep_price": 1.08731,
+  "linked_liquidity_id": "liq_001",
+
+  "post_sweep_close": 1.08695,
+  "reclaim_time": "2026-03-07T10:30:00Z",
+  "outcome": "reclaimed",
+  "reclaim_window_bars": 1
+}
+```
+
+### New fields
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `post_sweep_close` | `float \| null` | price | Close of the bar that confirmed or failed reclaim |
+| `reclaim_time` | `ISO8601 str \| null` | UTC timestamp | Matches linked LiquidityLevel.reclaim_time |
+| `outcome` | `str \| null` | `reclaimed` \| `accepted_beyond` \| `unresolved` | Mirrors linked level outcome |
+| `reclaim_window_bars` | `int \| null` | positive int | Config value in effect at sweep time |
+
+### Relationship to LiquidityLevel
+
+SweepEvent and its linked LiquidityLevel must remain consistent:
+
+```python
+assert sweep_event.outcome == liquidity_level.outcome
+assert sweep_event.reclaim_time == liquidity_level.reclaim_time
+assert sweep_event.linked_liquidity_id == liquidity_level.id
+```
+
+This consistency must be enforced by the engine, not assumed by consumers.
+
+---
+
+## StructureConfig — 3B additions
+
+Add only these two fields to `StructureConfig`:
+
+```python
+@dataclass
+class StructureConfig:
+    # --- existing 3A fields ---
+    pivot_left_bars: int = 3
+    pivot_right_bars: int = 3
+    eqh_eql_tolerance_eurusd: float = 0.0005
+    eqh_eql_tolerance_xauusd: float = 0.50
+    # ... other 3A fields ...
+
+    # --- 3B additions ---
+    allow_same_bar_reclaim: bool = True
+    reclaim_window_bars: int = 1
+```
+
+Do not add ATR scaling, wick BOS mode, or multi-bar acceptance parameters. Those are future phases.
+
+---
+
+## Structure packet — 3B impact
+
+The top-level packet schema does not change. Existing consumers see enriched liquidity and sweep objects, but the packet envelope is unchanged:
 
 ```json
 {
   "schema_version": "structure_packet_v1",
   "instrument": "EURUSD",
   "timeframe": "1h",
-  "as_of": "2026-03-07T10:00:00Z",
+  "as_of": "2026-03-07T10:15:00Z",
   "build": {
-    "engine_version": "phase_3a",
-    "source": "derived_1h_parquet",
-    "quality_flag": "trusted",
-    "pivot_left_bars": 3,
-    "pivot_right_bars": 3,
-    "bos_confirmation": "close",
-    "eqh_eql_tolerance": 0.00010
+    "engine_version": "phase_3b",
+    "source_archive": "canonical_1m",
+    "quality_flag": "trusted"
   },
-  "swings": [],
-  "events": [],
-  "liquidity": [],
-  "regime": {},
-  "diagnostics": {
-    "bars_processed": 240,
-    "swings_confirmed": 14,
-    "bos_events": 3,
-    "mss_events": 1,
-    "liquidity_levels": 6,
-    "sweep_events": 2
-  }
+  "swings": [...],
+  "events": [...],
+  "liquidity": [...],
+  "regime": {...},
+  "diagnostics": {}
 }
 ```
+
+Note: `engine_version` should update from `phase_3a` to `phase_3b`.
 
 ---
 
-## SwingPoint
+## Internal/external tagging reference
 
-```json
-{
-  "id": "sw_1h_20260306T0800_sh",
-  "type": "swing_high",
-  "price": 1.08642,
-  "anchor_time": "2026-03-06T08:00:00Z",
-  "confirm_time": "2026-03-06T11:00:00Z",
-  "timeframe": "1h",
-  "confirmation_method": "pivot_lr",
-  "left_bars": 3,
-  "right_bars": 3,
-  "strength": 3,
-  "status": "confirmed"
-}
-```
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | Stable unique ID — never changes on rerun |
-| `type` | `swing_high` \| `swing_low` | ICT swing type |
-| `price` | float | Exact high (for swing_high) or low (for swing_low) of anchor bar |
-| `anchor_time` | ISO8601 UTC | Timestamp of the anchor bar |
-| `confirm_time` | ISO8601 UTC | Timestamp of the bar that completed right-side confirmation |
-| `timeframe` | string | Source timeframe |
-| `confirmation_method` | `pivot_lr` | Fixed pivot method in 3A |
-| `left_bars` | int | Left-side bars used for confirmation |
-| `right_bars` | int | Right-side bars used for confirmation |
-| `strength` | int | Number of right bars confirmed (up to `right_bars`) |
-| `status` | `confirmed` \| `broken` \| `superseded` \| `archived` | Lifecycle state |
-
-**Python dataclass:**
+Implement this exactly. Do not expand or interpret beyond these rules:
 
 ```python
-@dataclass
-class SwingPoint:
-    id:                   str
-    type:                 str        # "swing_high" | "swing_low"
-    price:                float
-    anchor_time:          datetime
-    confirm_time:         datetime
-    timeframe:            str
-    confirmation_method:  str = "pivot_lr"
-    left_bars:            int = 3
-    right_bars:           int = 3
-    strength:             int = 3
-    status:               str = "confirmed"
+EXTERNAL_LEVEL_TYPES = {
+    "prior_day_high",
+    "prior_day_low",
+    "prior_week_high",
+    "prior_week_low",
+}
 
-    def to_dict(self) -> dict: ...
+def classify_liquidity_scope(level_type: str, level_price: float,
+                              confirmed_swings: list) -> str:
+    """
+    Returns 'external_liquidity', 'internal_liquidity', or 'unclassified'.
+    Prior day/week H/L are always external.
+    EQH/EQL are classified relative to the most recent confirmed swing of the same side.
+    If no relevant confirmed swing exists, return 'unclassified'.
+    """
+    if level_type in EXTERNAL_LEVEL_TYPES:
+        return "external_liquidity"
+
+    if level_type == "equal_highs":
+        relevant = [s for s in confirmed_swings if s.type == "swing_high"]
+        if not relevant:
+            return "unclassified"
+        most_recent_swing_high = max(relevant, key=lambda s: s.anchor_time)
+        if level_price > most_recent_swing_high.price:
+            return "external_liquidity"
+        return "internal_liquidity"
+
+    if level_type == "equal_lows":
+        relevant = [s for s in confirmed_swings if s.type == "swing_low"]
+        if not relevant:
+            return "unclassified"
+        most_recent_swing_low = min(relevant, key=lambda s: s.anchor_time)
+        if level_price < most_recent_swing_low.price:
+            return "external_liquidity"
+        return "internal_liquidity"
+
+    return "unclassified"
 ```
 
 ---
 
-## StructureEvent (BOS and MSS)
+## Reclaim logic reference
 
-```json
-{
-  "id": "ev_1h_20260307T1000_bos_bull",
-  "type": "bos_bull",
-  "time": "2026-03-07T10:00:00Z",
-  "timeframe": "1h",
-  "reference_swing_id": "sw_1h_20260306T0800_sh",
-  "reference_price": 1.08642,
-  "break_close": 1.08660,
-  "prior_bias": null,
-  "status": "confirmed"
-}
-```
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | string | Stable unique ID |
-| `type` | `bos_bull` \| `bos_bear` \| `mss_bull` \| `mss_bear` | ICT event type |
-| `time` | ISO8601 UTC | Close time of the confirming bar |
-| `timeframe` | string | Source timeframe |
-| `reference_swing_id` | string | ID of the broken swing |
-| `reference_price` | float | Price level of the broken swing |
-| `break_close` | float | Actual close price that confirmed the break |
-| `prior_bias` | `"bullish"` \| `"bearish"` \| null | Required for MSS; null for plain BOS |
-| `status` | `confirmed` \| `superseded` | Usually immutable once confirmed |
-
-**Python dataclass:**
+Implement this exactly:
 
 ```python
-@dataclass
-class StructureEvent:
-    id:                  str
-    type:                str
-    time:                datetime
-    timeframe:           str
-    reference_swing_id:  str
-    reference_price:     float
-    break_close:         float
-    prior_bias:          Optional[str] = None
-    status:              str = "confirmed"
+def detect_reclaim(level_price: float, level_type: str,
+                   sweep_bar_index: int, bars: pd.DataFrame,
+                   config: StructureConfig) -> tuple[str, datetime | None, float | None]:
+    """
+    Returns (outcome, reclaim_time, post_sweep_close).
+    outcome: 'reclaimed' | 'accepted_beyond' | 'unresolved'
+    """
+    is_high_side = level_type in {
+        "prior_day_high", "prior_week_high", "equal_highs"
+    }
 
-    def to_dict(self) -> dict: ...
-```
+    # Window: sweep bar + reclaim_window_bars subsequent bars
+    window_start = sweep_bar_index if config.allow_same_bar_reclaim else sweep_bar_index + 1
+    window_end = sweep_bar_index + config.reclaim_window_bars + 1
 
----
+    window_bars = bars.iloc[window_start:window_end]
 
-## LiquidityLevel
+    if window_bars.empty:
+        return "unresolved", None, None
 
-```json
-{
-  "id": "liq_1h_pdh_20260306T2100",
-  "type": "prior_day_high",
-  "price": 1.08720,
-  "origin_time": "2026-03-06T21:00:00Z",
-  "timeframe": "1h",
-  "status": "active",
-  "swept_time": null,
-  "sweep_type": null
-}
-```
+    for _, bar in window_bars.iterrows():
+        if is_high_side and bar["close"] < level_price:
+            return "reclaimed", bar.name, bar["close"]
+        if not is_high_side and bar["close"] > level_price:
+            return "reclaimed", bar.name, bar["close"]
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | string | Stable unique ID |
-| `type` | `prior_day_high` \| `prior_day_low` \| `prior_week_high` \| `prior_week_low` \| `equal_highs` \| `equal_lows` | ICT level type |
-| `price` | float | Representative price of the level |
-| `origin_time` | ISO8601 UTC | Session open of the originating period |
-| `timeframe` | string | Source timeframe |
-| `status` | `active` \| `swept` \| `invalidated` \| `archived` | Lifecycle state |
-| `swept_time` | ISO8601 UTC \| null | Time of sweep if swept |
-| `sweep_type` | `wick_sweep` \| `close_sweep` \| null | How it was swept |
+    # Window exhausted, check if we have enough bars to resolve
+    if len(bars) > window_end:
+        post_sweep_close = bars.iloc[window_end - 1]["close"]
+        return "accepted_beyond", None, post_sweep_close
 
-**For EQH/EQL, additional fields:**
-
-```json
-{
-  "id": "liq_1h_eqh_20260306T1200",
-  "type": "equal_highs",
-  "price": 1.08645,
-  "origin_time": "2026-03-06T12:00:00Z",
-  "timeframe": "1h",
-  "status": "active",
-  "swept_time": null,
-  "sweep_type": null,
-  "member_swing_ids": ["sw_1h_20260306T0800_sh", "sw_1h_20260306T1200_sh"],
-  "tolerance_used": 0.00010
-}
-```
-
-**Python dataclass:**
-
-```python
-@dataclass
-class LiquidityLevel:
-    id:                str
-    type:              str
-    price:             float
-    origin_time:       datetime
-    timeframe:         str
-    status:            str = "active"
-    swept_time:        Optional[datetime] = None
-    sweep_type:        Optional[str] = None
-    member_swing_ids:  list[str] = field(default_factory=list)
-    tolerance_used:    Optional[float] = None
-
-    def to_dict(self) -> dict: ...
-```
-
----
-
-## SweepEvent
-
-```json
-{
-  "id": "swp_1h_20260307T0900_pdh",
-  "type": "sweep_high",
-  "time": "2026-03-07T09:00:00Z",
-  "timeframe": "1h",
-  "liquidity_level_id": "liq_1h_pdh_20260306T2100",
-  "sweep_price": 1.08735,
-  "sweep_type": "wick_sweep",
-  "status": "confirmed"
-}
-```
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | string | Stable unique ID |
-| `type` | `sweep_high` \| `sweep_low` | Side of liquidity swept |
-| `time` | ISO8601 UTC | Bar time of the sweep |
-| `timeframe` | string | Source timeframe |
-| `liquidity_level_id` | string | ID of the swept level |
-| `sweep_price` | float | Wick high (or low) that traded through the level |
-| `sweep_type` | `wick_sweep` \| `close_sweep` | How price interacted |
-| `status` | `confirmed` | Immutable once confirmed |
-
-**Python dataclass:**
-
-```python
-@dataclass
-class SweepEvent:
-    id:                   str
-    type:                 str
-    time:                 datetime
-    timeframe:            str
-    liquidity_level_id:   str
-    sweep_price:          float
-    sweep_type:           str
-    status:               str = "confirmed"
-
-    def to_dict(self) -> dict: ...
-```
-
----
-
-## RegimeSummary
-
-```json
-{
-  "bias": "bullish",
-  "last_bos_direction": "bullish",
-  "last_mss_direction": null,
-  "trend_state": "trending",
-  "structure_quality": "clean"
-}
-```
-
-| Field | Values | Derivation |
-|---|---|---|
-| `bias` | `bullish` \| `bearish` \| `neutral` | Direction of most recent confirmed BOS |
-| `last_bos_direction` | `bullish` \| `bearish` \| null | Most recent BOS event direction |
-| `last_mss_direction` | `bullish` \| `bearish` \| null | Most recent MSS event direction, else null |
-| `trend_state` | `trending` \| `ranging` \| `unknown` | Last 3 BOS same direction → trending; alternating → ranging |
-| `structure_quality` | `clean` \| `choppy` \| `unknown` | No opposing BOS in last 5 swing cycles → clean |
-
-**Python dataclass:**
-
-```python
-@dataclass
-class RegimeSummary:
-    bias:                 str
-    last_bos_direction:   Optional[str]
-    last_mss_direction:   Optional[str]
-    trend_state:          str
-    structure_quality:    str
-
-    def to_dict(self) -> dict: ...
-```
-
----
-
-## Schema evolution policy
-
-- **Phase 3A**: Core structure objects as defined above
-- **Phase 3B**: `LiquidityLevel` gains `reclaim_time`, `acceptance_confirmed` fields; `SweepEvent` gains `post_sweep_close`; ATR-scaled tolerance added to config
-- **Phase 3C**: New top-level `imbalance` array added to packet; `FVGZone` object introduced
-- **Phase 3D**: Cross-timeframe synthesis fields; Officer integration fields; Parquet output
-
-**Never remove or rename a field. Adding fields is always safe.**
-
----
-
-## Output file naming
-
-```
-structure/output/{instrument_lower}_{tf}_structure.json
-
-eurusd_15m_structure.json
-eurusd_1h_structure.json
-eurusd_4h_structure.json
-xauusd_15m_structure.json
-xauusd_1h_structure.json
-xauusd_4h_structure.json
+    return "unresolved", None, None
 ```

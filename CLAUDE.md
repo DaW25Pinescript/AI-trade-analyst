@@ -1,18 +1,12 @@
-# CLAUDE.md — Structure Engine: Phase 3A
+# CLAUDE.md — Structure Engine: Phase 3B
 
 ## Role
 
 You are a principal Python/data engineer working inside the **AI Trade Analyst** repository.
 
-Your job in this task is to build the **Phase 3A Structure Engine** — a deterministic, ICT-native computation layer that transforms trusted canonical OHLCV into explicit structural state objects.
+Your job in this task is to extend the Phase 3A Structure Engine with liquidity refinement. Phase 3A is complete and merged. You are extending it narrowly — not rewriting it.
 
 Read this file first. Then read the supporting spec files in order before writing any code.
-
----
-
-## One-paragraph contract
-
-Phase 3A introduces a deterministic ICT-style Structure Engine that transforms trusted canonical OHLCV into explicit structural state objects — confirmed swings, BOS, MSS, liquidity references, EQH/EQL, sweeps, and regime summaries. Phase 3A is confirmed-only, excludes FVG/imbalance logic, and does not modify the Officer layer. Its purpose is to make market structure replayable, testable, and consumable by downstream agents as numeric state rather than visual inference.
 
 ---
 
@@ -20,109 +14,79 @@ Phase 3A introduces a deterministic ICT-style Structure Engine that transforms t
 
 Repo: `https://github.com/DaW25Pinescript/AI-trade-analyst`
 
-**What already exists (do not touch):**
-- `market_data_officer/feed/` — validated feed pipeline, EURUSD + XAUUSD
-- `market_data_officer/officer/` — Market Data Officer, emitting trusted market packets
-- `market_data/canonical/` — trusted 1m Parquet archives
-- `market_data/derived/` — validated derived timeframe Parquet/CSV
-- `market_data/packages/latest/` — hot package CSVs and JSON manifests
+**Already complete — do not touch:**
+- `market_data_officer/feed/` — Phase 1A–1D feed pipeline
+- `market_data_officer/officer/` — Phase 2 Market Data Officer
+- `market_data_officer/structure/schemas.py` — SwingPoint, StructureEvent, LiquidityLevel, SweepEvent, RegimeSummary, StructurePacket
+- `market_data_officer/structure/config.py` — StructureConfig
+- `market_data_officer/structure/swings.py` — fixed L/R pivot confirmation
+- `market_data_officer/structure/events.py` — BOS/MSS close-confirmed
+- `market_data_officer/structure/liquidity.py` — prior H/L, EQH/EQL, sweep detection
+- `market_data_officer/structure/regime.py` — bias, trend state, structure quality
+- `market_data_officer/structure/io.py` — bar loading, atomic JSON writes
+- `market_data_officer/structure/engine.py` — orchestration, `run_engine()`
+- `run_structure.py` — CLI entry point
 
-**What you are building:**
-- `market_data_officer/structure/` — the Structure Engine
-- `market_data_officer/run_structure.py` — Structure Engine CLI entry point
+**What you are extending in Phase 3B:**
+- `structure/schemas.py` — add new fields to LiquidityLevel and SweepEvent
+- `structure/liquidity.py` — add reclaim detection, post-sweep classification, internal/external tagging, lifecycle refinement
+- `structure/config.py` — add narrow 3B config surface
+- `tests/` — add 3B test groups
+
+---
+
+## Phase 3A decisions that are locked — do not reopen
+
+| Decision | Value |
+|---|---|
+| Swing confirmation | Fixed left/right pivot only |
+| BOS/MSS confirmation | Close beyond prior swing only |
+| EQH/EQL tolerance | Fixed per-instrument value in config |
+| Active timeframes | 15m, 1h, 4h |
+| Output format | JSON only |
+| FVG/imbalance | Not in scope |
+| Cross-timeframe synthesis | Not in scope |
+| Officer integration | Not in scope |
+| Parquet output | Deferred to Phase 3D |
+
+Any change to these is a scope violation.
 
 ---
 
 ## File reading order
 
-Before writing any code, read these files in order:
+Before writing any code, read in order:
 
 1. `CLAUDE.md` ← you are here
-2. `OBJECTIVE.md` — what 3A must deliver, scope boundaries, non-goals
-3. `CONSTRAINTS.md` — hard rules, logic contracts, implementation standards
-4. `CONTRACTS.md` — canonical schemas for all structure objects and the packet
-5. `ACCEPTANCE_TESTS.md` — exit criteria, 7 test groups, pass/fail required
+2. `OBJECTIVE.md` — what 3B adds and why
+3. `CONSTRAINTS.md` — hard rules, schema evolution policy, 3B config surface
+4. `CONTRACTS.md` — exact field additions to LiquidityLevel and SweepEvent
+5. `ACCEPTANCE_TESTS.md` — 7 test groups you must pass
 
 ---
 
 ## Repo placement
 
+No new top-level modules. Extensions only:
+
 ```
 market_data_officer/
-  feed/                        ← DO NOT TOUCH
-  officer/                     ← DO NOT TOUCH
   structure/
-    __init__.py
-    schemas.py                 ← typed dataclasses for all structure objects
-    engine.py                  ← top-level orchestration
-    swings.py                  ← confirmed swing detection
-    events.py                  ← BOS / MSS detection
-    liquidity.py               ← prior highs/lows, EQH/EQL, sweeps
-    regime.py                  ← objective regime summary
-    io.py                      ← load bars, write JSON packets
-    config.py                  ← engine configuration surface
+    schemas.py       ← extend LiquidityLevel + SweepEvent fields
+    config.py        ← add reclaim_window_bars, allow_same_bar_reclaim
+    liquidity.py     ← add reclaim, classification, tagging, lifecycle
   tests/
-    test_structure_swings.py
-    test_structure_events.py
-    test_structure_liquidity.py
-    test_structure_regime.py
-    test_structure_replay.py
-    test_structure_eurusd.py
-    test_structure_xauusd.py
-  run_structure.py             ← NEW: Structure Engine CLI
+    test_structure_swings.py      ← existing, must still pass
+    test_structure_events.py      ← existing, must still pass
+    test_structure_liquidity.py   ← extend with 3B groups
+    test_structure_regime.py      ← existing, must still pass
+    test_structure_replay.py      ← existing, must still pass
+    test_structure_eurusd.py      ← extend with 3B coverage
+    test_structure_xauusd.py      ← extend with 3B coverage
 ```
-
----
-
-## Build order
-
-Build modules in this sequence. Do not jump ahead:
-
-1. `schemas.py` — stable primitives first
-2. `config.py` — configuration surface
-3. `swings.py` — confirmed swing detection
-4. `events.py` — BOS / MSS using confirmed swings
-5. `liquidity.py` — prior levels, EQH/EQL, sweeps
-6. `regime.py` — objective summary from above
-7. `io.py` + `engine.py` — orchestration and JSON output
-8. Tests per module, then end-to-end
-
-This order gives you stable, tested primitives before packaging. Never build the orchestrator before the primitives it depends on are tested.
-
----
-
-## Active timeframes for 3A
-
-Structure is computed on: **15m, 1h, 4h**
-
-- 1m excluded: too noisy for confirmed structure
-- 5m excluded: deferred to 3B
-- 1d excluded: insufficient bars for meaningful swing confirmation in rolling windows
-
-Each timeframe computes structure **independently** from its own derived bars. No cross-timeframe synthesis in 3A.
-
----
-
-## Output
-
-One JSON packet per instrument per timeframe written to:
-
-```
-market_data_officer/structure/output/
-  eurusd_15m_structure.json
-  eurusd_1h_structure.json
-  eurusd_4h_structure.json
-  xauusd_15m_structure.json
-  xauusd_1h_structure.json
-  xauusd_4h_structure.json
-```
-
-Parquet output is deferred to Phase 3D once the schema stabilizes across 3A/3B/3C.
 
 ---
 
 ## When you are done
 
-Run every criterion in `ACCEPTANCE_TESTS.md` across all 7 test groups for both EURUSD and XAUUSD. Report pass/fail per group before declaring Phase 3A complete.
-
-Do not implement FVG, imbalance, order blocks, or Officer integration. Do not modify any existing module outside `structure/`.
+Run all test groups in `ACCEPTANCE_TESTS.md` — both 3B-specific and the full 3A regression suite. Report pass/fail per group. Do not declare Phase 3B complete until both EURUSD and XAUUSD pass all groups and the Officer and feed modules are confirmed untouched.

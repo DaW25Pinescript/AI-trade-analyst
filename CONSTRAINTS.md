@@ -1,269 +1,128 @@
-# CONSTRAINTS.md — Phase 3A Hard Rules and Logic Contracts
+# CONSTRAINTS.md — Phase 3B Hard Rules
 
-## Non-negotiable rules
+## Locked 3A decisions — do not reopen
+
+These are immutable. Any change is a scope violation:
+
+| Rule | Value |
+|---|---|
+| Swing confirmation method | Fixed left/right pivot only |
+| BOS/MSS confirmation | Close beyond prior swing only |
+| EQH/EQL tolerance | Fixed per-instrument value in config |
+| Active timeframes | 15m, 1h, 4h |
+| Output format | JSON only, pretty-printed, UTF-8, atomic writes |
+| FVG / imbalance | Not in scope until Phase 3C |
+| Cross-timeframe synthesis | Not in scope until Phase 3D |
+| Officer integration | Not in scope until Phase 3D |
+| Parquet structure output | Not in scope until Phase 3D |
+| Feed pipeline | Do not touch |
 
 ---
 
-### RULE 1 — No lookahead leakage
+## Phase 3B hard rules
 
-This is the most important rule in the entire Structure Engine.
+### RULE 1 — Schema additions only
 
-A confirmed swing, BOS, MSS, or sweep must never appear before its confirmation conditions are satisfied on already-closed bars.
+Add new fields to `LiquidityLevel` and `SweepEvent`. Do not rename, remove, or reorder existing 3A fields. Existing JSON consumers must not break.
+
+### RULE 2 — Reclaim logic uses close confirmation only
+
+Reclaim is confirmed by a close through the level — not a wick, not a touch, not a midpoint. This mirrors the 3A BOS rule. Consistency matters.
 
 ```python
-# Correct — confirmation uses bars[i + right_bars] which is already closed
-if all(bars[i].high > bars[j].high for j in range(i - left_bars, i)) \
-   and all(bars[i].high > bars[j].high for j in range(i + 1, i + right_bars + 1)):
-    confirm_time = bars[i + right_bars].timestamp  # confirmation is the close of the right-side bar
-
-# Wrong — inferring confirmation before right_bars are closed
-confirm_time = bars[i].timestamp  # lookahead — confirmation not yet possible
+# High-side reclaim: close < level_price
+# Low-side reclaim: close > level_price
 ```
 
-Test this explicitly with fixture datasets. See `ACCEPTANCE_TESTS.md` Group A.
+### RULE 3 — Lifecycle transitions are one-directional
 
----
-
-### RULE 2 — Close confirmation for BOS only
-
-BOS is confirmed **only** when a candle **closes** beyond the reference swing price.
+No backward transitions. Once `reclaimed` or `accepted_beyond`, the outcome is immutable. Reruns must not alter resolved outcomes.
 
 ```python
-# Correct
-if bar.close > swing_high.price:
-    emit_bos_bull(...)
-
-# Wrong — wick breach is not a BOS trigger in 3A
-if bar.high > swing_high.price:
-    emit_bos_bull(...)
+TERMINAL_STATES = {"reclaimed", "accepted_beyond", "invalidated"}
+# A level in a terminal state must not transition to any other state
 ```
 
-Wick interaction in 3A is reserved exclusively for sweep detection.
+### RULE 4 — SweepEvent and LiquidityLevel must stay consistent
 
----
-
-### RULE 3 — Append-safe reruns, no retroactive mutation
-
-When new bars are appended and the engine reruns:
-
-- Previously confirmed swings, events, and liquidity objects must not change
-- New confirmed objects may be added for newly confirmed bars only
-- The only allowed status transitions are additive: `active → swept`, `active → invalidated`
-- No confirmed object's `price`, `anchor_time`, `confirm_time`, or `id` may change on rerun
+After any reclaim/classification update, verify:
 
 ```python
-# Correct — new bars may produce new confirmed swings
-existing_ids = {sw.id for sw in prior_swings}
-new_swings = [sw for sw in recomputed if sw.id not in existing_ids]
-
-# Wrong — replacing or mutating existing confirmed objects
-prior_swings[3] = recomputed[3]  # mutation
+assert sweep.outcome == level.outcome
+assert sweep.reclaim_time == level.reclaim_time
 ```
 
----
+The engine enforces this. Consumers should not need to reconcile them.
 
-### RULE 4 — Timeframe isolation
+### RULE 5 — `unclassified` is a valid output
 
-Each timeframe (15m, 1h, 4h) computes its own structure independently from its own derived bars.
+Do not force a `liquidity_scope` value when the deterministic rule cannot resolve it. Returning `unclassified` is correct behaviour. Invented heuristics that produce wrong tags are worse than honest `unclassified`.
 
-No cross-timeframe logic in 3A. No "15m BOS confirmed by 1h" synthesis. No HTF bias filtering LTF swings. That is Phase 3D.
+### RULE 6 — Config surface stays narrow
 
+Add only:
 ```python
-# Correct
-for tf in ["15m", "1h", "4h"]:
-    bars = load_bars(instrument, tf)
-    packet = engine.compute(bars, tf, config)
-    write_packet(packet)
-
-# Wrong — passing HTF context into LTF computation
-bars_15m = load_bars(instrument, "15m")
-bars_1h = load_bars(instrument, "1h")
-packet = engine.compute(bars_15m, context=bars_1h)  # cross-TF synthesis not in 3A
+allow_same_bar_reclaim: bool = True
+reclaim_window_bars: int = 1
 ```
 
----
+Do not add:
+- ATR-scaled tolerance
+- ATR-scaled pivots
+- wick BOS mode
+- multi-bar acceptance windows beyond `reclaim_window_bars`
+- any other Phase 3C/3D parameters
 
-### RULE 5 — Instrument neutrality
+### RULE 7 — Replay safety
 
-The engine must work identically for EURUSD and XAUUSD. No instrument-specific logic inside `swings.py`, `events.py`, `liquidity.py`, or `regime.py`.
+Appending new bars may resolve previously `unresolved` outcomes. It must not change already-resolved outcomes. Test this explicitly.
 
-Instrument-specific values (EQH/EQL tolerance, session calendar) belong in `config.py` only.
+### RULE 8 — `engine_version` must update
 
-```python
-# Correct — tolerance from config, not hardcoded
-tolerance = config.eqh_eql_tolerance[instrument]
+In the build metadata block of every output packet:
 
-# Wrong — instrument check inside logic module
-if instrument == "XAUUSD":
-    tolerance = 0.50
+```json
+"build": {
+  "engine_version": "phase_3b",
+  ...
+}
 ```
 
----
+This allows downstream consumers to know which logic version produced the packet.
 
-### RULE 6 — Do not touch Officer or feed modules
+### RULE 9 — Officer and feed are untouched
 
-The Structure Engine is a separate lane. It reads from `market_data/derived/` (same source as the Officer) but does not call Officer functions, modify Officer contracts, or alter feed pipeline code.
+Run this check before declaring complete:
 
-If the Officer needs updating to reference structure packets later, that is Phase 3D.
-
----
-
-### RULE 7 — IDs must be stable and unique
-
-Every `SwingPoint`, `StructureEvent`, `LiquidityLevel`, and `SweepEvent` must have a stable, unique ID that does not change on rerun.
-
-Recommended ID scheme:
-```python
-# SwingPoint
-f"sw_{timeframe}_{anchor_time_compact}_{type_abbrev}"
-# e.g. "sw_1h_20260306T0800_sh"
-
-# StructureEvent
-f"ev_{timeframe}_{event_time_compact}_{type_abbrev}"
-# e.g. "ev_15m_20260307T1015_bos_bull"
-
-# LiquidityLevel
-f"liq_{timeframe}_{type_abbrev}_{origin_time_compact}"
-# e.g. "liq_1h_pdh_20260306T2100"
+```bash
+git diff --name-only HEAD | grep -E "officer/|feed/"
+# Must return no matches
 ```
 
-IDs must be deterministic — same bar data always produces same IDs.
+### RULE 10 — Both instruments must pass
+
+All 3B test groups must pass for both EURUSD and XAUUSD. Passing one instrument only is not acceptable.
 
 ---
 
-### RULE 8 — JSON output is human-readable
+## What "deterministic" means in 3B context
 
-Structure packets are JSON only in 3A. They must be:
+For reclaim and classification logic:
 
-- Pretty-printed (`indent=2`)
-- UTF-8 encoded
-- Written atomically (write to temp file, rename — avoid partial writes)
-- Named predictably: `{instrument_lower}_{tf}_structure.json`
+- Same bars → same `liquidity_scope` tags, same `outcome`, same `reclaim_time`
+- The config values (`allow_same_bar_reclaim`, `reclaim_window_bars`) are the only variables
+- No random seeds, no timestamp-dependent branching, no external lookups
 
-```python
-import json, tempfile, os
-
-def write_packet_atomic(packet: dict, path: str) -> None:
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(packet, f, indent=2, default=str)
-    os.replace(tmp, path)
-```
+Test this with hash-stable packet comparison on fixed fixture datasets.
 
 ---
 
-## Module boundary map
+## Common failure modes to avoid
 
-| Module | Owns | Must not touch |
+| Failure | How it manifests | Guard |
 |---|---|---|
-| `schemas.py` | Dataclass definitions, `to_dict()` | Computation logic, file I/O |
-| `config.py` | All configurable parameters | Computation logic |
-| `swings.py` | Confirmed pivot swing detection | Events, liquidity, regime, I/O |
-| `events.py` | BOS and MSS detection from confirmed swings | Swing computation, liquidity, I/O |
-| `liquidity.py` | Prior levels, EQH/EQL, sweep events | Swing computation, BOS logic |
-| `regime.py` | Objective summary from swings + events | Any computation from raw bars |
-| `io.py` | Load derived bars, write JSON packets | Computation logic |
-| `engine.py` | Orchestrate all modules | Implement any module's logic directly |
-
----
-
-## Configuration surface — keep narrow in 3A
-
-Expose only these parameters in `config.py`:
-
-```python
-@dataclass
-class StructureConfig:
-    # Pivot confirmation
-    pivot_left_bars:  int   = 3
-    pivot_right_bars: int   = 3
-
-    # BOS confirmation
-    bos_confirmation: str   = "close"   # "close" only in 3A
-
-    # EQH/EQL tolerance — fixed pip/point value per instrument
-    eqh_eql_tolerance: dict = field(default_factory=lambda: {
-        "EURUSD": 0.00010,   # 1 pip
-        "XAUUSD": 0.50,      # 50 cents
-    })
-
-    # Enabled timeframes
-    timeframes: list = field(default_factory=lambda: ["15m", "1h", "4h"])
-
-    # Session calendar for prior high/low derivation (UTC hour of day session open)
-    day_session_open_utc: int  = 21    # Sunday 21:00 UTC = start of FX week
-    week_session_open_day: int = 6     # Sunday = 6 (ISO weekday)
-```
-
-Do not expose more knobs than this in 3A. Configuration sprawl before the logic is proven creates untestable combinations.
-
----
-
-## Swing lifecycle
-
-```
-detected (internal only, not emitted)
-    ↓
-confirmed  ← emitted in SwingPoint object
-    ↓
-broken     ← status update when BOS fires through this swing
-    ↓
-superseded ← status update when a higher/lower swing replaces it
-    ↓
-archived   ← retained in packet history but no longer active
-```
-
-Status transitions are additive only. A `confirmed` swing never goes back to `detected`.
-
----
-
-## Liquidity lifecycle
-
-```
-active      ← emitted when level is identified
-    ↓
-swept       ← price trades through (wick or close)
-    ↓
-invalidated ← level context no longer valid (e.g. far exceeded, period expired)
-    ↓
-archived    ← retained in packet history
-```
-
----
-
-## What "deterministic" means in this context
-
-Given the same set of input bars:
-
-1. The same `SwingPoint` objects are produced with the same IDs, prices, and timestamps
-2. The same `StructureEvent` objects are produced
-3. The same `LiquidityLevel` objects are produced
-4. The JSON packet is logically identical (field values match, order may vary)
-
-This must hold across:
-- Multiple runs on the same machine
-- Runs after adding new bars (existing confirmed objects unchanged)
-- Runs on EURUSD vs XAUUSD (same logic, different config values)
-
----
-
-## Code quality standards
-
-- Every public function has a docstring
-- Type hints on all function signatures
-- Named constants for all threshold values — no magic numbers
-- Raise `ValueError` for invalid bar data inputs
-- Raise `RuntimeError` for internal state consistency violations
-- `print()` acceptable for CLI progress; no logging framework required in 3A
-- No ML libraries, no HTTP clients, no task frameworks
-
----
-
-## Dependencies
-
-No new dependencies beyond what exists. Phase 3A requires only:
-
-```
-pandas>=2.0
-pyarrow>=14.0   # for reading derived Parquet inputs
-```
+| Backward transition | `accepted_beyond` → `reclaimed` on rerun | Check terminal state before any update |
+| Inconsistent sweep/level outcome | `sweep.outcome != level.outcome` | Enforce in engine after every classification update |
+| False reclaim via wick | Wick crosses level but close does not | Use `bar["close"]` only, never `bar["high"]` or `bar["low"]` for reclaim |
+| EQH/EQL over-classification | Forcing internal/external when no relevant swing exists | Return `unclassified` when `relevant` list is empty |
+| Unresolved leaking into history | Old unresolved outcomes not resolved as new bars arrive | Process unresolved levels on every engine run with available bars |
