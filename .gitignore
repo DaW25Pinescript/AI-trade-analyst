@@ -155,5 +155,8 @@ ai_analyst/ai_analyst/
 # MRO — runtime artefacts (SQLite outcome DB is not committed)
 macro_risk_officer/data/*.db
 
+# LLM Router — local config (copy from llm_routing.example.yaml)
+config/llm_routing.yaml
+
 # Python test cache
 .pytest_cache/

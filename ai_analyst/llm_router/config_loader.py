@@ -1,0 +1,78 @@
+"""Load and validate llm_routing.yaml configuration.
+
+Lazy-loads on first call; caches the result for the process lifetime.
+Supports CLAUDE_PROXY_BASE_URL env var override for the proxy base URL.
+"""
+import os
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from .task_types import ALL_TASK_TYPES
+
+_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "llm_routing.yaml"
+_EXAMPLE_PATH = _CONFIG_PATH.with_name("llm_routing.example.yaml")
+
+_cached_config: dict[str, Any] | None = None
+
+
+class ConfigurationError(Exception):
+    """Raised when llm_routing.yaml is missing or malformed."""
+
+
+def _validate(config: dict[str, Any]) -> None:
+    """Validate required keys in the loaded config."""
+    if "llm_backend" not in config:
+        raise ConfigurationError("llm_routing.yaml missing required key: 'llm_backend'")
+    backend = config["llm_backend"]
+    for key in ("mode", "base_url", "api_key"):
+        if key not in backend:
+            raise ConfigurationError(f"llm_backend missing required key: '{key}'")
+
+    if "task_routing" not in config:
+        raise ConfigurationError("llm_routing.yaml missing required key: 'task_routing'")
+    routing = config["task_routing"]
+    for task_type in ALL_TASK_TYPES:
+        if task_type not in routing:
+            raise ConfigurationError(f"task_routing missing entry for task type: '{task_type}'")
+        entry = routing[task_type]
+        for key in ("primary_model", "fallback_model", "retries"):
+            if key not in entry:
+                raise ConfigurationError(
+                    f"task_routing.{task_type} missing required key: '{key}'"
+                )
+
+
+def load_config(*, force_reload: bool = False) -> dict[str, Any]:
+    """Load and cache the LLM routing configuration.
+
+    Tries config/llm_routing.yaml first, falls back to
+    config/llm_routing.example.yaml if the primary file does not exist.
+    """
+    global _cached_config
+    if _cached_config is not None and not force_reload:
+        return _cached_config
+
+    path = _CONFIG_PATH if _CONFIG_PATH.exists() else _EXAMPLE_PATH
+    if not path.exists():
+        raise ConfigurationError(
+            f"Neither {_CONFIG_PATH} nor {_EXAMPLE_PATH} found. "
+            "Copy config/llm_routing.example.yaml to config/llm_routing.yaml and customise."
+        )
+
+    with open(path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    if not isinstance(config, dict):
+        raise ConfigurationError(f"llm_routing config at {path} is not a valid YAML mapping.")
+
+    _validate(config)
+
+    # Apply env var override for base URL
+    env_base_url = os.getenv("CLAUDE_PROXY_BASE_URL")
+    if env_base_url:
+        config["llm_backend"]["base_url"] = env_base_url
+
+    _cached_config = config
+    return _cached_config

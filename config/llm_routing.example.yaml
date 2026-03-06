@@ -1,0 +1,30 @@
+llm_backend:
+  mode: local_claude_proxy
+  base_url: "http://127.0.0.1:8317/v1"
+  api_key: "not-needed"
+
+task_routing:
+  analyst_reasoning:
+    primary_model: "claude-sonnet-4-5-20250929"
+    fallback_model: "claude-opus-4-20250514"
+    retries: 1
+
+  chart_extract:
+    primary_model: "claude-opus-4-20250514"
+    fallback_model: "claude-sonnet-4-5-20250929"
+    retries: 1
+
+  chart_interpret:
+    primary_model: "claude-sonnet-4-5-20250929"
+    fallback_model: "claude-opus-4-20250514"
+    retries: 1
+
+  arbiter_decision:
+    primary_model: "claude-sonnet-4-5-20250929"
+    fallback_model: "claude-opus-4-20250514"
+    retries: 1
+
+  json_repair:
+    primary_model: "claude-sonnet-4-5-20250929"
+    fallback_model: "claude-opus-4-20250514"
+    retries: 1
