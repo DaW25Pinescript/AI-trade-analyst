@@ -14,6 +14,10 @@ Usage:
 
     # Or use the fallback-aware helper:
     response = await router.call_with_fallback("chart_extract", messages=[...])
+
+    # Or load the analyst roster:
+    roster = router.get_analyst_roster()
+    # roster = [{"model": "gpt-4o", "persona": PersonaType.DEFAULT_ANALYST}, ...]
 """
 import logging
 from typing import Any
@@ -22,6 +26,15 @@ from .config_loader import load_config
 from .task_types import ALL_TASK_TYPES
 
 logger = logging.getLogger(__name__)
+
+# Hardcoded default roster — used when analyst_roster is absent from YAML.
+# Keeps backwards compatibility with configs that predate Phase 9.
+_DEFAULT_ANALYST_ROSTER: list[dict[str, str]] = [
+    {"model": "gpt-4o", "persona": "default_analyst"},
+    {"model": "claude-sonnet-4-6", "persona": "risk_officer"},
+    {"model": "gemini/gemini-1.5-pro", "persona": "prosecutor"},
+    {"model": "xai/grok-vision-beta", "persona": "ict_purist"},
+]
 
 
 def resolve(task_type: str) -> dict[str, Any]:
@@ -56,6 +69,32 @@ def resolve(task_type: str) -> dict[str, Any]:
     )
 
     return route
+
+
+def get_analyst_roster() -> list[dict]:
+    """Load the analyst roster from llm_routing.yaml.
+
+    Returns a list of dicts with 'model' (str) and 'persona' (PersonaType).
+    Falls back to _DEFAULT_ANALYST_ROSTER if the YAML has no analyst_roster key.
+    """
+    from ..models.persona import PersonaType
+
+    config = load_config()
+    raw_roster = config.get("analyst_roster", _DEFAULT_ANALYST_ROSTER)
+
+    roster: list[dict] = []
+    for entry in raw_roster:
+        roster.append({
+            "model": entry["model"],
+            "persona": PersonaType(entry["persona"]),
+        })
+
+    logger.info(
+        "[router] analyst_roster loaded: %d analysts — %s",
+        len(roster),
+        [f"{r['persona'].value}={r['model']}" for r in roster],
+    )
+    return roster
 
 
 async def call_with_fallback(task_type: str, messages: list, **kwargs) -> Any:

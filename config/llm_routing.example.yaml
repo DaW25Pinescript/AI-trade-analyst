@@ -28,3 +28,16 @@ task_routing:
     primary_model: "claude-sonnet-4-5-20250929"
     fallback_model: "claude-opus-4-20250514"
     retries: 1
+
+# Analyst roster — maps persona to the LLM model used for fan-out analysis.
+# Each entry defines the model identifier (routed through LiteLLM) and the
+# persona type constant from ai_analyst.models.persona.PersonaType.
+analyst_roster:
+  - model: "gpt-4o"
+    persona: "default_analyst"
+  - model: "claude-sonnet-4-6"
+    persona: "risk_officer"
+  - model: "gemini/gemini-1.5-pro"
+    persona: "prosecutor"
+  - model: "xai/grok-vision-beta"
+    persona: "ict_purist"

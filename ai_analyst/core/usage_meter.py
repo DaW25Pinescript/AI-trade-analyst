@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 from ..models.llm_usage import LLMUsageEntry
 from .claude_code_api_client import chat_completions
 from .is_text_only import is_text_only
-from .llm_client import acompletion_with_fallback, acompletion_with_retry
+from .llm_client import acompletion_with_retry
 
 
 def append_usage(run_dir: Path, entry: LLMUsageEntry) -> None:
@@ -78,30 +78,22 @@ async def acompletion_metered(
     started = perf_counter()
     ts_utc = datetime.now(timezone.utc).isoformat()
 
-    # Phase 7 — use fallback routing when ENABLE_FALLBACK_ROUTING is set
-    use_fallback = os.getenv("ENABLE_FALLBACK_ROUTING", "").strip().lower() in ("1", "true", "yes")
-
     try:
         if acompletion_func is None:
             from litellm import acompletion
 
             acompletion_func = acompletion
 
-        if use_fallback:
-            response, attempts, actual_model = await acompletion_with_fallback(
-                acompletion_func,
-                model=model,
-                messages=messages,
-                **kwargs,
-            )
-        else:
-            response, attempts = await acompletion_with_retry(
-                acompletion_func,
-                model=model,
-                messages=messages,
-                **kwargs,
-            )
-            actual_model = model
+        # Unified fallback: acompletion_with_retry handles retries here.
+        # Task-level fallback (primary → fallback model) is handled upstream
+        # by router.call_with_fallback() — a single fallback authority.
+        response, attempts = await acompletion_with_retry(
+            acompletion_func,
+            model=model,
+            messages=messages,
+            **kwargs,
+        )
+        actual_model = model
 
         latency_ms = int((perf_counter() - started) * 1000)
         prompt_tokens, completion_tokens, total_tokens = extract_usage_tokens(response)

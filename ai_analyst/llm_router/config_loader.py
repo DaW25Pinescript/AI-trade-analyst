@@ -3,6 +3,7 @@
 Lazy-loads on first call; caches the result for the process lifetime.
 Supports CLAUDE_PROXY_BASE_URL env var override for the proxy base URL.
 """
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,8 @@ from typing import Any
 import yaml
 
 from .task_types import ALL_TASK_TYPES
+
+logger = logging.getLogger(__name__)
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "llm_routing.yaml"
 _EXAMPLE_PATH = _CONFIG_PATH.with_name("llm_routing.example.yaml")
@@ -42,6 +45,34 @@ def _validate(config: dict[str, Any]) -> None:
                 raise ConfigurationError(
                     f"task_routing.{task_type} missing required key: '{key}'"
                 )
+
+    # Validate analyst_roster if present
+    if "analyst_roster" in config:
+        _validate_analyst_roster(config["analyst_roster"])
+
+
+def _validate_analyst_roster(roster: Any) -> None:
+    """Validate analyst_roster entries have required keys and valid persona values."""
+    if not isinstance(roster, list):
+        raise ConfigurationError("analyst_roster must be a list")
+
+    # Import here to avoid circular imports at module level
+    from ..models.persona import PersonaType
+
+    valid_personas = {p.value for p in PersonaType}
+
+    for i, entry in enumerate(roster):
+        if not isinstance(entry, dict):
+            raise ConfigurationError(f"analyst_roster[{i}] must be a mapping")
+        if "model" not in entry:
+            raise ConfigurationError(f"analyst_roster[{i}] missing required key: 'model'")
+        if "persona" not in entry:
+            raise ConfigurationError(f"analyst_roster[{i}] missing required key: 'persona'")
+        if entry["persona"] not in valid_personas:
+            raise ConfigurationError(
+                f"analyst_roster[{i}] has invalid persona '{entry['persona']}'. "
+                f"Valid: {sorted(valid_personas)}"
+            )
 
 
 def load_config(*, force_reload: bool = False) -> dict[str, Any]:
