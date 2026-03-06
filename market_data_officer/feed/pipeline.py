@@ -19,6 +19,7 @@ from .config import (
 from .decode import decode_dukascopy_ticks
 from .export import export_hot_packages
 from .fetch import fetch_bi5
+from .gaps import generate_gap_report, save_gap_report
 from .resample import resample_from_1m
 from .validate import validate_ohlcv
 
@@ -26,6 +27,16 @@ from .validate import validate_ohlcv
 def _load_existing_canonical(symbol: str) -> Optional[pd.DataFrame]:
     """Load existing canonical parquet if it exists."""
     path = CANONICAL_DIR / f"{symbol}_1m.parquet"
+    if path.exists():
+        df = pd.read_parquet(path)
+        df.index = pd.to_datetime(df.index, utc=True)
+        return df
+    return None
+
+
+def _load_existing_derived(symbol: str, tf_label: str) -> Optional[pd.DataFrame]:
+    """Load existing derived parquet if it exists."""
+    path = DERIVED_DIR / f"{symbol}_{tf_label}.parquet"
     if path.exists():
         df = pd.read_parquet(path)
         df.index = pd.to_datetime(df.index, utc=True)
@@ -55,27 +66,126 @@ def _save_derived(df: pd.DataFrame, symbol: str, tf_label: str) -> None:
     print(f"[pipeline] saved derived {tf_label}: {parquet_path} ({len(df)} bars)")
 
 
+def _derive_affected_window(
+    canonical_ohlcv: pd.DataFrame,
+    symbol: str,
+    rule: str,
+    tf_label: str,
+    new_data_start: Optional[pd.Timestamp],
+) -> Optional[pd.DataFrame]:
+    """Derive a single higher timeframe, regenerating only the affected window.
+
+    If new_data_start is provided and existing derived data exists, only
+    resample the canonical slice from the affected boundary onwards, then
+    merge with the unaffected prefix of existing derived data.
+
+    Returns the full derived DataFrame or None if empty.
+    """
+    if canonical_ohlcv.empty:
+        return None
+
+    existing_derived = _load_existing_derived(symbol, tf_label)
+
+    # If no new data or no existing derived, do a full resample
+    if new_data_start is None or existing_derived is None or existing_derived.empty:
+        derived = resample_from_1m(canonical_ohlcv, rule)
+        return derived if not derived.empty else None
+
+    # Find the derived bar boundary that contains new_data_start.
+    # Resample a tiny slice to find where the boundary falls.
+    boundary = _find_resample_boundary(new_data_start, rule)
+
+    # Split existing derived into unaffected prefix and affected suffix
+    unaffected = existing_derived[existing_derived.index < boundary]
+
+    # Resample only the canonical data from the boundary onwards
+    affected_canonical = canonical_ohlcv[canonical_ohlcv.index >= boundary]
+    if affected_canonical.empty:
+        return existing_derived
+
+    new_derived = resample_from_1m(affected_canonical, rule)
+    if new_derived.empty:
+        return existing_derived if not existing_derived.empty else None
+
+    # Merge: unaffected prefix + newly resampled suffix
+    if unaffected.empty:
+        derived = new_derived
+    else:
+        derived = pd.concat([unaffected, new_derived])
+        derived = derived[~derived.index.duplicated(keep="last")]
+        derived = derived.sort_index()
+
+    return derived if not derived.empty else None
+
+
+def _find_resample_boundary(ts: pd.Timestamp, rule: str) -> pd.Timestamp:
+    """Find the start of the resample period containing ts.
+
+    For example, if ts is 14:23 and rule is "1h", returns 14:00.
+    """
+    # Strip tzinfo to avoid pandas "Cannot pass datetime with tzinfo with tz param"
+    dt = ts.to_pydatetime().replace(tzinfo=None)
+
+    if rule == "5min":
+        minute = (dt.minute // 5) * 5
+        result = dt.replace(minute=minute, second=0, microsecond=0)
+    elif rule == "15min":
+        minute = (dt.minute // 15) * 15
+        result = dt.replace(minute=minute, second=0, microsecond=0)
+    elif rule == "1h":
+        result = dt.replace(minute=0, second=0, microsecond=0)
+    elif rule == "4h":
+        hour = (dt.hour // 4) * 4
+        result = dt.replace(hour=hour, minute=0, second=0, microsecond=0)
+    elif rule == "1D":
+        result = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        return ts
+
+    return pd.Timestamp(result, tz="UTC")
+
+
 def run_pipeline(
     symbol: str,
     start_date: datetime,
     end_date: datetime,
     save_raw: bool = False,
+    gap_report: bool = False,
+    hot_only: bool = False,
 ) -> None:
     """Run the full ingestion pipeline for one instrument over a date range.
 
     1. Load existing canonical data (if any) for incremental append
     2. Fetch + decode + aggregate new hourly data
     3. Merge with existing, deduplicate, validate, save canonical
-    4. Derive higher timeframes
+    4. Derive higher timeframes (selective: only affected windows)
     5. Export hot packages
+    6. Optionally generate gap report
+
+    If hot_only=True, skip fetching and just regenerate derived + hot packages
+    from existing canonical data.
     """
     if symbol not in INSTRUMENTS:
         raise ValueError(f"Unknown instrument: {symbol}. Available: {list(INSTRUMENTS.keys())}")
 
     meta = INSTRUMENTS[symbol]
 
-    # Load existing canonical for incremental logic
+    # Load existing canonical
     existing = _load_existing_canonical(symbol)
+
+    # Hot-only mode: skip fetching, just rebuild derived + hot packages
+    if hot_only:
+        if existing is None or existing.empty:
+            print("[pipeline] no existing canonical data — nothing to refresh")
+            return
+        canonical = existing
+        print(f"[pipeline] hot-only mode: refreshing from {len(canonical)} canonical bars")
+        _rebuild_derived_and_export(canonical, symbol, new_data_start=None)
+        if gap_report:
+            _run_gap_report(canonical, symbol)
+        print(f"[pipeline] hot-only refresh complete for {symbol}")
+        return
+
     last_ts: Optional[pd.Timestamp] = None
     if existing is not None and not existing.empty:
         last_ts = existing.index[-1]
@@ -124,11 +234,16 @@ def run_pipeline(
         print("[pipeline] no data fetched and no existing canonical — nothing to do")
         return
 
+    # Track the earliest new bar for selective derived regeneration
+    new_data_start: Optional[pd.Timestamp] = None
+
     # Merge new bars
     if all_bars:
         new_df = pd.concat(all_bars)
         new_df = new_df.sort_index()
         new_df = new_df[~new_df.index.duplicated(keep="first")]
+
+        new_data_start = new_df.index[0]
 
         # Add metadata columns
         new_df["vendor"] = "dukascopy"
@@ -142,26 +257,54 @@ def run_pipeline(
             canonical = combined
         else:
             canonical = new_df
+
+        print(f"[pipeline] new data from {new_data_start} ({len(new_df)} new bars)")
     else:
         canonical = existing
+        print("[pipeline] no new data fetched — regenerating derived from existing canonical")
 
     # Save canonical
     _save_canonical(canonical, symbol)
 
-    # Strip metadata for OHLCV-only operations
+    # Rebuild derived timeframes and hot packages
+    _rebuild_derived_and_export(canonical, symbol, new_data_start)
+
+    # Gap report
+    if gap_report:
+        _run_gap_report(canonical, symbol)
+
+    print(f"[pipeline] pipeline complete for {symbol}")
+
+
+def _rebuild_derived_and_export(
+    canonical: pd.DataFrame,
+    symbol: str,
+    new_data_start: Optional[pd.Timestamp],
+) -> None:
+    """Rebuild derived timeframes (selectively if possible) and export hot packages."""
     canonical_ohlcv = canonical[["open", "high", "low", "close", "volume"]]
 
-    # Derive higher timeframes
     hot_dfs = {"1m": canonical_ohlcv}
 
     for rule in DERIVED_TIMEFRAMES:
         tf_label = TIMEFRAME_LABELS[rule]
-        derived = resample_from_1m(canonical_ohlcv, rule)
-        if not derived.empty:
+        derived = _derive_affected_window(
+            canonical_ohlcv, symbol, rule, tf_label, new_data_start
+        )
+        if derived is not None and not derived.empty:
             _save_derived(derived, symbol, tf_label)
             hot_dfs[tf_label] = derived[["open", "high", "low", "close", "volume"]]
 
-    # Export hot packages
     export_hot_packages(hot_dfs, symbol)
 
-    print(f"[pipeline] Phase 1A complete for {symbol}")
+
+def _run_gap_report(canonical: pd.DataFrame, symbol: str) -> None:
+    """Generate and save gap report for the canonical data."""
+    report = generate_gap_report(symbol, canonical)
+    save_gap_report(symbol, report)
+
+    summary = report.get("summary", {})
+    trading_gaps = summary.get("trading_hour_gaps", 0)
+    trading_missing = summary.get("trading_hour_missing_minutes", 0)
+    print(f"[pipeline] gap report: {trading_gaps} trading-hour gap(s), "
+          f"{trading_missing} missing minute(s)")
