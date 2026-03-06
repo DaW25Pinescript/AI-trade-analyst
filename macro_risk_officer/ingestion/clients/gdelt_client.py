@@ -50,6 +50,28 @@ class GdeltClient:
     No API key required.
     """
 
+    async def fetch_geopolitical_events_async(self, lookback_days: int = 3) -> List[MacroEvent]:
+        """Async variant of fetch_geopolitical_events — does not block the event loop."""
+        timespan = f"{lookback_days}d"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    _BASE_URL,
+                    params={
+                        "query": _QUERY,
+                        "mode": "ArtList",
+                        "maxrecords": 50,
+                        "format": "json",
+                        "timespan": timespan,
+                    },
+                )
+            response.raise_for_status()
+            data = response.json()
+        except Exception:
+            return []
+
+        return self._parse_geopolitical(data, lookback_days)
+
     def fetch_geopolitical_events(self, lookback_days: int = 3) -> List[MacroEvent]:
         """
         Query GDELT for recent geopolitical news and derive a MacroEvent if the
@@ -78,6 +100,10 @@ class GdeltClient:
         except Exception:
             return []
 
+        return self._parse_geopolitical(data, lookback_days)
+
+    def _parse_geopolitical(self, data: dict, lookback_days: int) -> List[MacroEvent]:
+        """Parse GDELT article list JSON into MacroEvent list."""
         articles = data.get("articles") or []
         tones = [
             float(a["tone"])

@@ -33,6 +33,11 @@ from ai_analyst.models.persona import PersonaType
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 
+async def _async_none(instrument: str):
+    """Async stub replacing _try_fetch_macro_context for tests."""
+    return None
+
+
 def _sample_macro_context() -> MacroContext:
     return MacroContext(
         regime="risk_off",
@@ -178,7 +183,7 @@ async def test_mro_failure_produces_unavailability_notice_not_exception(
     # Simulate MRO completely unavailable
     monkeypatch.setattr(
         "ai_analyst.core.execution_router._try_fetch_macro_context",
-        lambda instrument: None,
+        _async_none,
     )
 
     captured: list[str] = []
@@ -220,7 +225,7 @@ async def test_overlay_was_provided_true_when_m15_overlay_in_packet(
 
     monkeypatch.setattr(
         "ai_analyst.core.execution_router._try_fetch_macro_context",
-        lambda instrument: None,
+        _async_none,
     )
 
     captured: list[str] = []
@@ -262,7 +267,7 @@ async def test_overlay_was_provided_false_when_no_m15_overlay(
 
     monkeypatch.setattr(
         "ai_analyst.core.execution_router._try_fetch_macro_context",
-        lambda instrument: None,
+        _async_none,
     )
 
     captured: list[str] = []
