@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 def main() -> None:
     """Run the market data feed pipeline from the command line."""
     parser = argparse.ArgumentParser(
-        description="Market Data Officer Feed — Phase 1A ingestion spine",
+        description="Market Data Officer Feed — ingestion spine (EURUSD, XAUUSD)",
     )
     parser.add_argument(
         "--instrument",

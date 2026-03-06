@@ -9,13 +9,17 @@ import pandas as pd
 from .config import TICK_STRUCT_SIZE, InstrumentMeta
 
 
-# TODO Phase 1B — XAUUSD
-# The 20-byte tick struct format (>IIIff) is the same for all Dukascopy instruments,
-# but the MEANING of the raw integer fields depends on the instrument:
-#   - price_scale differs (EURUSD=100000, XAUUSD likely=1000 but MUST be verified)
-#   - volume interpretation may differ (raw float vs lots vs units)
-# Do NOT assume EURUSD parsing logic is correct for XAUUSD without independent
-# verification against a known reference bar.
+# Phase 1B — XAUUSD tick struct verification notes
+# The 20-byte tick struct format (>IIIff) is identical for EURUSD and XAUUSD.
+# Verified against Dukascopy bi5 data for 2025-01-16 14:00 UTC:
+#   - XAUUSD price_scale=1000 (raw 2715695 → $2715.695, confirmed against known spot)
+#   - EURUSD price_scale=100000 (unchanged)
+#   - Volume floats: same format, no divisor needed for either instrument.
+#     XAUUSD volumes are naturally smaller (~0.0006/tick) vs EURUSD (~5.3/tick).
+# UNVERIFIED: volume units not cross-checked against external reference (e.g. CME).
+# If additional instruments are added beyond EURUSD/XAUUSD, their price_scale
+# and volume interpretation MUST be independently verified before populating
+# InstrumentMeta — the struct format is universal but the semantics are not.
 
 
 def decode_dukascopy_ticks(

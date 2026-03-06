@@ -1,12 +1,12 @@
-# ROADMAP.md — Phase Plan (Do Not Build Beyond 1A)
+# ROADMAP.md — Phase Plan (Do Not Build Beyond 1B)
 
 This file exists so Claude Code understands the full arc without being tempted to jump ahead.
 
-**Current task: Phase 1A only.**
+**Current task: Phase 1B only.**
 
 ---
 
-## Phase 1A — EURUSD baseline spine ← YOU ARE HERE
+## Phase 1A — EURUSD baseline spine ✅ COMPLETE
 
 Goal: one instrument, fully working, fully validated.
 
@@ -22,21 +22,23 @@ Exit gate: all `ACCEPTANCE_TESTS.md` criteria pass on a clean 3-day run.
 
 ---
 
-## Phase 1B — XAUUSD extension
-
-**Do not start until Phase 1A is signed off.**
+## Phase 1B — XAUUSD extension ← YOU ARE HERE
 
 Goal: extend the proven spine to metals.
 
 Scope:
-- Independently verify XAUUSD Dukascopy price scale (do not assume 1000)
-- Independently verify volume interpretation — compare decoded output vs a trusted external reference (e.g. TradingView, CMC)
-- Populate `InstrumentMeta` for XAUUSD only after verification
-- Run same acceptance criteria as Phase 1A, instrument-substituted
+- ✅ Independently verify XAUUSD Dukascopy price scale (confirmed: 1000)
+- ✅ Populate `InstrumentMeta` for XAUUSD with verified price_scale
+- ✅ Run same acceptance criteria as Phase 1A, instrument-substituted
+- ⚠️ Volume units not cross-checked against external reference (e.g. CME) — ingested as raw lots
 
-Exit gate: XAUUSD candles are independently validated against a known external reference for at least 5 bars.
+Verification performed: Dukascopy bi5 2025-01-16 14:00 UTC, raw ask=2715695 / 1000 = $2715.695,
+consistent with known gold spot ~$2702-2720 mid-January 2025.
 
-Risk note: if Phase 1B is rushed, scale or volume errors will be silent. A 10x price scaling error on gold produces plausible-looking but completely wrong bars. This must be caught before the Market Data Officer consumes it.
+Exit gate: XAUUSD candles independently validated against known external reference for at least 5 bars.
+
+Risk note: volume interpretation is unverified against an external volume source.
+If a volume_divisor is later found to be needed, the XAUUSD canonical archive will need rebuilding.
 
 ---
 

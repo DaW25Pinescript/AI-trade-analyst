@@ -75,3 +75,64 @@ class TestDecodeDukascopyTicks:
         ])
         df = decode_dukascopy_ticks(payload, self.hour_start, self.meta)
         assert abs(df["volume"].iloc[0] - 6.0) < 1e-6
+
+
+class TestDecodeXAUUSD:
+    """Phase 1B — XAUUSD-specific decode tests."""
+
+    def setup_method(self):
+        self.meta = INSTRUMENTS["XAUUSD"]
+        self.hour_start = datetime(2025, 1, 16, 14, 0, 0, tzinfo=timezone.utc)
+
+    def test_price_scale_xauusd(self):
+        """XAUUSD price_scale=1000 produces plausible gold prices.
+
+        Verification reference: Dukascopy bi5 2025-01-16 14:00 UTC showed
+        raw ask=2715695 → $2715.695, matching known spot ~$2702-2720.
+        """
+        # ask=2715695 / 1000 = 2715.695, bid=2715195 / 1000 = 2715.195
+        # mid = (2715.695 + 2715.195) / 2 = 2715.445
+        payload = _make_bi5_payload([
+            (17, 2715695, 2715195, 0.0014, 0.0001),
+        ])
+        df = decode_dukascopy_ticks(payload, self.hour_start, self.meta)
+
+        assert not df.empty
+        assert df["mid"].between(2000.0, 4000.0).all(), (
+            f"XAUUSD mid outside plausible range: {df['mid'].iloc[0]}"
+        )
+        assert abs(df["mid"].iloc[0] - 2715.445) < 0.01
+
+    def test_xauusd_schema_matches_eurusd(self):
+        """XAUUSD decode produces same schema as EURUSD."""
+        payload = _make_bi5_payload([
+            (0, 2715000, 2714500, 0.001, 0.001),
+            (1000, 2715100, 2714600, 0.002, 0.002),
+        ])
+        df = decode_dukascopy_ticks(payload, self.hour_start, self.meta)
+
+        assert set(df.columns) >= {"mid", "volume"}
+        assert df.index.name == "timestamp_utc"
+        assert df.index.tzinfo is not None
+        assert df.index.is_monotonic_increasing
+
+    def test_xauusd_volume_no_divisor(self):
+        """XAUUSD volume is sum of ask_vol + bid_vol with no divisor."""
+        payload = _make_bi5_payload([
+            (0, 2715000, 2714500, 0.0014, 0.0001),
+        ])
+        df = decode_dukascopy_ticks(payload, self.hour_start, self.meta)
+        assert abs(df["volume"].iloc[0] - 0.0015) < 1e-6
+
+    def test_xauusd_multiple_ticks_range(self):
+        """Multiple XAUUSD ticks produce prices in plausible range."""
+        payload = _make_bi5_payload([
+            (0, 2715000, 2714500, 0.001, 0.001),
+            (500, 2716000, 2715500, 0.002, 0.001),
+            (1000, 2714000, 2713500, 0.001, 0.002),
+            (1500, 2715500, 2715000, 0.003, 0.001),
+        ])
+        df = decode_dukascopy_ticks(payload, self.hour_start, self.meta)
+
+        assert len(df) == 4
+        assert df["mid"].between(2000.0, 4000.0).all()

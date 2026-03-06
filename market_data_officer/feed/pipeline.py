@@ -164,4 +164,4 @@ def run_pipeline(
     # Export hot packages
     export_hot_packages(hot_dfs, symbol)
 
-    print(f"[pipeline] Phase 1A complete for {symbol}")
+    print(f"[pipeline] pipeline complete for {symbol}")
