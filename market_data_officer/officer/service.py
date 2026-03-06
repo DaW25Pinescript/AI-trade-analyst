@@ -19,9 +19,9 @@ from .loader import EXPECTED_TIMEFRAMES, PACKAGES_DIR, load_all_timeframes, load
 from .quality import check_package_quality
 from .summarizer import build_state_summary
 
-# Instruments verified in Phase 1A
-TRUSTED_INSTRUMENTS = {"EURUSD"}
-PROVISIONAL_INSTRUMENTS = {"XAUUSD"}
+# Instruments verified through Phase 1A (EURUSD) and Phase 1B (XAUUSD)
+TRUSTED_INSTRUMENTS = {"EURUSD", "XAUUSD"}
+PROVISIONAL_INSTRUMENTS: set[str] = set()
 
 
 @dataclass
