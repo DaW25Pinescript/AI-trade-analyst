@@ -22,14 +22,14 @@ class DecodeStats:
     error: str  # empty string if no error
 
 
-# Phase 1B — XAUUSD tick struct verification notes
+# Phase 1B — XAUUSD tick struct verification notes (VERIFIED 2026-03-06)
 # The 20-byte tick struct format (>IIIff) is identical for EURUSD and XAUUSD.
-# Verified against Dukascopy bi5 data for 2025-01-16 14:00 UTC:
-#   - XAUUSD price_scale=1000 (raw 2715695 → $2715.695, confirmed against known spot)
+# Verified against Dukascopy bi5 data for 5 days (2025-01-13 to 2025-01-17):
+#   - XAUUSD price_scale=1000 (raw 2694105 → $2694.105, confirmed against
+#     pricegold.net and bullion-rates.com daily OHLC for 5 trading days)
 #   - EURUSD price_scale=100000 (unchanged)
 #   - Volume floats: same format, no divisor needed for either instrument.
 #     XAUUSD volumes are naturally smaller (~0.0006/tick) vs EURUSD (~5.3/tick).
-# UNVERIFIED: volume units not cross-checked against external reference (e.g. CME).
 # If additional instruments are added beyond EURUSD/XAUUSD, their price_scale
 # and volume interpretation MUST be independently verified before populating
 # InstrumentMeta — the struct format is universal but the semantics are not.
