@@ -34,6 +34,18 @@ def main() -> None:
         default=False,
         help="Cache raw bi5 files to disk",
     )
+    parser.add_argument(
+        "--gap-report",
+        action="store_true",
+        default=False,
+        help="Generate gap detection report after ingestion",
+    )
+    parser.add_argument(
+        "--hot-only",
+        action="store_true",
+        default=False,
+        help="Skip fetching — rebuild derived timeframes and hot packages from existing canonical",
+    )
 
     args = parser.parse_args()
 
@@ -56,6 +68,8 @@ def main() -> None:
         start_date=start,
         end_date=end,
         save_raw=args.save_raw,
+        gap_report=args.gap_report,
+        hot_only=args.hot_only,
     )
 
 

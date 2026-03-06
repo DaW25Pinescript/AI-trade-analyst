@@ -45,6 +45,7 @@ RAW_DIR = DATA_ROOT / "raw" / "dukascopy"
 CANONICAL_DIR = DATA_ROOT / "canonical"
 DERIVED_DIR = DATA_ROOT / "derived"
 PACKAGES_DIR = DATA_ROOT / "packages" / "latest"
+REPORTS_DIR = DATA_ROOT / "reports"
 
 # Rolling tail window sizes for hot package export
 HOT_WINDOW_SIZES = {

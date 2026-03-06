@@ -1,8 +1,8 @@
-# ROADMAP.md — Phase Plan (Do Not Build Beyond 1B)
+# ROADMAP.md — Phase Plan (Do Not Build Beyond 1C)
 
 This file exists so Claude Code understands the full arc without being tempted to jump ahead.
 
-**Current task: Phase 1B only.**
+**Current task: Phase 1C only.**
 
 ---
 
@@ -22,7 +22,7 @@ Exit gate: all `ACCEPTANCE_TESTS.md` criteria pass on a clean 3-day run.
 
 ---
 
-## Phase 1B — XAUUSD extension ← YOU ARE HERE
+## Phase 1B — XAUUSD extension ✅ COMPLETE
 
 Goal: extend the proven spine to metals.
 
@@ -42,14 +42,21 @@ If a volume_divisor is later found to be needed, the XAUUSD canonical archive wi
 
 ---
 
-## Phase 1C — Incremental updater hardening
+## Phase 1C — Incremental updater hardening ← YOU ARE HERE
 
 Goal: make daily/hourly updates robust.
 
 Scope:
-- Detect affected derived windows (only regenerate what changed, not full rewrite)
-- Idempotent gap detection with gap report output
-- Optional: hot package refresh on schedule
+- ✅ Selective derived regeneration (only resample affected window, not full rewrite)
+- ✅ Idempotent gap detection with gap report output (JSON)
+- ✅ Hot-only refresh mode (--hot-only flag)
+- ✅ Gap report CLI flag (--gap-report)
+
+Implementation:
+- `gaps.py`: gap detection, FX trading-hour classification, JSON report generation
+- `pipeline.py`: selective derived regeneration via `_derive_affected_window()`,
+  `_find_resample_boundary()` computes the first affected derived bar
+- `run_feed.py`: `--gap-report` and `--hot-only` CLI flags
 
 ---
 
