@@ -63,6 +63,25 @@ class FinnhubClient:
                 "FINNHUB_API_KEY not set. Add it to your environment or .env file."
             )
 
+    async def fetch_calendar_async(
+        self,
+        lookback_days: int = 7,
+        lookahead_days: int = 3,
+    ) -> List[MacroEvent]:
+        """Async variant of fetch_calendar — does not block the event loop."""
+        now_utc = datetime.now(timezone.utc)
+        from_dt = (now_utc - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+        to_dt = (now_utc + timedelta(days=lookahead_days)).strftime("%Y-%m-%d")
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{_BASE_URL}/calendar/economic",
+                params={"from": from_dt, "to": to_dt, "token": self.api_key},
+            )
+        response.raise_for_status()
+        data = response.json()
+        return self._parse_calendar(data)
+
     def fetch_calendar(
         self,
         lookback_days: int = 7,
@@ -83,7 +102,10 @@ class FinnhubClient:
         )
         response.raise_for_status()
         data = response.json()
+        return self._parse_calendar(data)
 
+    def _parse_calendar(self, data: dict) -> List[MacroEvent]:
+        """Parse Finnhub calendar JSON into MacroEvent list."""
         events: List[MacroEvent] = []
         for item in data.get("economicCalendar", []):
             actual = item.get("actual")

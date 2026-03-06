@@ -38,13 +38,17 @@ def _get_mro_scheduler() -> Optional[object]:
     return _mro_scheduler
 
 
-def _try_fetch_macro_context(instrument: str) -> Optional["MacroContext"]:
-    """Fetch macro context for *instrument*, returning None on any failure."""
+async def _try_fetch_macro_context(instrument: str) -> Optional["MacroContext"]:
+    """Fetch macro context for *instrument*, returning None on any failure.
+
+    Runs the synchronous scheduler.get_context() in a thread so the async
+    event loop is never blocked by network I/O (CRITICAL-2 mitigation).
+    """
     scheduler = _get_mro_scheduler()
     if scheduler is None:
         return None
     try:
-        return scheduler.get_context(instrument=instrument)
+        return await asyncio.to_thread(scheduler.get_context, instrument=instrument)
     except Exception as exc:
         logger.warning(
             "[MRO] MacroContext fetch failed in ExecutionRouter (%s: %s) — "
@@ -62,8 +66,8 @@ from ..models.execution_config import (
 from ..models.analyst_output import AnalystOutput
 from ..models.arbiter_output import FinalVerdict
 from ..models.persona import PersonaType
-from ..graph.analyst_nodes import run_analyst, run_deliberation_round, MINIMUM_VALID_ANALYSTS
-from .analyst_prompt_builder import build_analyst_prompt
+from ..graph.analyst_nodes import run_analyst, run_overlay_delta, run_deliberation_round, MINIMUM_VALID_ANALYSTS
+from .analyst_prompt_builder import build_analyst_prompt, build_overlay_delta_prompt
 from .arbiter_prompt_builder import build_arbiter_prompt
 from .prompt_pack_generator import PromptPackGenerator
 from .json_extractor import extract_json
@@ -295,14 +299,80 @@ class ExecutionRouter:
                 logger.warning("Deliberation '%s' failed: %s", model, result)
         return delib
 
+    async def _run_overlay_delta(
+        self, all_outputs: list[AnalystOutput]
+    ) -> list:
+        """
+        Phase 2 — Run overlay delta analysis for all analysts that completed Phase 1.
+        Mirrors the graph-path overlay_delta_node logic. Each analyst gets its own
+        Phase 1 output as context plus the 15M overlay image. Failures are logged
+        but never block the pipeline.
+        """
+        from ..models.analyst_output import OverlayDeltaReport
+        from pydantic import ValidationError as _VE
+
+        # Build configs aligned with all_outputs (same order as _run_api_analysts)
+        api_configs = [
+            {"model": a.model, "persona": a.persona}
+            for a in self.config.api_analysts
+            if a.model  # Only API analysts with a model can run overlay delta
+        ]
+        configs_used = api_configs[: len(all_outputs)]
+
+        if not configs_used:
+            logger.warning(
+                "Phase 2 — no API analyst configs available for overlay delta. Skipping."
+            )
+            return []
+
+        logger.info("Phase 2 — overlay delta analysis for %d analysts.", len(configs_used))
+
+        # Only run overlay delta for outputs that have a matching config
+        paired_outputs = all_outputs[: len(configs_used)]
+        tasks = [
+            run_overlay_delta(
+                configs_used[i],
+                build_overlay_delta_prompt(self.ground_truth, analyst_output),
+                self.run_id,
+            )
+            for i, analyst_output in enumerate(paired_outputs)
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        delta_reports: list[OverlayDeltaReport] = []
+        for i, result in enumerate(results):
+            model = configs_used[i].get("model", "unknown")
+            if isinstance(result, OverlayDeltaReport):
+                delta_reports.append(result)
+            elif isinstance(result, _VE):
+                logger.warning(
+                    "Analyst '%s' Phase 2 returned schema-invalid delta report: %s",
+                    model, result,
+                )
+            else:
+                logger.warning("Analyst '%s' Phase 2 failed: %s", model, result)
+
+        if not delta_reports:
+            logger.warning(
+                "No valid overlay delta reports produced. "
+                "Arbiter will proceed with clean analysis only."
+            )
+
+        return delta_reports
+
     async def _run_arbiter_and_finalise(
         self, all_outputs: list[AnalystOutput]
     ) -> FinalVerdict:
         # Fetch macro context if not already injected (fail-silent).
         if self.macro_context is None:
-            self.macro_context = _try_fetch_macro_context(self.ground_truth.instrument)
+            self.macro_context = await _try_fetch_macro_context(self.ground_truth.instrument)
 
         overlay_was_provided = bool(self.ground_truth.m15_overlay)
+
+        # Phase 2 — overlay delta analysis (only when overlay is provided)
+        overlay_delta_reports: list = []
+        if overlay_was_provided and all_outputs:
+            overlay_delta_reports = await self._run_overlay_delta(all_outputs)
 
         # v2.1b — run deliberation round if enabled (automated/API analysts only)
         deliberation_outputs: list[AnalystOutput] | None = None
@@ -323,7 +393,7 @@ class ExecutionRouter:
             analyst_outputs=all_outputs,
             risk_constraints=self.ground_truth.risk_constraints,
             run_id=self.run_id,
-            overlay_delta_reports=[],
+            overlay_delta_reports=overlay_delta_reports,
             overlay_was_provided=overlay_was_provided,
             macro_context=self.macro_context,
             deliberation_outputs=deliberation_outputs,

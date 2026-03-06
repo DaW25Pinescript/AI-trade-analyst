@@ -50,6 +50,23 @@ class FredClient:
                 "FRED_API_KEY not set. Add it to your environment or .env file."
             )
 
+    async def fetch_latest_async(self, series_id: str, n_obs: int = 2) -> List[Dict]:
+        """Async variant of fetch_latest — does not block the event loop."""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{_BASE_URL}/series/observations",
+                params={
+                    "series_id": series_id,
+                    "api_key": self.api_key,
+                    "file_type": "json",
+                    "sort_order": "desc",
+                    "limit": n_obs,
+                    "observation_end": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                },
+            )
+        response.raise_for_status()
+        return response.json().get("observations", [])
+
     def fetch_latest(self, series_id: str, n_obs: int = 2) -> List[Dict]:
         """Fetch the last n observations for a FRED series."""
         response = httpx.get(
