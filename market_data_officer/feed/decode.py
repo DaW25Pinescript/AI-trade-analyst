@@ -2,11 +2,24 @@
 
 import lzma
 import struct
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import Optional, Tuple
 
 import pandas as pd
 
 from .config import TICK_STRUCT_SIZE, InstrumentMeta
+
+
+@dataclass
+class DecodeStats:
+    """Decode statistics for diagnostics layer."""
+
+    tick_count: int
+    price_min: Optional[float]
+    price_max: Optional[float]
+    volume_total: Optional[float]
+    error: str  # empty string if no error
 
 
 # Phase 1B — XAUUSD tick struct verification notes
@@ -80,3 +93,42 @@ def decode_dukascopy_ticks(
     df = df.sort_index()
 
     return df
+
+
+def decode_with_diagnostics(
+    raw_bytes: bytes,
+    hour_start: datetime,
+    meta: InstrumentMeta,
+) -> Tuple[pd.DataFrame, DecodeStats]:
+    """Decode a bi5 payload and return both the tick DataFrame and decode stats.
+
+    Wraps decode_dukascopy_ticks, capturing price range, tick count, and
+    volume totals for the diagnostics layer.
+    """
+    if not raw_bytes:
+        return pd.DataFrame(), DecodeStats(
+            tick_count=0, price_min=None, price_max=None,
+            volume_total=None, error="empty_input",
+        )
+
+    try:
+        df = decode_dukascopy_ticks(raw_bytes, hour_start, meta)
+    except Exception as exc:
+        return pd.DataFrame(), DecodeStats(
+            tick_count=0, price_min=None, price_max=None,
+            volume_total=None, error=str(exc),
+        )
+
+    if df.empty:
+        return df, DecodeStats(
+            tick_count=0, price_min=None, price_max=None,
+            volume_total=None, error="",
+        )
+
+    return df, DecodeStats(
+        tick_count=len(df),
+        price_min=float(df["mid"].min()),
+        price_max=float(df["mid"].max()),
+        volume_total=float(df["volume"].sum()),
+        error="",
+    )

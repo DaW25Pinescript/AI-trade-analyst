@@ -1,8 +1,8 @@
-# ROADMAP.md — Phase Plan (Do Not Build Beyond 1C)
+# ROADMAP.md — Phase Plan (Do Not Build Beyond 1D)
 
 This file exists so Claude Code understands the full arc without being tempted to jump ahead.
 
-**Current task: Phase 1C only.**
+**Current task: Phase 1D only.**
 
 ---
 
@@ -42,7 +42,7 @@ If a volume_divisor is later found to be needed, the XAUUSD canonical archive wi
 
 ---
 
-## Phase 1C — Incremental updater hardening ← YOU ARE HERE
+## Phase 1C — Incremental updater hardening ✅ COMPLETE
 
 Goal: make daily/hourly updates robust.
 
@@ -60,15 +60,26 @@ Implementation:
 
 ---
 
-## Phase 1D — Raw cache and diagnostics
+## Phase 1D — Raw cache and diagnostics ✅ COMPLETE
 
 Goal: improve debugging trust and replay capability.
 
 Scope:
-- Structured raw payload cache with vendor metadata
-- Gap report (which hours are missing and why)
-- Source/vendor audit trail per bar
-- Parser diagnostics to verify decode assumptions
+- ✅ Structured raw payload cache with vendor metadata (FetchRecord with sha256, status, URL)
+- ✅ Gap report enhanced: per-hour fetch diagnostics explain why gaps exist (404, empty, decode error)
+- ✅ Source/vendor audit trail per bar (DiagnosticsCollector, per-hour fetch/decode records)
+- ✅ Parser diagnostics to verify decode assumptions (verify_decode_assumptions: price range, tick density, empty decode)
+
+Implementation:
+- `diagnostics.py`: DiagnosticsCollector, FetchRecord, DecodeRecord, cache inventory,
+  verify_decode_assumptions (anomaly detection: empty_decode, price_range_outlier,
+  low/high_tick_density)
+- `fetch.py`: FetchResult dataclass, fetch_bi5_detailed() returning metadata
+- `decode.py`: DecodeStats dataclass, decode_with_diagnostics() returning stats
+- `pipeline.py`: diagnostics=True path collects per-hour records, saves report +
+  anomaly verification + optional cache inventory
+- `run_feed.py`: --diagnostics CLI flag
+- Tests: test_diagnostics.py (28+ tests)
 
 ---
 

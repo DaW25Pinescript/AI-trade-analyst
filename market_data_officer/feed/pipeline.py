@@ -16,9 +16,10 @@ from .config import (
     TIMEFRAME_LABELS,
     InstrumentMeta,
 )
-from .decode import decode_dukascopy_ticks
+from .decode import decode_dukascopy_ticks, decode_with_diagnostics
+from .diagnostics import DiagnosticsCollector, save_cache_inventory, verify_decode_assumptions
 from .export import export_hot_packages
-from .fetch import fetch_bi5
+from .fetch import build_bi5_url, fetch_bi5, fetch_bi5_detailed
 from .gaps import generate_gap_report, save_gap_report
 from .resample import resample_from_1m
 from .validate import validate_ohlcv
@@ -152,6 +153,7 @@ def run_pipeline(
     save_raw: bool = False,
     gap_report: bool = False,
     hot_only: bool = False,
+    diagnostics: bool = False,
 ) -> None:
     """Run the full ingestion pipeline for one instrument over a date range.
 
@@ -161,6 +163,7 @@ def run_pipeline(
     4. Derive higher timeframes (selective: only affected windows)
     5. Export hot packages
     6. Optionally generate gap report
+    7. Optionally generate diagnostics report (Phase 1D)
 
     If hot_only=True, skip fetching and just regenerate derived + hot packages
     from existing canonical data.
@@ -183,8 +186,15 @@ def run_pipeline(
         _rebuild_derived_and_export(canonical, symbol, new_data_start=None)
         if gap_report:
             _run_gap_report(canonical, symbol)
+        if diagnostics:
+            save_cache_inventory(symbol)
         print(f"[pipeline] hot-only refresh complete for {symbol}")
         return
+
+    # Initialize diagnostics collector if enabled
+    collector: Optional[DiagnosticsCollector] = None
+    if diagnostics:
+        collector = DiagnosticsCollector(symbol)
 
     last_ts: Optional[pd.Timestamp] = None
     if existing is not None and not existing.empty:
@@ -210,21 +220,74 @@ def run_pipeline(
             hour_end = current + timedelta(minutes=59)
             if hour_end <= last_ts:
                 skip_count += 1
+                if collector:
+                    collector.record_skipped(current)
                 current += timedelta(hours=1)
                 continue
 
-        try:
-            raw = fetch_bi5(symbol, current, save_raw=save_raw)
-            fetch_count += 1
+        if collector:
+            # Diagnostics-enabled path: use detailed fetch + decode
+            try:
+                result = fetch_bi5_detailed(symbol, current, save_raw=save_raw)
+                fetch_count += 1
 
-            if raw:
-                ticks = decode_dukascopy_ticks(raw, current, meta)
-                if not ticks.empty:
-                    bars = ticks_to_1m_ohlcv(ticks)
-                    if not bars.empty:
-                        all_bars.append(bars)
-        except Exception as exc:
-            print(f"[pipeline] error at {current}: {exc}")
+                collector.record_fetch(
+                    hour_utc=current,
+                    url=result.url,
+                    http_status=result.http_status,
+                    payload=result.data,
+                    cached_path=result.cached_path,
+                    error=result.error,
+                )
+
+                if result.data:
+                    ticks, stats = decode_with_diagnostics(result.data, current, meta)
+                    bars_produced = 0
+                    if not ticks.empty:
+                        bars = ticks_to_1m_ohlcv(ticks)
+                        if not bars.empty:
+                            all_bars.append(bars)
+                            bars_produced = len(bars)
+
+                    collector.record_decode(
+                        hour_utc=current,
+                        tick_count=stats.tick_count,
+                        bars_produced=bars_produced,
+                        price_min=stats.price_min,
+                        price_max=stats.price_max,
+                        volume_total=stats.volume_total,
+                        decode_error=stats.error,
+                    )
+                else:
+                    collector.record_decode(
+                        hour_utc=current,
+                        tick_count=0,
+                        bars_produced=0,
+                        decode_error=result.error or "no_payload",
+                    )
+            except Exception as exc:
+                print(f"[pipeline] error at {current}: {exc}")
+                collector.record_fetch(
+                    hour_utc=current,
+                    url=build_bi5_url(symbol, current),
+                    http_status=0,
+                    payload=b"",
+                    error=f"pipeline_error:{exc}",
+                )
+        else:
+            # Standard path: original fetch + decode (no diagnostics overhead)
+            try:
+                raw = fetch_bi5(symbol, current, save_raw=save_raw)
+                fetch_count += 1
+
+                if raw:
+                    ticks = decode_dukascopy_ticks(raw, current, meta)
+                    if not ticks.empty:
+                        bars = ticks_to_1m_ohlcv(ticks)
+                        if not bars.empty:
+                            all_bars.append(bars)
+            except Exception as exc:
+                print(f"[pipeline] error at {current}: {exc}")
 
         current += timedelta(hours=1)
 
@@ -272,6 +335,26 @@ def run_pipeline(
     # Gap report
     if gap_report:
         _run_gap_report(canonical, symbol)
+
+    # Diagnostics report (Phase 1D)
+    if collector:
+        report_path = collector.save_report()
+        diag_report = collector.build_report()
+
+        # Run decode assumption verification
+        anomaly_report = verify_decode_assumptions(symbol, diag_report)
+        n_anomalies = anomaly_report.get("anomalies_found", 0)
+        if n_anomalies > 0:
+            print(f"[diagnostics] {n_anomalies} decode anomaly(ies) detected — see report")
+
+        # Save cache inventory if raw cache was enabled
+        if save_raw:
+            save_cache_inventory(symbol)
+
+        summary = diag_report.get("summary", {})
+        print(f"[diagnostics] {summary.get('total_ticks_decoded', 0)} ticks → "
+              f"{summary.get('total_bars_produced', 0)} bars across "
+              f"{summary.get('fetched', 0)} fetched hours")
 
     print(f"[pipeline] pipeline complete for {symbol}")
 
