@@ -1,337 +1,338 @@
-# CONTRACTS.md — Market Packet v1 Schema
+# CONTRACTS.md — Phase 3A Structure Object Schemas
 
-## Why this file matters most
+## Why this file matters
 
-The Market Packet is the single most important JSON schema in the entire AI Trade Analyst system. It defines exactly what every AI agent sees as "the market." Every analyst persona, every arbiter verdict, every senate deliberation starts from this packet.
+Every downstream consumer — analyst agents, Senate, future replay tools — reads structure packets. The schemas defined here are the contract. Field names, types, and lifecycle values must be stable across 3A/3B/3C or downstream consumers break.
 
-Getting this contract right now — with reserved fields and clean placeholders — means future phases can populate advanced features without schema churn, without breaking downstream agents, and without rewriting analyst prompts.
+Fields may be **added** in later phases. Fields must never be **removed or renamed** without a versioned migration.
 
 ---
 
-## Market Packet v1 — Full Schema
+## ICT vocabulary standard
+
+Use ICT vocabulary directly in all external schemas. Do not substitute generic names.
+
+| ICT term | Use in schema |
+|---|---|
+| Break of Structure | `bos_bull`, `bos_bear` |
+| Market Structure Shift / CHoCH | `mss_bull`, `mss_bear` |
+| Swing High | `swing_high` |
+| Swing Low | `swing_low` |
+| Equal Highs | `equal_highs` |
+| Equal Lows | `equal_lows` |
+| Prior Day High | `prior_day_high` |
+| Prior Day Low | `prior_day_low` |
+| Prior Week High | `prior_week_high` |
+| Prior Week Low | `prior_week_low` |
+| Liquidity Sweep | `sweep_high`, `sweep_low` |
+
+Internal helper variable names may stay neutral. Output objects use ICT-native terms.
+
+---
+
+## Structure Packet v1
+
+Top-level packet written per instrument per timeframe:
 
 ```json
 {
+  "schema_version": "structure_packet_v1",
   "instrument": "EURUSD",
-  "as_of_utc": "2026-03-06T12:00:00Z",
-
-  "source": {
-    "vendor": "dukascopy",
-    "canonical_tf": "1m",
-    "quality": "validated"
+  "timeframe": "1h",
+  "as_of": "2026-03-07T10:00:00Z",
+  "build": {
+    "engine_version": "phase_3a",
+    "source": "derived_1h_parquet",
+    "quality_flag": "trusted",
+    "pivot_left_bars": 3,
+    "pivot_right_bars": 3,
+    "bos_confirmation": "close",
+    "eqh_eql_tolerance": 0.00010
   },
-
-  "timeframes": {
-    "1m":  { "count": 3000, "rows": [...] },
-    "5m":  { "count": 1200, "rows": [...] },
-    "15m": { "count": 600,  "rows": [...] },
-    "1h":  { "count": 240,  "rows": [...] },
-    "4h":  { "count": 120,  "rows": [...] },
-    "1d":  { "count": 30,   "rows": [...] }
-  },
-
-  "features": {
-    "core": {
-      "atr_14":            2.34,
-      "volatility_regime": "normal",
-      "momentum":          0.27,
-      "ma_50":             1.0842,
-      "ma_200":            1.0791,
-      "swing_high":        1.0901,
-      "swing_low":         1.0763,
-      "rolling_range":     0.0138,
-      "session_context":   "london"
-    },
-    "structure":   null,
-    "imbalance":   null,
-    "compression": null
-  },
-
-  "state_summary": {
-    "trend_1h":          "bullish",
-    "trend_4h":          "bullish",
-    "trend_1d":          "neutral",
-    "volatility_regime": "normal",
-    "momentum_state":    "expanding",
-    "session_context":   "london",
-    "data_quality":      "validated"
-  },
-
-  "quality": {
-    "manifest_valid":      true,
-    "all_timeframes_present": true,
-    "staleness_minutes":   4,
-    "stale":               false,
-    "partial":             false,
-    "flags":               []
+  "swings": [],
+  "events": [],
+  "liquidity": [],
+  "regime": {},
+  "diagnostics": {
+    "bars_processed": 240,
+    "swings_confirmed": 14,
+    "bos_events": 3,
+    "mss_events": 1,
+    "liquidity_levels": 6,
+    "sweep_events": 2
   }
 }
 ```
 
 ---
 
-## Field definitions
-
-### Top level
-
-| Field | Type | Description |
-|---|---|---|
-| `instrument` | string | Instrument symbol e.g. `EURUSD` |
-| `as_of_utc` | ISO8601 string | Timestamp the packet was assembled |
-
-### `source`
-
-| Field | Type | Description |
-|---|---|---|
-| `vendor` | string | Source vendor e.g. `dukascopy` |
-| `canonical_tf` | string | Canonical truth timeframe, always `1m` |
-| `quality` | string | `validated` \| `partial` \| `stale` \| `unverified` |
-
-### `timeframes`
-
-Each key is a timeframe label (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`).
-
-Each value:
-
-| Field | Type | Description |
-|---|---|---|
-| `count` | int | Number of rows in this window |
-| `rows` | list of dicts | OHLCV rows as `{timestamp_utc, open, high, low, close, volume}` |
-
-Row schema per bar:
+## SwingPoint
 
 ```json
 {
-  "timestamp_utc": "2026-03-06T11:00:00Z",
-  "open":   1.0831,
-  "high":   1.0847,
-  "low":    1.0823,
-  "close":  1.0842,
-  "volume": 1842.0
+  "id": "sw_1h_20260306T0800_sh",
+  "type": "swing_high",
+  "price": 1.08642,
+  "anchor_time": "2026-03-06T08:00:00Z",
+  "confirm_time": "2026-03-06T11:00:00Z",
+  "timeframe": "1h",
+  "confirmation_method": "pivot_lr",
+  "left_bars": 3,
+  "right_bars": 3,
+  "strength": 3,
+  "status": "confirmed"
 }
 ```
-
-### `features.core`
-
-| Field | Type | Phase |
-|---|---|---|
-| `atr_14` | float | Phase 2 |
-| `volatility_regime` | `low` \| `normal` \| `expanding` | Phase 2 |
-| `momentum` | float | Phase 2 |
-| `ma_50` | float | Phase 2 |
-| `ma_200` | float | Phase 2 |
-| `swing_high` | float | Phase 2 |
-| `swing_low` | float | Phase 2 |
-| `rolling_range` | float | Phase 2 |
-| `session_context` | `asian` \| `london` \| `new_york` \| `overlap` | Phase 2 |
-
-### `features.structure` — Phase 3, stub now
-
-```json
-null
-```
-
-Future shape (do not implement yet):
-
-```json
-{
-  "bos": [...],
-  "swing_structure": "higher_highs_higher_lows",
-  "trend_state": "bullish"
-}
-```
-
-### `features.imbalance` — Phase 4, stub now
-
-```json
-null
-```
-
-Future shape (do not implement yet):
-
-```json
-{
-  "fvg_zones": [...],
-  "imbalance_bias": "bullish"
-}
-```
-
-### `features.compression` — Phase 4, stub now
-
-```json
-null
-```
-
-Future shape (do not implement yet):
-
-```json
-{
-  "compression_state": "compressed",
-  "range_percentile": 12.4
-}
-```
-
-### `state_summary`
-
-| Field | Type | Derivation |
-|---|---|---|
-| `trend_1h` | `bullish` \| `bearish` \| `neutral` | close vs ma_50 vs ma_200 |
-| `trend_4h` | `bullish` \| `bearish` \| `neutral` | same logic on 4h bars |
-| `trend_1d` | `bullish` \| `bearish` \| `neutral` | same logic on 1d bars |
-| `volatility_regime` | `low` \| `normal` \| `expanding` | ATR vs rolling ATR baseline |
-| `momentum_state` | `expanding` \| `contracting` \| `flat` | ROC direction |
-| `session_context` | `asian` \| `london` \| `new_york` \| `overlap` | UTC hour of `as_of_utc` |
-| `data_quality` | `validated` \| `partial` \| `stale` | from quality block |
-
-### `quality`
 
 | Field | Type | Description |
 |---|---|---|
-| `manifest_valid` | bool | Manifest file parsed successfully |
-| `all_timeframes_present` | bool | All 6 TF CSVs found |
-| `staleness_minutes` | int | Minutes since last bar in 1m file |
-| `stale` | bool | True if staleness > threshold (e.g. 60 min during market hours) |
-| `partial` | bool | True if some but not all TFs loaded |
-| `flags` | list of strings | Human-readable quality issues e.g. `["4h_missing", "stale_1d"]` |
+| `id` | string | Stable unique ID — never changes on rerun |
+| `type` | `swing_high` \| `swing_low` | ICT swing type |
+| `price` | float | Exact high (for swing_high) or low (for swing_low) of anchor bar |
+| `anchor_time` | ISO8601 UTC | Timestamp of the anchor bar |
+| `confirm_time` | ISO8601 UTC | Timestamp of the bar that completed right-side confirmation |
+| `timeframe` | string | Source timeframe |
+| `confirmation_method` | `pivot_lr` | Fixed pivot method in 3A |
+| `left_bars` | int | Left-side bars used for confirmation |
+| `right_bars` | int | Right-side bars used for confirmation |
+| `strength` | int | Number of right bars confirmed (up to `right_bars`) |
+| `status` | `confirmed` \| `broken` \| `superseded` \| `archived` | Lifecycle state |
 
----
-
-## Trend derivation logic
+**Python dataclass:**
 
 ```python
-def derive_trend(df: pd.DataFrame) -> str:
-    """
-    Derives trend state from MA relationship on a given timeframe DataFrame.
-    Returns 'bullish', 'bearish', or 'neutral'.
-    """
-    if len(df) < 200:
-        return "neutral"
-    close = df["close"].iloc[-1]
-    ma50  = df["close"].rolling(50).mean().iloc[-1]
-    ma200 = df["close"].rolling(200).mean().iloc[-1]
-    if close > ma50 > ma200:
-        return "bullish"
-    if close < ma50 < ma200:
-        return "bearish"
-    return "neutral"
+@dataclass
+class SwingPoint:
+    id:                   str
+    type:                 str        # "swing_high" | "swing_low"
+    price:                float
+    anchor_time:          datetime
+    confirm_time:         datetime
+    timeframe:            str
+    confirmation_method:  str = "pivot_lr"
+    left_bars:            int = 3
+    right_bars:           int = 3
+    strength:             int = 3
+    status:               str = "confirmed"
+
+    def to_dict(self) -> dict: ...
 ```
 
 ---
 
-## Session context logic
+## StructureEvent (BOS and MSS)
+
+```json
+{
+  "id": "ev_1h_20260307T1000_bos_bull",
+  "type": "bos_bull",
+  "time": "2026-03-07T10:00:00Z",
+  "timeframe": "1h",
+  "reference_swing_id": "sw_1h_20260306T0800_sh",
+  "reference_price": 1.08642,
+  "break_close": 1.08660,
+  "prior_bias": null,
+  "status": "confirmed"
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Stable unique ID |
+| `type` | `bos_bull` \| `bos_bear` \| `mss_bull` \| `mss_bear` | ICT event type |
+| `time` | ISO8601 UTC | Close time of the confirming bar |
+| `timeframe` | string | Source timeframe |
+| `reference_swing_id` | string | ID of the broken swing |
+| `reference_price` | float | Price level of the broken swing |
+| `break_close` | float | Actual close price that confirmed the break |
+| `prior_bias` | `"bullish"` \| `"bearish"` \| null | Required for MSS; null for plain BOS |
+| `status` | `confirmed` \| `superseded` | Usually immutable once confirmed |
+
+**Python dataclass:**
 
 ```python
-SESSION_WINDOWS = {
-    "asian":    (0,  8),
-    "london":   (8,  13),
-    "overlap":  (13, 17),
-    "new_york": (17, 21),
-}
+@dataclass
+class StructureEvent:
+    id:                  str
+    type:                str
+    time:                datetime
+    timeframe:           str
+    reference_swing_id:  str
+    reference_price:     float
+    break_close:         float
+    prior_bias:          Optional[str] = None
+    status:              str = "confirmed"
 
-def derive_session(as_of_utc: datetime) -> str:
-    hour = as_of_utc.hour
-    for session, (start, end) in SESSION_WINDOWS.items():
-        if start <= hour < end:
-            return session
-    return "asian"  # outside all windows defaults to asian
+    def to_dict(self) -> dict: ...
 ```
 
 ---
 
-## Python dataclass contracts
+## LiquidityLevel
 
-Implement these in `officer/contracts.py`:
+```json
+{
+  "id": "liq_1h_pdh_20260306T2100",
+  "type": "prior_day_high",
+  "price": 1.08720,
+  "origin_time": "2026-03-06T21:00:00Z",
+  "timeframe": "1h",
+  "status": "active",
+  "swept_time": null,
+  "sweep_type": null
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Stable unique ID |
+| `type` | `prior_day_high` \| `prior_day_low` \| `prior_week_high` \| `prior_week_low` \| `equal_highs` \| `equal_lows` | ICT level type |
+| `price` | float | Representative price of the level |
+| `origin_time` | ISO8601 UTC | Session open of the originating period |
+| `timeframe` | string | Source timeframe |
+| `status` | `active` \| `swept` \| `invalidated` \| `archived` | Lifecycle state |
+| `swept_time` | ISO8601 UTC \| null | Time of sweep if swept |
+| `sweep_type` | `wick_sweep` \| `close_sweep` \| null | How it was swept |
+
+**For EQH/EQL, additional fields:**
+
+```json
+{
+  "id": "liq_1h_eqh_20260306T1200",
+  "type": "equal_highs",
+  "price": 1.08645,
+  "origin_time": "2026-03-06T12:00:00Z",
+  "timeframe": "1h",
+  "status": "active",
+  "swept_time": null,
+  "sweep_type": null,
+  "member_swing_ids": ["sw_1h_20260306T0800_sh", "sw_1h_20260306T1200_sh"],
+  "tolerance_used": 0.00010
+}
+```
+
+**Python dataclass:**
 
 ```python
-from dataclasses import dataclass, field
-from typing import Optional
-import pandas as pd
-
 @dataclass
-class CoreFeatures:
-    atr_14:            float
-    volatility_regime: str
-    momentum:          float
-    ma_50:             float
-    ma_200:            float
-    swing_high:        float
-    swing_low:         float
-    rolling_range:     float
-    session_context:   str
+class LiquidityLevel:
+    id:                str
+    type:              str
+    price:             float
+    origin_time:       datetime
+    timeframe:         str
+    status:            str = "active"
+    swept_time:        Optional[datetime] = None
+    sweep_type:        Optional[str] = None
+    member_swing_ids:  list[str] = field(default_factory=list)
+    tolerance_used:    Optional[float] = None
 
+    def to_dict(self) -> dict: ...
+```
+
+---
+
+## SweepEvent
+
+```json
+{
+  "id": "swp_1h_20260307T0900_pdh",
+  "type": "sweep_high",
+  "time": "2026-03-07T09:00:00Z",
+  "timeframe": "1h",
+  "liquidity_level_id": "liq_1h_pdh_20260306T2100",
+  "sweep_price": 1.08735,
+  "sweep_type": "wick_sweep",
+  "status": "confirmed"
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | Stable unique ID |
+| `type` | `sweep_high` \| `sweep_low` | Side of liquidity swept |
+| `time` | ISO8601 UTC | Bar time of the sweep |
+| `timeframe` | string | Source timeframe |
+| `liquidity_level_id` | string | ID of the swept level |
+| `sweep_price` | float | Wick high (or low) that traded through the level |
+| `sweep_type` | `wick_sweep` \| `close_sweep` | How price interacted |
+| `status` | `confirmed` | Immutable once confirmed |
+
+**Python dataclass:**
+
+```python
 @dataclass
-class FeatureBlock:
-    core:        CoreFeatures
-    structure:   None = None   # Phase 3
-    imbalance:   None = None   # Phase 4
-    compression: None = None   # Phase 4
+class SweepEvent:
+    id:                   str
+    type:                 str
+    time:                 datetime
+    timeframe:            str
+    liquidity_level_id:   str
+    sweep_price:          float
+    sweep_type:           str
+    status:               str = "confirmed"
 
+    def to_dict(self) -> dict: ...
+```
+
+---
+
+## RegimeSummary
+
+```json
+{
+  "bias": "bullish",
+  "last_bos_direction": "bullish",
+  "last_mss_direction": null,
+  "trend_state": "trending",
+  "structure_quality": "clean"
+}
+```
+
+| Field | Values | Derivation |
+|---|---|---|
+| `bias` | `bullish` \| `bearish` \| `neutral` | Direction of most recent confirmed BOS |
+| `last_bos_direction` | `bullish` \| `bearish` \| null | Most recent BOS event direction |
+| `last_mss_direction` | `bullish` \| `bearish` \| null | Most recent MSS event direction, else null |
+| `trend_state` | `trending` \| `ranging` \| `unknown` | Last 3 BOS same direction → trending; alternating → ranging |
+| `structure_quality` | `clean` \| `choppy` \| `unknown` | No opposing BOS in last 5 swing cycles → clean |
+
+**Python dataclass:**
+
+```python
 @dataclass
-class StateSummary:
-    trend_1h:          str
-    trend_4h:          str
-    trend_1d:          str
-    volatility_regime: str
-    momentum_state:    str
-    session_context:   str
-    data_quality:      str
+class RegimeSummary:
+    bias:                 str
+    last_bos_direction:   Optional[str]
+    last_mss_direction:   Optional[str]
+    trend_state:          str
+    structure_quality:    str
 
-@dataclass
-class QualityBlock:
-    manifest_valid:          bool
-    all_timeframes_present:  bool
-    staleness_minutes:       int
-    stale:                   bool
-    partial:                 bool
-    flags:                   list[str] = field(default_factory=list)
-
-@dataclass
-class MarketPacket:
-    instrument:    str
-    as_of_utc:     str
-    source:        dict
-    timeframes:    dict
-    features:      FeatureBlock
-    state_summary: StateSummary
-    quality:       QualityBlock
-
-    def to_dict(self) -> dict:
-        """Serialize to the canonical Market Packet v1 JSON structure."""
-        ...
-
-    def is_trusted(self) -> bool:
-        """Returns True only if packet is validated and not stale or partial."""
-        return (
-            not self.quality.stale
-            and not self.quality.partial
-            and self.quality.manifest_valid
-            and self.state_summary.data_quality == "validated"
-        )
+    def to_dict(self) -> dict: ...
 ```
 
 ---
 
 ## Schema evolution policy
 
-- **Phase 2**: `features.core` populated. `structure`, `imbalance`, `compression` = `null`.
-- **Phase 3**: `features.structure` populated. Core unchanged.
-- **Phase 4**: `features.imbalance` and `features.compression` populated. Core and structure unchanged.
+- **Phase 3A**: Core structure objects as defined above
+- **Phase 3B**: `LiquidityLevel` gains `reclaim_time`, `acceptance_confirmed` fields; `SweepEvent` gains `post_sweep_close`; ATR-scaled tolerance added to config
+- **Phase 3C**: New top-level `imbalance` array added to packet; `FVGZone` object introduced
+- **Phase 3D**: Cross-timeframe synthesis fields; Officer integration fields; Parquet output
 
-**Never remove or rename a field without a versioned migration.** Downstream analyst prompts depend on field names being stable. Adding fields is safe. Removing or renaming is a breaking change.
+**Never remove or rename a field. Adding fields is always safe.**
 
 ---
 
-## Instrument policy
+## Output file naming
 
-| Instrument | Status | Notes |
-|---|---|---|
-| `EURUSD` | `trusted` | Verified Phase 1A |
-| `XAUUSD` | `provisional_until_verified` | Do not emit `validated` quality until Phase 1B sign-off |
+```
+structure/output/{instrument_lower}_{tf}_structure.json
 
-If an instrument is not in the trusted list, the Officer must set:
-
-```json
-"source": { "quality": "unverified" }
-"state_summary": { "data_quality": "unverified" }
-"quality": { "flags": ["instrument_not_verified"] }
+eurusd_15m_structure.json
+eurusd_1h_structure.json
+eurusd_4h_structure.json
+xauusd_15m_structure.json
+xauusd_1h_structure.json
+xauusd_4h_structure.json
 ```

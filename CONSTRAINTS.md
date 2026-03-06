@@ -1,166 +1,269 @@
-# CONSTRAINTS.md — Phase 1B Hard Rules and Verification Protocol
+# CONSTRAINTS.md — Phase 3A Hard Rules and Logic Contracts
 
-## The verification gate is non-negotiable
-
-This is the single most important constraint in Phase 1B.
-
-**Do not populate `XAUUSD` in `INSTRUMENTS` dict until all of the following are true:**
-
-1. At least 5 decoded XAUUSD bars have been compared against TradingView XAUUSD
-2. At least 5 decoded XAUUSD bars have been compared against CMC Markets XAUUSD
-3. Price scale has been confirmed — not assumed
-4. Volume semantics have been explicitly documented
-5. A written verification note exists in the codebase
-
-This gate cannot be bypassed by:
-- Assuming XAUUSD uses the same scale as EURUSD (it does not)
-- Assuming a "likely" value of 1000 without confirmation
-- Producing bars that look internally consistent but were never externally compared
-- Declaring "close enough" without documenting the delta
-
-If verification produces ambiguous results, the correct action is to document the ambiguity and leave the stub — not to guess and proceed.
+## Non-negotiable rules
 
 ---
 
-## Verification protocol — step by step
+### RULE 1 — No lookahead leakage
 
-### Step 1 — Fetch a sample hour
+This is the most important rule in the entire Structure Engine.
 
-Choose a recent trading hour with known market activity (avoid weekends, holidays).
-
-Fetch the raw bi5 file for that hour:
-```
-https://www.dukascopy.com/datafeed/XAUUSD/{year}/{month_zero_based}/{day}/{hour}h_ticks.bi5
-```
-
-### Step 2 — Decode raw integers before scaling
-
-Print the first 5 rows of decoded data showing:
-- `time_ms` offset
-- `ask_raw` (raw integer, before division)
-- `bid_raw` (raw integer, before division)
-- `ask_vol_raw`
-- `bid_vol_raw`
-
-Do not apply price scale yet. First understand the raw values.
-
-### Step 3 — Derive candidate mid price
-
-Try candidate scales and compute mid:
-```python
-for candidate_scale in [100, 1000, 10000, 100000]:
-    mid = ((ask_raw / candidate_scale) + (bid_raw / candidate_scale)) / 2
-    print(f"scale={candidate_scale}: mid={mid:.4f}")
-```
-
-One of these should produce a value in the 1,500–3,500 USD range. That is the confirmed scale.
-
-### Step 4 — Aggregate to 1m OHLCV
-
-Using the confirmed scale, aggregate the sample hour to 1-minute OHLCV bars.
-
-### Step 5 — Compare against TradingView
-
-Open TradingView. Navigate to XAUUSD on the 1-minute chart. Find the same timestamp.
-
-For at least 5 bars, record:
-
-| Timestamp UTC | Decoded O | Decoded H | Decoded L | Decoded C | TV O | TV H | TV L | TV C | Delta |
-|---|---|---|---|---|---|---|---|---|---|
-| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-
-Acceptable parity: within 0.50 USD on gold (minor spread/source differences are expected).
-
-### Step 6 — Compare against CMC Markets
-
-Repeat the same comparison using CMC Markets XAUUSD chart.
-
-### Step 7 — Document volume semantics
-
-Examine `ask_vol_raw + bid_vol_raw` values. Determine:
-- Are they in units that make sense as tick volume?
-- Is a divisor needed to normalise?
-- Are they zero or absent for some bars?
-- Document conclusion explicitly
-
-### Step 8 — Write verification note
-
-Produce this comment block in `feed/config.py` above the XAUUSD entry:
+A confirmed swing, BOS, MSS, or sweep must never appear before its confirmation conditions are satisfied on already-closed bars.
 
 ```python
-# XAUUSD Verification — [DATE]
-# Verified by: [your name or "Phase 1B automated check"]
-# Reference sources: TradingView XAUUSD, CMC Markets XAUUSD
-# Bars compared: [N]
-# Price scale confirmed: [value]
-# Volume semantics: [description]
-# Max OHLC delta vs TradingView: [value] USD
-# Max OHLC delta vs CMC: [value] USD
-# Status: VERIFIED / PARTIALLY VERIFIED / UNRESOLVED
-# Notes: [any caveats]
+# Correct — confirmation uses bars[i + right_bars] which is already closed
+if all(bars[i].high > bars[j].high for j in range(i - left_bars, i)) \
+   and all(bars[i].high > bars[j].high for j in range(i + 1, i + right_bars + 1)):
+    confirm_time = bars[i + right_bars].timestamp  # confirmation is the close of the right-side bar
+
+# Wrong — inferring confirmation before right_bars are closed
+confirm_time = bars[i].timestamp  # lookahead — confirmation not yet possible
 ```
 
----
-
-## All Phase 1A rules carry forward
-
-Every constraint from Phase 1A `CONSTRAINTS.md` applies to XAUUSD:
-
-- UTC everywhere
-- Canonical truth is 1m OHLCV
-- Higher timeframes derived only, never fetched
-- Validation before every write
-- Instrument metadata controls all parsing assumptions
-- Source abstraction boundary maintained
-- Incremental append is idempotent
-- No framework bloat
-
-Do not relax any of these for XAUUSD.
+Test this explicitly with fixture datasets. See `ACCEPTANCE_TESTS.md` Group A.
 
 ---
 
-## XAUUSD-specific additional constraints
+### RULE 2 — Close confirmation for BOS only
 
-### RULE X1 — Price range guard for XAUUSD
-
-After decoding, all XAUUSD close prices must pass a plausibility check:
+BOS is confirmed **only** when a candle **closes** beyond the reference swing price.
 
 ```python
-XAUUSD_PRICE_RANGE = (1_500.0, 3_500.0)
+# Correct
+if bar.close > swing_high.price:
+    emit_bos_bull(...)
 
-def validate_xauusd_price_range(df: pd.DataFrame) -> None:
-    out_of_range = ~df["close"].between(*XAUUSD_PRICE_RANGE)
-    if out_of_range.any():
-        raise ValueError(
-            f"XAUUSD close prices out of plausible range "
-            f"{XAUUSD_PRICE_RANGE}: {df.loc[out_of_range, 'close'].describe()}"
-        )
+# Wrong — wick breach is not a BOS trigger in 3A
+if bar.high > swing_high.price:
+    emit_bos_bull(...)
 ```
 
-This catches scale errors that pass structural validation.
-
-### RULE X2 — Do not reuse EURUSD price range guards for XAUUSD
-
-Phase 1A has a plausibility check that EURUSD closes are between 0.8 and 1.5. That check must not be applied to XAUUSD. Each instrument needs its own range constants. Centralise these in `config.py`.
-
-### RULE X3 — Session gap behaviour must be documented
-
-Gold may exhibit different session gap behaviour vs FX. If gaps are observed in the canonical archive at specific hours, document them rather than treating as errors. The validation layer should distinguish between:
-- Genuine data gaps (missing bi5 files = no activity or source gap)
-- Expected session gaps (if gold has thinner overnight hours)
-
-### RULE X4 — Do not modify Officer internals to accommodate XAUUSD parsing
-
-If the Officer needs updating for XAUUSD, it should be limited to the instrument status registry (`trusted` / `provisional`). No parsing logic, no new feature thresholds, no special-casing XAUUSD inside Officer modules.
+Wick interaction in 3A is reserved exclusively for sweep detection.
 
 ---
 
-## What "verified" means vs "assumed"
+### RULE 3 — Append-safe reruns, no retroactive mutation
 
-| State | Meaning | Action |
+When new bars are appended and the engine reruns:
+
+- Previously confirmed swings, events, and liquidity objects must not change
+- New confirmed objects may be added for newly confirmed bars only
+- The only allowed status transitions are additive: `active → swept`, `active → invalidated`
+- No confirmed object's `price`, `anchor_time`, `confirm_time`, or `id` may change on rerun
+
+```python
+# Correct — new bars may produce new confirmed swings
+existing_ids = {sw.id for sw in prior_swings}
+new_swings = [sw for sw in recomputed if sw.id not in existing_ids]
+
+# Wrong — replacing or mutating existing confirmed objects
+prior_swings[3] = recomputed[3]  # mutation
+```
+
+---
+
+### RULE 4 — Timeframe isolation
+
+Each timeframe (15m, 1h, 4h) computes its own structure independently from its own derived bars.
+
+No cross-timeframe logic in 3A. No "15m BOS confirmed by 1h" synthesis. No HTF bias filtering LTF swings. That is Phase 3D.
+
+```python
+# Correct
+for tf in ["15m", "1h", "4h"]:
+    bars = load_bars(instrument, tf)
+    packet = engine.compute(bars, tf, config)
+    write_packet(packet)
+
+# Wrong — passing HTF context into LTF computation
+bars_15m = load_bars(instrument, "15m")
+bars_1h = load_bars(instrument, "1h")
+packet = engine.compute(bars_15m, context=bars_1h)  # cross-TF synthesis not in 3A
+```
+
+---
+
+### RULE 5 — Instrument neutrality
+
+The engine must work identically for EURUSD and XAUUSD. No instrument-specific logic inside `swings.py`, `events.py`, `liquidity.py`, or `regime.py`.
+
+Instrument-specific values (EQH/EQL tolerance, session calendar) belong in `config.py` only.
+
+```python
+# Correct — tolerance from config, not hardcoded
+tolerance = config.eqh_eql_tolerance[instrument]
+
+# Wrong — instrument check inside logic module
+if instrument == "XAUUSD":
+    tolerance = 0.50
+```
+
+---
+
+### RULE 6 — Do not touch Officer or feed modules
+
+The Structure Engine is a separate lane. It reads from `market_data/derived/` (same source as the Officer) but does not call Officer functions, modify Officer contracts, or alter feed pipeline code.
+
+If the Officer needs updating to reference structure packets later, that is Phase 3D.
+
+---
+
+### RULE 7 — IDs must be stable and unique
+
+Every `SwingPoint`, `StructureEvent`, `LiquidityLevel`, and `SweepEvent` must have a stable, unique ID that does not change on rerun.
+
+Recommended ID scheme:
+```python
+# SwingPoint
+f"sw_{timeframe}_{anchor_time_compact}_{type_abbrev}"
+# e.g. "sw_1h_20260306T0800_sh"
+
+# StructureEvent
+f"ev_{timeframe}_{event_time_compact}_{type_abbrev}"
+# e.g. "ev_15m_20260307T1015_bos_bull"
+
+# LiquidityLevel
+f"liq_{timeframe}_{type_abbrev}_{origin_time_compact}"
+# e.g. "liq_1h_pdh_20260306T2100"
+```
+
+IDs must be deterministic — same bar data always produces same IDs.
+
+---
+
+### RULE 8 — JSON output is human-readable
+
+Structure packets are JSON only in 3A. They must be:
+
+- Pretty-printed (`indent=2`)
+- UTF-8 encoded
+- Written atomically (write to temp file, rename — avoid partial writes)
+- Named predictably: `{instrument_lower}_{tf}_structure.json`
+
+```python
+import json, tempfile, os
+
+def write_packet_atomic(packet: dict, path: str) -> None:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(packet, f, indent=2, default=str)
+    os.replace(tmp, path)
+```
+
+---
+
+## Module boundary map
+
+| Module | Owns | Must not touch |
 |---|---|---|
-| Verified | Decoded bars match TradingView + CMC within tolerance, scale confirmed, volume documented | Populate `InstrumentMeta`, proceed |
-| Partially verified | Price scale confirmed, volume ambiguous | Populate with `volume_divisor=None` and explicit note, proceed with caution |
-| Unresolved | Price scale produces values outside plausible range, or bars don't match references | Leave stub, document findings, do not proceed |
+| `schemas.py` | Dataclass definitions, `to_dict()` | Computation logic, file I/O |
+| `config.py` | All configurable parameters | Computation logic |
+| `swings.py` | Confirmed pivot swing detection | Events, liquidity, regime, I/O |
+| `events.py` | BOS and MSS detection from confirmed swings | Swing computation, liquidity, I/O |
+| `liquidity.py` | Prior levels, EQH/EQL, sweep events | Swing computation, BOS logic |
+| `regime.py` | Objective summary from swings + events | Any computation from raw bars |
+| `io.py` | Load derived bars, write JSON packets | Computation logic |
+| `engine.py` | Orchestrate all modules | Implement any module's logic directly |
 
-Partial verification is acceptable if documented. Silent assumption is never acceptable.
+---
+
+## Configuration surface — keep narrow in 3A
+
+Expose only these parameters in `config.py`:
+
+```python
+@dataclass
+class StructureConfig:
+    # Pivot confirmation
+    pivot_left_bars:  int   = 3
+    pivot_right_bars: int   = 3
+
+    # BOS confirmation
+    bos_confirmation: str   = "close"   # "close" only in 3A
+
+    # EQH/EQL tolerance — fixed pip/point value per instrument
+    eqh_eql_tolerance: dict = field(default_factory=lambda: {
+        "EURUSD": 0.00010,   # 1 pip
+        "XAUUSD": 0.50,      # 50 cents
+    })
+
+    # Enabled timeframes
+    timeframes: list = field(default_factory=lambda: ["15m", "1h", "4h"])
+
+    # Session calendar for prior high/low derivation (UTC hour of day session open)
+    day_session_open_utc: int  = 21    # Sunday 21:00 UTC = start of FX week
+    week_session_open_day: int = 6     # Sunday = 6 (ISO weekday)
+```
+
+Do not expose more knobs than this in 3A. Configuration sprawl before the logic is proven creates untestable combinations.
+
+---
+
+## Swing lifecycle
+
+```
+detected (internal only, not emitted)
+    ↓
+confirmed  ← emitted in SwingPoint object
+    ↓
+broken     ← status update when BOS fires through this swing
+    ↓
+superseded ← status update when a higher/lower swing replaces it
+    ↓
+archived   ← retained in packet history but no longer active
+```
+
+Status transitions are additive only. A `confirmed` swing never goes back to `detected`.
+
+---
+
+## Liquidity lifecycle
+
+```
+active      ← emitted when level is identified
+    ↓
+swept       ← price trades through (wick or close)
+    ↓
+invalidated ← level context no longer valid (e.g. far exceeded, period expired)
+    ↓
+archived    ← retained in packet history
+```
+
+---
+
+## What "deterministic" means in this context
+
+Given the same set of input bars:
+
+1. The same `SwingPoint` objects are produced with the same IDs, prices, and timestamps
+2. The same `StructureEvent` objects are produced
+3. The same `LiquidityLevel` objects are produced
+4. The JSON packet is logically identical (field values match, order may vary)
+
+This must hold across:
+- Multiple runs on the same machine
+- Runs after adding new bars (existing confirmed objects unchanged)
+- Runs on EURUSD vs XAUUSD (same logic, different config values)
+
+---
+
+## Code quality standards
+
+- Every public function has a docstring
+- Type hints on all function signatures
+- Named constants for all threshold values — no magic numbers
+- Raise `ValueError` for invalid bar data inputs
+- Raise `RuntimeError` for internal state consistency violations
+- `print()` acceptable for CLI progress; no logging framework required in 3A
+- No ML libraries, no HTTP clients, no task frameworks
+
+---
+
+## Dependencies
+
+No new dependencies beyond what exists. Phase 3A requires only:
+
+```
+pandas>=2.0
+pyarrow>=14.0   # for reading derived Parquet inputs
+```
