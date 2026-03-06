@@ -565,8 +565,8 @@ def replay(
     from .core.arbiter_prompt_builder import build_arbiter_prompt
     from .models.arbiter_output import FinalVerdict
     from litellm import acompletion
-
-    ARBITER_MODEL = "claude-haiku-4-5-20251001"
+    from .llm_router import router
+    from .llm_router.task_types import ARBITER_DECISION
 
     async def _replay():
         macro_context = None
@@ -581,12 +581,15 @@ def replay(
             run_id=f"{run_id}-replay",
             macro_context=macro_context,
         )
+        route = router.resolve(ARBITER_DECISION)
         response = await acompletion(
-            model=ARBITER_MODEL,
+            model=route["model"],
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.1,
             max_tokens=2000,
+            api_base=route["base_url"],
+            api_key=route["api_key"],
         )
         raw: str = response.choices[0].message.content
         return FinalVerdict.model_validate_json(raw)
