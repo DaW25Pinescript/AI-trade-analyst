@@ -160,3 +160,7 @@ config/llm_routing.yaml
 
 # Python test cache
 .pytest_cache/
+
+# Market Data Officer — runtime data output (not committed)
+market_data/
+market_data_officer/market_data/
