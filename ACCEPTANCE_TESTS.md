@@ -1,321 +1,345 @@
-# ACCEPTANCE_TESTS.md — Phase 1A Exit Criteria
+# ACCEPTANCE_TESTS.md — Market Data Officer Phase 2 Exit Criteria
 
 ## How to use this file
 
-Run each test group in order. Phase 1A is not complete until every criterion below passes. Where Python test snippets are provided, they should be implemented in `tests/` and runnable via `pytest`.
+Run each test group in order. Phase 2 is not complete until every criterion passes. Implement tests in `market_data_officer/tests/` and run via `pytest`.
+
+Prerequisite: Phase 1A feed pipeline has run successfully and hot packages exist in `market_data/packages/latest/`.
 
 ---
 
-## Group 1 — Fetch layer
+## Group 1 — Loader
 
-### T1.1 — URL construction is correct
-
-```python
-from feed.fetch import build_bi5_url
-from datetime import datetime, timezone
-
-dt = datetime(2025, 1, 15, 9, 0, 0, tzinfo=timezone.utc)
-url = build_bi5_url("EURUSD", dt)
-
-assert url == "https://www.dukascopy.com/datafeed/EURUSD/2025/00/15/09h_ticks.bi5"
-# Note: Dukascopy uses zero-based month index (January = 00)
-```
-
-### T1.2 — Empty or 404 response returns empty bytes without crashing
+### T1.1 — Manifest loads and parses correctly
 
 ```python
-from feed.fetch import fetch_bi5
-from datetime import datetime, timezone
+from officer.loader import load_manifest
 
-# Use a future date that will return no data
-far_future = datetime(2099, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-result = fetch_bi5("EURUSD", far_future, save_raw=False)
-assert result == b""
+manifest = load_manifest("EURUSD")
+
+assert manifest["instrument"] == "EURUSD"
+assert "as_of_utc" in manifest
+assert "windows" in manifest
+assert "1m" in manifest["windows"]
+assert "1d" in manifest["windows"]
 ```
 
-### T1.3 — Raw cache writes to correct path
-
-If `save_raw=True`, verify the bi5 file appears at:
-`market_data/raw/dukascopy/EURUSD/<year>/<month>/<day>/<hour>h_ticks.bi5`
-
----
-
-## Group 2 — Decode layer
-
-### T2.1 — Tick decode produces correct schema
+### T1.2 — All six timeframe DataFrames load with correct schema
 
 ```python
-from feed.decode import decode_dukascopy_ticks
-from feed.config import INSTRUMENTS
-from datetime import datetime, timezone
+from officer.loader import load_timeframe
 
-meta = INSTRUMENTS["EURUSD"]
-hour_start = datetime(2025, 1, 15, 9, 0, 0, tzinfo=timezone.utc)
-
-# Use a real fetched bi5 payload for this test
-df = decode_dukascopy_ticks(raw_bytes, hour_start, meta)
-
-assert not df.empty
-assert set(df.columns) >= {"mid", "volume"}
-assert df.index.name == "timestamp_utc"
-assert df.index.tzinfo is not None  # UTC-aware
-assert df.index.is_monotonic_increasing
+for tf in ["1m", "5m", "15m", "1h", "4h", "1d"]:
+    df = load_timeframe("EURUSD", tf)
+    assert not df.empty, f"{tf} DataFrame is empty"
+    assert set(df.columns) >= {"open", "high", "low", "close", "volume"}
+    assert df.index.tzinfo is not None, f"{tf} index is not UTC-aware"
+    assert df.index.is_monotonic_increasing, f"{tf} index is not monotonic"
 ```
 
-### T2.2 — Price scale applied correctly for EURUSD
-
-Decoded `mid` values must be in the range 0.8–1.5 (plausible EURUSD range).
+### T1.3 — Loader does not read raw Parquet
 
 ```python
-assert df["mid"].between(0.8, 1.5).all(), f"Suspicious EURUSD price: {df['mid'].describe()}"
+# Grep check — must return no matches
+# grep -rn "read_parquet" market_data_officer/officer/loader.py
+# Expected: no output
 ```
 
-### T2.3 — Corrupt or empty bytes return empty DataFrame without crash
-
-```python
-result = decode_dukascopy_ticks(b"", hour_start, meta)
-assert result.empty
-
-result = decode_dukascopy_ticks(b"not_valid_lzma_data", hour_start, meta)
-assert result.empty
-```
-
----
-
-## Group 3 — Aggregation layer
-
-### T3.1 — 1m OHLCV schema is correct
-
-```python
-from feed.aggregate import ticks_to_1m_ohlcv
-
-m1 = ticks_to_1m_ohlcv(tick_df)
-
-assert set(m1.columns) >= {"open", "high", "low", "close", "volume"}
-assert m1.index.tzinfo is not None
-assert m1.index.freq == "T" or m1.index.is_monotonic_increasing
-```
-
-### T3.2 — OHLC derivation is correct
-
-For a known tick sequence, verify:
-
-```python
-# If ticks at 09:00 are: 1.0900, 1.0950, 1.0880, 1.0920
-# Then 1m bar at 09:00 must be:
-assert bar["open"] == 1.0900
-assert bar["high"] == 1.0950
-assert bar["low"]  == 1.0880
-assert bar["close"] == 1.0920
-```
-
-### T3.3 — Empty tick input returns empty DataFrame
-
-```python
-result = ticks_to_1m_ohlcv(pd.DataFrame())
-assert result.empty
-```
-
----
-
-## Group 4 — Validation layer
-
-### T4.1 — Valid DataFrame passes silently
-
-```python
-from feed.validate import validate_ohlcv
-# Should not raise
-validate_ohlcv(clean_df, "test")
-```
-
-### T4.2 — Non-monotonic index raises
+### T1.4 — Missing manifest raises FileNotFoundError
 
 ```python
 import pytest
-with pytest.raises(ValueError, match="monotonic"):
-    validate_ohlcv(df_with_scrambled_index, "test")
-```
-
-### T4.3 — Duplicate timestamps raise
-
-```python
-with pytest.raises(ValueError, match="duplicate"):
-    validate_ohlcv(df_with_dupes, "test")
-```
-
-### T4.4 — Null OHLC raises
-
-```python
-with pytest.raises(ValueError, match="null"):
-    validate_ohlcv(df_with_null_close, "test")
-```
-
-### T4.5 — Invalid high/low envelope raises
-
-```python
-# Row where high < open (impossible candle)
-with pytest.raises(ValueError, match="invalid high"):
-    validate_ohlcv(df_with_bad_high, "test")
+with pytest.raises(FileNotFoundError):
+    load_manifest("FAKEINSTRUMENT")
 ```
 
 ---
 
-## Group 5 — Resample layer
+## Group 2 — Quality checks
 
-### T5.1 — Derived timeframes have correct schemas
-
-For each of 5m, 15m, 1h, 4h, 1d:
+### T2.1 — Valid package passes all quality checks
 
 ```python
-from feed.resample import resample_from_1m
+from officer.quality import check_package_quality
 
-df_5m = resample_from_1m(canonical_df, "5min")
+result = check_package_quality("EURUSD")
 
-assert set(df_5m.columns) >= {"open", "high", "low", "close", "volume", "vendor", "build_method", "quality_flag"}
-assert df_5m.index.tzinfo is not None
-assert df_5m["vendor"].iloc[0] == "derived"
-assert df_5m["build_method"].iloc[0] == "resample_from_1m"
+assert result.manifest_valid is True
+assert result.all_timeframes_present is True
+assert result.partial is False
+assert result.flags == []
 ```
 
-### T5.2 — No `mid` column reference anywhere in resample logic
+### T2.2 — Stale package is flagged, not crashed
 
-Run a grep check:
-
-```bash
-grep -rn "mid" market_data_officer/feed/resample.py
-# Must return no matches
+```python
+# Simulate: modify manifest as_of_utc to be 3 hours ago
+# Re-run quality check
+result = check_package_quality("EURUSD")
+assert result.stale is True
+assert result.staleness_minutes > 60
+assert "stale" in result.flags or result.stale is True
 ```
 
-### T5.3 — Derived bar count is plausible
+### T2.3 — Partial package degrades gracefully
 
-A 5m bar produced from 5 1m bars must have `high` = max of those 5 highs, not some intermediate value. Verify on a known fixture.
+```python
+# Simulate: rename EURUSD_4h_latest.csv temporarily
+result = check_package_quality("EURUSD")
+assert result.partial is True
+assert any("4h" in f for f in result.flags)
+```
 
-### T5.4 — Validation runs on derived output before write
+### T2.4 — Unverified instrument returns unverified quality, not crash
 
-Confirm `validate_ohlcv()` is called inside `derive_timeframes()` for each timeframe before saving.
+```python
+from officer.service import build_market_packet
+
+packet = build_market_packet("XAUUSD")  # provisional instrument
+assert packet.quality.flags  # must have at least one flag
+assert packet.state_summary.data_quality in ("unverified", "partial")
+# Must NOT raise an exception
+```
 
 ---
 
-## Group 6 — Hot package export
+## Group 3 — Core features
 
-### T6.1 — Correct row counts in hot CSVs
+### T3.1 — All core feature fields are present and non-null
+
+```python
+from officer.features import compute_core_features
+from officer.loader import load_timeframe
+
+df_1h = load_timeframe("EURUSD", "1h")
+features = compute_core_features(df_1h)
+
+assert features.atr_14 > 0
+assert features.volatility_regime in ("low", "normal", "expanding")
+assert features.momentum is not None
+assert features.ma_50 > 0
+assert features.ma_200 > 0
+assert features.swing_high > 0
+assert features.swing_low > 0
+assert features.rolling_range > 0
+assert features.session_context in ("asian", "london", "new_york", "overlap")
+```
+
+### T3.2 — ATR is positive and plausible for EURUSD
+
+```python
+# EURUSD ATR on 1h should be in range 0.0001 to 0.02
+assert 0.0001 < features.atr_14 < 0.02, f"ATR out of plausible range: {features.atr_14}"
+```
+
+### T3.3 — MA values are plausible for EURUSD
+
+```python
+assert 0.8 < features.ma_50 < 1.5
+assert 0.8 < features.ma_200 < 1.5
+```
+
+### T3.4 — Feature computation is deterministic
+
+```python
+features_a = compute_core_features(df_1h)
+features_b = compute_core_features(df_1h)
+assert features_a.atr_14 == features_b.atr_14
+assert features_a.ma_50 == features_b.ma_50
+```
+
+### T3.5 — Insufficient data returns graceful result, not crash
 
 ```python
 import pandas as pd
-
-df_1m = pd.read_csv("market_data/packages/latest/EURUSD_1m_latest.csv", index_col=0)
-assert len(df_1m) <= 3000
-
-df_1h = pd.read_csv("market_data/packages/latest/EURUSD_1h_latest.csv", index_col=0)
-assert len(df_1h) <= 240
+tiny_df = df_1h.head(10)  # only 10 bars, not enough for MA200
+features = compute_core_features(tiny_df)
+# Should not raise — ma_200 may be None or 0.0, not an exception
+assert features is not None
 ```
 
-### T6.2 — JSON manifest is valid and complete
+---
+
+## Group 4 — Advanced feature stubs
+
+### T4.1 — All stub modules exist
+
+```bash
+# Each of these files must exist:
+ls market_data_officer/officer/structure/bos_detector.py
+ls market_data_officer/officer/structure/fvg_detector.py
+ls market_data_officer/officer/structure/compression_detector.py
+ls market_data_officer/officer/structure/imbalance_detector.py
+```
+
+### T4.2 — All stubs return None without raising
+
+```python
+from officer.structure.bos_detector import detect_bos
+from officer.structure.fvg_detector import detect_fvg
+from officer.structure.compression_detector import detect_compression
+from officer.structure.imbalance_detector import detect_imbalance
+
+df_1h = load_timeframe("EURUSD", "1h")
+
+assert detect_bos(df_1h) is None
+assert detect_fvg(df_1h) is None
+assert detect_compression(df_1h) is None
+assert detect_imbalance(df_1h) is None
+```
+
+### T4.3 — All stubs have docstrings explaining Phase 3/4 intent
+
+```python
+import inspect
+from officer.structure import bos_detector
+
+assert bos_detector.detect_bos.__doc__ is not None
+assert len(bos_detector.detect_bos.__doc__) > 20
+```
+
+---
+
+## Group 5 — State summary
+
+### T5.1 — All state summary fields present
+
+```python
+from officer.summarizer import build_state_summary
+
+summary = build_state_summary(features, timeframes)
+
+assert summary.trend_1h in ("bullish", "bearish", "neutral")
+assert summary.trend_4h in ("bullish", "bearish", "neutral")
+assert summary.trend_1d in ("bullish", "bearish", "neutral")
+assert summary.volatility_regime in ("low", "normal", "expanding")
+assert summary.momentum_state in ("expanding", "contracting", "flat")
+assert summary.session_context in ("asian", "london", "new_york", "overlap")
+assert summary.data_quality in ("validated", "partial", "stale", "unverified")
+```
+
+### T5.2 — Trend derivation is consistent with MA relationship
+
+```python
+# If close > ma_50 > ma_200 on 1h, trend_1h must be "bullish"
+# Construct a synthetic DataFrame to verify this deterministically
+```
+
+---
+
+## Group 6 — Market Packet assembly
+
+### T6.1 — Full packet builds without exception
+
+```python
+from officer.service import build_market_packet
+
+packet = build_market_packet("EURUSD")
+assert packet is not None
+```
+
+### T6.2 — Packet serialises to valid JSON matching v1 schema
 
 ```python
 import json
 
-with open("market_data/packages/latest/EURUSD_hot.json") as f:
-    manifest = json.load(f)
+d = packet.to_dict()
+json_str = json.dumps(d)  # must not raise
+parsed = json.loads(json_str)
 
-assert manifest["instrument"] == "EURUSD"
-assert "as_of_utc" in manifest
-assert "1m" in manifest["windows"]
-assert "1d" in manifest["windows"]
-assert manifest["windows"]["1m"]["count"] > 0
+# Top-level keys
+assert set(parsed.keys()) >= {"instrument", "as_of_utc", "source", "timeframes", "features", "state_summary", "quality"}
+
+# All four feature keys present
+assert set(parsed["features"].keys()) == {"core", "structure", "imbalance", "compression"}
+
+# Advanced features are null
+assert parsed["features"]["structure"] is None
+assert parsed["features"]["imbalance"] is None
+assert parsed["features"]["compression"] is None
+
+# Core features populated
+assert parsed["features"]["core"]["atr_14"] > 0
 ```
 
-### T6.3 — Hot CSVs contain only OHLCV columns (no metadata columns)
+### T6.3 — All six timeframes present in packet
 
 ```python
-df = pd.read_csv("market_data/packages/latest/EURUSD_1m_latest.csv", index_col=0)
-assert set(df.columns) == {"open", "high", "low", "close", "volume"}
+d = packet.to_dict()
+for tf in ["1m", "5m", "15m", "1h", "4h", "1d"]:
+    assert tf in d["timeframes"], f"Missing timeframe: {tf}"
+    assert d["timeframes"][tf]["count"] > 0
+```
+
+### T6.4 — Timestamps in packet are UTC ISO8601 strings
+
+```python
+from datetime import datetime, timezone
+
+as_of = datetime.fromisoformat(packet.as_of_utc.replace("Z", "+00:00"))
+assert as_of.tzinfo is not None
+```
+
+### T6.5 — `is_trusted()` returns True for clean EURUSD packet
+
+```python
+assert packet.is_trusted() is True
+```
+
+### T6.6 — Packet written to correct output path
+
+```python
+import os
+packet_path = "market_data_officer/state/packets/EURUSD_market_packet.json"
+# After run_officer.py --instrument EURUSD
+assert os.path.exists(packet_path)
 ```
 
 ---
 
-## Group 7 — Incremental update
+## Group 7 — CLI entry point
 
-### T7.1 — Re-run produces no duplicate timestamps
-
-After a successful run, run again on the same date range.
-
-```python
-canonical = pd.read_parquet("market_data/canonical/EURUSD_1m.parquet")
-assert not canonical.index.duplicated().any()
-```
-
-### T7.2 — Re-run does not re-fetch already-ingested data
-
-Add a fetch counter or log check. On second run for the same date, fetch calls for already-covered hours must be zero (or skipped).
-
-### T7.3 — New data appends cleanly
-
-Simulate: run for day 1, then run extending to day 2. Confirm:
-- Row count increases
-- Timestamps remain monotonic
-- No duplicates at the boundary
-- Validation passes after append
-
----
-
-## Group 8 — End-to-end smoke test
-
-### T8.1 — Full pipeline run completes without exception
+### T7.1 — Help flag works
 
 ```bash
-python run_feed.py --instrument EURUSD --start-date 2025-01-13 --end-date 2025-01-15
+python run_officer.py --help
+# Must exit 0 and show usage
 ```
 
-Expected: no unhandled exceptions, all output files exist.
+### T7.2 — Full run completes without exception
 
-### T8.2 — All output files exist after run
-
-```
-market_data/canonical/EURUSD_1m.parquet       ✓
-market_data/derived/EURUSD_5m.parquet         ✓
-market_data/derived/EURUSD_5m.csv             ✓
-market_data/derived/EURUSD_15m.parquet        ✓
-market_data/derived/EURUSD_1h.parquet         ✓
-market_data/derived/EURUSD_4h.parquet         ✓
-market_data/derived/EURUSD_1d.parquet         ✓
-market_data/packages/latest/EURUSD_1m_latest.csv  ✓
-market_data/packages/latest/EURUSD_hot.json   ✓
+```bash
+python run_officer.py --instrument EURUSD
+# Expected: no unhandled exceptions, packet file written
 ```
 
-### T8.3 — Canonical bar timestamps are UTC-aware
+### T7.3 — Output confirms packet quality in terminal
 
-```python
-df = pd.read_parquet("market_data/canonical/EURUSD_1m.parquet")
-assert df.index.tzinfo is not None
-assert str(df.index.tzinfo) in ("UTC", "utc", "<UTC>")
+The CLI must print something like:
+
 ```
-
-### T8.4 — EURUSD mid prices are in plausible FX range
-
-```python
-assert df["close"].between(0.8, 1.5).all()
-```
-
-### T8.5 — No `mid` column in canonical archive
-
-```python
-assert "mid" not in df.columns
+Market packet built: EURUSD
+  as_of_utc: 2026-03-06T12:00:00Z
+  data_quality: validated
+  stale: False
+  partial: False
+  flags: []
 ```
 
 ---
 
-## Phase 1A sign-off checklist
+## Phase 2 sign-off checklist
 
-Before marking Phase 1A complete, confirm:
+Before marking Phase 2 complete, confirm:
 
-- [ ] All 8 test groups pass
-- [ ] `validate_ohlcv()` is called before every Parquet/CSV write
-- [ ] No `mid` column reference in resample or export code
-- [ ] All timestamps UTC-aware throughout
-- [ ] XAUUSD stub comment is present in `config.py`
-- [ ] XAUUSD is not implemented
-- [ ] `requirements.txt` is present
-- [ ] `run_feed.py --help` works
-- [ ] A 3-day EURUSD run completes cleanly end-to-end
-- [ ] Re-run of same 3-day range produces zero new fetches and no duplicates
+- [ ] All 7 test groups pass
+- [ ] `features.structure`, `features.imbalance`, `features.compression` are all `null` in serialized packet
+- [ ] No raw Parquet reads in `officer/loader.py`
+- [ ] No feed pipeline calls anywhere in `officer/`
+- [ ] All four stub files exist and return `None`
+- [ ] All stubs have docstrings
+- [ ] Market Packet JSON validates against v1 schema
+- [ ] `is_trusted()` returns `True` for clean EURUSD packet
+- [ ] `run_officer.py --instrument EURUSD` completes end-to-end
+- [ ] Packet file written to `state/packets/EURUSD_market_packet.json`
+- [ ] XAUUSD handled gracefully as `unverified` without crashing

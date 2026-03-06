@@ -1,169 +1,186 @@
-# CONSTRAINTS.md — Hard Rules, Known Defects, Engineering Standards
+# CONSTRAINTS.md — Hard Rules, Module Boundaries, Failure Handling
 
-## Non-negotiable engineering rules
-
-These rules are not suggestions. Violating any of them is a defect.
+## Non-negotiable rules
 
 ---
 
-### RULE 1 — UTC everywhere
+### RULE 1 — The Officer does not fetch, decode, or write canonical data
 
-All timestamps must be UTC and timezone-aware throughout the entire pipeline.
+The Officer is a **read layer only**. It must not:
+- Make HTTP requests to Dukascopy or any vendor
+- Decompress bi5 files
+- Write to `market_data/canonical/`
+- Write to `market_data/derived/`
+- Call any function in `feed/fetch.py`, `feed/decode.py`, or `feed/pipeline.py`
+
+If the feed hasn't run, the Officer should detect that via missing manifests and degrade gracefully — not attempt to fill the gap itself.
+
+---
+
+### RULE 2 — Read from hot packages, not raw Parquet
+
+The Officer reads from `market_data/packages/latest/` only.
+
+It must not read `market_data/canonical/EURUSD_1m.parquet` directly. Hot packages are the contract surface between feed and Officer. Raw Parquet is the feed's internal truth, not the Officer's input.
 
 ```python
 # Correct
-ts = datetime.now(timezone.utc)
-df.index = pd.to_datetime(df.index, utc=True)
+loader.load_hot_package("EURUSD", "1h")
 
 # Wrong
-ts = datetime.utcnow()  # naive, not timezone-aware
-df.index = pd.to_datetime(df.index)  # may lose tz info
+pd.read_parquet("market_data/canonical/EURUSD_1m.parquet")
 ```
 
-If any timestamp is naive (no tzinfo), that is a defect. Raise on it.
+---
+
+### RULE 3 — Validate before building
+
+The Officer must run `quality.py` checks before assembling any packet. If validation fails:
+
+- Set `quality.partial = True` or `quality.stale = True`
+- Populate `quality.flags` with specific failure reasons
+- Set `state_summary.data_quality` to `"partial"` or `"stale"`
+- Still return a packet (do not crash)
+- Log warnings for every flag raised
+
+Never silently continue past a quality failure.
 
 ---
 
-### RULE 2 — Canonical truth is 1m OHLCV only
+### RULE 4 — Features are computed from loaded DataFrames, not re-fetched data
 
-The canonical archive is `EURUSD_1m.parquet`. It is not a tick archive. It is not a mid-price series.
-
-Once ticks have been aggregated to 1m OHLCV, the tick-level `mid` column no longer exists. Derived timeframes must resample from `open/high/low/close/volume` columns — **never from a `mid` column** (this was the critical bug in the prototype).
+All feature computation happens on the DataFrames already loaded from hot packages. Features must not trigger additional file reads, HTTP calls, or feed pipeline runs.
 
 ---
 
-### RULE 3 — Higher timeframes derived only, never fetched
+### RULE 5 — Advanced feature stubs return None, not partial logic
 
-5m, 15m, 1h, 4h, 1d are always computed by resampling canonical 1m. They are never fetched independently from Dukascopy or any other source. This ensures:
-
-- internal consistency across all timeframes
-- a single source of truth
-- simpler validation
-
----
-
-### RULE 4 — Validation before every write
-
-The validation function must run before any Parquet or CSV write. It must check:
-
-1. **Monotonic timestamps** — index must be strictly increasing
-2. **No duplicate timestamps** — zero tolerance
-3. **No null OHLC** — open/high/low/close must all be non-null
-4. **High/low envelope validity**:
-   - `high >= max(open, close, low)` for every row
-   - `low <= min(open, close, high)` for every row
-5. **Required columns present** — open, high, low, close, volume
-
-If validation fails, raise a `ValueError` with a descriptive message. Do not silently write corrupt data.
+The structure stubs in `officer/structure/` must:
 
 ```python
-def validate_ohlcv(df: pd.DataFrame, label: str) -> None:
-    """Raises ValueError if df fails any integrity check."""
-    ...
+def detect_bos(df: pd.DataFrame) -> None:
+    """
+    Phase 3: Detect Break of Structure events.
+    Will require: pivot detection rules, break confirmation logic,
+    close vs wick interpretation, timeframe interaction model.
+    Not implemented in Phase 2.
+    """
+    return None
 ```
+
+Do not implement partial BOS, FVG, or compression logic. Partial implementations are worse than explicit stubs because they create false confidence. Return `None`. Reserve the field in the packet. Move on.
 
 ---
 
-### RULE 5 — Instrument metadata controls parsing assumptions
+### RULE 6 — Market Packet schema is fixed at v1
 
-All instrument-specific values (price scale, volume divisor, symbol name) must come from a single `InstrumentMeta` dataclass, not from hardcoded magic numbers inside parsing functions.
+The packet schema defined in `CONTRACTS.md` is the contract. Do not add, remove, or rename fields during Phase 2 implementation without explicit instruction.
+
+Fields present: `instrument`, `as_of_utc`, `source`, `timeframes`, `features`, `state_summary`, `quality`.
+
+Feature sub-keys present: `core`, `structure`, `imbalance`, `compression`.
+
+All four feature keys must always be present, even if value is `null`.
+
+---
+
+### RULE 7 — UTC everywhere
+
+All timestamps in the packet must be UTC-aware ISO8601 strings.
 
 ```python
-@dataclass(frozen=True)
-class InstrumentMeta:
-    symbol: str
-    price_scale: int
-    volume_divisor: Optional[float] = None
+# Correct
+"as_of_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-INSTRUMENTS = {
-    "EURUSD": InstrumentMeta(symbol="EURUSD", price_scale=100000),
-    # XAUUSD: DO NOT POPULATE until Phase 1B with verified values
-}
+# Wrong
+"as_of_utc": datetime.utcnow().isoformat()
 ```
 
 ---
 
-### RULE 6 — Source abstraction boundary
+### RULE 8 — Instrument policy must be enforced
 
-Dukascopy-specific parsing logic must live behind a clear module boundary (`fetch.py`, `decode.py`). The rest of the pipeline (`aggregate.py`, `validate.py`, `resample.py`, `export.py`) must be source-agnostic. This is what makes Phase 1B (XAUUSD) and Phase 1E (HistData bootstrap) possible without rewriting the core.
+Only emit `quality: "validated"` for instruments that have passed Phase 1A/1B verification.
 
----
+Current trusted list: `EURUSD`
+Current provisional list: `XAUUSD` (until Phase 1B sign-off)
 
-### RULE 7 — Incremental append is idempotent
-
-Re-running the pipeline must:
-- Detect the last canonical timestamp
-- Only fetch data after that point
-- Append without creating duplicate rows
-- Produce the same result whether run once or ten times
-
-Test this explicitly. See `ACCEPTANCE_TESTS.md`.
+If an unverified instrument is requested, set quality to `"unverified"` and add flag `"instrument_not_verified"`. Do not crash. Do not silently emit validated quality for unverified instruments.
 
 ---
 
-### RULE 8 — No framework bloat
+## Module boundary map
 
-Do not introduce:
-- Celery, Airflow, Prefect, or task queue frameworks
-- FastAPI/Flask endpoints
-- Database ORM layers
-- Heavy ML dependencies
-
-Phase 1A is a data pipeline, not a web service. Keep it: `requests`, `pandas`, `pyarrow`, `lzma`, `struct`, `pathlib`, `dataclasses`. That is sufficient.
-
----
-
-## Known defects in the prototype — must fix
-
-These were identified in the prior Codex session. All must be corrected:
-
-| # | Defect | Fix required |
-|---|--------|--------------|
-| 1 | `derive_timeframes()` referenced a nonexistent `mid` column after canonical 1m was already OHLCV | Resample from `open/high/low/close/volume` only |
-| 2 | Dukascopy volume parsing was not isolated — `ask_vol_raw + bid_vol_raw` summed raw integers without instrument-aware divisor handling | Route through `InstrumentMeta.volume_divisor` |
-| 3 | Price scaling was inconsistently applied — not always routed through `InstrumentMeta.price_scale` | All price scaling must go through metadata |
-| 4 | Timezone handling was inconsistent — some paths produced naive timestamps | Enforce UTC-aware everywhere, raise on naive |
-| 5 | No validation before writes | Add `validate_ohlcv()` before every Parquet/CSV write |
-| 6 | Hour-by-hour loop had no error isolation — one bad hour crashed the day | Wrap each hour in try/except, log and continue |
+| Module | Owns | Must not touch |
+|---|---|---|
+| `loader.py` | Read hot CSVs, parse manifest, return DataFrames | feed pipeline, raw Parquet, vendor fetch |
+| `features.py` | Compute core features from loaded DataFrames | file I/O, HTTP, feed internals |
+| `summarizer.py` | Build StateSummary from features + timeframe DFs | raw bar calculations |
+| `quality.py` | Read-side sanity checks, staleness, manifest validation | feature computation |
+| `contracts.py` | Dataclass definitions, `to_dict()`, `is_trusted()` | computation logic |
+| `service.py` | Orchestrate loader → quality → features → summarizer → packet | implement any of the above directly |
+| `structure/*.py` | Stubs only, return None | any real logic |
 
 ---
 
-## XAUUSD stubs — do not implement, do leave explicit notes
+## Failure mode handling
 
-In `config.py`, leave this exact stub with comment block:
+### Stale package
+
+Staleness threshold: 60 minutes during assumed market hours.
 
 ```python
-# TODO Phase 1B — XAUUSD
-# DO NOT populate until the following are independently verified:
-#   1. Dukascopy price_scale for XAUUSD (likely 1000, but MUST be confirmed
-#      against a known reference bar — e.g. compare decoded close vs CMC/TradingView)
-#   2. Volume interpretation for XAUUSD (lots? units? divisor needed?)
-#   3. Any session/gap behaviour differences vs EURUSD
-# Populating with unverified values will silently corrupt the canonical archive.
-# "XAUUSD": InstrumentMeta(symbol="XAUUSD", price_scale=???, volume_divisor=???),
+staleness_minutes = (now_utc - last_bar_utc).total_seconds() / 60
+stale = staleness_minutes > 60
 ```
 
-In `decode.py`, leave a corresponding note at the tick parsing layer flagging the struct format assumption.
+Emit packet with `quality.stale = True`, `data_quality = "stale"`.
+
+### Partial package
+
+One or more timeframe CSVs missing but manifest exists.
+
+Emit packet with available timeframes only. Set `quality.partial = True`. Add specific flags e.g. `"4h_missing"`, `"1d_missing"`.
+
+### Corrupt package
+
+CSV schema mismatch, unparseable timestamps, duplicate rows detected.
+
+Raise a warning. Skip the corrupt timeframe. Treat as partial. Do not crash.
+
+### Missing manifest
+
+`EURUSD_hot.json` does not exist.
+
+```python
+raise FileNotFoundError(f"Hot package manifest not found for {instrument}. Has the feed pipeline run?")
+```
+
+This is the one case where a hard raise is acceptable — the Officer cannot function without the manifest.
+
+### Unverified instrument
+
+Set quality fields as specified in RULE 8. Return packet. Do not raise.
 
 ---
 
 ## Code quality standards
 
-- Every public function must have a docstring (one line minimum)
-- Functions do one thing — if a function name requires "and", split it
-- No magic numbers — name your constants
-- `print()` is acceptable for pipeline logging at this stage; structured logging is Phase 2
+- All public functions must have docstrings
 - Type hints on all function signatures
-- No silent failures — log warnings, raise on data integrity issues
+- No magic numbers — use named constants for thresholds (e.g. `STALENESS_THRESHOLD_MINUTES = 60`)
+- `print()` is acceptable for CLI logging; structured logging is Phase 3
+- No silent failures on quality issues — always log and flag
 
 ---
 
-## Dependency list (Phase 1A)
+## Dependencies
+
+Phase 2 requires no new external dependencies beyond Phase 1:
 
 ```
 pandas>=2.0
 pyarrow>=14.0
-requests>=2.28
 ```
 
-No other external dependencies required for Phase 1A. Include a `requirements.txt` or note in `README.md`.
+No ML libraries, no HTTP clients, no task frameworks needed in the Officer layer.
