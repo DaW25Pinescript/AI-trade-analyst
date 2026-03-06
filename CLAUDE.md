@@ -1,94 +1,133 @@
-# CLAUDE.md — AI Trade Analyst
+# CLAUDE.md — Market Data Officer Feed: Phase 1A
 
-## Local Claude Max Proxy + Task-Based Model Routing
+## Role
 
-### Repo-Level Operating Guide for Claude Code
+You are a principal Python/data engineer working inside the **AI Trade Analyst** repository.
 
----
+Your job in this task is to build **Phase 1A** of the Market Data Officer feed pipeline — a clean, validated, production-lean ingestion spine for **EURUSD only**.
 
-## How to read this document
-
-This is the authoritative operating guide for Claude Code implementing the local Claude Max proxy mode, Claude-first task routing, and chart-safe two-step flow in this repo.
-
-Think of this like a cockpit checklist — work through the numbered passes in order. Do not skip Phase 0. Do not start writing files until the audit is complete and mapped.
+Read this file first. Then read the supporting spec files in order before writing any code.
 
 ---
 
-## Architecture
+## Repo context
+
+This task lives inside the AI Trade Analyst repo:
+`https://github.com/DaW25Pinescript/AI-trade-analyst`
+
+The repo already contains:
+- A static frontend surface
+- A Python analyst engine (early stage)
+- Macro Risk Officer module
+- Arbiter/Senate governance scaffold
+
+This pipeline feeds **upstream** of all those layers. It is the **data-source / feed lane**. Nothing else in the system should be touched in this task.
+
+---
+
+## Task scope — Phase 1A only
+
+**Do not** broaden this task beyond Phase 1A.
+
+Phase 1A deliverable = a fully working ingestion spine for EURUSD:
+
+1. Dukascopy bi5 fetch
+2. Tick decode → UTC canonical 1m OHLCV
+3. Validation layer (before every write)
+4. Derived timeframes: 5m, 15m, 1h, 4h, 1d
+5. Hot package export (rolling CSV windows + JSON manifest)
+6. Incremental update logic (append-safe, idempotent)
+7. Clear TODO/defect notes for XAUUSD extension (do not implement it yet)
+
+XAUUSD is **not** in scope. Do not guess at its scale/volume parsing. Leave explicit verification stubs instead.
+
+Market Data Officer integration is **not** in scope. The feed must prove itself trustworthy first.
+
+---
+
+## Architecture principle
+
+> Charts are a human interface. The AI backend should consume canonical numeric market state — not screenshots, not OCR, not visual guessing.
+
+This pipeline is the mechanism that makes that principle real. It provides downstream AI agents with:
+
+- Explicit OHLCV series
+- Clean UTC timestamps  
+- Rolling hot windows per timeframe
+- Deterministic derived features
+- Vendor/quality metadata
+
+**Canonical truth = UTC 1-minute OHLCV per instrument.**  
+Higher timeframes are always derived from canonical 1m — never fetched independently.
+
+---
+
+## File reading order
+
+Before writing any code, read these files:
+
+1. `CLAUDE.md` ← you are here
+2. `OBJECTIVE.md` — what success looks like and why
+3. `CONSTRAINTS.md` — hard rules, known defects, engineering standards
+4. `ACCEPTANCE_TESTS.md` — the exit criteria you must pass
+
+Then implement.
+
+---
+
+## Repo placement
+
+Place all new code under:
 
 ```
-AI Trade Analyst pipeline
-        │
-        ▼
-  router.resolve(task_type)
-        │
-        ▼
-  llm_routing.yaml
-  (model + base_url resolved)
-        │
-        ▼
-  litellm.completion(
-      model=...,
-      api_base="http://127.0.0.1:8317/v1",
-      api_key="not-needed",
-      ...
-  )
-        │
-        ▼
-  CLIProxyAPI (local)
-        │
-        ▼
-  Claude Max
+market_data_officer/
+  feed/
+    __init__.py
+    config.py
+    fetch.py
+    decode.py
+    aggregate.py
+    validate.py
+    resample.py
+    export.py
+    pipeline.py
+  tests/
+    test_validate.py
+    test_resample.py
+    test_decode.py
+  run_feed.py
 ```
 
-The router sits between the application and LiteLLM. LiteLLM remains untouched. The proxy is transparent to the application layer.
+Do not place code in the analyst engine, frontend, or arbiter modules.
 
-## Key module locations
+---
 
-| Component | Path |
-|---|---|
-| Router module | `ai_analyst/llm_router/` |
-| Task type constants | `ai_analyst/llm_router/task_types.py` |
-| Router interface | `ai_analyst/llm_router/router.py` |
-| Config loader | `ai_analyst/llm_router/config_loader.py` |
-| Routing config | `config/llm_routing.yaml` (gitignored) |
-| Example config | `config/llm_routing.example.yaml` (committed) |
-| Chart two-step flow | `ai_analyst/core/chart_two_step.py` |
-| Proxy setup docs | `docs/local_claude_proxy_setup.md` |
-| Routing docs | `docs/model_routing.md` |
-| Helper scripts | `scripts/*.ps1` |
+## Output data layout
 
-## Task routing reference
-
-| Task | Primary Model | Rationale |
-|---|---|---|
-| `chart_extract` | Opus | Higher vision fidelity; image ambiguity is highest here |
-| `chart_interpret` | Sonnet | Text reasoning from structured input; Opus not needed |
-| `analyst_reasoning` | Sonnet | Sufficient for text-based analysis |
-| `arbiter_decision` | Sonnet | Sufficient for structured arbitration |
-| `json_repair` | Sonnet | Lightweight repair task |
-
-## Constraints (hard rules)
-
-- **No broad refactors** — touch only files required for each pass
-- **No new dependencies without approval** — stop and ask first
-- **No silent fallbacks** — every fallback must produce a WARNING log
-- **No magic strings** — all task types referenced via `task_types.py` constants
-- **Router is the only YAML consumer** — no other module parses `llm_routing.yaml`
-- **Preserve existing conventions** — match import style, logging, file naming
-
-## Quick start
-
-```bash
-# Smoke test the router
-python -c "
-from ai_analyst.llm_router import router
-r = router.resolve('chart_extract')
-assert 'opus' in r['model']
-r2 = router.resolve('analyst_reasoning')
-assert 'sonnet' in r2['model']
-print('Router smoke test passed.')
-"
+```
+market_data/
+  raw/dukascopy/EURUSD/          ← optional raw bi5 cache
+  canonical/EURUSD_1m.parquet    ← canonical truth
+  derived/
+    EURUSD_5m.parquet / .csv
+    EURUSD_15m.parquet / .csv
+    EURUSD_1h.parquet / .csv
+    EURUSD_4h.parquet / .csv
+    EURUSD_1d.parquet / .csv
+  packages/latest/
+    EURUSD_1m_latest.csv
+    EURUSD_5m_latest.csv
+    EURUSD_15m_latest.csv
+    EURUSD_1h_latest.csv
+    EURUSD_4h_latest.csv
+    EURUSD_1d_latest.csv
+    EURUSD_hot.json
 ```
 
-This document is the source of truth for this implementation.
+---
+
+## When you are done
+
+Run the acceptance tests in `ACCEPTANCE_TESTS.md` and confirm each exit criterion passes before declaring Phase 1A complete.
+
+Leave Phase 1B (XAUUSD), Phase 1C (incremental optimizer), and Phase 2 (Market Data Officer integration) fully untouched — documented as next steps only.
