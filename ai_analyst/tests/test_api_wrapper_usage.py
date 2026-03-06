@@ -39,8 +39,10 @@ def _multipart_payload():
         "open_positions": json.dumps([]),
         "overlay_indicator_claims": json.dumps(["FVG"]),
     }
+    # Minimal valid PNG (1x1 transparent pixel) to pass magic-number validation
+    _PNG_HEADER = b"\x89PNG\r\n\x1a\n"
     files = {
-        "chart_h4": ("chart.png", b"fake-image-bytes", "image/png"),
+        "chart_h4": ("chart.png", _PNG_HEADER + b"\x00" * 64, "image/png"),
     }
     return data, files
 
