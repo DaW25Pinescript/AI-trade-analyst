@@ -153,14 +153,25 @@ class ReasoningEngine:
         return pair[0] if surprise > 0 else pair[1]
 
     def _surprise_multiplier(self, event: MacroEvent) -> float:
-        """Normalise surprise magnitude into a [0.5, 2.0] multiplier."""
+        """Normalise surprise magnitude into a [0.5, 2.0] multiplier.
+
+        MED-2 fix: when forecast is zero (e.g. GDELT events where actual
+        already encodes signal magnitude), use abs(actual) directly instead
+        of short-circuiting to 1.0.  This lets the tone-magnitude scaling
+        in GdeltClient._tone_to_event propagate into the combined weight.
+        """
         surprise = event.surprise
-        if surprise is None or event.forecast == 0:
+        if surprise is None:
             return 1.0
-        try:
-            magnitude = abs(surprise / event.forecast)
-        except ZeroDivisionError:
-            magnitude = abs(surprise)
+        if event.forecast == 0:
+            if event.actual is None or event.actual == 0:
+                return 1.0
+            magnitude = abs(event.actual)
+        else:
+            try:
+                magnitude = abs(surprise / event.forecast)
+            except ZeroDivisionError:
+                magnitude = abs(surprise)
         capped = min(magnitude, self._surprise_cap)
         return 0.5 + (capped / self._surprise_cap) * 1.5
 

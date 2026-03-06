@@ -206,10 +206,10 @@ class ExecutionRouter:
                 json_str = extract_json(raw)
                 output = AnalystOutput.model_validate_json(json_str)
                 outputs.append(output)
-                print(f"  ✅ Validated: {response_file.name}")
+                logger.info("Validated: %s", response_file.name)
             except Exception as e:
-                print(f"  ❌ Failed to parse {response_file.name}: {e}")
-                print(f"     Please check the file, correct the JSON, and re-run.")
+                logger.warning("Failed to parse %s: %s", response_file.name, e)
+                logger.warning("  Please check the file, correct the JSON, and re-run.")
 
         self.run_state = transition(
             self.run_state, RunStatus.RESPONSES_COLLECTED,
@@ -246,9 +246,9 @@ class ExecutionRouter:
             model = api_configs[i].model
             if isinstance(result, AnalystOutput):
                 valid.append(result)
-                print(f"  ✅ API analyst '{model}' succeeded.")
+                logger.info("API analyst '%s' succeeded.", model)
             else:
-                print(f"  ❌ API analyst '{model}' failed: {result}")
+                logger.warning("API analyst '%s' failed: %s", model, result)
         return valid
 
     def _save_api_outputs(self, outputs: list[AnalystOutput]) -> None:
@@ -264,7 +264,7 @@ class ExecutionRouter:
                     path.read_text(encoding="utf-8")
                 ))
             except Exception as e:
-                print(f"  [WARN] Could not reload saved API output {path.name}: {e}")
+                logger.warning("Could not reload saved API output %s: %s", path.name, e)
         return outputs
 
     async def _run_deliberation(
@@ -386,7 +386,7 @@ class ExecutionRouter:
             configs_for_delib = api_configs[: len(all_outputs)]
             deliberation_outputs = await self._run_deliberation(all_outputs, configs_for_delib)
             if deliberation_outputs:
-                print(f"  Deliberation complete: {len(deliberation_outputs)} Round 2 outputs.")
+                logger.info("Deliberation complete: %d Round 2 outputs.", len(deliberation_outputs))
 
         # Generate and optionally write the arbiter prompt to disk
         arbiter_prompt = build_arbiter_prompt(
