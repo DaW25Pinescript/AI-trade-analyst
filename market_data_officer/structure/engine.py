@@ -14,6 +14,7 @@ import pandas as pd
 
 from .config import StructureConfig
 from .events import detect_events, update_swing_statuses
+from .imbalance import process_imbalance
 from .io import get_output_path, load_bars, write_packet_atomic
 from .liquidity import detect_liquidity
 from .regime import compute_regime
@@ -67,13 +68,18 @@ def compute_structure_packet(
         instrument=instrument,
     )
 
-    # Step 5: Compute regime summary
+    # Step 5: Detect FVGs and build active zone registry
+    imbalance_zones, active_zones = process_imbalance(
+        bars, config, instrument=instrument, timeframe=timeframe,
+    )
+
+    # Step 6: Compute regime summary
     regime = compute_regime(swings, events)
 
-    # Step 6: Assemble packet
+    # Step 7: Assemble packet
     tolerance = config.eqh_eql_tolerance.get(instrument, 0.00010)
     build_info = {
-        "engine_version": "phase_3b",
+        "engine_version": "phase_3c",
         "source": f"hot_package_{timeframe}_csv",
         "quality_flag": "trusted",
         "pivot_left_bars": config.pivot_left_bars,
@@ -93,6 +99,8 @@ def compute_structure_packet(
         "mss_events": mss_count,
         "liquidity_levels": len(liquidity_levels),
         "sweep_events": len(sweep_events),
+        "fvg_zones": len(imbalance_zones),
+        "active_fvg_zones": active_zones["count"],
     }
 
     packet = StructurePacket(
@@ -105,6 +113,8 @@ def compute_structure_packet(
         events=events,
         liquidity=liquidity_levels,
         sweep_events=sweep_events,
+        imbalance=imbalance_zones,
+        active_zones=active_zones,
         regime=regime,
         diagnostics=diagnostics,
     )
@@ -156,7 +166,8 @@ def run_engine(
                 print(f"    -> {len(packet.swings)} swings, "
                       f"{len(packet.events)} events, "
                       f"{len(packet.liquidity)} levels, "
-                      f"{len(packet.sweep_events)} sweeps")
+                      f"{len(packet.sweep_events)} sweeps, "
+                      f"{len(packet.imbalance)} FVGs")
 
             except FileNotFoundError as e:
                 print(f"    -> SKIPPED: {e}")

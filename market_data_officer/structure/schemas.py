@@ -1,8 +1,8 @@
-"""Typed dataclasses for all Phase 3A structure objects.
+"""Typed dataclasses for all Phase 3A/3B/3C structure objects.
 
 Defines: SwingPoint, StructureEvent, LiquidityLevel, SweepEvent,
-RegimeSummary, and StructurePacket. These are the canonical contract
-for downstream consumers.
+FairValueGap, RegimeSummary, and StructurePacket. These are the
+canonical contract for downstream consumers.
 """
 
 from dataclasses import dataclass, field
@@ -153,6 +153,47 @@ class SweepEvent:
 
 
 @dataclass
+class FairValueGap:
+    """A Fair Value Gap (FVG) zone detected via body-only gap logic."""
+
+    id: str                          # e.g. "fvg_001"
+    fvg_type: str                    # "bullish_fvg" | "bearish_fvg"
+    zone_high: float                 # upper boundary
+    zone_low: float                  # lower boundary
+    zone_size: float                 # zone_high - zone_low
+    origin_time: datetime            # candle 2 timestamp
+    confirm_time: datetime           # candle 3 timestamp (emit after this)
+    timeframe: str                   # "15m" | "1h" | "4h"
+    status: str                      # "open" | "partially_filled" | "invalidated" | "archived"
+
+    # Fill tracking
+    fill_high: Optional[float] = None       # highest close reached into zone (bearish FVG)
+    fill_low: Optional[float] = None        # lowest close reached into zone (bullish FVG)
+    first_touch_time: Optional[datetime] = None
+    partial_fill_time: Optional[datetime] = None
+    full_fill_time: Optional[datetime] = None
+
+    def to_dict(self) -> dict:
+        """Serialize to JSON-safe dictionary."""
+        return {
+            "id": self.id,
+            "fvg_type": self.fvg_type,
+            "zone_high": self.zone_high,
+            "zone_low": self.zone_low,
+            "zone_size": self.zone_size,
+            "origin_time": self.origin_time.isoformat(),
+            "confirm_time": self.confirm_time.isoformat(),
+            "timeframe": self.timeframe,
+            "status": self.status,
+            "fill_high": self.fill_high,
+            "fill_low": self.fill_low,
+            "first_touch_time": self.first_touch_time.isoformat() if self.first_touch_time else None,
+            "partial_fill_time": self.partial_fill_time.isoformat() if self.partial_fill_time else None,
+            "full_fill_time": self.full_fill_time.isoformat() if self.full_fill_time else None,
+        }
+
+
+@dataclass
 class RegimeSummary:
     """Objective structural regime summary derived from confirmed events."""
 
@@ -186,6 +227,8 @@ class StructurePacket:
     events: list  # list[StructureEvent]
     liquidity: list  # list[LiquidityLevel]
     sweep_events: list  # list[SweepEvent]
+    imbalance: list  # list[FairValueGap]
+    active_zones: dict  # {"count": int, "zones": list}
     regime: RegimeSummary
     diagnostics: dict
 
@@ -201,6 +244,12 @@ class StructurePacket:
             "events": [e.to_dict() for e in self.events],
             "liquidity": [l.to_dict() for l in self.liquidity],
             "sweep_events": [s.to_dict() for s in self.sweep_events],
+            "imbalance": [z.to_dict() for z in self.imbalance],
+            "active_zones": {
+                "count": self.active_zones["count"],
+                "zones": [z.to_dict() if hasattr(z, "to_dict") else z
+                          for z in self.active_zones["zones"]],
+            },
             "regime": self.regime.to_dict(),
             "diagnostics": self.diagnostics,
         }
