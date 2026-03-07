@@ -207,6 +207,7 @@ export function setExecutionPlan(plan) {
 export function createSnapshot() {
   const snapshot = {
     snapshotId: _generateId(),
+    journeyId: _state.journeyId,
     instrument: _state.selectedAsset,
     frozenAt: new Date().toISOString(),
     journeyStatus: _state.journeyStatus,
@@ -214,6 +215,14 @@ export function createSnapshot() {
     userDecision: _state.userDecision ? { ..._state.userDecision } : null,
     executionPlan: _state.executionPlan ? { ..._state.executionPlan } : null,
     gateStates: _state.gateStates.map(g => ({ ...g })),
+    gateJustifications: Object.fromEntries(
+      _state.gateStates.map(g => [g.id, g.justification ?? null])
+    ),
+    provenance: {
+      systemVerdict: Provenance.AI_PREFILL,
+      userDecision: _state.userDecision?.provenance ?? null,
+      executionPlan: _state.executionPlan?.provenance ?? null,
+    },
     stageData: JSON.parse(JSON.stringify(_state.stageData)),
     digest: _state.stageData[StageKey.STRUCTURE_LIQUIDITY]?.digest || null,
     macroContext: _state.stageData[StageKey.MACRO_ALIGNMENT] || null,
@@ -261,6 +270,7 @@ export function resetJourney() {
  */
 export function bootstrapJourney(bootstrap) {
   _state.selectedAsset = bootstrap.instrument;
+  _state.journeyId = _generateJourneyId();
   _state.journeyStatus = JourneyStatus.DRAFT;
   _state.currentStage = StageKey.MARKET_OVERVIEW;
 
@@ -301,4 +311,8 @@ function _updateJourneyStatusFromGates() {
 
 function _generateId() {
   return `snap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function _generateJourneyId() {
+  return `jrn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }

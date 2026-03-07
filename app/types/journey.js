@@ -199,6 +199,7 @@ export const ConfidenceLevel = Object.freeze({
 /**
  * @typedef {Object} DecisionSnapshot
  * @property {string} snapshotId
+ * @property {string} journeyId - Unique journey session identifier
  * @property {string} instrument
  * @property {string} frozenAt - ISO timestamp
  * @property {string} journeyStatus
@@ -206,6 +207,8 @@ export const ConfidenceLevel = Object.freeze({
  * @property {UserDecision} userDecision
  * @property {ExecutionPlan} executionPlan
  * @property {GateCheckItem[]} gateStates
+ * @property {Object<string, string|null>} gateJustifications - Map of gate ID → justification text
+ * @property {{systemVerdict: string, userDecision: string|null, executionPlan: string|null}} provenance - Field-level provenance tracking
  * @property {Object} stageData - Frozen per-stage data
  * @property {Object} digest - StructureDigest at freeze time
  * @property {Object} [macroContext] - Macro snapshot at freeze time
@@ -218,6 +221,7 @@ export const ConfidenceLevel = Object.freeze({
  * @property {string} currentStage - One of StageKey values
  * @property {string} journeyStatus - One of JourneyStatus values
  * @property {string|null} selectedAsset - Instrument symbol
+ * @property {string|null} journeyId - Unique journey session identifier
  * @property {TriageItem[]} triageItems - Loaded triage board items
  * @property {Object} stageData - Per-stage data keyed by StageKey
  * @property {GateCheckItem[]} gateStates - Current gate check states
@@ -239,6 +243,7 @@ export function createEmptyJourneyState() {
     currentStage: StageKey.MARKET_OVERVIEW,
     journeyStatus: JourneyStatus.DRAFT,
     selectedAsset: null,
+    journeyId: null,
     triageItems: [],
     stageData: {
       [StageKey.MARKET_OVERVIEW]: null,
