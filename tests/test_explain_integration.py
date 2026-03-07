@@ -168,9 +168,10 @@ class TestGroupG_CLIAndCoverage:
 
     def test_tg3_no_llm_calls(self):
         output = _make_test_output()
-        with mock.patch("anthropic.Anthropic") as mock_client:
+        fake_anthropic = mock.Mock()
+        with mock.patch.dict(sys.modules, {"anthropic": fake_anthropic}):
             block = build_explanation(output)
-            mock_client.assert_not_called()
+        fake_anthropic.Anthropic.assert_not_called()
         assert block is not None
 
     def test_tg4_only_multi_contracts_changed(self):
