@@ -52,6 +52,14 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _current_session() -> str:
+    hour = datetime.now(timezone.utc).hour
+    if 0 <= hour < 7: return "Asia"
+    if 7 <= hour < 12: return "London"
+    if 12 <= hour < 21: return "NY"
+    return "Asia"  # off-hours default — Sydney/Tokyo overlap
+
+
 def _load_json(path: Path) -> dict | None:
     """Load a JSON file, returning None if it doesn't exist or is invalid."""
     try:
