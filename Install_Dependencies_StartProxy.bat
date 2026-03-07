@@ -265,7 +265,7 @@ if not errorlevel 1 (
 )
 
 echo Starting backend...
-start "AI Trade Analyst Backend" cmd /k "cd /d %ROOT% && %VENV_PY% -m uvicorn ai_analyst.api.main:app --reload --host 127.0.0.1 --port 8000"
+start "AI Trade Analyst Backend" cmd /k "cd /d "%ROOT%" && "%VENV_PY%" -m uvicorn ai_analyst.api.main:app --reload --host 127.0.0.1 --port 8000"
 exit /b 0
 
 :start_ui

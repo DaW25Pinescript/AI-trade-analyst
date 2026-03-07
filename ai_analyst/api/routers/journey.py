@@ -86,9 +86,25 @@ async def watchlist_triage():
     if not _ANALYST_OUTPUT.exists():
         return {"data_state": "unavailable", "generated_at": None, "items": []}
 
-    output_files = sorted(_ANALYST_OUTPUT.glob("multi_analyst_output_*.json"))
-    if not output_files:
+    all_files = sorted(_ANALYST_OUTPUT.glob("multi_analyst_output_*.json"), reverse=True)
+    if not all_files:
         return {"data_state": "unavailable", "generated_at": None, "items": []}
+
+    # Deduplicate: keep only the latest file per symbol.
+    # Filename format: multi_analyst_output_{SYMBOL}_{TIMESTAMP}Z.json
+    # Reverse-sorted so the latest timestamp comes first per symbol.
+    seen_symbols: set[str] = set()
+    output_files: list[Path] = []
+    for fpath in all_files:
+        # Extract symbol: strip prefix and suffix, then drop the trailing timestamp
+        stem = fpath.stem  # e.g. "multi_analyst_output_NAS100_20260308T001045Z"
+        after_prefix = stem[len("multi_analyst_output_"):]  # "NAS100_20260308T001045Z"
+        # Timestamp is always the last _-separated segment (e.g. "20260308T001045Z")
+        parts = after_prefix.rsplit("_", 1)
+        sym = parts[0] if len(parts) == 2 else after_prefix
+        if sym not in seen_symbols:
+            seen_symbols.add(sym)
+            output_files.append(fpath)
 
     items = []
     latest_ts = None
@@ -100,49 +116,59 @@ async def watchlist_triage():
 
         arbiter = raw.get("arbiter_decision") or {}
         digest = raw.get("digest") or {}
-        generated_at = raw.get("as_of_utc")
+        generated_at = raw.get("as_of_utc") or raw.get("generated_at")
 
         if generated_at and (latest_ts is None or generated_at > latest_ts):
             latest_ts = generated_at
 
-        # Derive triage_status
-        triage_status = "no_data"
-        if arbiter.get("no_trade_enforced"):
-            triage_status = "blocked"
-        else:
-            v = arbiter.get("final_verdict", "")
-            c = arbiter.get("final_confidence", "")
-            if v in ("long_bias", "short_bias") and c in ("high", "moderate"):
-                triage_status = "active"
-            elif v == "conditional":
-                triage_status = "watch"
-            elif v in ("no_trade", "no_data"):
+        # Derive triage_status — prefer flat key, fall back to arbiter derivation
+        triage_status = raw.get("triage_status")
+        if not triage_status:
+            triage_status = "no_data"
+            if arbiter.get("no_trade_enforced") or raw.get("no_trade_enforced"):
                 triage_status = "blocked"
             else:
-                triage_status = "watch"
+                v = arbiter.get("final_verdict", "")
+                c = arbiter.get("final_confidence", "")
+                if v in ("long_bias", "short_bias") and c in ("high", "moderate"):
+                    triage_status = "active"
+                elif v == "conditional":
+                    triage_status = "watch"
+                elif v in ("no_trade", "no_data"):
+                    triage_status = "blocked"
+                else:
+                    triage_status = "watch"
 
-        # Derive bias
-        bias = arbiter.get("final_directional_bias", "no_data")
+        # Derive bias — prefer flat key, fall back to arbiter
+        bias = raw.get("bias") or arbiter.get("final_directional_bias", "no_data")
         if bias == "none":
             bias = "neutral"
 
-        # Derive confidence
-        confidence = arbiter.get("final_confidence", "none")
+        # Derive confidence — prefer flat key, fall back to arbiter
+        confidence = raw.get("confidence") or arbiter.get("final_confidence", "none")
 
-        # Derive why_interesting
-        why_interesting = []
-        supports = digest.get("structure_supports") or []
-        why_interesting.extend(supports[:3])
-        caution = digest.get("caution_flags") or []
-        why_interesting.extend([f"caution: {f}" for f in caution[:2]])
+        # Derive why_interesting — prefer flat key, fall back to digest
+        why_interesting = raw.get("why_interesting_tags")
+        if why_interesting is None:
+            why_interesting = []
+            supports = digest.get("structure_supports") or []
+            why_interesting.extend(supports[:3])
+            caution = digest.get("caution_flags") or []
+            why_interesting.extend([f"caution: {f}" for f in caution[:2]])
+
+        # Symbol — prefer flat key, fall back to instrument
+        symbol = raw.get("symbol") or raw.get("instrument", "UNKNOWN")
+
+        # Rationale — prefer flat key, fall back to arbiter
+        rationale = raw.get("rationale_summary") or arbiter.get("winning_rationale_summary")
 
         items.append({
-            "symbol": raw.get("instrument", "UNKNOWN"),
+            "symbol": symbol,
             "triage_status": triage_status,
             "bias": bias,
             "confidence": confidence,
             "why_interesting": why_interesting,
-            "rationale": arbiter.get("winning_rationale_summary"),
+            "rationale": rationale,
             "verdict_at": generated_at,
         })
 
