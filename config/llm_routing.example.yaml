@@ -5,28 +5,28 @@ llm_backend:
 
 task_routing:
   analyst_reasoning:
-    primary_model: "claude-sonnet-4-5-20250929"
-    fallback_model: "claude-opus-4-20250514"
+    primary_model: "openai/claude-sonnet-4-6"
+    fallback_model: "openai/claude-sonnet-4-6"
     retries: 1
 
   chart_extract:
-    primary_model: "claude-opus-4-20250514"
-    fallback_model: "claude-sonnet-4-5-20250929"
+    primary_model: "openai/claude-sonnet-4-6"
+    fallback_model: "openai/claude-sonnet-4-6"
     retries: 1
 
   chart_interpret:
-    primary_model: "claude-sonnet-4-5-20250929"
-    fallback_model: "claude-opus-4-20250514"
+    primary_model: "openai/claude-sonnet-4-6"
+    fallback_model: "openai/claude-sonnet-4-6"
     retries: 1
 
   arbiter_decision:
-    primary_model: "claude-sonnet-4-5-20250929"
-    fallback_model: "claude-opus-4-20250514"
+    primary_model: "openai/claude-sonnet-4-6"
+    fallback_model: "openai/claude-sonnet-4-6"
     retries: 1
 
   json_repair:
-    primary_model: "claude-sonnet-4-5-20250929"
-    fallback_model: "claude-opus-4-20250514"
+    primary_model: "openai/claude-sonnet-4-6"
+    fallback_model: "openai/claude-sonnet-4-6"
     retries: 1
 
 # Analyst roster — maps persona to the LLM model used for fan-out analysis.
