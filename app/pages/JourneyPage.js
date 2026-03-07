@@ -194,13 +194,13 @@ function _renderAssetContext(container, state) {
     leftPanel.appendChild(createAIPrefillCard({
       title: 'Structure Digest',
       fields: [
-        { label: 'HTF Bias', value: digest.htf_bias },
-        { label: 'Source Timeframe', value: digest.htf_source_timeframe },
-        { label: 'Structure Gate', value: digest.structure_gate },
-        { label: 'BOS/MSS Alignment', value: digest.bos_mss_alignment },
-        { label: 'Liquidity Bias', value: digest.liquidity_bias },
-        { label: 'FVG Context', value: digest.active_fvg_context },
-        { label: 'Recent Sweep', value: digest.recent_sweep_signal },
+        { label: 'HTF Bias', value: digest.htfBias },
+        { label: 'Source Timeframe', value: digest.htfSourceTimeframe },
+        { label: 'Structure Gate', value: digest.structureGate },
+        { label: 'BOS/MSS Alignment', value: digest.bosMssAlignment },
+        { label: 'Liquidity Bias', value: digest.liquidityBias },
+        { label: 'FVG Context', value: digest.activeFvgContext },
+        { label: 'Recent Sweep', value: digest.recentSweepSignal },
       ],
     }));
   }
