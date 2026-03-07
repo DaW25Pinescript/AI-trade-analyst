@@ -66,6 +66,20 @@ export async function loadTriageItems() {
   return items;
 }
 
+export async function runTriage(options = {}) {
+  const res = await fetch(`${API_BASE}/triage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: 'manual_trigger', ...options }),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.message || detail.detail || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return { success: true, artifactsWritten: data.artifacts_written ?? 0 };
+}
+
 // ── Journey Bootstrap Service ───────────────────────────────────────────────
 
 /**

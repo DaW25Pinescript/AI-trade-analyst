@@ -11,7 +11,7 @@
 import { createPageHeader } from '../components/PageHeader.js';
 import { createSurfaceCard } from '../components/SurfaceCard.js';
 import { createStatusBadge } from '../components/StatusBadge.js';
-import { fetchTriage } from '../lib/services.js';
+import { fetchTriage, runTriage } from '../lib/services.js';
 import { navigate } from '../lib/router.js';
 
 /**
@@ -21,51 +21,84 @@ import { navigate } from '../lib/router.js';
 export async function renderDashboardPage(container) {
   container.innerHTML = '';
 
+  const headerWrap = document.createElement('div');
+  headerWrap.className = 'dashboard-header-row';
+
   const header = createPageHeader({
     title: 'Market Triage',
     subtitle: 'Pre-loaded intelligence — assets ranked by relevance and opportunity quality',
   });
-  container.appendChild(header);
+  headerWrap.appendChild(header);
 
-  // Loading state
-  const loadingEl = document.createElement('div');
-  loadingEl.className = 'triage-loading';
-  loadingEl.innerHTML = '<p class="text-muted">Loading triage data...</p>';
-  container.appendChild(loadingEl);
+  const runBtn = document.createElement('button');
+  runBtn.className = 'btn btn--primary run-triage-btn';
+  runBtn.textContent = 'Run Triage';
+  runBtn.setAttribute('aria-label', 'Run triage producer pipeline');
+  headerWrap.appendChild(runBtn);
 
-  // Load triage items through service layer
-  const result = await fetchTriage();
-  loadingEl.remove();
+  container.appendChild(headerWrap);
 
-  const { items, dataState } = result;
+  const errorBanner = document.createElement('div');
+  errorBanner.className = 'triage-error-banner';
+  errorBanner.style.display = 'none';
+  container.appendChild(errorBanner);
 
-  // Data state banner
-  if (dataState && dataState !== 'live') {
-    const banner = _createDataStateBanner(dataState);
-    container.appendChild(banner);
+  const contentArea = document.createElement('div');
+  contentArea.className = 'triage-content';
+  container.appendChild(contentArea);
+
+  async function loadAndRender() {
+    contentArea.innerHTML = '<p class="text-muted triage-loading">Loading triage data...</p>';
+    const result = await fetchTriage();
+    contentArea.innerHTML = '';
+
+    const { items, dataState } = result;
+
+    if (dataState && dataState !== 'live') {
+      contentArea.appendChild(_createDataStateBanner(dataState));
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'triage-grid';
+
+    if (dataState === 'unavailable') {
+      grid.innerHTML = `
+        <div class="data-state-empty">
+          <h3 class="text-secondary">No triage data available</h3>
+          <p class="text-muted">Run the multi-analyst pipeline to generate triage data, or check that analyst/output/ contains analysis files.</p>
+        </div>`;
+      contentArea.appendChild(grid);
+    } else if (items.length === 0) {
+      grid.innerHTML = '<p class="text-muted">No triage data available. Run the multi-analyst pipeline first.</p>';
+      contentArea.appendChild(grid);
+    } else {
+      items.forEach(item => {
+        const card = _createTriageCard(item, dataState);
+        contentArea.appendChild(card);
+      });
+    }
   }
 
-  // Triage grid
-  const grid = document.createElement('div');
-  grid.className = 'triage-grid';
+  runBtn.addEventListener('click', async () => {
+    if (runBtn.disabled) return;
+    runBtn.disabled = true;
+    runBtn.textContent = 'Running…';
+    errorBanner.style.display = 'none';
 
-  if (dataState === 'unavailable') {
-    grid.innerHTML = `
-      <div class="data-state-empty">
-        <h3 class="text-secondary">No triage data available</h3>
-        <p class="text-muted">Run the multi-analyst pipeline to generate triage data, or check that analyst/output/ contains analysis files.</p>
-      </div>
-    `;
-  } else if (items.length === 0) {
-    grid.innerHTML = '<p class="text-muted">No triage data available. Run the multi-analyst pipeline first.</p>';
-  } else {
-    items.forEach(item => {
-      const card = _createTriageCard(item, dataState);
-      grid.appendChild(card);
-    });
-  }
+    try {
+      await runTriage();
+      runBtn.textContent = 'Run Triage';
+      runBtn.disabled = false;
+      await loadAndRender();
+    } catch (err) {
+      runBtn.textContent = 'Run Triage';
+      runBtn.disabled = false;
+      errorBanner.textContent = `Triage run failed: ${err.message}`;
+      errorBanner.style.display = 'block';
+    }
+  });
 
-  container.appendChild(grid);
+  await loadAndRender();
 }
 
 function _createDataStateBanner(dataState) {

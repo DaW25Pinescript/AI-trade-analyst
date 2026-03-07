@@ -10,6 +10,7 @@ All writes go to app/data/journeys/{drafts,decisions,results}/.
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -153,6 +154,77 @@ async def watchlist_triage():
         "data_state": data_state,
         "generated_at": latest_ts,
         "items": items,
+    }
+
+
+# ── POST /triage ─────────────────────────────────────────────────────────────
+
+
+def _stub_triage_artifact(symbol: str) -> dict:
+    """TEMPORARY STUB — replace with real multi-analyst pipeline output."""
+    return {
+        "symbol": symbol,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "triage_status": "conditional",
+        "bias": "bullish",
+        "confidence": "moderate",
+        "consensus_state": "partial_agreement",
+        "verdict": "conditional",
+        "no_trade_enforced": False,
+        "rationale_summary": f"[STUB] Mock triage artifact for {symbol}. Wire real pipeline to replace.",
+        "why_interesting_tags": ["stub_data", "pipeline_not_wired"],
+        "analysts": ["stub"],
+        "gates_passed": [],
+        "gates_failed": [],
+    }
+
+
+@router.post("/triage")
+async def run_triage(request: Request):
+    """
+    POST /triage — Trigger triage artifact production.
+
+    TEMPORARY STUB: writes mock artifacts until real pipeline is wired in.
+    Replace _stub_triage_artifact() with real analyst pipeline call.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    output_dir = "analyst/output"
+    os.makedirs(output_dir, exist_ok=True)
+
+    symbols = body.get("symbols") or ["XAUUSD", "NAS100", "US30"]
+    written = []
+    failed = []
+
+    for symbol in symbols:
+        try:
+            # TODO: replace with real pipeline: result = await run_analyst_pipeline(symbol)
+            result = _stub_triage_artifact(symbol)
+            ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            filename = f"multi_analyst_output_{symbol}_{ts}.json"
+            path = os.path.join(output_dir, filename)
+            with open(path, "w") as f:
+                json.dump(result, f, indent=2)
+            written.append(symbol)
+        except Exception as e:
+            failed.append(symbol)
+            print(f"[triage] {symbol} failed: {e}")
+
+    if not written:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail={
+            "message": "All symbols failed to produce artifacts",
+            "partial": failed,
+        })
+
+    return {
+        "status": "complete",
+        "artifacts_written": len(written),
+        "symbols_processed": written,
+        "output_dir": output_dir,
     }
 
 
