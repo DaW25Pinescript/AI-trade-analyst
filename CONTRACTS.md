@@ -1,391 +1,266 @@
-# CONTRACTS.md — Phase 3D: v2 Packet Schema and Reader API
+# CONTRACTS.md — Phase 3E: StructureDigest, AnalystVerdict, ReasoningBlock
 
-## Market Packet v2 — Full Schema
+## StructureDigest dataclass
 
-```json
-{
-  "schema_version": "market_packet_v2",
-  "instrument": "EURUSD",
-  "as_of_utc": "2026-03-07T10:15:00Z",
-
-  "source": {
-    "vendor": "dukascopy",
-    "canonical_tf": "1m",
-    "quality": "validated"
-  },
-
-  "timeframes": {
-    "1m":  { "count": 3000, "rows": [...] },
-    "5m":  { "count": 1200, "rows": [...] },
-    "15m": { "count": 600,  "rows": [...] },
-    "1h":  { "count": 240,  "rows": [...] },
-    "4h":  { "count": 120,  "rows": [...] },
-    "1d":  { "count": 30,   "rows": [...] }
-  },
-
-  "features": {
-    "core": {
-      "atr_14": 0.00234,
-      "volatility_regime": "normal",
-      "momentum": 0.27,
-      "ma_50": 1.08420,
-      "ma_200": 1.07910,
-      "swing_high": 1.08901,
-      "swing_low": 1.07630,
-      "rolling_range": 0.01380,
-      "session_context": "london"
-    },
-    "structure": null,
-    "imbalance": null,
-    "compression": null
-  },
-
-  "state_summary": {
-    "trend_1h": "bullish",
-    "trend_4h": "bullish",
-    "trend_1d": "neutral",
-    "volatility_regime": "normal",
-    "momentum_state": "expanding",
-    "session_context": "london",
-    "data_quality": "validated"
-  },
-
-  "quality": {
-    "manifest_valid": true,
-    "all_timeframes_present": true,
-    "staleness_minutes": 4,
-    "stale": false,
-    "partial": false,
-    "flags": []
-  },
-
-  "structure": {
-    "available": true,
-    "source_engine_version": "phase_3c",
-    "as_of": "2026-03-07T10:00:00Z",
-
-    "regime": {
-      "bias": "bullish",
-      "last_bos_direction": "bullish",
-      "last_mss_direction": null,
-      "trend_state": "trending",
-      "structure_quality": "clean",
-      "source_timeframe": "4h"
-    },
-
-    "recent_events": [
-      {
-        "type": "bos_bull",
-        "time": "2026-03-07T08:00:00Z",
-        "timeframe": "1h",
-        "reference_price": 1.08642
-      },
-      {
-        "type": "bos_bull",
-        "time": "2026-03-06T20:00:00Z",
-        "timeframe": "4h",
-        "reference_price": 1.08200
-      }
-    ],
-
-    "liquidity": {
-      "1h": {
-        "active_count": 3,
-        "nearest_above": {
-          "type": "prior_day_high",
-          "price": 1.08720,
-          "scope": "external_liquidity",
-          "status": "active"
-        },
-        "nearest_below": {
-          "type": "equal_lows",
-          "price": 1.08410,
-          "scope": "internal_liquidity",
-          "status": "active"
-        }
-      },
-      "4h": {
-        "active_count": 2,
-        "nearest_above": {
-          "type": "prior_week_high",
-          "price": 1.09140,
-          "scope": "external_liquidity",
-          "status": "active"
-        },
-        "nearest_below": null
-      }
-    },
-
-    "active_fvg_zones": [
-      {
-        "id": "fvg_003",
-        "fvg_type": "bullish_fvg",
-        "zone_high": 1.08620,
-        "zone_low": 1.08475,
-        "zone_size": 0.00145,
-        "status": "open",
-        "timeframe": "1h",
-        "origin_time": "2026-03-07T06:00:00Z"
-      },
-      {
-        "id": "fvg_007",
-        "fvg_type": "bearish_fvg",
-        "zone_high": 1.09140,
-        "zone_low": 1.09010,
-        "zone_size": 0.00130,
-        "status": "partially_filled",
-        "timeframe": "4h",
-        "origin_time": "2026-03-06T12:00:00Z"
-      }
-    ]
-  }
-}
-```
-
----
-
-## Structure block — unavailable state
-
-When structure packets are missing or stale:
-
-```json
-"structure": {
-  "available": false,
-  "source_engine_version": null,
-  "as_of": null,
-  "regime": null,
-  "recent_events": null,
-  "liquidity": null,
-  "active_fvg_zones": null
-}
-```
-
-The Officer must produce a valid v2 packet in this state. No crash, no exception propagation.
-
----
-
-## Python dataclasses — Phase 3D additions
-
-Add to `officer/contracts.py`:
+`analyst/contracts.py`:
 
 ```python
 from dataclasses import dataclass, field
 from typing import Optional
 
 @dataclass
-class StructureRegime:
-    bias: str                          # "bullish" | "bearish" | "neutral"
-    last_bos_direction: Optional[str]
-    last_mss_direction: Optional[str]
-    trend_state: str                   # "trending" | "ranging" | "unknown"
-    structure_quality: str             # "clean" | "choppy" | "unknown"
-    source_timeframe: str              # "4h" | "1h" | "15m"
-
-@dataclass
-class StructureRecentEvent:
-    type: str                          # "bos_bull" | "bos_bear" | "mss_bull" | "mss_bear"
-    time: str                          # ISO8601 UTC
-    timeframe: str
-    reference_price: float
-
-@dataclass
-class LiquidityNearest:
-    type: str                          # level type e.g. "prior_day_high"
+class LiquidityRef:
+    type: str                  # e.g. "prior_day_high"
     price: float
-    scope: str                         # "external_liquidity" | "internal_liquidity" | "unclassified"
-    status: str                        # "active" | "swept"
+    scope: str                 # "external_liquidity" | "internal_liquidity" | "unclassified"
+    status: str                # "active" | "swept"
 
 @dataclass
-class LiquidityTimeframeSummary:
-    active_count: int
-    nearest_above: Optional[LiquidityNearest]
-    nearest_below: Optional[LiquidityNearest]
-
-@dataclass
-class ActiveFVGZone:
-    id: str
-    fvg_type: str                      # "bullish_fvg" | "bearish_fvg"
-    zone_high: float
-    zone_low: float
-    zone_size: float
-    status: str                        # "open" | "partially_filled"
-    timeframe: str
-    origin_time: str                   # ISO8601 UTC
-
-@dataclass
-class StructureBlock:
-    available: bool
-    source_engine_version: Optional[str] = None
-    as_of: Optional[str] = None
-    regime: Optional[StructureRegime] = None
-    recent_events: Optional[list[StructureRecentEvent]] = None
-    liquidity: Optional[dict[str, LiquidityTimeframeSummary]] = None
-    active_fvg_zones: Optional[list[ActiveFVGZone]] = None
-
-    @classmethod
-    def unavailable(cls) -> "StructureBlock":
-        """Factory for the unavailable state."""
-        return cls(available=False)
-
-@dataclass
-class MarketPacketV2:
-    # --- all Phase 2 / v1 fields preserved ---
+class StructureDigest:
+    """
+    Deterministic, compact summary of structure block state.
+    Produced by pre_filter.py. Consumed by prompt_builder.py and analyst.py.
+    Never produced by the LLM.
+    """
     instrument: str
     as_of_utc: str
-    source: dict
-    timeframes: dict
-    features: "FeatureBlock"
-    state_summary: "StateSummary"
-    quality: "QualityBlock"
+    structure_available: bool
 
-    # --- v2 addition ---
-    structure: StructureBlock
+    # Gate
+    structure_gate: str              # "pass" | "fail" | "no_data" | "mixed"
+    gate_reason: Optional[str]       # human-readable reason for gate result
+
+    # Regime
+    htf_bias: Optional[str]          # "bullish" | "bearish" | "neutral" | None
+    htf_source_timeframe: Optional[str]
+    last_bos: Optional[str]          # "bullish" | "bearish" | None
+    last_mss: Optional[str]          # "bullish" | "bearish" | None
+    bos_mss_alignment: Optional[str] # "aligned" | "conflicted" | "incomplete" | None
+
+    # Liquidity
+    nearest_liquidity_above: Optional[LiquidityRef]
+    nearest_liquidity_below: Optional[LiquidityRef]
+    liquidity_bias: Optional[str]    # "above_closer" | "below_closer" | "balanced" | None
+
+    # FVG
+    active_fvg_context: Optional[str]  # "discount_bullish" | "premium_bearish" | "at_fvg" | "none"
+    active_fvg_count: int
+
+    # Sweep/reclaim
+    recent_sweep_signal: Optional[str] # "bullish_reclaim" | "bearish_reclaim" | "accepted_beyond" | "none"
+
+    # Signal lists
+    structure_supports: list[str] = field(default_factory=list)
+    structure_conflicts: list[str] = field(default_factory=list)
+
+    # Flags
+    no_trade_flags: list[str] = field(default_factory=list)
+    caution_flags: list[str] = field(default_factory=list)
+
+    def has_hard_no_trade(self) -> bool:
+        return len(self.no_trade_flags) > 0
+
+    def to_prompt_dict(self) -> dict:
+        """Compact dict for LLM prompt injection. Excludes raw packet data."""
+        ...
+```
+
+---
+
+## AnalystVerdict dataclass
+
+```python
+@dataclass
+class AnalystVerdict:
+    """
+    Structured machine-readable verdict. Produced by LLM, parsed by analyst.py.
+    Authoritative contract for downstream systems.
+    """
+    instrument: str
+    as_of_utc: str
+
+    verdict: str                     # "long_bias" | "short_bias" | "no_trade" | "conditional" | "no_data"
+    confidence: str                  # "high" | "moderate" | "low" | "none"
+
+    structure_gate: str              # echoed from digest
+    htf_bias: Optional[str]
+    ltf_structure_alignment: str     # "aligned" | "mixed" | "conflicted" | "unknown"
+    active_fvg_context: Optional[str]
+    recent_sweep_signal: Optional[str]
+
+    structure_supports: list[str]
+    structure_conflicts: list[str]
+    no_trade_flags: list[str]
+    caution_flags: list[str]
+
+    def is_actionable(self) -> bool:
+        """True if verdict is long_bias or short_bias with at least moderate confidence."""
+        return (
+            self.verdict in ("long_bias", "short_bias")
+            and self.confidence in ("high", "moderate")
+            and not self.no_trade_flags
+        )
+```
+
+---
+
+## ReasoningBlock dataclass
+
+```python
+@dataclass
+class ReasoningBlock:
+    """
+    Human-readable explanation of how structure influenced the verdict.
+    Produced by LLM alongside AnalystVerdict.
+    """
+    summary: str              # 2-4 sentence overall verdict explanation
+    htf_context: str          # regime, BOS/MSS direction
+    liquidity_context: str    # nearest levels, liquidity bias
+    fvg_context: str          # active zones, discount/premium
+    sweep_context: str        # sweep/reclaim signal
+    verdict_rationale: str    # why verdict and confidence were assigned
+```
+
+---
+
+## AnalystOutput — top-level container
+
+```python
+@dataclass
+class AnalystOutput:
+    verdict: AnalystVerdict
+    reasoning: ReasoningBlock
+    digest: StructureDigest    # preserved for audit/replay
 
     def to_dict(self) -> dict:
-        """Serialize to Market Packet v2 JSON structure."""
         ...
-
-    def is_trusted(self) -> bool:
-        """True if packet is validated, not stale, not partial."""
-        return (
-            not self.quality.stale
-            and not self.quality.partial
-            and self.quality.manifest_valid
-            and self.state_summary.data_quality == "validated"
-        )
-
-    def has_structure(self) -> bool:
-        """
-        True if structure block is available AND at least one sub-field is non-null.
-        available=True with all null sub-fields is treated as unavailable.
-        """
-        return (
-            self.structure.available
-            and any([
-                self.structure.regime is not None,
-                self.structure.recent_events is not None,
-                self.structure.liquidity is not None,
-                self.structure.active_fvg_zones is not None,
-            ])
-        )
 ```
 
 ---
 
-## Structure reader API (`structure/reader.py`)
+## Full AnalystOutput JSON
 
-```python
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
+```json
+{
+  "verdict": {
+    "instrument": "EURUSD",
+    "as_of_utc": "2026-03-07T10:15:00Z",
+    "verdict": "long_bias",
+    "confidence": "moderate",
+    "structure_gate": "pass",
+    "htf_bias": "bullish",
+    "ltf_structure_alignment": "mixed",
+    "active_fvg_context": "discount_bullish",
+    "recent_sweep_signal": "bullish_reclaim",
+    "structure_supports": [
+      "bullish 4h regime",
+      "active discount FVG at 1.08475",
+      "bullish BOS on 1h",
+      "bullish reclaim of equal_lows"
+    ],
+    "structure_conflicts": [
+      "bearish MSS on 15m against HTF bullish regime"
+    ],
+    "no_trade_flags": [],
+    "caution_flags": ["ltf_mss_conflict"]
+  },
 
-STRUCTURE_OUTPUT_DIR = Path("market_data_officer/structure/output")
-STRUCTURE_STALENESS_MINUTES = 120  # configurable
+  "reasoning": {
+    "summary": "Bullish bias on EURUSD with moderate confidence. HTF 4h regime is bullish with recent bullish BOS on 1h confirming directional momentum. LTF 15m shows a bearish MSS which introduces short-term conflict but does not override HTF alignment.",
+    "htf_context": "4h regime: bullish. Last BOS: bullish (1h). Last MSS: bearish (15m) — minor conflict present.",
+    "liquidity_context": "Nearest above: prior_day_high at 1.08720 (external). Nearest below: equal_lows at 1.08410 (internal). Liquidity draw is toward the prior_day_high above.",
+    "fvg_context": "Active bullish FVG at 1.08475–1.08620 (1h, open). Price approaching from above — discount zone in play for potential continuation.",
+    "sweep_context": "Recent bullish reclaim of equal_lows. Supportive of bullish continuation narrative.",
+    "verdict_rationale": "Long bias with moderate confidence. HTF gate passes. LTF MSS conflict noted as caution. No hard no-trade flags present."
+  },
 
-def load_structure_packet(instrument: str, timeframe: str) -> dict | None:
-    """
-    Load the latest structure packet JSON for an instrument/timeframe.
-    Returns None if file does not exist or cannot be parsed.
-    Never raises on missing files.
-    """
-    path = STRUCTURE_OUTPUT_DIR / f"{instrument.lower()}_{timeframe}_structure.json"
-    if not path.exists():
-        return None
-    try:
-        import json
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-def load_structure_summary(instrument: str,
-                           timeframes: list[str] = ("15m", "1h", "4h")) -> dict:
-    """
-    Load and merge structure packets across timeframes into a summary dict.
-    Missing timeframes are skipped — not an error.
-    """
-    return {
-        tf: load_structure_packet(instrument, tf)
-        for tf in timeframes
-        if load_structure_packet(instrument, tf) is not None
-    }
-
-def structure_is_available(instrument: str,
-                            timeframes: list[str] = ("15m", "1h", "4h")) -> bool:
-    """
-    Returns True if at least one valid, non-stale structure packet exists.
-    """
-    for tf in timeframes:
-        packet = load_structure_packet(instrument, tf)
-        if packet and _is_fresh(packet):
-            return True
-    return False
-
-def _is_fresh(packet: dict) -> bool:
-    """Returns True if packet as_of is within staleness threshold."""
-    try:
-        as_of = datetime.fromisoformat(packet["as_of"].replace("Z", "+00:00"))
-        age_minutes = (datetime.now(timezone.utc) - as_of).total_seconds() / 60
-        return age_minutes <= STRUCTURE_STALENESS_MINUTES
-    except Exception:
-        return False
+  "digest": {
+    "instrument": "EURUSD",
+    "as_of_utc": "2026-03-07T10:15:00Z",
+    "structure_available": true,
+    "structure_gate": "pass",
+    "gate_reason": "4h regime bullish, no contradiction",
+    "htf_bias": "bullish",
+    "htf_source_timeframe": "4h",
+    "last_bos": "bullish",
+    "last_mss": "bearish",
+    "bos_mss_alignment": "conflicted",
+    "nearest_liquidity_above": {
+      "type": "prior_day_high", "price": 1.08720,
+      "scope": "external_liquidity", "status": "active"
+    },
+    "nearest_liquidity_below": {
+      "type": "equal_lows", "price": 1.08410,
+      "scope": "internal_liquidity", "status": "active"
+    },
+    "liquidity_bias": "above_closer",
+    "active_fvg_context": "discount_bullish",
+    "active_fvg_count": 2,
+    "recent_sweep_signal": "bullish_reclaim",
+    "structure_supports": ["bullish 4h regime", "active discount FVG at 1.08475", "bullish BOS on 1h", "bullish reclaim of equal_lows"],
+    "structure_conflicts": ["bearish MSS on 15m against HTF bullish regime"],
+    "no_trade_flags": [],
+    "caution_flags": ["ltf_mss_conflict"]
+  }
+}
 ```
 
 ---
 
-## `recent_events` assembly rule
+## LLM prompt contract
 
-Select last 5 BOS/MSS events across all active timeframes, sorted by time descending:
+### System prompt (locked — do not deviate)
 
-```python
-def assemble_recent_events(packets: dict[str, dict],
-                           max_events: int = 5) -> list[StructureRecentEvent]:
-    all_events = []
-    for tf, packet in packets.items():
-        for event in packet.get("events", []):
-            if event["type"] in ("bos_bull", "bos_bear", "mss_bull", "mss_bear"):
-                all_events.append(StructureRecentEvent(
-                    type=event["type"],
-                    time=event["time"],
-                    timeframe=tf,
-                    reference_price=event["reference_price"],
-                ))
-    all_events.sort(key=lambda e: e.time, reverse=True)
-    return all_events[:max_events]
 ```
+You are a disciplined ICT-style market analyst. You reason over structured market state only.
+You do not re-derive structure from raw price data. You do not interpret charts.
+Your structural knowledge comes exclusively from the structure digest provided.
+
+Your output must always contain two parts:
+1. A JSON verdict block matching the AnalystVerdict schema exactly.
+2. A JSON reasoning block matching the ReasoningBlock schema exactly.
+
+Output only valid JSON. No preamble. No markdown. No commentary outside the JSON.
+```
+
+### User prompt shape
+
+```
+Instrument: {instrument}
+As of: {as_of_utc}
+
+--- STRUCTURE DIGEST ---
+{digest.to_prompt_dict() as formatted JSON}
+
+--- MARKET CONTEXT ---
+Session: {state_summary.session_context}
+Volatility: {state_summary.volatility_regime}
+Momentum: {state_summary.momentum_state}
+ATR (14): {features.core.atr_14}
+MA50 / MA200: {features.core.ma_50} / {features.core.ma_200}
+
+--- HARD CONSTRAINTS ---
+{if digest.has_hard_no_trade():}
+  HARD NO-TRADE FLAGS PRESENT: {digest.no_trade_flags}
+  You must set verdict = "no_trade" and confidence = "none".
+  Do not override this constraint.
+
+Produce the AnalystVerdict and ReasoningBlock JSON now.
+```
+
+### Hard constraint enforcement
+
+If `digest.has_hard_no_trade()` is True:
+- The prompt must explicitly state the no-trade constraint
+- The LLM must set `verdict = "no_trade"` and `confidence = "none"`
+- The post-parse validator must assert this — if the LLM overrides it, raise a `ValueError`
 
 ---
 
-## `liquidity` summary assembly rule
+## Output file path
 
-For each timeframe, find the nearest active level above and below current price:
-
-```python
-def assemble_liquidity_summary(packets: dict[str, dict],
-                                current_price: float) -> dict[str, LiquidityTimeframeSummary]:
-    summary = {}
-    for tf, packet in packets.items():
-        active_levels = [l for l in packet.get("liquidity", [])
-                         if l["status"] == "active"]
-        above = [l for l in active_levels if l["price"] > current_price]
-        below = [l for l in active_levels if l["price"] < current_price]
-
-        nearest_above = min(above, key=lambda l: l["price"] - current_price) if above else None
-        nearest_below = max(below, key=lambda l: l["price"]) if below else None
-
-        summary[tf] = LiquidityTimeframeSummary(
-            active_count=len(active_levels),
-            nearest_above=_to_liquidity_nearest(nearest_above),
-            nearest_below=_to_liquidity_nearest(nearest_below),
-        )
-    return summary
+```
+analyst/output/{instrument}_analyst_output.json
 ```
 
----
-
-## Schema evolution rule
-
-`market_packet_v1` consumers are not broken by v2. The only change is:
-- `schema_version` string changes from `market_packet_v1` to `market_packet_v2`
-- New top-level key `structure` is added
-
-All existing v1 keys (`source`, `timeframes`, `features`, `state_summary`, `quality`) are present and unchanged in v2.
+One file per instrument. Overwritten on each run. Preserved for audit alongside the digest.

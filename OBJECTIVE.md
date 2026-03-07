@@ -1,180 +1,209 @@
-# OBJECTIVE.md — Phase 3D: Officer Integration
+# OBJECTIVE.md — Phase 3E: Analyst Structure Consumption
 
-## What Phase 3D does and why
+## Why Phase 3E exists
 
-Phases 3A through 3C built a deterministic structure engine that computes explicit ICT-style structural state — confirmed swings, BOS, MSS, liquidity levels, sweep outcomes, FVG zones, and regime summaries. Every object is numeric, auditable, and replay-safe.
+By the end of Phase 3D the system has:
+- A trusted feed producing canonical OHLCV
+- An Officer producing Market Packet v2 with core features and structure state
+- A structure engine computing confirmed swings, BOS/MSS, liquidity, FVGs, and regime
 
-Phase 2 built the Market Data Officer, which produces a market packet consumed by downstream AI agents. That packet currently contains feed-derived features and state summaries — but no structural context.
+But nothing downstream is consuming that structure yet. The structure block in every v2 packet is populated, deterministic, and auditable — and completely ignored by any reasoning layer.
 
-Phase 3D closes that gap. It connects the structure engine into the Officer, producing **Market Packet v2** — a single unified packet that gives downstream agents everything they need: price data, core features, and explicit structural state, in one schema-versioned JSON object.
+Phase 3E closes that gap. It builds the analyst layer that turns structured market state into verdicts. Not by re-deriving structure from scratch via chart interpretation, but by reading the pre-computed structure block and reasoning over it explicitly.
 
-Think of it like this: the feed is the raw database, the structure engine is the analytics layer that runs queries on it, and the Officer is the report that lands on the analyst's desk. Phase 3D is the moment the report starts including the analytics output, not just the raw numbers.
-
----
-
-## What the Officer gains in 3D
-
-### 1. Structure read API (`structure/reader.py`)
-
-A clean, Officer-facing read interface over structure engine outputs. The Officer calls this API — it does not read structure JSON files directly via hardcoded paths.
-
-```python
-def load_structure_packet(instrument: str, timeframe: str) -> StructurePacket | None:
-    """Load the latest structure packet for an instrument/timeframe. Returns None if unavailable."""
-
-def load_structure_summary(instrument: str) -> StructureSummary | None:
-    """Load a compact cross-timeframe structure summary. Returns None if unavailable."""
-
-def structure_is_available(instrument: str) -> bool:
-    """Returns True if valid structure packets exist and are not stale."""
-```
-
-The reader handles: file existence checks, JSON parsing, staleness detection, and graceful None returns. It never raises on missing files.
-
-### 2. `StructureBlock` dataclass (`officer/contracts.py`)
-
-A typed container for the structure state that flows into the Officer packet:
-
-```python
-@dataclass
-class StructureBlock:
-    available: bool
-    source_engine_version: str | None
-    as_of: str | None
-    regime: dict | None
-    recent_events: list | None
-    liquidity: dict | None
-    active_fvg_zones: list | None
-```
-
-### 3. Market Packet v2 (`officer/contracts.py`)
-
-Extends `MarketPacketV1` by adding `structure: StructureBlock` as a new top-level field. All v1 fields preserved unchanged.
-
-```python
-@dataclass
-class MarketPacketV2:
-    # --- all v1 fields preserved ---
-    instrument: str
-    as_of_utc: str
-    source: dict
-    timeframes: dict
-    features: FeatureBlock
-    state_summary: StateSummary
-    quality: QualityBlock
-
-    # --- v2 addition ---
-    structure: StructureBlock
-```
-
-### 4. Officer service integration (`officer/service.py`)
-
-`build_market_packet()` extended to:
-1. Check if structure is available via `structure_is_available(instrument)`
-2. If yes: load structure packets for all active timeframes, assemble `StructureBlock`
-3. If no: assemble `StructureBlock` with `available=False`, all sub-fields `None`
-4. Assemble and return `MarketPacketV2`
-
-The Officer never crashes because structure is unavailable. It degrades gracefully.
+This is the payoff of the entire Phase 3 investment.
 
 ---
 
-## What flows into the structure block
+## The hybrid architecture
 
-### `regime`
+### Layer 1 — Python pre-filter (`pre_filter.py`)
 
-Compact regime summary from the highest-confidence timeframe (4h preferred, fall back to 1h):
+Reads `MarketPacketV2.structure` and produces a `StructureDigest` — a compact, deterministic, machine-readable summary of what the structure block says about current market context.
 
-```json
-{
-  "bias": "bullish",
-  "last_bos_direction": "bullish",
-  "last_mss_direction": null,
-  "trend_state": "trending",
-  "structure_quality": "clean",
-  "source_timeframe": "4h"
-}
+The pre-filter:
+- Applies the HTF regime gate (hard: pass / fail / no-data)
+- Extracts and classifies recent BOS/MSS direction
+- Identifies nearest liquidity above and below current price
+- Classifies active FVG context (discount / premium / none)
+- Summarises sweep/reclaim outcomes
+- Produces explicit `structure_supports` and `structure_conflicts` lists
+- Sets `structure_gate` status
+
+This layer is deterministic. Same v2 packet → same digest, every time. It is fully testable without an LLM.
+
+### Layer 2 — LLM analyst (`analyst.py`)
+
+Receives the `StructureDigest` plus selected context from the v2 packet (core features, state summary, timeframes if needed). Does not receive the raw structure block directly — the digest is the only structure input.
+
+The LLM:
+- Synthesises the digest into a coherent directional view
+- Weighs mixed or conflicting signals
+- Produces a structured `AnalystVerdict` JSON block
+- Produces a compact `ReasoningBlock` in plain English
+
+The LLM must not re-derive structure from raw OHLCV or attempt chart interpretation. Its structural knowledge comes exclusively from the digest.
+
+---
+
+## What the pre-filter computes
+
+### HTF regime gate
+
+The hard gate. If HTF regime is unavailable or contradicts the proposed direction, the gate fails.
+
+```
+structure_gate = "pass"     → HTF regime is present and internally consistent
+structure_gate = "fail"     → HTF regime contradicts trade direction
+structure_gate = "no_data"  → structure block unavailable or stale
+structure_gate = "mixed"    → 4h and 1h regimes conflict
 ```
 
-### `recent_events`
+Gate logic:
+- Check `structure.available` — if False, gate = `no_data`
+- Read `structure.regime.bias` from the 4h-preferred source
+- If `bias == "neutral"` → gate = `mixed`
+- If `bias` conflicts with proposed direction → gate = `fail`
+- If `bias` aligns or no direction yet proposed → gate = `pass`
 
-Last 5 confirmed BOS/MSS events across all active timeframes, sorted by time descending:
+### BOS/MSS direction summary
 
-```json
-[
-  {
-    "type": "bos_bull",
-    "time": "2026-03-07T08:00:00Z",
-    "timeframe": "1h",
-    "reference_price": 1.08642
-  }
+From `structure.recent_events`, extract the most recent BOS and MSS:
+- `last_bos`: `"bullish"` / `"bearish"` / `None`
+- `last_mss`: `"bullish"` / `"bearish"` / `None`
+- `bos_mss_alignment`: `"aligned"` / `"conflicted"` / `"incomplete"`
+
+### Liquidity context
+
+From `structure.liquidity` on the primary timeframe (1h preferred):
+- `nearest_liquidity_above`: type, price, scope
+- `nearest_liquidity_below`: type, price, scope
+- `liquidity_bias`: `"above_closer"` / `"below_closer"` / `"balanced"`
+
+### FVG context
+
+From `structure.active_fvg_zones`:
+- `active_fvg_context`: `"discount_bullish"` / `"premium_bearish"` / `"at_fvg"` / `"none"`
+- Discount = price inside or below a bullish FVG
+- Premium = price inside or above a bearish FVG
+
+### Sweep/reclaim summary
+
+From `structure.liquidity` levels with sweep outcomes:
+- `recent_sweep_signal`: `"bullish_reclaim"` / `"bearish_reclaim"` / `"accepted_beyond"` / `"none"`
+- Bullish reclaim = low-side sweep reclaimed = bullish signal
+- Bearish reclaim = high-side sweep reclaimed = bearish signal
+
+### Supports and conflicts
+
+Plain-language strings describing what structure supports or conflicts with a bullish or bearish case:
+
+```python
+structure_supports = [
+    "bullish 4h regime",
+    "active discount FVG at 1.08475",
+    "bullish BOS on 1h"
 ]
-```
-
-Keep this compact — downstream agents need recency context, not full event history.
-
-### `liquidity`
-
-Per-timeframe active liquidity summary — levels that are currently `active` or `swept` but not yet resolved:
-
-```json
-{
-  "1h": {
-    "active_count": 3,
-    "nearest_above": { "type": "prior_day_high", "price": 1.08720, "scope": "external_liquidity" },
-    "nearest_below": { "type": "equal_lows", "price": 1.08410, "scope": "internal_liquidity" }
-  },
-  "4h": { ... }
-}
-```
-
-Do not dump the full liquidity array. Downstream agents need orientation, not a raw list.
-
-### `active_fvg_zones`
-
-All `open` and `partially_filled` FVG zones across all active timeframes, sorted by proximity to current price (nearest first):
-
-```json
-[
-  {
-    "id": "fvg_003",
-    "fvg_type": "bullish_fvg",
-    "zone_high": 1.08620,
-    "zone_low": 1.08475,
-    "status": "open",
-    "timeframe": "1h",
-    "origin_time": "2026-03-07T06:00:00Z"
-  }
+structure_conflicts = [
+    "bearish MSS on 15m against HTF bullish regime",
+    "external liquidity above at prior_day_high 1.08720"
 ]
 ```
 
 ---
 
-## What Phase 3D explicitly does NOT include
+## AnalystVerdict schema
 
-| Out of scope | Reason |
+```json
+{
+  "instrument": "EURUSD",
+  "as_of_utc": "2026-03-07T10:15:00Z",
+  "verdict": "long_bias",
+  "confidence": "moderate",
+  "structure_gate": "pass",
+  "htf_bias": "bullish",
+  "ltf_structure_alignment": "mixed",
+  "active_fvg_context": "discount_bullish",
+  "recent_sweep_signal": "bullish_reclaim",
+  "structure_supports": ["bullish 4h regime", "active discount FVG"],
+  "structure_conflicts": ["bearish MSS on 15m"],
+  "no_trade_flags": [],
+  "caution_flags": ["ltf_mss_conflict"]
+}
+```
+
+### Verdict values
+- `long_bias` — structure supports bullish
+- `short_bias` — structure supports bearish
+- `no_trade` — gate fail or too many conflicts
+- `conditional` — mixed signals, conditional entry criteria needed
+- `no_data` — structure unavailable
+
+### Confidence values
+- `high` — gate pass, strong alignment across HTF + LTF
+- `moderate` — gate pass, some conflict at LTF
+- `low` — gate pass but significant conflict
+- `none` — gate fail or no_data
+
+---
+
+## ReasoningBlock schema
+
+```json
+{
+  "summary": "Bullish bias on EURUSD. HTF 4h regime is bullish with recent bullish BOS on 1h confirming directional momentum. Price is trading near an active discount FVG at 1.08475–1.08620, providing a potential area of interest for continuation. A recent bullish reclaim of prior low-side liquidity adds conviction. Caution: 15m shows a bearish MSS, which introduces short-term conflict. Overall structure supports a long bias with moderate confidence, contingent on LTF stabilisation.",
+  "htf_context": "4h regime: bullish. Last BOS: bullish (1h). Last MSS: bearish (15m) — minor conflict.",
+  "liquidity_context": "Nearest above: prior_day_high at 1.08720 (external). Nearest below: equal_lows at 1.08410 (internal). Liquidity bias: above is closer — potential draw on liquidity above.",
+  "fvg_context": "Active bullish FVG at 1.08475–1.08620 (1h, open). Price approaching from above — discount zone in play.",
+  "sweep_context": "Recent bullish reclaim of equal_lows. Supportive of bullish continuation.",
+  "verdict_rationale": "Long bias with moderate confidence. HTF gate passes. LTF MSS conflict noted but does not override HTF alignment. No hard no-trade flags."
+}
+```
+
+---
+
+## No-trade and caution flags
+
+The pre-filter must emit explicit flags when conditions warrant:
+
+### No-trade flags (hard — LLM must respect these)
+- `htf_gate_fail` — HTF regime contradicts direction
+- `no_structure_data` — structure block unavailable
+- `htf_regime_neutral` — no directional bias available
+
+### Caution flags (advisory — LLM weighs these)
+- `ltf_mss_conflict` — LTF MSS against HTF direction
+- `liquidity_above_close` — significant external liquidity just above price
+- `fvg_partially_filled` — nearest FVG is partially filled, may have less magnetic pull
+- `sweep_unresolved` — recent sweep with unresolved outcome
+- `htf_mss_present` — HTF MSS fired recently, possible trend change
+
+---
+
+## What Phase 3E explicitly does NOT include
+
+| Out of scope | Phase |
 |---|---|
-| Cross-timeframe structure synthesis | Separate future phase |
-| Confluence scoring | Never in structure engine |
-| Trade signal generation | Never in this stack |
-| Analyst persona logic | Downstream layer |
-| Parquet structure output | Deferred — JSON is sufficient |
-| New instruments | Feed decision, not 3D |
-| New timeframes | Separate config decision |
-| Rewriting structure engine modules | 3A/3B/3C are locked |
-| Rewriting Officer v1 fields | v1 fields are preserved unchanged |
+| Multiple analyst personas | 3F |
+| Arbiter / Senate layer | Future |
+| Backtesting / performance tracking | Future |
+| Trade entry / exit logic | Never in analyst layer |
+| Confluence scoring system | Future |
+| New structure features | 4A+ |
+| Officer or feed modifications | Not needed |
+| Cross-timeframe structure synthesis | 4A |
 
 ---
 
 ## Definition of done
 
-Phase 3D is complete when:
-- `structure/reader.py` provides a clean Officer-facing read API
-- `StructureBlock` dataclass is typed and complete
-- `MarketPacketV2` extends v1 with `structure` block
-- Officer assembles v2 packet with structure when available
-- Officer assembles v2 packet with `available=False` gracefully when structure is missing
-- `schema_version` is `market_packet_v2` in all Officer output
-- All 3A/3B/3C/Phase 2 tests still pass
-- Feed pipeline untouched
-- All 3D test groups pass for EURUSD and XAUUSD
+Phase 3E is complete when:
+- `pre_filter.py` produces deterministic `StructureDigest` from any v2 packet
+- HTF gate logic is correct and testable without LLM
+- `AnalystVerdict` and `ReasoningBlock` schemas are defined and populated
+- LLM analyst receives digest only — never raw structure block
+- No-trade flags from pre-filter are respected in LLM output
+- Verdict changes deterministically when structure inputs change
+- Both EURUSD and XAUUSD produce coherent verdicts
+- All test groups pass
+- All prior phase tests pass
