@@ -35,3 +35,8 @@ class StructureConfig:
     # Phase 3B — Reclaim detection
     allow_same_bar_reclaim: bool = True
     reclaim_window_bars: int = 1
+
+    # Phase 3C — FVG detection
+    fvg_min_size_eurusd: float = 0.0003    # 3 pips minimum gap
+    fvg_min_size_xauusd: float = 0.30      # 30 cents minimum gap
+    fvg_use_body_only: bool = True          # always True in 3C, wick mode deferred

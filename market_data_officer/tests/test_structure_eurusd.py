@@ -143,7 +143,7 @@ class TestGroupG_Output_EURUSD:
         assert "regime" in data
         assert "diagnostics" in data
         assert "build" in data
-        assert data["build"]["engine_version"] == "phase_3b"
+        assert data["build"]["engine_version"] == "phase_3c"
         assert data["build"]["bos_confirmation"] == "close"
 
 
@@ -259,4 +259,4 @@ class TestGroup3B_G_EURUSD:
 
             with open(path) as f:
                 data = json.load(f)
-            assert data["build"]["engine_version"] == "phase_3b"
+            assert data["build"]["engine_version"] == "phase_3c"
