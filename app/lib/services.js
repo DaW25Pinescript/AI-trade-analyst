@@ -1,37 +1,35 @@
 /**
- * Service Layer — Trade Ideation Journey v1
+ * Service Layer — Trade Ideation Journey v1.1
  *
- * Transport pattern: File-based (Pattern A).
- * Reads saved JSON artifacts from analyst/output/ and app/data/.
+ * Transport pattern: API-first (V1.1).
+ * All reads go through FastAPI at port 8000.
+ * Demo fallback only when backend is unreachable — sets data_state: "demo".
  *
  * No component should contain raw fetch logic or direct file reads.
  * All backend data flows through this service layer.
- *
- * In production, these functions read real JSON files.
- * In development/demo mode, they return typed mock data.
  */
 
-import { adaptTriageItem, adaptTriageList, adaptJourneyBootstrap } from './adapters.js';
+import {
+  adaptTriageItem,
+  adaptTriageList,
+  adaptTriageResponse,
+  adaptJourneyBootstrap,
+  adaptBootstrapResponse,
+  adaptSnapshotForSave,
+  adaptJournalRecords,
+  adaptReviewRecords,
+} from './adapters.js';
 
-/** @type {'file' | 'api'} Declared transport pattern — locked per audit */
-export const TRANSPORT_PATTERN = 'file';
+/** @type {'api'} Declared transport pattern — locked per audit */
+export const TRANSPORT_PATTERN = 'api';
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
-/**
- * Base path for analyst output artifacts.
- * In file-based mode, this is the directory containing JSON outputs.
- */
-let _outputBasePath = '../analyst/output';
-let _dataBasePath = './data';
-
-/** Set the base path for analyst outputs (for testing/configuration). */
-export function setOutputBasePath(path) { _outputBasePath = path; }
-export function setDataBasePath(path) { _dataBasePath = path; }
+const API_BASE = 'http://localhost:8000';
 
 // ── Demo Mode ───────────────────────────────────────────────────────────────
 
-let _demoMode = true; // Default to demo mode until real artifacts exist
+let _demoMode = false;
 
 export function setDemoMode(enabled) { _demoMode = enabled; }
 export function isDemoMode() { return _demoMode; }
@@ -39,148 +37,235 @@ export function isDemoMode() { return _demoMode; }
 // ── Triage Service ──────────────────────────────────────────────────────────
 
 /**
- * Load triage items for the dashboard.
- * In file mode: scans analyst/output/ for *_multi_analyst_output.json files.
- * In demo mode: returns typed mock data.
+ * Fetch triage items for the dashboard.
+ * Calls GET /watchlist/triage. Falls back to demo on network failure.
  *
+ * @returns {Promise<{items: import('../types/journey.js').TriageItem[], dataState: string}>}
+ */
+export async function fetchTriage() {
+  try {
+    const res = await fetch(`${API_BASE}/watchlist/triage`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return adaptTriageResponse(data);
+  } catch (e) {
+    console.warn('[services] fetchTriage failed, using demo fallback:', e.message);
+    return _demoTriageResponse();
+  }
+}
+
+/**
+ * Legacy alias for backward compatibility with DashboardPage.
  * @returns {Promise<import('../types/journey.js').TriageItem[]>}
  */
 export async function loadTriageItems() {
-  if (_demoMode) return _demoTriageItems();
-
-  try {
-    // In file-based mode, we need to know which instruments have outputs.
-    // This would typically be provided by a manifest or directory listing.
-    // For now, attempt to load a known instrument list.
-    const manifest = await _fetchJSON(`${_outputBasePath}/manifest.json`).catch(() => null);
-    if (!manifest || !manifest.instruments) {
-      console.warn('[services] No manifest found. Falling back to demo data.');
-      return _demoTriageItems();
-    }
-
-    const outputs = await Promise.all(
-      manifest.instruments.map(inst =>
-        _fetchJSON(`${_outputBasePath}/${inst}_multi_analyst_output.json`).catch(() => null)
-      )
-    );
-
-    return adaptTriageList(outputs.filter(Boolean));
-  } catch (e) {
-    console.error('[services] Failed to load triage items:', e);
-    return _demoTriageItems();
-  }
+  const result = await fetchTriage();
+  // Attach dataState to the array for components that need it
+  const items = result.items;
+  items._dataState = result.dataState;
+  return items;
 }
 
 // ── Journey Bootstrap Service ───────────────────────────────────────────────
 
 /**
- * Load journey bootstrap data for a specific instrument.
+ * Fetch bootstrap data for a specific instrument.
+ * Calls GET /journey/{asset}/bootstrap.
  *
- * @param {string} instrument - e.g. "EURUSD"
- * @returns {Promise<Object>} Journey bootstrap from adaptJourneyBootstrap
+ * @param {string} asset - Instrument symbol
+ * @returns {Promise<Object>} Adapted journey bootstrap
+ */
+export async function fetchBootstrap(asset) {
+  try {
+    const res = await fetch(`${API_BASE}/journey/${encodeURIComponent(asset)}/bootstrap`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return adaptBootstrapResponse(data);
+  } catch (e) {
+    console.warn(`[services] fetchBootstrap(${asset}) failed, using demo fallback:`, e.message);
+    return _demoJourneyBootstrap(asset);
+  }
+}
+
+/**
+ * Legacy alias for backward compatibility with JourneyPage.
+ * @param {string} instrument
+ * @returns {Promise<Object>}
  */
 export async function loadJourneyBootstrap(instrument) {
-  if (_demoMode) return _demoJourneyBootstrap(instrument);
-
-  try {
-    const [multiOutput, explainBlock, macroSnapshot] = await Promise.all([
-      _fetchJSON(`${_outputBasePath}/${instrument}_multi_analyst_output.json`),
-      _fetchJSON(`${_outputBasePath}/${instrument}_multi_analyst_explainability.json`).catch(() => null),
-      _fetchJSON(`${_dataBasePath}/macro_snapshot.json`).catch(() => null),
-    ]);
-
-    return adaptJourneyBootstrap(multiOutput, explainBlock, macroSnapshot);
-  } catch (e) {
-    console.error(`[services] Failed to load journey bootstrap for ${instrument}:`, e);
-    return _demoJourneyBootstrap(instrument);
-  }
+  return fetchBootstrap(instrument);
 }
 
 // ── Persistence Service ─────────────────────────────────────────────────────
 
 /**
- * Save a decision snapshot to local storage.
- * In v1, persistence is browser-local (localStorage/IndexedDB).
- *
- * @param {import('../types/journey.js').DecisionSnapshot} snapshot
- * @returns {Promise<boolean>}
+ * Save a journey draft to the backend.
+ * @param {Object} state - Journey state object
+ * @returns {Promise<{success: boolean, journeyId?: string, savedAt?: string, error?: string}>}
  */
-export async function saveSnapshot(snapshot) {
+export async function saveDraft(state) {
   try {
-    const key = `journey_snapshot_${snapshot.snapshotId}`;
-    localStorage.setItem(key, JSON.stringify(snapshot));
-
-    // Also update the snapshot index
-    const indexKey = 'journey_snapshot_index';
-    const existing = JSON.parse(localStorage.getItem(indexKey) || '[]');
-    existing.push({
-      snapshotId: snapshot.snapshotId,
-      instrument: snapshot.instrument,
-      frozenAt: snapshot.frozenAt,
-      journeyStatus: snapshot.journeyStatus,
+    const payload = adaptSnapshotForSave(state);
+    const res = await fetch(`${API_BASE}/journey/draft`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
-    localStorage.setItem(indexKey, JSON.stringify(existing));
-
-    return true;
+    const data = await res.json();
+    if (!data.success) {
+      return { success: false, error: data.error || 'Draft save failed' };
+    }
+    return {
+      success: true,
+      journeyId: data.journey_id,
+      savedAt: data.saved_at,
+    };
   } catch (e) {
-    console.error('[services] Failed to save snapshot:', e);
-    return false;
+    console.error('[services] saveDraft failed:', e);
+    return { success: false, error: e.message };
   }
 }
 
 /**
- * Load saved snapshots index.
+ * Save a frozen decision snapshot to the backend.
+ * @param {import('../types/journey.js').DecisionSnapshot} snapshot
+ * @returns {Promise<{success: boolean, snapshotId?: string, savedAt?: string, error?: string}>}
+ */
+export async function saveDecision(snapshot) {
+  try {
+    const payload = adaptSnapshotForSave(snapshot);
+    const res = await fetch(`${API_BASE}/journey/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return { success: false, error: data.error || 'Decision save failed' };
+    }
+    return {
+      success: true,
+      snapshotId: data.snapshot_id,
+      savedAt: data.saved_at,
+    };
+  } catch (e) {
+    console.error('[services] saveDecision failed:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Save a result snapshot to the backend.
+ * @param {Object} snapshot
+ * @returns {Promise<{success: boolean, snapshotId?: string, savedAt?: string, error?: string}>}
+ */
+export async function saveResult(snapshot) {
+  try {
+    const payload = adaptSnapshotForSave(snapshot);
+    const res = await fetch(`${API_BASE}/journey/result`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return { success: false, error: data.error || 'Result save failed' };
+    }
+    return {
+      success: true,
+      snapshotId: data.snapshot_id,
+      savedAt: data.saved_at,
+    };
+  } catch (e) {
+    console.error('[services] saveResult failed:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Legacy alias — now calls saveDecision via backend.
+ * @param {import('../types/journey.js').DecisionSnapshot} snapshot
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function saveSnapshot(snapshot) {
+  return saveDecision(snapshot);
+}
+
+// ── Journal Service ─────────────────────────────────────────────────────────
+
+/**
+ * Fetch saved decision records for the journal page.
  * @returns {Promise<Object[]>}
  */
-export async function loadSnapshotIndex() {
+export async function fetchJournalDecisions() {
   try {
-    return JSON.parse(localStorage.getItem('journey_snapshot_index') || '[]');
-  } catch {
+    const res = await fetch(`${API_BASE}/journal/decisions`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return adaptJournalRecords(data);
+  } catch (e) {
+    console.warn('[services] fetchJournalDecisions failed:', e.message);
     return [];
   }
 }
 
 /**
- * Load a specific snapshot by ID.
+ * Legacy alias for JournalPage backward compatibility.
+ * @returns {Promise<Object[]>}
+ */
+export async function loadSnapshotIndex() {
+  return fetchJournalDecisions();
+}
+
+/**
+ * Load a specific snapshot by ID — stub, not needed for V1.1.
  * @param {string} snapshotId
- * @returns {Promise<import('../types/journey.js').DecisionSnapshot|null>}
+ * @returns {Promise<null>}
  */
 export async function loadSnapshot(snapshotId) {
-  try {
-    const raw = localStorage.getItem(`journey_snapshot_${snapshotId}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 // ── Review Service ──────────────────────────────────────────────────────────
 
 /**
- * Load review patterns. Stub — not yet produced by backend.
+ * Fetch review records from the backend.
+ * @returns {Promise<Object[]>}
+ */
+export async function fetchReviewRecords() {
+  try {
+    const res = await fetch(`${API_BASE}/review/records`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return adaptReviewRecords(data);
+  } catch (e) {
+    console.warn('[services] fetchReviewRecords failed:', e.message);
+    return [];
+  }
+}
+
+/**
+ * Legacy alias for ReviewPage.
  * @returns {Promise<Object>}
  */
 export async function loadReviewPatterns() {
-  // TODO: missing — review patterns not yet produced by backend
+  const records = await fetchReviewRecords();
   return {
-    _stub: true,
-    _note: 'Review patterns not yet available. Stub per interface audit.',
+    records,
     overrideFrequency: [],
     gateFailureClusters: [],
     plannedVsActual: [],
   };
 }
 
-// ── Internal Helpers ────────────────────────────────────────────────────────
-
-async function _fetchJSON(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
-  return res.json();
-}
-
 // ── Demo Data ───────────────────────────────────────────────────────────────
-// Typed mock data for development. Clearly marked as demo, not real backend.
+
+function _demoTriageResponse() {
+  return {
+    dataState: 'demo',
+    items: _demoTriageItems().map(item => ({ ...item, _dataState: 'demo' })),
+  };
+}
 
 function _demoTriageItems() {
   return [
@@ -196,6 +281,7 @@ function _demoTriageItems() {
       noTradeEnforced: false,
       asOfUtc: '2026-03-07T10:00:00Z',
       miniChartRef: null,
+      dataState: 'demo',
     },
     {
       symbol: 'XAUUSD',
@@ -209,6 +295,7 @@ function _demoTriageItems() {
       noTradeEnforced: false,
       asOfUtc: '2026-03-07T10:00:00Z',
       miniChartRef: null,
+      dataState: 'demo',
     },
     {
       symbol: 'GBPUSD',
@@ -222,6 +309,7 @@ function _demoTriageItems() {
       noTradeEnforced: false,
       asOfUtc: '2026-03-07T10:00:00Z',
       miniChartRef: null,
+      dataState: 'demo',
     },
     {
       symbol: 'USDJPY',
@@ -235,6 +323,7 @@ function _demoTriageItems() {
       noTradeEnforced: true,
       asOfUtc: '2026-03-07T10:00:00Z',
       miniChartRef: null,
+      dataState: 'demo',
     },
   ];
 }
@@ -365,5 +454,7 @@ function _demoJourneyBootstrap(instrument) {
     },
   };
 
-  return adaptJourneyBootstrap(multiOutput, demoExplain, demoMacro);
+  const bootstrap = adaptJourneyBootstrap(multiOutput, demoExplain, demoMacro);
+  bootstrap.dataState = 'demo';
+  return bootstrap;
 }
