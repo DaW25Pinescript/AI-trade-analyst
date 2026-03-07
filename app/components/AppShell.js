@@ -5,8 +5,6 @@
  * Routes are handled by hash-based navigation (#/dashboard, #/journey/:asset, etc.)
  */
 
-import { PageHeader } from './PageHeader.js';
-
 /**
  * Renders the AppShell into the given container.
  * @param {HTMLElement} container
