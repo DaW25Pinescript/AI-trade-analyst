@@ -21,9 +21,12 @@ Phase 3 — deliberation_node (optional, v2.1b, only when enable_deliberation=Tr
 """
 import asyncio
 import logging
+import os
 from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
+
+_TRIAGE_SMOKE_MODE = os.getenv("TRIAGE_SMOKE_MODE", "").lower() == "true"
 
 from ..models.persona import PersonaType
 from ..models.analyst_output import AnalystOutput, OverlayDeltaReport
@@ -54,7 +57,23 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
     Pushes a progress event to the run's queue (if registered) on completion.
     Raises on model error or schema validation failure — caller handles exceptions.
     """
+    import os as _os
     route = router.resolve(ANALYST_REASONING)
+
+    # Smoke-path instrumentation — log LLM call details (never the key value)
+    _triage_debug = _os.getenv("TRIAGE_DEBUG", "").lower() == "true"
+    if _triage_debug:
+        _api_key_env = "OPENAI_API_KEY"  # default; actual source depends on config
+        _key_val = route.get("api_key") or ""
+        logger.info(
+            "[run_analyst] LLM call — model=%s base_url=%s api_key_env=%s key_present=%s persona=%s",
+            config["model"],
+            route.get("base_url"),
+            _api_key_env,
+            bool(_key_val and len(str(_key_val)) > 0),
+            config["persona"].value,
+        )
+
     messages = build_messages(prompt)
     response = await acompletion_metered(
         run_dir=get_run_dir(run_id),
@@ -173,9 +192,17 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     Invalid/failed analyst responses are logged as warnings and skipped,
     not silently ignored — a count is preserved in the audit log via analyst_outputs length.
     Raises RuntimeError if fewer than MINIMUM_VALID_ANALYSTS return valid output.
+
+    TRIAGE_SMOKE_MODE: runs only the first analyst/persona and skips quorum.
+    On LLM error returns an error dict in _smoke_error instead of raising.
     """
     ground_truth = state["ground_truth"]
     lens_config = state["lens_config"]
+
+    configs_to_run = ANALYST_CONFIGS
+    if _TRIAGE_SMOKE_MODE:
+        configs_to_run = ANALYST_CONFIGS[:1]
+        logger.info("[smoke] TRIAGE_SMOKE_MODE — running only first analyst: %s", configs_to_run[0]["model"])
 
     tasks = [
         run_analyst(
@@ -183,7 +210,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
             build_analyst_prompt(ground_truth, lens_config, config["persona"]),
             ground_truth.run_id,
         )
-        for config in ANALYST_CONFIGS
+        for config in configs_to_run
     ]
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -191,7 +218,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     valid_outputs: list[AnalystOutput] = []
     configs_used: list[dict] = []
     for i, result in enumerate(results):
-        config = ANALYST_CONFIGS[i]
+        config = configs_to_run[i]
         model = config["model"]
         if isinstance(result, AnalystOutput):
             valid_outputs.append(result)
@@ -201,7 +228,25 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
         else:
             logger.warning("Analyst '%s' Phase 1 failed with error: %s", model, result)
 
-    if len(valid_outputs) < MINIMUM_VALID_ANALYSTS:
+    if _TRIAGE_SMOKE_MODE:
+        if not valid_outputs:
+            # In smoke mode, capture the error instead of raising
+            err = results[0] if results else Exception("no results")
+            route = router.resolve(ANALYST_REASONING)
+            smoke_error = {
+                "error_type": type(err).__name__,
+                "status_code": getattr(err, "status_code", None),
+                "model_attempted": configs_to_run[0]["model"],
+                "base_url_attempted": route.get("base_url"),
+                "message": str(err)[:500],
+            }
+            logger.error("[smoke] LLM error captured: %s", smoke_error)
+            state["_smoke_error"] = smoke_error
+            state["analyst_outputs"] = []
+            state["analyst_configs_used"] = []
+            return state
+        # Smoke mode: skip quorum check
+    elif len(valid_outputs) < MINIMUM_VALID_ANALYSTS:
         raise RuntimeError(
             f"Insufficient analyst responses: {len(valid_outputs)} valid out of "
             f"{len(ANALYST_CONFIGS)} attempted. Minimum required: {MINIMUM_VALID_ANALYSTS}."
