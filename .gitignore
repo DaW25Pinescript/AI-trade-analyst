@@ -164,3 +164,6 @@ config/llm_routing.yaml
 # Market Data Officer — runtime data output (not committed)
 market_data/
 market_data_officer/market_data/
+
+# Analyst — runtime output (generated JSON artifacts)
+analyst/output/
