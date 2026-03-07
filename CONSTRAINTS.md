@@ -1,92 +1,103 @@
-# CONSTRAINTS.md — Trade Ideation Journey V1.1
+# CONSTRAINTS.md — Post-Merge Audit, Trade Ideation Journey V1.1
 
-## Hard constraints — never violate
+## Auditor constraints
 
-### 1. No redesign
-- Do not restyle, restructure, or reorder the accepted V1 UI
-- Do not change visual language, routing shape, stage order, or gate boundary styling
-- Component names from ARCHITECTURE.md are frozen: AppShell, PageHeader, SurfaceCard, SeverityCard, StatusBadge, ProvenanceBadge, StageStepper, EvidencePanel, SplitVerdictPanel, AIPrefillCard, GateChecklist, ChartAnnotationLayer, NotesTextarea
-
-### 2. No invented data
-- Do not fabricate backend payload fields
-- Do not substitute analysis prose when the upstream source is absent
-- If a field is missing, surface that as `null` or an explicit missing state — not a plausible-looking fake value
-- Demo mode is only for when the backend is explicitly unreachable — not as a cover for missing data
-
-### 3. No browser-only persistence
-- `localStorage`, `sessionStorage`, and `IndexedDB` must not be the source of truth for saved records
-- In-memory store mutation is not a save
-- `success: true` must only be returned after a confirmed disk write via the backend
-- Do not show "Saved successfully" for state that lives only in `journeyStore`
-
-### 4. No direct Python calls from the browser
-- The UI does not execute Python, import Python modules, or call analyst pipeline scripts directly
-- All backend interaction goes through the FastAPI server at port 8000
-- Pattern A (direct file reads from `analyst/output/`) is superseded in V1.1 — all reads go through FastAPI endpoints
-
-### 5. No collapse of the three verdict layers
-- `systemVerdict`, `userDecision`, and `executionPlan` must remain separate objects in the snapshot
-- Do not merge them into a convenience object at save time
-
-### 6. No new product surfaces
-- Do not add screens, routes, or features outside the defined V1.1 scope
-- Charting, multi-persona expansion, and cloud persistence are explicitly out of scope
+These rules govern how the audit is conducted. They are not optional.
 
 ---
 
-## Casing convention (locked)
+### 1. No PASS without evidence
 
-| Layer | Convention |
+Every PASS, FAIL, or PARTIAL verdict must be backed by at least one of:
+- file path + function or class name
+- route path + response shape or example
+- saved JSON path on disk
+- console or runtime error text
+- OpenAPI route listing
+
+Impressions and assumptions do not count as evidence.
+
+---
+
+### 2. No redesign suggestions during audit
+
+The auditor must not suggest UI changes, architectural rewrites, or new features during the audit pass.
+
+If a structural violation is found, document it as a finding with severity. Do not propose a fix that changes the accepted V1.1 design.
+
+Exception: if a Critical finding requires a one-line targeted fix to unblock acceptance, that fix may be described. It must be scoped to the exact violation — no broader changes.
+
+---
+
+### 3. Fake save success is an immediate blocker
+
+If `success: true` is returned or shown to the user without a confirmed disk write, that is a Critical finding. Stop the audit on persistence and escalate immediately.
+
+Do not continue to mark other persistence checks as PASS if the save path is fake.
+
+---
+
+### 4. Browser-only persistence is a blocker
+
+If `localStorage`, `sessionStorage`, or `IndexedDB` is the primary persistence layer for saved records, that is a Critical finding. The constraint from V1.1 CONSTRAINTS.md is absolute: browser-only persistence is not acceptable.
+
+---
+
+### 5. Placeholder data without demo marker is a blocker
+
+If the dashboard or journey bootstrap is serving placeholder/mock data without a visible `data_state: "demo"` marker in the UI, that is a Critical finding.
+
+If the data is genuinely unavailable and the UI shows a truthful unavailable state, that is acceptable.
+
+---
+
+### 6. data_state must not be dropped
+
+If `data_state` is present in the backend response but absent from the component render layer, that is a High finding. The entire chain must preserve it: backend response → adapter output → store → component.
+
+---
+
+### 7. Casing violations are High severity
+
+If components reference `snake_case` field names directly, or if adapters pass `snake_case` into the store, that is a High finding. The casing convention from CONTRACTS.md Section 5 is locked.
+
+---
+
+### 8. Scope creep is not a finding
+
+If the implementation added something outside V1.1 scope that does not violate any contract or constraint, document it as a Low observation — not a finding. Do not escalate out-of-scope additions unless they break something.
+
+---
+
+## Severity guide
+
+| Level | Definition |
 |-------|-----------|
-| Backend FastAPI models, API responses, persisted JSON on disk | `snake_case` |
-| Frontend JS store, component props, domain state | `camelCase` |
-| Adapters | Explicit translation boundary — converts both ways |
+| **Critical** | Blocks acceptance completely. Must be fixed before merge is called accepted. |
+| **High** | Major contract violation but localized. Does not block acceptance but must be in the follow-up patch. |
+| **Medium** | Usable but incomplete. Contract partially met. |
+| **Low** | Non-blocking polish issue — no contract impact. |
 
-- `app/lib/adapters.js` is the only place that touches `snake_case` field names
-- Components never reference `snake_case` directly
-- Save payloads are converted back to `snake_case` by the adapter before POST
-- See CONTRACTS.md Section 5 for the full field mapping table
+### Critical examples
+- No real disk persistence
+- Fake save success (`success: true` with no file write)
+- Missing Journey endpoint
+- Placeholder data active without `demo` marker
+- Blocking regression in V1 UI (broken stage, broken gate, broken route)
 
----
+### High examples
+- Wrong endpoint response shape vs CONTRACTS.md
+- Casing boundary broken (components consume `snake_case`)
+- `data_state` dropped at adapter or component layer
+- Journal/review still reading placeholder arrays
+- Decision snapshot immutability not enforced
 
-## Architecture constraints
+### Medium examples
+- Stale/partial banners missing from UI
+- Weak empty-state truthfulness (shows nothing instead of explicit unavailable state)
+- Backend readiness edge cases not handled
 
-### Backend
-- New Journey endpoints must be added to the existing FastAPI app — do not create a second server
-- All file writes use `app/data/journeys/` as the canonical root — no alternative locations
-- Directories are created on first write if they do not exist
-- Decision snapshots are immutable — once written, they are not overwritten
-
-### Frontend
-- Service layer is the only place that knows about transport — components never call `fetch` directly
-- Adapters are the only place that knows about backend payload shapes — components consume typed UI shapes only
-- `data_state` must flow from backend response → adapter → store → component — it must not be dropped at any layer
-
-### API
-- Ensure `load_dotenv()` is called before any config or client init in `ai_analyst/api/main.py`
-- New Journey router should be a separate file, e.g. `ai_analyst/api/routers/journey.py`, registered in `main.py`
-- Do not modify existing routes
-
----
-
-## Data state display rules
-
-| State | Dashboard behavior | Journey behavior |
-|-------|--------------------|-----------------|
-| `live` | Render normally | Render normally, no banner |
-| `stale` | Show staleness indicator on card | Show amber banner with timestamp |
-| `partial` | Show partial badge | Show partial banner, continue allowed |
-| `unavailable` | Show empty state card | Show blocking unavailable state |
-| `demo` | Show "Demo data" badge on each card | Show "Demo mode" banner in stage header |
-| `error` | Show error state card | Show error banner, block progression |
-
----
-
-## Save semantics
-
-1. User triggers save/freeze action
-2. Frontend calls `POST /journey/decision` with full snapshot object
-3. Backend writes file, returns `{ success: true, snapshot_id, saved_at, path }`
-4. Frontend resolves save promise only on confirmed success
-5. UI shows success state only after step 4
-6. If backend returns error, UI shows explicit failure — no silent fallback
+### Low examples
+- Noisy logs
+- Minor wording inconsistencies
+- Non-blocking cosmetic differences that don't affect contracts

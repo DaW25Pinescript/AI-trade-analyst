@@ -1,16 +1,33 @@
-# OBJECTIVE.md — Trade Ideation Journey V1.1
+# OBJECTIVE.md — Post-Merge Audit, Trade Ideation Journey V1.1
 
-## What this phase is
+## What this audit is
 
-V1 UI is accepted visually. It runs. All data is placeholder.
+A formal phase-gate audit run after V1.1 is merged. Its purpose is to confirm the merge delivers against the locked V1.1 requirements — not to review code quality generally, and not to suggest redesigns.
 
-V1.1 makes it real:
-- dashboard triage reads real repo artifacts
-- journey bootstrap reads real analyst output
-- saves write JSON to local disk
-- journal and review read those saved records
+This is an acceptance audit. The output is a go/no-go decision.
 
-The visual design, routing shape, stage order, and gate logic are frozen. Do not touch them.
+---
+
+## What the audit must confirm
+
+Four things, in priority order:
+
+1. **No V1 UI regression** — the accepted V1 surface is intact: dashboard, journey, journal, review, seven stages, gate enforcement, verdict layer separation
+2. **Real triage and bootstrap wiring is active** — placeholder/mock data is no longer the active path
+3. **Saves are backend-mediated and disk-backed** — in-memory store mutation is not treated as a completed save
+4. **Truthful data-state handling is preserved end to end** — `data_state` flows from backend → adapter → store → component without being dropped or fabricated
+
+---
+
+## What the audit is NOT
+
+- Not a code quality review
+- Not a refactor opportunity
+- Not a redesign task
+- Not a speculative architecture review
+- Not a scope expansion
+
+If an issue is found, the auditor documents it and flags severity. The auditor does not fix it during the audit.
 
 ---
 
@@ -18,50 +35,13 @@ The visual design, routing shape, stage order, and gate logic are frozen. Do not
 
 | Port | Service |
 |------|---------|
-| 8080 | UI — vanilla ES modules, served by `python -m http.server` |
-| 8000 | Repo backend — FastAPI (`ai_analyst/api/main.py`) |
-| 8317 | Model proxy — local Claude proxy, OpenAI-compatible |
-
-The UI cannot write files directly — it is a static browser page. All persistence must go through the FastAPI backend at port 8000.
+| 8080 | UI — vanilla ES modules, `python -m http.server` |
+| 8000 | FastAPI backend — `ai_analyst/api/main.py` |
+| 8317 | Local Claude proxy — OpenAI-compatible |
 
 ---
 
-## What the backend currently has
-
-Existing FastAPI routes (confirmed via OpenAPI docs):
-- health, feeder, analyse/analyse-stream, metrics/dashboard, analytics, backtest, plugins
-
-**Missing — must be added in this phase:**
-
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /watchlist/triage` | Read triage artifacts for dashboard |
-| `GET /journey/{asset}/bootstrap` | Read bootstrap payload for journey entry |
-| `POST /journey/draft` | Save journey draft to disk |
-| `POST /journey/decision` | Save decision snapshot to disk |
-| `POST /journey/result` | Save result snapshot to disk |
-| `GET /journal/decisions` | List saved decision records |
-| `GET /review/records` | List saved decision + result records |
-
----
-
-## What the frontend currently has
-
-- Service layer (`app/lib/services.js`) — Pattern A file reads + demo mode fallback
-- Adapter layer (`app/lib/adapters.js`) — normalises backend JSON to typed UI shapes
-- Journey store (`app/stores/journeyStore.js`) — pub/sub state, in-memory snapshot only
-- All data paths currently return demo/mock data
-
-**Frontend work in this phase:**
-- Wire service layer to real backend endpoints
-- Replace active mock paths with real reads
-- Add truthful loading / stale / missing / unavailable states
-- Wire save action to backend POST — not in-memory only
-- Wire journal + review reads to backend GET
-
----
-
-## Persistence layout (locked)
+## Persistence root (locked)
 
 ```
 app/data/journeys/
@@ -70,29 +50,20 @@ app/data/journeys/
   results/      result_<snapshotId>.json
 ```
 
-All three directories created by the backend on first write if they do not exist.
+Any writes outside this root are a contract violation.
 
 ---
 
-## Output of this phase
+## Acceptance threshold
 
-At the end of V1.1:
+The merge is accepted only when:
 
-1. Dashboard populates from real triage artifacts (or shows truthful unavailable state)
-2. Begin Journey loads real bootstrap payload for the selected asset
-3. Save/freeze writes a JSON file to `app/data/journeys/decisions/`
-4. Journal page lists real saved records from disk
-5. Review page reads real saved records from disk
-6. Saved records survive refresh, route change, and app restart
-7. V1 visual design is unchanged
+- No Critical findings remain open
+- Group A (regression) conditions hold
+- Saves are confirmed disk-backed — not in-memory only
+- Triage and bootstrap are confirmed real — not placeholder
+- V1 UI is visually and structurally unchanged
 
----
+PASS WITH ISSUES is acceptable only when all open findings are Medium or Low severity, and a follow-up patch is scoped and assigned.
 
-## What this phase is NOT
-
-- Not a UI redesign
-- Not charting implementation
-- Not multi-persona UI expansion
-- Not cloud or database persistence
-- Not a new product surface
-- Not fake browser-only persistence dressed as real saves
+FAIL means the merge must be reverted or patched before acceptance.
