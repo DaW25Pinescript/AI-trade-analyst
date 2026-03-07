@@ -18,9 +18,9 @@ test-web:
 	node --test tests/*.js
 
 # Run the pytest suite for the Python AI analyst pipeline.
-# Must cd into ai_analyst/ so pytest.ini (testpaths, asyncio_mode) is picked up.
+# Run from repo root so tests resolve paths correctly.
 test-ai:
-	cd ai_analyst && pytest -q
+	python3 -m pytest -q ai_analyst/tests
 
 # Run both suites — minimum bar before opening a PR.
 test-all: test-web test-ai
