@@ -328,6 +328,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# ── Journey router (V1.1) ────────────────────────────────────────────────────
+from .routers.journey import router as journey_router
+
+app.include_router(journey_router)
+
 
 @app.get("/health")
 async def health():

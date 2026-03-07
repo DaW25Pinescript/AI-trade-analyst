@@ -3,6 +3,9 @@
  *
  * Implements all 7 journey stages with the StageShell layout.
  * Data sourced through typed service layer and journey store.
+ *
+ * V1.1: Wired to real backend. Save calls POST /journey/decision
+ * and only shows success after backend confirmation.
  */
 
 import { createStageShell } from '../components/StageShell.js';
@@ -16,7 +19,10 @@ import { createSurfaceCard } from '../components/SurfaceCard.js';
 import { createStatusBadge } from '../components/StatusBadge.js';
 import { StageKey, STAGE_ORDER } from '../types/journey.js';
 import * as store from '../stores/journeyStore.js';
-import { loadJourneyBootstrap, saveSnapshot } from '../lib/services.js';
+import { loadJourneyBootstrap, saveDecision } from '../lib/services.js';
+
+/** Track the bootstrap dataState for the current journey */
+let _bootstrapDataState = null;
 
 /**
  * Renders the journey page for a specific asset.
@@ -25,6 +31,7 @@ import { loadJourneyBootstrap, saveSnapshot } from '../lib/services.js';
  */
 export async function renderJourneyPage(container, asset) {
   container.innerHTML = '';
+  _bootstrapDataState = null;
 
   // Loading
   const loadingEl = document.createElement('div');
@@ -34,9 +41,23 @@ export async function renderJourneyPage(container, asset) {
 
   // Bootstrap journey data
   const bootstrap = await loadJourneyBootstrap(asset);
-  store.bootstrapJourney(bootstrap);
+  _bootstrapDataState = bootstrap.dataState || null;
 
   loadingEl.remove();
+
+  // Handle unavailable data state — block journey entry
+  if (_bootstrapDataState === 'unavailable') {
+    _renderUnavailableState(container, asset);
+    return;
+  }
+
+  // Handle error data state
+  if (_bootstrapDataState === 'error') {
+    _renderErrorState(container, asset);
+    return;
+  }
+
+  store.bootstrapJourney(bootstrap);
 
   // Render current stage
   _renderCurrentStage(container);
@@ -45,9 +66,56 @@ export async function renderJourneyPage(container, asset) {
   store.subscribe(() => _renderCurrentStage(container));
 }
 
+function _renderUnavailableState(container, asset) {
+  container.innerHTML = `
+    <div class="data-state-block data-state-block--unavailable">
+      <h2 class="text-secondary">Data Unavailable</h2>
+      <p class="text-muted">No analyst output found for <strong>${_escapeHtml(asset)}</strong>.</p>
+      <p class="text-muted">Run the multi-analyst pipeline for this instrument to generate the required data.</p>
+      <a href="#/dashboard" class="btn btn--primary">Return to Dashboard</a>
+    </div>
+  `;
+}
+
+function _renderErrorState(container, asset) {
+  container.innerHTML = `
+    <div class="data-state-block data-state-block--error">
+      <h2 class="text-secondary">Error Loading Data</h2>
+      <p class="text-muted">Failed to load journey data for <strong>${_escapeHtml(asset)}</strong>.</p>
+      <p class="text-muted">Check that the backend server is running at port 8000.</p>
+      <a href="#/dashboard" class="btn btn--primary">Return to Dashboard</a>
+    </div>
+  `;
+}
+
+function _createDataStateBanner(dataState) {
+  if (!dataState || dataState === 'live') return null;
+
+  const banner = document.createElement('div');
+  banner.className = `data-state-banner data-state-banner--${dataState}`;
+
+  const messages = {
+    stale: 'Analyst data may be outdated — consider re-running the pipeline.',
+    partial: 'Some analysis data is missing — partial results are displayed. Journey may continue.',
+    demo: 'Demo mode — backend is unreachable. Showing sample data for UI preview only.',
+  };
+
+  banner.innerHTML = `
+    <span class="data-state-banner__icon">${dataState === 'demo' ? '&#9881;' : '&#9888;'}</span>
+    <span class="data-state-banner__text">${messages[dataState] || `Data state: ${dataState}`}</span>
+  `;
+  return banner;
+}
+
 function _renderCurrentStage(container) {
   container.innerHTML = '';
   const state = store.getState();
+
+  // Add data state banner if applicable
+  const banner = _createDataStateBanner(_bootstrapDataState);
+  if (banner) {
+    container.appendChild(banner);
+  }
 
   const stageRenderers = {
     [StageKey.MARKET_OVERVIEW]: _renderMarketOverview,
@@ -361,9 +429,21 @@ function _renderJournalCapture(container, state) {
     onStageClick: (key) => store.setStage(key),
     onPrev: () => store.prevStage(),
     onNext: async () => {
+      // Create snapshot in store
       const snapshot = store.createSnapshot();
-      await saveSnapshot(snapshot);
-      alert('Decision snapshot saved successfully.');
+
+      // Enrich snapshot with bootstrap data state
+      snapshot.bootstrapDataState = _bootstrapDataState || 'live';
+
+      // Save to backend — only show success after confirmed write
+      const result = await saveDecision(snapshot);
+      if (result.success) {
+        alert('Decision snapshot saved successfully.');
+      } else {
+        // Revert journey status since save failed
+        store.setJourneyStatus('draft');
+        alert(`Save failed: ${result.error || 'Unknown error'}`);
+      }
     },
     nextLabel: 'Save & Freeze',
     gateBlocked: store.hasBlockedGate(),
@@ -436,4 +516,10 @@ function _influenceBadge(influence) {
   if (influence === 'conflicting') return 'blocked';
   if (influence === 'neutral') return 'watch';
   return 'user-manual';
+}
+
+function _escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
 }
