@@ -179,4 +179,4 @@ class TestGroup3B_F2_XAUUSD:
         """TG.4 — engine_version is phase_3b in XAUUSD packets."""
         bars = generate_xauusd_bars(tf)
         packet = compute_structure_packet("XAUUSD", tf, config, bars=bars)
-        assert packet.build["engine_version"] == "phase_3b"
+        assert packet.build["engine_version"] == "phase_3c"
