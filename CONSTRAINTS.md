@@ -1,99 +1,92 @@
-# CONSTRAINTS.md
+# CONSTRAINTS.md — Trade Ideation Journey V1.1
 
-# AI Trade Analyst – Constraints
-Version: 1.0
+## Hard constraints — never violate
 
-## 1. Core Constraints
+### 1. No redesign
+- Do not restyle, restructure, or reorder the accepted V1 UI
+- Do not change visual language, routing shape, stage order, or gate boundary styling
+- Component names from ARCHITECTURE.md are frozen: AppShell, PageHeader, SurfaceCard, SeverityCard, StatusBadge, ProvenanceBadge, StageStepper, EvidencePanel, SplitVerdictPanel, AIPrefillCard, GateChecklist, ChartAnnotationLayer, NotesTextarea
 
-### 1.1 No guessed payloads
-The frontend must not invent backend payload shapes. All serious UI work must follow the interface audit and contract freeze.
+### 2. No invented data
+- Do not fabricate backend payload fields
+- Do not substitute analysis prose when the upstream source is absent
+- If a field is missing, surface that as `null` or an explicit missing state — not a plausible-looking fake value
+- Demo mode is only for when the backend is explicitly unreachable — not as a cover for missing data
 
-### 1.2 No broad unrelated rewrites
-This initiative is a journey/UI architecture upgrade, not permission to refactor unrelated repo areas.
+### 3. No browser-only persistence
+- `localStorage`, `sessionStorage`, and `IndexedDB` must not be the source of truth for saved records
+- In-memory store mutation is not a save
+- `success: true` must only be returned after a confirmed disk write via the backend
+- Do not show "Saved successfully" for state that lives only in `journeyStore`
 
-### 1.3 No fake production logic in v1 scaffolding
-Component and route scaffolds may use typed placeholders, but they must not masquerade as real backend behavior.
+### 4. No direct Python calls from the browser
+- The UI does not execute Python, import Python modules, or call analyst pipeline scripts directly
+- All backend interaction goes through the FastAPI server at port 8000
+- Pattern A (direct file reads from `analyst/output/`) is superseded in V1.1 — all reads go through FastAPI endpoints
 
-### 1.4 No premature chart-tool complexity
-Initial implementation may use placeholder chart containers and annotation regions. Heavy charting logic is out of scope for the first pass.
+### 5. No collapse of the three verdict layers
+- `systemVerdict`, `userDecision`, and `executionPlan` must remain separate objects in the snapshot
+- Do not merge them into a convenience object at save time
 
-### 1.5 No multi-persona workflow expansion in v1 UI
-The multi-analyst/persona backend may exist, but the first-pass UI should not attempt to expose a full multi-persona orchestration surface.
-
-### 1.6 No collapse of recommendation and commitment
-`systemVerdict`, `userDecision`, and `executionPlan` must remain distinct.
-
-### 1.7 No black-box learning claims
-The review/refinement loop must be framed as transparent review and policy refinement, not mysterious self-learning.
-
----
-
-## 2. UX Constraints
-
-### 2.1 No blank-page landing
-The landing surface must be triage-oriented, not a blank ticket form.
-
-### 2.2 No decorative gate checks
-Gate checks must act as a real control boundary with severe visual treatment and policy-aware progression.
-
-### 2.3 No stage chaos
-The journey must keep strong inter-stage structure even if local stage fields remain flexible.
-
-### 2.4 No ambiguity about who said what
-AI-prefilled vs user-confirmed vs user-overridden vs manual fields must be distinguishable through provenance.
-
-### 2.5 Visual treatment must follow the style guide
-The dark institutional workspace aesthetic, semantic color roles, surface system, and severity model defined in `UI_STYLE_GUIDE.md` are not optional style preferences — they are part of the product contract.
-
-Specifically:
-- Gate Checks must use `SeverityCard` treatment, not standard card styling
-- `SplitVerdictPanel` must keep System Verdict, User Decision, and Execution Plan visually distinct
-- Provenance markers must distinguish AI content from user action on every surface where both appear
-- Color usage must follow the semantic roles in Section 5 — emerald/amber/rose/indigo are state signals, not decoration
+### 6. No new product surfaces
+- Do not add screens, routes, or features outside the defined V1.1 scope
+- Charting, multi-persona expansion, and cloud persistence are explicitly out of scope
 
 ---
 
-## 3. Technical Constraints
+## Casing convention (locked)
 
-### 3.1 Typed modular structure
-Types, stores, components, routes, and service interfaces should remain separated.
+| Layer | Convention |
+|-------|-----------|
+| Backend FastAPI models, API responses, persisted JSON on disk | `snake_case` |
+| Frontend JS store, component props, domain state | `camelCase` |
+| Adapters | Explicit translation boundary — converts both ways |
 
-### 3.2 Thin service layer
-Future API calls should sit behind explicit service functions rather than being scattered inside components.
-
-### 3.3 Snapshot persistence
-The system must persist a save-time decision snapshot instead of relying on future reconstruction from mutable live state.
-
-### 3.4 Adapter visibility
-If a frontend need depends on an unstable or missing backend producer, it must be surfaced as an explicit adapter/gap rather than hidden in component logic.
-
-### 3.5 No direct Python execution from the browser
-The UI must not import Python modules, call subprocess, or invoke the analyst pipeline from browser context. The UI consumes backend output through one of two permitted patterns: (A) reading saved JSON artifacts via a file-based service layer, or (B) calling a thin API layer that wraps the Python services. Establish which pattern is in use during the interface audit. This is a hard constraint — it determines how every service call in the frontend is shaped.
+- `app/lib/adapters.js` is the only place that touches `snake_case` field names
+- Components never reference `snake_case` directly
+- Save payloads are converted back to `snake_case` by the adapter before POST
+- See CONTRACTS.md Section 5 for the full field mapping table
 
 ---
 
-## 4. Scope Constraints for Initial Upgrade
+## Architecture constraints
 
-Out of scope for the first major UI pass:
-- advanced mobile-first redesign
-- collaborative workflows
-- excessive settings/configuration surfaces
-- full chart drawing tool suite
-- auto-learning claims or optimization engines
-- any build sequence that skips the interface audit gate
+### Backend
+- New Journey endpoints must be added to the existing FastAPI app — do not create a second server
+- All file writes use `app/data/journeys/` as the canonical root — no alternative locations
+- Directories are created on first write if they do not exist
+- Decision snapshots are immutable — once written, they are not overwritten
+
+### Frontend
+- Service layer is the only place that knows about transport — components never call `fetch` directly
+- Adapters are the only place that knows about backend payload shapes — components consume typed UI shapes only
+- `data_state` must flow from backend response → adapter → store → component — it must not be dropped at any layer
+
+### API
+- Ensure `load_dotenv()` is called before any config or client init in `ai_analyst/api/main.py`
+- New Journey router should be a separate file, e.g. `ai_analyst/api/routers/journey.py`, registered in `main.py`
+- Do not modify existing routes
 
 ---
 
-## 5. Process Constraints
+## Data state display rules
 
-### 5.1 Audit before build
-The interface audit is a hard gating phase before serious UI implementation.
+| State | Dashboard behavior | Journey behavior |
+|-------|--------------------|-----------------|
+| `live` | Render normally | Render normally, no banner |
+| `stale` | Show staleness indicator on card | Show amber banner with timestamp |
+| `partial` | Show partial badge | Show partial banner, continue allowed |
+| `unavailable` | Show empty state card | Show blocking unavailable state |
+| `demo` | Show "Demo data" badge on each card | Show "Demo mode" banner in stage header |
+| `error` | Show error state card | Show error banner, block progression |
 
-### 5.2 Staged delivery only
-Implementation should follow staged milestones rather than a big-bang rewrite.
+---
 
-### 5.3 Reviewable increments
-Each phase must leave behind files and structures that are reviewable, testable, and ready for the next pass.
+## Save semantics
 
-### 5.4 Preserve repo realism
-All documentation and scaffolding should reflect the repo as it exists, with uncertainty marked explicitly rather than smoothed over.
+1. User triggers save/freeze action
+2. Frontend calls `POST /journey/decision` with full snapshot object
+3. Backend writes file, returns `{ success: true, snapshot_id, saved_at, path }`
+4. Frontend resolves save promise only on confirmed success
+5. UI shows success state only after step 4
+6. If backend returns error, UI shows explicit failure — no silent fallback

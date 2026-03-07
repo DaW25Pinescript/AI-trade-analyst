@@ -1,207 +1,292 @@
-# CONTRACTS.md
+# CONTRACTS.md — Trade Ideation Journey V1.1
 
-# AI Trade Analyst – Contract Direction
-Version: 1.0
+## 1. Backend endpoint contracts
 
-## 1. Contract Philosophy
+### GET /watchlist/triage
 
-The Trade Ideation Journey frontend must be backed by explicit contracts. Contract work begins with an interface audit of existing repo producers and only then introduces a narrow v1 contract layer the UI is allowed to depend on.
+Returns a list of triage items for the dashboard.
 
-This document does **not** assume all desired backend shapes already exist. It defines how contracts should be discovered, frozen, and consumed.
+**Source:** Read from `analyst/output/` — any available `*_multi_analyst_output.json` files. If none exist, return empty list with `data_state: "unavailable"`.
 
----
+**Response shape:**
+```json
+{
+  "data_state": "live | stale | unavailable",
+  "generated_at": "ISO timestamp or null",
+  "items": [
+    {
+      "symbol": "XAUUSD",
+      "triage_status": "watch | active | blocked | no_data",
+      "bias": "long | short | neutral | no_data",
+      "confidence": "high | moderate | low | none",
+      "why_interesting": ["string"],
+      "rationale": "string or null",
+      "verdict_at": "ISO timestamp or null"
+    }
+  ]
+}
+```
 
-## 2. Contract Lifecycle
-
-### Stage A — Interface Audit
-Inventory existing producers and consumers.
-
-Audit:
-- request/response models
-- JSON schemas
-- saved artifacts
-- officer outputs
-- arbiter outputs
-- current app export/import shapes
-- CLI and batch outputs that may influence UI state
-
-### Stage B — Availability Classification
-For each required field, classify:
-- `available_now`
-- `derivable_now`
-- `missing`
-- `unstable`
-- `deprecated`
-- `requires_adapter`
-
-### Stage C — v1 Contract Freeze
-Define the minimal, stable UI-facing contract layer for the first journey release.
-
-### Stage D — Adapter Layer
-Where repo reality and UI needs do not line up, use explicit adapters rather than silently widening the frontend model.
-
-### Stage E — Conformance Testing
-Ensure the frontend service layer and backend producers satisfy the frozen contracts.
+**Rules:**
+- If `analyst/output/` is empty, return `{ data_state: "unavailable", items: [] }`
+- Do not fabricate triage items
+- `why_interesting` may be empty array if upstream data has no tags
 
 ---
 
-## 3. Required Contract Artifacts
+### GET /journey/{asset}/bootstrap
 
-The audit/freeze phase should leave behind these artifacts:
+Returns the full bootstrap payload for a journey entry screen.
 
-### 3.1 Interface Inventory
-A machine- and human-readable list of upstream producers and downstream consumers.
+**Source:** `analyst/output/{asset}_multi_analyst_output.json` + `analyst/output/{asset}_multi_analyst_explainability.json`
 
-Suggested fields:
-- contract name
-- source file/module
-- producer owner
-- consumer owner
-- transport type
-- schema/model reference
-- status
-- notes
+**Response shape:**
+```json
+{
+  "data_state": "live | stale | partial | unavailable",
+  "instrument": "XAUUSD",
+  "generated_at": "ISO timestamp or null",
+  "structure_digest": { },
+  "analyst_verdict": {
+    "verdict": "long_bias | short_bias | no_trade | conditional | no_data",
+    "confidence": "high | moderate | low | none"
+  },
+  "arbiter_decision": { },
+  "explanation": { },
+  "reasoning_summary": "string or null"
+}
+```
 
-### 3.2 Availability Matrix
-A field-level matrix for all journey-critical data.
-
-Suggested columns:
-- field name
-- used by screen/stage
-- current source
-- status
-- type confidence
-- notes
-
-### 3.3 v1 Contract Freeze
-A frontend-safe contract definition for the journey.
-
-### 3.4 Adapter Register
-List of fields/endpoints that require transformation before the UI can consume them safely.
+**Rules:**
+- If file does not exist, return `{ data_state: "unavailable", instrument: asset }`
+- If explainability file missing but output file exists, return `data_state: "partial"`
+- Never populate fields with invented analysis text
 
 ---
 
-## 4. Journey Domain Contract Surface
+### POST /journey/draft
 
-The frontend journey contract should cover, at minimum, these domain objects:
+Saves a journey draft to disk.
 
-### 4.1 Triage Item
-Intent:
-- describe an asset on the landing board
+**Request body:** Full journey state object (see store shape in CONTRACTS section 2)
 
-Must support concepts such as:
-- symbol
-- triage status
-- why-interesting tags
-- regime/bias hint
-- mini-chart reference or placeholder
-- rationale summary
+**Response:**
+```json
+{
+  "success": true,
+  "journey_id": "string",
+  "saved_at": "ISO timestamp",
+  "path": "app/data/journeys/drafts/journey_<id>.json"
+}
+```
 
-### 4.2 Journey Bootstrap
-Intent:
-- deliver the initial state needed to open a journey for a selected asset
-
-Must support concepts such as:
-- selected asset metadata
-- stage-prefill blocks
-- macro summary
-- structure summary
-- gate seed state
-- system context summary
-
-### 4.3 Journey Update Payload
-Intent:
-- update the staged journey draft without committing the final decision snapshot
-
-Must support concepts such as:
-- current stage
-- partial stage data
-- notes
-- overrides
-- evidence references
-- gate changes
-
-### 4.4 Ticket / Decision Commit Payload
-Intent:
-- commit the final decision record
-
-Must support concepts such as:
-- frozen decision snapshot
-- system verdict
-- user decision
-- execution plan
-- provenance metadata
-- save timestamp
-
-### 4.5 Result Snapshot Payload
-Intent:
-- attach actual outcome data later for review
-
-Must support concepts such as:
-- outcome status
-- result notes
-- post-trade evidence
-- realized metrics
-- review tags
-
-### 4.6 Review Pattern Response
-Intent:
-- power transparent review surfaces
-
-Must support concepts such as:
-- planned vs actual comparisons
-- override frequency patterns
-- gate failure clusters
-- policy refinement suggestions
+**Rules:**
+- Create `app/data/journeys/drafts/` if it does not exist
+- Return `success: false` with `error` field if write fails
+- Never return `success: true` for in-memory-only operation
 
 ---
 
-## 5. Suggested Endpoint Direction
+### POST /journey/decision
 
-These are architectural endpoint targets, pending audit and ownership confirmation:
-- `GET /watchlist/triage`
-- `GET /journey/:asset/bootstrap`
-- `POST /journey/update`
-- `POST /tickets/create`
-- `POST /journal/result`
-- `GET /review/patterns`
+Saves a frozen decision snapshot to disk.
 
-These are not permission to invent payloads. They are routing intentions that must be grounded in real backend capabilities.
+**Request body:** `decisionSnapshot` object (see section 2)
 
-**Known backend sources to map against during audit:**
+**Response:**
+```json
+{
+  "success": true,
+  "snapshot_id": "string",
+  "saved_at": "ISO timestamp",
+  "path": "app/data/journeys/decisions/decision_<id>.json"
+}
+```
 
-| Endpoint intent | Known backend producer | Artifact location |
-|---|---|---|
-| Journey bootstrap — structure/verdict state | `MultiAnalystOutput` | `analyst/output/{instrument}_multi_analyst_output.json` |
-| Journey bootstrap — explainability | `ExplainabilityBlock` | `analyst/output/{instrument}_multi_analyst_explainability.json` |
-| Journey bootstrap — market features | `MarketPacketV2` | `market_data_officer/officer/contracts.py` |
-| Triage board — per-asset summary | Derivable from `MultiAnalystOutput.arbiter_decision` + `StructureDigest` | Adapter required |
-| Review patterns | Not yet produced | Missing — stub required |
-
-The transport pattern (file-based vs API wrapper) must be confirmed during the audit before any endpoint is implemented.
+**Rules:**
+- Create directory if missing
+- Snapshot is immutable — do not overwrite an existing ID
+- Return error if ID collision detected
 
 ---
 
-## 6. Frontend Contract Rules
+### POST /journey/result
 
-### 6.1 Services own transport details
-Components should consume typed service methods, not raw fetch logic or guessed JSON.
+Saves a result snapshot (planned vs actual) to disk.
 
-### 6.2 UI types must map to frozen contracts
-Frontend types may enrich local interaction state, but backend-backed fields must remain traceable to audited contract shapes.
+**Request body:** `resultSnapshot` object
 
-### 6.3 Provenance is a contract concern
-Field provenance is not just UI decoration. It must be carried in the domain model where relevant.
-
-### 6.4 Snapshots are immutable artifacts
-A `decisionSnapshot` should be treated as a frozen artifact once saved, not a mutable draft object.
+**Response:** Same shape as decision response, path under `app/data/journeys/results/`
 
 ---
 
-## 7. Contract Exit Criteria
+### GET /journal/decisions
 
-The contract layer is considered ready when:
-- journey-critical fields have a known source or explicit adapter
-- frontend service methods are typed against frozen shapes
-- missing fields are documented rather than guessed
-- acceptance tests can validate contract conformance at phase boundaries
+Returns list of saved decision snapshots.
+
+**Source:** `app/data/journeys/decisions/*.json`
+
+**Response:**
+```json
+{
+  "records": [
+    {
+      "snapshot_id": "string",
+      "instrument": "string",
+      "saved_at": "ISO timestamp",
+      "journey_status": "string",
+      "verdict": "string",
+      "user_decision": "string or null"
+    }
+  ]
+}
+```
+
+**Rules:**
+- If directory is empty or missing, return `{ records: [] }`
+- Do not return full snapshot body in list — summary fields only
+
+---
+
+### GET /review/records
+
+Returns list of saved decision + result records for the review surface.
+
+**Response:** Same shape as journal/decisions but may include `has_result: bool` per record.
+
+---
+
+## 2. Frontend contracts
+
+### decisionSnapshot (frozen at save time)
+
+```js
+{
+  snapshot_id: string,        // stable UUID
+  journey_id: string,
+  instrument: string,
+  saved_at: ISO string,
+  journey_status: string,
+  stage_data: { ...per stage },
+  gate_states: { gate_id: "passed|conditional|blocked" },
+  gate_justifications: { gate_id: string },
+  system_verdict: {
+    verdict: string,
+    confidence: string,
+    reasoning_summary: string | null
+  },
+  user_decision: {
+    direction: string,
+    conviction: string,
+    notes: string | null
+  },
+  execution_plan: {
+    entry: string | null,
+    stop: string | null,
+    target: string | null,
+    risk_reward: string | null,
+    notes: string | null
+  },
+  provenance: { field_key: "ai_prefill|user_confirm|user_override|user_manual" },
+  bootstrap_data_state: "live|stale|partial|unavailable"
+}
+```
+
+### data_state values (used across all service responses)
+
+| Value | Meaning |
+|-------|---------|
+| `live` | Data exists and is fresh |
+| `stale` | Data exists but is old |
+| `partial` | Some required fields missing |
+| `unavailable` | No data exists at all |
+| `error` | Read/write failure |
+
+### Provenance markers
+
+| Value | Meaning |
+|-------|---------|
+| `ai_prefill` | Field populated by system/analyst output |
+| `user_confirm` | User confirmed AI-prefilled value |
+| `user_override` | User changed AI-prefilled value |
+| `user_manual` | User entered value with no AI prefill |
+
+---
+
+## 3. Adapter contracts
+
+Adapters must:
+- Accept sparse/partial backend payloads without throwing
+- Map missing fields to typed null/default — never to fabricated values
+- Pass `data_state` through to the UI shape so components can render truthful states
+- Not invent `why_interesting` tags, rationale text, or analysis prose when upstream is absent
+
+Adapters must not:
+- Silently substitute demo values when real data is missing
+- Suppress `data_state` from the component layer
+
+---
+
+## 5. Casing convention (locked)
+
+This is the canonical casing rule for all V1.1 and later work. Do not deviate.
+
+| Layer | Convention | Examples |
+|-------|-----------|---------|
+| Backend — FastAPI models, API responses, persisted JSON on disk | `snake_case` | `snapshot_id`, `journey_status`, `data_state`, `saved_at` |
+| Frontend — JS store objects, component props, domain state | `camelCase` | `snapshotId`, `journeyStatus`, `dataState`, `savedAt` |
+| Adapters — service layer and adapter files | Explicit translation boundary — converts both ways | `snake_case` in → `camelCase` out; `camelCase` in → `snake_case` out before POST/write |
+
+**Rules:**
+
+- Backend Pydantic models use `snake_case` field names
+- Persisted JSON files on disk use `snake_case` (they are written by the backend)
+- JS store state, `decisionSnapshot`, `journeyBootstrap`, and all component-facing objects use `camelCase`
+- `app/lib/adapters.js` is the only place that knows about `snake_case` — it converts on read and on write
+- `app/lib/services.js` passes raw backend responses to adapters before touching field names
+- Components never reference `snake_case` field names directly
+- The adapter conversion is not optional — it applies to every field in every payload, including nested objects
+
+**Concrete examples:**
+
+```
+API response (snake_case)         Adapter output (camelCase)
+─────────────────────────         ──────────────────────────
+snapshot_id          →            snapshotId
+journey_status       →            journeyStatus
+data_state           →            dataState
+saved_at             →            savedAt
+bootstrap_data_state →            bootstrapDataState
+system_verdict       →            systemVerdict
+user_decision        →            userDecision
+execution_plan       →            executionPlan
+why_interesting      →            whyInteresting
+reasoning_summary    →            reasoningSummary
+```
+
+**On save (camelCase → snake_case):**
+
+```
+Store object (camelCase)          POST body (snake_case)
+────────────────────────          ──────────────────────
+snapshotId           →            snapshot_id
+journeyStatus        →            journey_status
+savedAt              →            saved_at
+systemVerdict        →            system_verdict
+userDecision         →            user_decision
+executionPlan        →            execution_plan
+bootstrapDataState   →            bootstrap_data_state
+```
+
+**Existing V1 code that uses camelCase in store/components is correct — do not change it.**
+**Existing backend code that uses snake_case in Python models is correct — do not change it.**
+**Only the adapters need updating if they currently pass snake_case field names into the store.**
+
+---
+
+## 4. Service layer rules
+
+- Real endpoint first, demo fallback only when backend returns `unavailable` or is unreachable
+- Demo fallback must set `data_state: "demo"` on the returned shape
+- Save calls must confirm backend write success before resolving
+- Never resolve a save promise on in-memory mutation alone

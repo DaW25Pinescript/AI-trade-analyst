@@ -1,103 +1,98 @@
-# OBJECTIVE.md
+# OBJECTIVE.md — Trade Ideation Journey V1.1
 
-# AI Trade Analyst – Objective
-Version: 1.0
+## What this phase is
 
-## 1. Primary Objective
+V1 UI is accepted visually. It runs. All data is placeholder.
 
-Transform AI Trade Analyst from a static analysis form into a guided **Trade Ideation Journey**: a stage-based trading workspace that pre-loads market, macro, and structure intelligence, triages assets by relevance, and guides the user through a disciplined, auditable trade-construction flow.
+V1.1 makes it real:
+- dashboard triage reads real repo artifacts
+- journey bootstrap reads real analyst output
+- saves write JSON to local disk
+- journal and review read those saved records
 
----
-
-## 2. Product Outcome
-
-The app should no longer feel like a blank page waiting for manual setup.
-
-It should feel like:
-- a live market workspace
-- a triage-first analyst desk
-- a controlled decision pipeline
-- a journal-ready decision system
-- a transparent review engine foundation
+The visual design, routing shape, stage order, and gate logic are frozen. Do not touch them.
 
 ---
 
-## 3. Specific Objectives
+## Stack context (confirmed)
 
-### 3.1 Replace blank-form entry with pre-loaded intelligence
-The landing experience should open into a useful market overview where each asset answers: **Why should I care about this right now?**
+| Port | Service |
+|------|---------|
+| 8080 | UI — vanilla ES modules, served by `python -m http.server` |
+| 8000 | Repo backend — FastAPI (`ai_analyst/api/main.py`) |
+| 8317 | Model proxy — local Claude proxy, OpenAI-compatible |
 
-### 3.2 Introduce a staged ideation workflow
-The selected asset should enter a structured journey with explicit stages for context, structure, macro alignment, gate review, verdict, and journal capture.
-
-### 3.3 Preserve auditability
-The system must preserve a frozen decision record that captures what the system recommended, what the user decided, and what execution plan was committed.
-
-### 3.4 Enable later review and self-critique
-The architecture must support transparent review flows such as override analysis, gate failure patterns, rule refinement, and planned-vs-actual comparison.
-
-### 3.5 Ground the UI in repo reality
-Before major UI implementation, complete a formal interface audit so the frontend builds against real repo inputs/outputs rather than guessed payloads.
+The UI cannot write files directly — it is a static browser page. All persistence must go through the FastAPI backend at port 8000.
 
 ---
 
-## 4. Success Criteria
+## What the backend currently has
 
-This objective is achieved when:
-- the product has a triage-first landing surface
-- the journey stages are coherent and auditable
-- gate checks behave like a control boundary
-- system verdict and user decision are distinct and persisted separately
-- a decision snapshot can be saved and reviewed later
-- the UI contract layer is derived from audited repo interfaces
+Existing FastAPI routes (confirmed via OpenAPI docs):
+- health, feeder, analyse/analyse-stream, metrics/dashboard, analytics, backtest, plugins
 
----
+**Missing — must be added in this phase:**
 
-## 5. Stage-by-Stage Delivery Objective
-
-### Phase 0
-Complete the interface audit and freeze v1 contracts.
-
-### Phase 1
-Define the journey domain model, shared types, and store API.
-
-### Phase 2
-Build the shell, routes, and step navigation.
-
-### Phase 3
-Build the landing triage board.
-
-### Phase 4
-Build context, structure/liquidity, and macro alignment screens.
-
-### Phase 5
-Implement gate checks as a strict discipline checkpoint.
-
-### Phase 6
-Implement verdict separation and execution planning.
-
-### Phase 7
-Implement journal capture and frozen decision snapshot persistence.
-
-### Phase 8
-Add the first review engine surface.
-
-### Phase 9
-Harden contracts, resolve adapter gaps, clean placeholder drift, and stabilise the review surface.
-
-Outputs:
-- contract conformance tests for each stage
-- resolved or explicitly deferred `requires_adapter` fields
-- no silent mock values remaining in production paths
-- review surface traceable to saved `decisionSnapshot` and `ExplainabilityBlock` fields
-- transport pattern locked and consistent across all service calls
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /watchlist/triage` | Read triage artifacts for dashboard |
+| `GET /journey/{asset}/bootstrap` | Read bootstrap payload for journey entry |
+| `POST /journey/draft` | Save journey draft to disk |
+| `POST /journey/decision` | Save decision snapshot to disk |
+| `POST /journey/result` | Save result snapshot to disk |
+| `GET /journal/decisions` | List saved decision records |
+| `GET /review/records` | List saved decision + result records |
 
 ---
 
-## 6. Long-Term Direction
+## What the frontend currently has
 
-The long-term intent is not just a nicer frontend. It is a controlled trading decision environment where:
-- intelligence is pre-loaded
-- decisions are staged and reviewable
-- human overrides are measurable
-- policy refinement is possible without black-box claims
+- Service layer (`app/lib/services.js`) — Pattern A file reads + demo mode fallback
+- Adapter layer (`app/lib/adapters.js`) — normalises backend JSON to typed UI shapes
+- Journey store (`app/stores/journeyStore.js`) — pub/sub state, in-memory snapshot only
+- All data paths currently return demo/mock data
+
+**Frontend work in this phase:**
+- Wire service layer to real backend endpoints
+- Replace active mock paths with real reads
+- Add truthful loading / stale / missing / unavailable states
+- Wire save action to backend POST — not in-memory only
+- Wire journal + review reads to backend GET
+
+---
+
+## Persistence layout (locked)
+
+```
+app/data/journeys/
+  drafts/       journey_<journeyId>.json
+  decisions/    decision_<snapshotId>.json
+  results/      result_<snapshotId>.json
+```
+
+All three directories created by the backend on first write if they do not exist.
+
+---
+
+## Output of this phase
+
+At the end of V1.1:
+
+1. Dashboard populates from real triage artifacts (or shows truthful unavailable state)
+2. Begin Journey loads real bootstrap payload for the selected asset
+3. Save/freeze writes a JSON file to `app/data/journeys/decisions/`
+4. Journal page lists real saved records from disk
+5. Review page reads real saved records from disk
+6. Saved records survive refresh, route change, and app restart
+7. V1 visual design is unchanged
+
+---
+
+## What this phase is NOT
+
+- Not a UI redesign
+- Not charting implementation
+- Not multi-persona UI expansion
+- Not cloud or database persistence
+- Not a new product surface
+- Not fake browser-only persistence dressed as real saves
