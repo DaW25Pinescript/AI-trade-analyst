@@ -1,232 +1,322 @@
-# CONTRACTS.md — Phase 3F: PersonaVerdict, ArbiterDecision, MultiAnalystOutput
+# CONTRACTS.md — Phase 3G: ExplainabilityBlock and supporting dataclasses
 
-## New file: `analyst/multi_contracts.py`
+## New file: `analyst/explain_contracts.py`
 
-3F dataclasses live in a **new file only**. `analyst/contracts.py` is not modified.
-Import existing 3E types from `analyst.contracts` as needed.
+All 3G dataclasses live here. No existing file is modified except the single additive field on `MultiAnalystOutput`.
 
 ```python
-# analyst/multi_contracts.py
+# analyst/explain_contracts.py
 from dataclasses import dataclass, field
 from typing import Optional
-from analyst.contracts import StructureDigest, AnalystVerdict, ReasoningBlock
-
-```python
-@dataclass
-class PersonaVerdict:
-    """
-    Structured verdict from a single LLM persona.
-    Produced by analyst/personas.py. Never produced by Arbiter or pre-filter.
-    """
-    persona_name: str            # "technical_structure" | "execution_timing"
-    instrument: str
-    as_of_utc: str
-
-    verdict: str                 # same taxonomy as AnalystVerdict
-    confidence: str              # "high" | "moderate" | "low" | "none"
-    directional_bias: str        # "bullish" | "bearish" | "neutral" | "none"
-
-    structure_gate: str          # echoed from digest — must not differ
-    persona_supports: list[str]  # what this persona found supportive
-    persona_conflicts: list[str] # what this persona found conflicting
-    persona_cautions: list[str]  # persona-specific caution flags
-
-    reasoning: ReasoningBlock    # reuse existing ReasoningBlock schema
-
-    def is_directional(self) -> bool:
-        return self.verdict in ("long_bias", "short_bias")
-
-    def is_blocked(self) -> bool:
-        return self.verdict in ("no_trade", "no_data")
 ```
 
 ---
 
-## ArbiterDecision dataclass
+## SignalInfluence
 
 ```python
 @dataclass
-class ArbiterDecision:
-    """
-    Final synthesized decision from the Arbiter.
-    Directional fields are pre-determined by Python conflict rules.
-    LLM writes synthesis_notes and winning_rationale_summary only.
-    """
-    instrument: str
-    as_of_utc: str
+class SignalInfluence:
+    """Influence classification for one structure signal."""
+    signal: str           # e.g. "htf_regime", "bos_mss", "fvg_context", "sweep_reclaim"
+    value: str            # the actual value from the digest, e.g. "bullish", "discount_bullish"
+    influence: str        # "dominant" | "supporting" | "conflicting" | "neutral" | "absent"
+    direction: str        # "bullish" | "bearish" | "neutral" | "n/a"
+    note: str             # one-line human-readable note, template-rendered
+```
 
-    # Pre-determined by Python conflict rules (no LLM involvement)
-    consensus_state: str         # see taxonomy in OBJECTIVE.md
-    final_verdict: str           # "long_bias" | "short_bias" | "no_trade" | "conditional" | "no_data"
-    final_confidence: str        # "high" | "moderate" | "low" | "none"
-    final_directional_bias: str  # "bullish" | "bearish" | "neutral" | "none"
-    no_trade_enforced: bool      # True if Python hard-constraint triggered override
+### Influence classification rules
 
-    # Agreement/conflict record
-    personas_agree_direction: bool
-    personas_agree_confidence: bool
-    confidence_spread: str       # e.g. "high vs moderate" or "aligned"
+Computed from `StructureDigest` fields:
 
-    # LLM-written fields (synthesis call only — given the pre-computed skeleton above)
-    synthesis_notes: str         # plain English: what aligned, what conflicted, how resolved
-    winning_rationale_summary: str  # why final_verdict was the right outcome
+| Signal | Dominant when | Supporting when | Conflicting when | Neutral/Absent |
+|---|---|---|---|---|
+| `htf_regime` | gate=pass, bias aligns with verdict | bias present, minor LTF conflict | gate=fail or bias opposes verdict | gate=no_data |
+| `bos_mss` | both BOS+MSS align with verdict direction | BOS aligns, MSS minor conflict | MSS directly opposes HTF direction | neither present |
+| `liquidity` | nearest level is internal and below price (bullish) or above (bearish) | liquidity bias aligned | external level just above (bearish barrier) | no active levels |
+| `fvg_context` | price at or below discount FVG (bullish) / at or above premium (bearish) | active FVG present and aligned | FVG partially filled | no active FVG |
+| `sweep_reclaim` | bullish/bearish reclaim confirmed | accepted beyond level | reclaim opposed direction | none |
+| `no_trade_flags` | — | — | any flag present = conflicting | no flags |
+| `caution_flags` | — | — | any flag present = conflicting (minor) | no flags |
 
-    def is_actionable(self) -> bool:
-        return (
-            self.final_verdict in ("long_bias", "short_bias")
-            and self.final_confidence in ("high", "moderate")
-            and not self.no_trade_enforced
+---
+
+## SignalInfluenceRanking
+
+```python
+@dataclass
+class SignalInfluenceRanking:
+    """Ranked list of signal influences. Dominant first, absent last."""
+    signals: list[SignalInfluence]
+    dominant_signal: Optional[str]    # signal name of top-ranked dominant, or None
+    primary_conflict: Optional[str]   # signal name of top-ranked conflicting, or None
+
+    def ranked(self) -> list[SignalInfluence]:
+        """Return signals sorted: dominant → supporting → conflicting → neutral → absent.
+        Conflicting ranks above neutral so primary conflicts are prominent in audit views."""
+        order = {"dominant": 0, "supporting": 1, "conflicting": 2, "neutral": 3, "absent": 4}
+        return sorted(self.signals, key=lambda s: order[s.influence])
+```
+
+---
+
+## PersonaDominance
+
+```python
+@dataclass
+class PersonaDominance:
+    """Records which persona drove or constrained the final decision."""
+    direction_driver: str           # "technical_structure" | "execution_timing" | "both" | "arbiter_override"
+    confidence_driver: str          # persona whose confidence tier was used, or "arbiter_rule"
+    confidence_effect: str          # "held" | "downgraded" | "upgraded" | "overridden_by_python"
+    stricter_persona: Optional[str] # persona with lower confidence, or None if aligned
+    python_override_active: bool    # True if hard no-trade flag triggered
+
+    note: str                       # template-rendered summary sentence
+```
+
+### Computation rules
+
+```python
+def compute_persona_dominance(
+    persona_outputs: list[PersonaVerdict],
+    arbiter: ArbiterDecision
+) -> PersonaDominance:
+
+    pa = next(p for p in persona_outputs if p.persona_name == "technical_structure")
+    pb = next(p for p in persona_outputs if p.persona_name == "execution_timing")
+
+    if arbiter.no_trade_enforced:
+        return PersonaDominance(
+            direction_driver="arbiter_override",
+            confidence_driver="arbiter_rule",
+            confidence_effect="overridden_by_python",
+            stricter_persona=None,
+            python_override_active=True,
+            note="Python hard no-trade constraint overrode both personas."
         )
+
+    if pa.directional_bias == pb.directional_bias:
+        direction_driver = "both"
+    elif pa.is_directional() and not pb.is_directional():
+        direction_driver = "technical_structure"
+    else:
+        direction_driver = "execution_timing"
+
+    conf_order = {"high": 3, "moderate": 2, "low": 1, "none": 0}
+    if conf_order[pa.confidence] < conf_order[pb.confidence]:
+        stricter = "technical_structure"
+        confidence_driver = "technical_structure"
+    elif conf_order[pb.confidence] < conf_order[pa.confidence]:
+        stricter = "execution_timing"
+        confidence_driver = "execution_timing"
+    else:
+        stricter = None
+        confidence_driver = "arbiter_rule"  # same tier, arbiter held it
+
+    if arbiter.final_confidence != pa.confidence and arbiter.final_confidence != pb.confidence:
+        effect = "downgraded"
+    elif stricter and arbiter.final_confidence == _lower(pa.confidence, pb.confidence):
+        effect = "downgraded"
+    else:
+        effect = "held"
+
+    return PersonaDominance(
+        direction_driver=direction_driver,
+        confidence_driver=confidence_driver,
+        confidence_effect=effect,
+        stricter_persona=stricter,
+        python_override_active=False,
+        note=_render_dominance_note(direction_driver, confidence_driver, effect, stricter)
+    )
 ```
 
 ---
 
-## MultiAnalystOutput dataclass
+## ConfidenceProvenance
 
 ```python
 @dataclass
-class MultiAnalystOutput:
+class ConfidenceStep:
+    step: int
+    label: str      # e.g. "Technical Structure Analyst"
+    value: str      # confidence value at this step
+    rule: str       # rule applied, e.g. "use lower confidence on split"
+
+@dataclass
+class ConfidenceProvenance:
+    """Step-by-step trace of how final_confidence was determined."""
+    steps: list[ConfidenceStep]
+    final_confidence: str
+    python_override: bool
+    override_reason: Optional[str]
+```
+
+### Provenance construction
+
+```python
+def compute_confidence_provenance(
+    persona_outputs: list[PersonaVerdict],
+    arbiter: ArbiterDecision,
+    digest: StructureDigest
+) -> ConfidenceProvenance:
+
+    steps = []
+    pa = next(p for p in persona_outputs if p.persona_name == "technical_structure")
+    pb = next(p for p in persona_outputs if p.persona_name == "execution_timing")
+
+    steps.append(ConfidenceStep(1, "Technical Structure Analyst", pa.confidence, "persona output"))
+    steps.append(ConfidenceStep(2, "Execution/Timing Analyst",    pb.confidence, "persona output"))
+    steps.append(ConfidenceStep(3, "Consensus state",             arbiter.consensus_state, "arbiter classification"))
+
+    rule = _confidence_rule_for_state(arbiter.consensus_state)
+    steps.append(ConfidenceStep(4, "Arbiter rule applied", arbiter.final_confidence, rule))
+
+    if digest.has_hard_no_trade():
+        steps.append(ConfidenceStep(5, "Python override", "none", f"hard no-trade flags: {digest.no_trade_flags}"))
+        return ConfidenceProvenance(steps=steps, final_confidence="none", python_override=True,
+                                    override_reason=str(digest.no_trade_flags))
+
+    steps.append(ConfidenceStep(5, "Final confidence", arbiter.final_confidence, "no override"))
+    return ConfidenceProvenance(steps=steps, final_confidence=arbiter.final_confidence,
+                                python_override=False, override_reason=None)
+```
+
+---
+
+## CausalChain
+
+```python
+@dataclass
+class CausalDriver:
+    flag: str
+    source: str       # "digest" | "persona_technical" | "persona_execution" | "arbiter"
+    raised_by: str    # "pre_filter" | "persona" | "arbiter_rule"
+    effect: str       # human-readable effect description
+
+@dataclass
+class CausalChain:
+    no_trade_drivers: list[CausalDriver]
+    caution_drivers: list[CausalDriver]
+    has_hard_block: bool
+```
+
+---
+
+## ExplainabilityBlock
+
+```python
+@dataclass
+class ExplainabilityBlock:
     """
-    Top-level container for one full multi-analyst run.
-    Preserved entirely for audit and replay.
+    Top-level explanation container. Fully deterministic.
+    Produced by explainability.py from saved MultiAnalystOutput.
+    No LLM calls permitted anywhere in this object's construction.
     """
     instrument: str
     as_of_utc: str
+    source_verdict: str           # final_verdict echoed for quick reference
+    source_confidence: str        # final_confidence echoed
 
-    digest: StructureDigest           # shared input — identical for both personas
-    persona_outputs: list[PersonaVerdict]  # ordered: [technical_structure, execution_timing]
-    arbiter_decision: ArbiterDecision
-    final_verdict: AnalystVerdict      # Arbiter decision re-expressed as AnalystVerdict for downstream compat
+    signal_ranking: SignalInfluenceRanking
+    persona_dominance: PersonaDominance
+    confidence_provenance: ConfidenceProvenance
+    causal_chain: CausalChain
+
+    audit_summary: str            # template-rendered human-readable text (no LLM)
 
     def to_dict(self) -> dict:
         ...
 ```
 
-The `final_verdict` field re-expresses the `ArbiterDecision` in `AnalystVerdict` schema so downstream systems (and the 3E contract) remain unchanged.
+---
+
+## Additive change to `analyst/multi_contracts.py`
+
+Add one optional field to `MultiAnalystOutput`. This is the **only** permitted modification to any existing file:
+
+```python
+# In MultiAnalystOutput dataclass — add at end of field list:
+explanation: Optional["ExplainabilityBlock"] = None
+```
+
+Import guard:
+```python
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from analyst.explain_contracts import ExplainabilityBlock
+```
+
+Or import directly if no circular dependency risk.
 
 ---
 
-## Persona prompt contracts
+## Standalone file contract
 
-### Technical Structure Analyst system prompt
+`analyst/output/{instrument}_multi_analyst_explainability.json` must be:
 
-```
-You are a disciplined ICT-style technical structure analyst.
-Your job is to assess whether the structural case for a trade is valid.
-You do not re-derive structure from raw price data.
-Your structural knowledge comes exclusively from the structure digest provided.
+1. Derived from `MultiAnalystOutput.explanation` — never independently computed
+2. Written atomically at the same time as `_multi_analyst_output.json`
+3. A complete serialisation of `ExplainabilityBlock.to_dict()`
 
-You assess: HTF regime consistency, BOS/MSS direction and quality,
-liquidity positioning (internal vs external), FVG zone context (discount/premium),
-and sweep/reclaim outcomes.
-
-You do not optimise for timing or execution cleanliness.
-You answer only: is the structural case for a directional bias sound?
-
-Output only valid JSON matching PersonaVerdict schema. No preamble. No markdown.
-```
-
-### Execution/Timing Analyst system prompt
-
-```
-You are a disciplined ICT-style execution and timing analyst.
-Your job is to assess whether the current context is a good place and time to act.
-You do not re-derive structure from raw price data.
-Your structural knowledge comes exclusively from the structure digest provided.
-
-You assess: proximity and quality of nearby liquidity barriers, FVG positioning
-relative to current price, reclaim vs acceptance outcomes, execution cleanliness,
-and short-term conflict signals (LTF MSS, partial FVG fills, unresolved sweeps).
-
-You do not re-assess HTF regime validity. You take the HTF gate result as given
-and focus entirely on execution context quality.
-
-You answer only: is this a good place and time to act on the structural case?
-
-Output only valid JSON matching PersonaVerdict schema. No preamble. No markdown.
-```
-
-### Arbiter system prompt
-
-```
-You are the Arbiter. You do not form opinions about the market.
-You have been given a pre-computed ArbiterDecision skeleton:
-- consensus_state, final_verdict, final_confidence, no_trade_enforced are already determined.
-
-Your only job is to write:
-1. synthesis_notes: 2-4 sentences explaining what aligned, what conflicted, and how it resolved.
-2. winning_rationale_summary: 1-2 sentences stating why the final verdict is the right outcome.
-
-Do not change final_verdict. Do not change final_confidence.
-Do not argue against no_trade_enforced if it is True.
-Output only valid JSON with exactly two fields: synthesis_notes, winning_rationale_summary.
-```
+If the embedded `explanation` field and the standalone file ever diverge, the embedded field is authoritative.
 
 ---
 
-## Full MultiAnalystOutput JSON example
+## Full ExplainabilityBlock JSON example
 
 ```json
 {
   "instrument": "EURUSD",
   "as_of_utc": "2026-03-07T10:15:00Z",
+  "source_verdict": "long_bias",
+  "source_confidence": "moderate",
 
-  "digest": { "...": "same StructureDigest as 3E" },
-
-  "persona_outputs": [
-    {
-      "persona_name": "technical_structure",
-      "verdict": "long_bias",
-      "confidence": "high",
-      "directional_bias": "bullish",
-      "structure_gate": "pass",
-      "persona_supports": ["bullish 4h regime", "bullish BOS on 1h", "active discount FVG"],
-      "persona_conflicts": ["bearish MSS on 15m"],
-      "persona_cautions": ["ltf_mss_conflict"],
-      "reasoning": { "...": "ReasoningBlock" }
-    },
-    {
-      "persona_name": "execution_timing",
-      "verdict": "conditional",
-      "confidence": "moderate",
-      "directional_bias": "bullish",
-      "structure_gate": "pass",
-      "persona_supports": ["price approaching discount FVG", "bullish reclaim of equal_lows"],
-      "persona_conflicts": ["external liquidity (prior_day_high) close above — potential barrier"],
-      "persona_cautions": ["liquidity_above_close", "entry may be late relative to FVG"],
-      "reasoning": { "...": "ReasoningBlock" }
-    }
-  ],
-
-  "arbiter_decision": {
-    "consensus_state": "directional_alignment_confidence_split",
-    "final_verdict": "long_bias",
-    "final_confidence": "moderate",
-    "final_directional_bias": "bullish",
-    "no_trade_enforced": false,
-    "personas_agree_direction": true,
-    "personas_agree_confidence": false,
-    "confidence_spread": "high vs moderate",
-    "synthesis_notes": "Both personas agree on a bullish directional bias. Technical structure sees a clean HTF alignment with minor LTF conflict. Execution timing notes the prior_day_high as a nearby barrier and rates the setup conditional. Arbiter resolves to long_bias at moderate confidence — lower confidence tier honoured due to timing caution.",
-    "winning_rationale_summary": "Directional alignment holds across both personas. Confidence is moderated by execution timing concern. Long bias at moderate confidence is the defensible output."
+  "signal_ranking": {
+    "dominant_signal": "htf_regime",
+    "primary_conflict": "caution_flags",
+    "signals": [
+      {"signal": "htf_regime",     "value": "bullish",          "influence": "dominant",    "direction": "bullish", "note": "4h regime bullish — HTF gate passed."},
+      {"signal": "bos_mss",        "value": "bullish_bos",      "influence": "supporting",  "direction": "bullish", "note": "Bullish BOS on 1h confirms directional momentum."},
+      {"signal": "fvg_context",    "value": "discount_bullish", "influence": "supporting",  "direction": "bullish", "note": "Active discount FVG at 1.08475 — price approaching from above."},
+      {"signal": "sweep_reclaim",  "value": "bullish_reclaim",  "influence": "supporting",  "direction": "bullish", "note": "Bullish reclaim of equal_lows confirmed."},
+      {"signal": "liquidity",      "value": "above_closer",     "influence": "conflicting", "direction": "bearish", "note": "External liquidity (prior_day_high) closer above — potential barrier."},
+      {"signal": "caution_flags",  "value": "ltf_mss_conflict", "influence": "conflicting", "direction": "bearish", "note": "LTF bearish MSS on 15m active — minor conflict against HTF bias."},
+      {"signal": "no_trade_flags", "value": "none",             "influence": "neutral",     "direction": "n/a",     "note": "No hard no-trade flags active."}
+    ]
   },
 
-  "final_verdict": {
-    "verdict": "long_bias",
-    "confidence": "moderate",
-    "structure_gate": "pass",
-    "htf_bias": "bullish",
-    "...": "full AnalystVerdict schema"
-  }
+  "persona_dominance": {
+    "direction_driver": "both",
+    "confidence_driver": "execution_timing",
+    "confidence_effect": "downgraded",
+    "stricter_persona": "execution_timing",
+    "python_override_active": false,
+    "note": "Both personas agreed on bullish direction. Execution/Timing was stricter at moderate confidence. Arbiter used lower tier — confidence downgraded from high to moderate."
+  },
+
+  "confidence_provenance": {
+    "final_confidence": "moderate",
+    "python_override": false,
+    "override_reason": null,
+    "steps": [
+      {"step": 1, "label": "Technical Structure Analyst", "value": "high",     "rule": "persona output"},
+      {"step": 2, "label": "Execution/Timing Analyst",    "value": "moderate", "rule": "persona output"},
+      {"step": 3, "label": "Consensus state",             "value": "directional_alignment_confidence_split", "rule": "arbiter classification"},
+      {"step": 4, "label": "Arbiter rule applied",        "value": "moderate", "rule": "use lower confidence on split"},
+      {"step": 5, "label": "Final confidence",            "value": "moderate", "rule": "no override"}
+    ]
+  },
+
+  "causal_chain": {
+    "has_hard_block": false,
+    "no_trade_drivers": [],
+    "caution_drivers": [
+      {"flag": "ltf_mss_conflict",     "source": "digest", "raised_by": "pre_filter", "effect": "caution — did not block verdict"},
+      {"flag": "liquidity_above_close","source": "digest", "raised_by": "pre_filter", "effect": "caution — contributed to execution persona confidence downgrade"}
+    ]
+  },
+
+  "audit_summary": "HTF Context: 4h regime was bullish. Last confirmed BOS was bullish on 1h. Last MSS was bearish on 15m — classified as minor LTF conflict.\n\nLiquidity: Nearest overhead level was prior_day_high at 1.08720 (external). Nearest support was equal_lows at 1.08410 (internal). Liquidity draw toward levels above.\n\nFVG Context: Active bullish FVG at 1.08475–1.08620 (1h, open). Price approaching from above — discount zone active.\n\nSweep/Reclaim: Bullish reclaim of equal_lows confirmed. Supportive of bullish continuation.\n\nPersona Summary: Technical Structure returned long_bias at high confidence. Execution/Timing returned conditional at moderate confidence. Consensus: directional alignment, confidence split. Arbiter used lower confidence tier.\n\nFinal Verdict: long_bias — moderate confidence. Active cautions: ltf_mss_conflict, liquidity_above_close. No hard no-trade flags were active."
 }
 ```
-
----
-
-## Output file path
-
-```
-analyst/output/{instrument}_multi_analyst_output.json
-```
-
-Single-analyst 3E output at `{instrument}_analyst_output.json` is preserved and unchanged.
