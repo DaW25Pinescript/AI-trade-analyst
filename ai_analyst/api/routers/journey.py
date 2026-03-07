@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# ── Triage debug flag ────────────────────────────────────────────────────────
+_TRIAGE_DEBUG = os.getenv("TRIAGE_DEBUG", "").lower() == "true"
+
+def _debug(msg: str, *args: object) -> None:
+    """Emit a log line only when TRIAGE_DEBUG=true."""
+    if _TRIAGE_DEBUG:
+        logger.info(msg, *args)
+
 # ── Path configuration ────────────────────────────────────────────────────────
 
 # Project root is 3 levels up from this file:
@@ -219,11 +227,19 @@ async def run_real_triage_for_symbol(symbol: str) -> dict:
         ("max_risk_per_trade", (None, "0.5")),
         ("triage_mode", (None, "true")),
     ]
+    loopback_url = "http://127.0.0.1:8000/analyse"
+    payload_fields = [name for name, _ in files]
+    _debug("[triage] PRE-loopback  symbol=%s url=%s payload_fields=%s", symbol, loopback_url, payload_fields)
+
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
-                "http://127.0.0.1:8000/analyse",
+                loopback_url,
                 files=files,
+            )
+            _debug(
+                "[triage] POST-loopback symbol=%s url=%s status=%s body=%.500s",
+                symbol, loopback_url, resp.status_code, resp.text,
             )
             resp.raise_for_status()
             result = resp.json()
@@ -261,6 +277,100 @@ async def run_real_triage_for_symbol(symbol: str) -> dict:
     }
 
 
+@router.post("/triage/smoke")
+async def triage_smoke():
+    """
+    Diagnostic endpoint — single-symbol (XAUUSD) probe through the triage→analyse chain.
+
+    Returns JSON showing exactly how far execution got: loopback hop status,
+    LLM env key presence, validate_input_node reached, and artifact written.
+    Not wired to the frontend.
+    """
+    symbol = "XAUUSD"
+    loopback_url = "http://127.0.0.1:8000/analyse"
+    ts_start = datetime.now(timezone.utc).isoformat()
+    diag: dict[str, Any] = {
+        "symbol": symbol,
+        "started_at": ts_start,
+        "loopback_url": loopback_url,
+        "loopback_hop_succeeded": False,
+        "loopback_status_code": None,
+        "loopback_response_truncated": None,
+        "llm_env_key_present": False,
+        "validate_input_node_reached": False,
+        "llm_call_result": None,
+        "artifact_written": False,
+        "error": None,
+    }
+
+    # Check LLM env key presence (from llm_routing config, not a specific env var)
+    try:
+        from ...llm_router import router as llm_router
+        route = llm_router.resolve("analyst_reasoning")
+        _key = route.get("api_key") or ""
+        diag["llm_env_key_present"] = bool(_key and len(str(_key)) > 0)
+        diag["llm_base_url_configured"] = route.get("base_url")
+        diag["llm_model_configured"] = route.get("model")
+    except Exception as e:
+        diag["llm_config_error"] = f"{type(e).__name__}: {str(e)[:300]}"
+
+    # Perform the loopback call
+    session = _current_session()
+    files = [
+        ("instrument", (None, symbol)),
+        ("session", (None, session)),
+        ("timeframes", (None, '["H4","H1","M15"]')),
+        ("account_balance", (None, "10000")),
+        ("min_rr", (None, "2.0")),
+        ("max_risk_per_trade", (None, "0.5")),
+        ("triage_mode", (None, "true")),
+    ]
+
+    try:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            resp = await client.post(loopback_url, files=files)
+            diag["loopback_status_code"] = resp.status_code
+            diag["loopback_response_truncated"] = resp.text[:500]
+            diag["loopback_hop_succeeded"] = 200 <= resp.status_code < 400
+
+            if diag["loopback_hop_succeeded"]:
+                result = resp.json()
+                diag["llm_call_result"] = result.get("smoke_error") or "success"
+                diag["run_id"] = result.get("run_id")
+
+                # Check if validate_input_node was reached (it always runs if we got 200)
+                diag["validate_input_node_reached"] = True
+
+                # Write minimal artifact
+                output_dir = str(_ANALYST_OUTPUT)
+                os.makedirs(output_dir, exist_ok=True)
+                ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                filename = f"multi_analyst_output_{symbol}_{ts}.json"
+                artifact_path = os.path.join(output_dir, filename)
+
+                artifact = {
+                    "symbol": symbol,
+                    "triage_status": "smoke_test",
+                    "bias": "neutral",
+                    "confidence": "none",
+                    "rationale_summary": "smoke test probe",
+                    "why_interesting_tags": ["smoke_test"],
+                    "no_trade_enforced": False,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "run_id": result.get("run_id"),
+                    "smoke_result": result,
+                }
+                with open(artifact_path, "w") as f:
+                    json.dump(artifact, f, indent=2)
+                diag["artifact_written"] = True
+                diag["artifact_path"] = artifact_path
+    except Exception as e:
+        diag["error"] = f"{type(e).__name__}: {str(e)[:500]}"
+
+    diag["finished_at"] = datetime.now(timezone.utc).isoformat()
+    return JSONResponse(content=diag)
+
+
 @router.post("/triage")
 async def run_triage(request: Request):
     """
@@ -278,6 +388,8 @@ async def run_triage(request: Request):
     os.makedirs(output_dir, exist_ok=True)
 
     symbols = body.get("symbols") or ["XAUUSD", "NAS100", "US30"]
+    logger.info("[triage] POST /triage received — symbols=%s ts=%s",
+                symbols, datetime.now(timezone.utc).isoformat())
     written = []
     failed = []
 

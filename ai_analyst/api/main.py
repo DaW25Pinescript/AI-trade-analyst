@@ -568,6 +568,10 @@ async def analyse(
         ),
     ),
 ):
+    # ── Triage-path entry log ──────────────────────────────────────────────
+    logger.info("[analyse] POST /analyse received — instrument=%s triage_mode=%s ts=%s",
+                instrument, triage_mode, datetime.now(timezone.utc).isoformat())
+
     # ── Rate limit check (HIGH-7) ────────────────────────────────────────────
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
@@ -717,18 +721,34 @@ async def analyse(
         "_node_timings": None,
     }
 
+    _smoke_mode = os.getenv("TRIAGE_SMOKE_MODE", "").lower() == "true"
+
     # Phase 3: set correlation context for structured logging
     ctx_token = correlation_ctx.set(ground_truth.run_id)
     try:
         final_state = await request.app.state.graph.ainvoke(initial_state)
     except RuntimeError as e:
+        if _smoke_mode:
+            return JSONResponse(content={"smoke_error": _mask_secrets(str(e)), "run_id": ground_truth.run_id})
         # Propagate pipeline failures (e.g. insufficient analysts) as 503
         raise HTTPException(status_code=503, detail=_mask_secrets(str(e)))
     except Exception as exc:
+        if _smoke_mode:
+            return JSONResponse(content={
+                "smoke_error": {"error_type": type(exc).__name__, "message": _mask_secrets(str(exc))[:500]},
+                "run_id": ground_truth.run_id,
+            })
         logger.error("Pipeline error: %s: %s", type(exc).__name__, _mask_secrets(str(exc)))
         raise HTTPException(status_code=500, detail="Internal pipeline error. Check server logs.")
     finally:
         correlation_ctx.reset(ctx_token)
+
+    # Smoke mode: if _smoke_error was captured, return it instead of crashing
+    if _smoke_mode and final_state.get("_smoke_error"):
+        return JSONResponse(content={
+            "smoke_error": final_state["_smoke_error"],
+            "run_id": ground_truth.run_id,
+        })
 
     verdict: FinalVerdict = final_state["final_verdict"]
     ticket_draft = build_ticket_draft(verdict, ground_truth)

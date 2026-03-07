@@ -56,6 +56,13 @@ async def validate_input_node(state: GraphState) -> GraphState:
 
     Phase 3: Sets the correlation context (run_id) and starts pipeline timing.
     """
+    import os as _os
+    _triage_debug = _os.getenv("TRIAGE_DEBUG", "").lower() == "true"
+    logger.info("[validate_input_node] entered — state keys present: %s", sorted(state.keys()))
+    if _triage_debug:
+        logger.info("[validate_input_node] TRIAGE_DEBUG detail — ground_truth=%s, lens_config=%s",
+                    state.get("ground_truth") is not None, state.get("lens_config") is not None)
+
     gt = state.get("ground_truth")
     if gt is None:
         raise ValueError("GraphState is missing 'ground_truth'.")
