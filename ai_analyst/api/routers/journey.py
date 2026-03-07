@@ -86,7 +86,7 @@ async def watchlist_triage():
     if not _ANALYST_OUTPUT.exists():
         return {"data_state": "unavailable", "generated_at": None, "items": []}
 
-    output_files = sorted(_ANALYST_OUTPUT.glob("*_multi_analyst_output.json"))
+    output_files = sorted(_ANALYST_OUTPUT.glob("multi_analyst_output_*.json"))
     if not output_files:
         return {"data_state": "unavailable", "generated_at": None, "items": []}
 
@@ -192,7 +192,7 @@ async def run_triage(request: Request):
     except Exception:
         body = {}
 
-    output_dir = "analyst/output"
+    output_dir = str(_ANALYST_OUTPUT)
     os.makedirs(output_dir, exist_ok=True)
 
     symbols = body.get("symbols") or ["XAUUSD", "NAS100", "US30"]
