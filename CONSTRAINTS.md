@@ -1,121 +1,112 @@
-# CONSTRAINTS.md — Phase 3C Hard Rules
+# CONSTRAINTS.md — Phase 3D Hard Rules
 
-## Locked decisions — do not reopen
+## Non-negotiable rules
 
-### From 3A
-- Swing confirmation: fixed left/right pivot only
-- BOS/MSS: close-confirmed only
-- EQH/EQL tolerance: fixed per-instrument in config
-- Active timeframes: 15m, 1h, 4h
-- Output: JSON only, pretty-printed, UTF-8, atomic writes
+### RULE 1 — Officer reads structure via reader API only
 
-### From 3B
-- Reclaim: close confirmation only
-- Reclaim window: `allow_same_bar_reclaim` + `reclaim_window_bars`
-- Liquidity lifecycle: additive, no backward transitions
-
-### From 3C spec decisions
-- FVG detection: body-only (open-to-close boundaries)
-- Wick-inclusive mode: not in scope
-- Fill progression: partial + full as separate sequential states
-- Invalidation: full fill only
-- 50% threshold: not in scope
-- Config-selectable invalidation modes: not in scope
-
----
-
-## Phase 3C hard rules
-
-### RULE 1 — Body-only detection, always
-
-```python
-# Correct — body boundaries
-c1_body_high = max(c1["open"], c1["close"])
-c1_body_low  = min(c1["open"], c1["close"])
-
-# Wrong — wick boundaries
-c1_wick_high = c1["high"]
-c1_wick_low  = c1["low"]
-```
-
-`fvg_use_body_only` must always be `True` in Phase 3C. Acceptance tests will assert this.
-
-### RULE 2 — No pre-confirmation emission
-
-A zone is emitted only after candle 3 closes. Never emit a zone based on candle 1 or candle 2 alone. `confirm_time` must equal candle 3's timestamp.
+The Officer must call `structure/reader.py` functions. It must not:
+- Read structure JSON files via hardcoded `open()` paths
+- Import from `structure/engine.py` directly
+- Call `run_engine()` or any structure computation function
 
 ```python
 # Correct
-zone.confirm_time = bars.index[i]  # candle 3 timestamp
+from structure.reader import load_structure_summary, structure_is_available
 
 # Wrong
-zone.confirm_time = bars.index[i - 1]  # candle 2 — premature
+import json
+with open("structure/output/eurusd_1h_structure.json") as f:  # hardcoded path
+    packet = json.load(f)
 ```
 
-### RULE 3 — No skipping partial fill
+### RULE 2 — Officer never crashes on missing structure
 
-A zone cannot transition from `open` to `invalidated` without first passing through `partially_filled`. If price blows straight through the zone in one bar, both transitions must fire in sequence on that bar.
+If structure packets are unavailable, stale, or corrupt:
+- Return `StructureBlock.unavailable()`
+- Set `structure.available = False`
+- All sub-fields `None`
+- Continue assembling the rest of the v2 packet normally
 
 ```python
-# When price blows through:
-zone.status = "partially_filled"  # fire first
-zone.partial_fill_time = ts
-# then immediately:
-zone.status = "invalidated"
-zone.full_fill_time = ts
+# Correct
+if not structure_is_available(instrument):
+    structure_block = StructureBlock.unavailable()
+else:
+    structure_block = assemble_structure_block(instrument)
 ```
 
-### RULE 4 — Invalidated zones are terminal
+### RULE 3 — All v1 fields preserved unchanged in v2
 
-Once a zone reaches `invalidated`, it must not be reprocessed or transitioned backward on reruns.
+`MarketPacketV2.to_dict()` must produce all fields that `MarketPacketV1.to_dict()` produced. No v1 field may be renamed, removed, or moved.
 
-```python
-if zone.status == "invalidated":
-    return zone  # skip all fill processing
-```
+The only changes from v1 to v2:
+- `schema_version` changes from `"market_packet_v1"` to `"market_packet_v2"`
+- `structure` top-level key is added
 
-### RULE 5 — Active zone registry contains only live zones
+### RULE 4 — Feed pipeline untouched
 
-The `active_zones` packet key must contain only zones with `status` in `{"open", "partially_filled"}`. Invalidated and archived zones must not appear there.
-
-```python
-active = [z for z in all_zones if z.status in ("open", "partially_filled")]
-```
-
-### RULE 6 — Minimum gap size is instrument-specific
-
-Use `fvg_min_size_eurusd` for EURUSD and `fvg_min_size_xauusd` for XAUUSD. Do not use a single shared value. Do not silently default to zero.
-
-### RULE 7 — Replay safety
-
-Reruns on unchanged bars must not alter confirmed zones or resolved fill states. New bars may:
-- Add new confirmed zones
-- Advance `open` → `partially_filled`
-- Advance `partially_filled` → `invalidated`
-
-They must not:
-- Change `confirm_time` of existing zones
-- Reset fill tracking fields
-- Remove zones from the packet
-
-### RULE 8 — `engine_version` must update
-
-```json
-"build": {
-  "engine_version": "phase_3c"
-}
-```
-
-### RULE 9 — Officer and feed untouched
+No modifications to `market_data_officer/feed/`.
 
 ```bash
-git diff --name-only HEAD | grep -E "officer/|feed/"
+git diff --name-only HEAD | grep "feed/"
 # Must return no output
 ```
 
-### RULE 10 — Both instruments must pass
+### RULE 5 — Structure engine modules untouched
 
-EURUSD and XAUUSD must both pass all test groups. Each uses its own minimum gap size from config.
+No modifications to `structure/swings.py`, `structure/events.py`, `structure/liquidity.py`, `structure/imbalance.py`, `structure/regime.py`, `structure/engine.py`, `structure/io.py`, `structure/schemas.py`, or `structure/config.py`.
+
+The only permitted structure module addition is `structure/reader.py`.
+
+```bash
+git diff --name-only HEAD | grep "structure/" | grep -v "reader.py"
+# Must return no output
+```
+
+### RULE 6 — `recent_events` is capped at 5
+
+Never include more than 5 events in `structure.recent_events`. The reader must enforce this cap regardless of how many events exist in the structure packets.
+
+### RULE 7 — `active_fvg_zones` contains only open and partially_filled
+
+```python
+assert all(z["status"] in ("open", "partially_filled")
+           for z in packet["structure"]["active_fvg_zones"])
+```
+
+### RULE 8 — `schema_version` must be `market_packet_v2`
+
+```python
+assert packet["schema_version"] == "market_packet_v2"
+```
+
+### RULE 9 — `has_structure()` is reliable
+
+`MarketPacketV2.has_structure()` must return `True` if and only if `structure.available` is `True` and at least one structure sub-field is non-null.
+
+### RULE 10 — Regime source timeframe preference
+
+When assembling `structure.regime`, prefer 4h regime if available. Fall back to 1h, then 15m. Document the source in `regime.source_timeframe`.
+
+```python
+for preferred_tf in ("4h", "1h", "15m"):
+    if preferred_tf in packets and packets[preferred_tf]:
+        regime = packets[preferred_tf].get("regime")
+        if regime:
+            regime["source_timeframe"] = preferred_tf
+            return regime
+```
+
+---
+
+## Module boundary summary
+
+| Module | Permitted to call | Must not call |
+|---|---|---|
+| `officer/service.py` | `structure/reader.py` | `structure/engine.py`, feed modules |
+| `structure/reader.py` | `pathlib`, `json` | `structure/engine.py`, Officer modules |
+| `officer/contracts.py` | stdlib only | any external module |
+| `structure/engine.py` | unchanged | Officer modules |
 
 ---
 
@@ -123,10 +114,10 @@ EURUSD and XAUUSD must both pass all test groups. Each uses its own minimum gap 
 
 | Failure | Guard |
 |---|---|
-| Using wick high/low for gap boundaries | Always use `max(open,close)` and `min(open,close)` |
-| Emitting zone before candle 3 closes | `confirm_time` must be candle 3 index, emit only after `i >= 2` |
-| Skipping partial_fill on blowthrough | Fire both transitions in sequence on same bar |
-| Reprocessing invalidated zones | Check `status == "invalidated"` before any fill update |
-| Active registry including invalidated zones | Filter on `status in {"open", "partially_filled"}` strictly |
-| XAUUSD using EURUSD minimum gap size | Route through instrument-specific config field |
-| fill_low/fill_high not updating progressively | Update on every bar inside zone, not just first touch |
+| Crash when structure JSON missing | `load_structure_packet` returns `None`, never raises |
+| v1 field renamed in v2 serialization | Test v1 field presence explicitly in Group C |
+| Stale structure silently treated as fresh | `_is_fresh()` check in `structure_is_available()` |
+| `active_fvg_zones` including invalidated zones | Filter on `status in {"open", "partially_filled"}` |
+| `recent_events` exceeding 5 | Cap with `[:5]` slice after sort |
+| Regime from wrong timeframe | Enforce 4h → 1h → 15m preference order |
+| `has_structure()` returning True with null sub-fields | Check `available` AND at least one non-null sub-field |

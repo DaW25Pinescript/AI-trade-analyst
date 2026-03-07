@@ -1,289 +1,391 @@
-# CONTRACTS.md — Phase 3C Schema and Packet Integration
+# CONTRACTS.md — Phase 3D: v2 Packet Schema and Reader API
 
-## FairValueGap dataclass
-
-Add to `structure/schemas.py`:
-
-```python
-@dataclass
-class FairValueGap:
-    id: str                          # e.g. "fvg_001"
-    fvg_type: str                    # "bullish_fvg" | "bearish_fvg"
-    zone_high: float                 # upper boundary
-    zone_low: float                  # lower boundary
-    zone_size: float                 # zone_high - zone_low
-    origin_time: datetime            # candle 2 timestamp
-    confirm_time: datetime           # candle 3 timestamp (emit after this)
-    timeframe: str                   # "15m" | "1h" | "4h"
-    status: str                      # see lifecycle below
-
-    # Fill tracking
-    fill_high: Optional[float]       # highest close reached into zone (bearish FVG)
-    fill_low: Optional[float]        # lowest close reached into zone (bullish FVG)
-    first_touch_time: Optional[datetime]
-    partial_fill_time: Optional[datetime]
-    full_fill_time: Optional[datetime]
-```
-
----
-
-## FVG JSON object — full schema
+## Market Packet v2 — Full Schema
 
 ```json
 {
-  "id": "fvg_001",
-  "fvg_type": "bullish_fvg",
-  "zone_high": 1.08620,
-  "zone_low": 1.08475,
-  "zone_size": 0.00145,
-  "origin_time": "2026-03-07T08:00:00Z",
-  "confirm_time": "2026-03-07T08:15:00Z",
-  "timeframe": "15m",
-  "status": "partially_filled",
-
-  "fill_high": null,
-  "fill_low": 1.08510,
-  "first_touch_time": "2026-03-07T09:30:00Z",
-  "partial_fill_time": "2026-03-07T09:30:00Z",
-  "full_fill_time": null
-}
-```
-
----
-
-## Active zone registry JSON object
-
-```json
-{
+  "schema_version": "market_packet_v2",
   "instrument": "EURUSD",
-  "timeframe": "1h",
-  "as_of": "2026-03-07T10:00:00Z",
-  "active_zones": [
-    {
-      "id": "fvg_001",
-      "fvg_type": "bullish_fvg",
-      "zone_high": 1.08620,
-      "zone_low": 1.08475,
-      "zone_size": 0.00145,
-      "status": "partially_filled",
-      "origin_time": "2026-03-07T08:00:00Z"
+  "as_of_utc": "2026-03-07T10:15:00Z",
+
+  "source": {
+    "vendor": "dukascopy",
+    "canonical_tf": "1m",
+    "quality": "validated"
+  },
+
+  "timeframes": {
+    "1m":  { "count": 3000, "rows": [...] },
+    "5m":  { "count": 1200, "rows": [...] },
+    "15m": { "count": 600,  "rows": [...] },
+    "1h":  { "count": 240,  "rows": [...] },
+    "4h":  { "count": 120,  "rows": [...] },
+    "1d":  { "count": 30,   "rows": [...] }
+  },
+
+  "features": {
+    "core": {
+      "atr_14": 0.00234,
+      "volatility_regime": "normal",
+      "momentum": 0.27,
+      "ma_50": 1.08420,
+      "ma_200": 1.07910,
+      "swing_high": 1.08901,
+      "swing_low": 1.07630,
+      "rolling_range": 0.01380,
+      "session_context": "london"
     },
-    {
-      "id": "fvg_003",
-      "fvg_type": "bearish_fvg",
-      "zone_high": 1.09140,
-      "zone_low": 1.09010,
-      "zone_size": 0.00130,
-      "status": "open",
-      "origin_time": "2026-03-06T14:00:00Z"
-    }
-  ]
+    "structure": null,
+    "imbalance": null,
+    "compression": null
+  },
+
+  "state_summary": {
+    "trend_1h": "bullish",
+    "trend_4h": "bullish",
+    "trend_1d": "neutral",
+    "volatility_regime": "normal",
+    "momentum_state": "expanding",
+    "session_context": "london",
+    "data_quality": "validated"
+  },
+
+  "quality": {
+    "manifest_valid": true,
+    "all_timeframes_present": true,
+    "staleness_minutes": 4,
+    "stale": false,
+    "partial": false,
+    "flags": []
+  },
+
+  "structure": {
+    "available": true,
+    "source_engine_version": "phase_3c",
+    "as_of": "2026-03-07T10:00:00Z",
+
+    "regime": {
+      "bias": "bullish",
+      "last_bos_direction": "bullish",
+      "last_mss_direction": null,
+      "trend_state": "trending",
+      "structure_quality": "clean",
+      "source_timeframe": "4h"
+    },
+
+    "recent_events": [
+      {
+        "type": "bos_bull",
+        "time": "2026-03-07T08:00:00Z",
+        "timeframe": "1h",
+        "reference_price": 1.08642
+      },
+      {
+        "type": "bos_bull",
+        "time": "2026-03-06T20:00:00Z",
+        "timeframe": "4h",
+        "reference_price": 1.08200
+      }
+    ],
+
+    "liquidity": {
+      "1h": {
+        "active_count": 3,
+        "nearest_above": {
+          "type": "prior_day_high",
+          "price": 1.08720,
+          "scope": "external_liquidity",
+          "status": "active"
+        },
+        "nearest_below": {
+          "type": "equal_lows",
+          "price": 1.08410,
+          "scope": "internal_liquidity",
+          "status": "active"
+        }
+      },
+      "4h": {
+        "active_count": 2,
+        "nearest_above": {
+          "type": "prior_week_high",
+          "price": 1.09140,
+          "scope": "external_liquidity",
+          "status": "active"
+        },
+        "nearest_below": null
+      }
+    },
+
+    "active_fvg_zones": [
+      {
+        "id": "fvg_003",
+        "fvg_type": "bullish_fvg",
+        "zone_high": 1.08620,
+        "zone_low": 1.08475,
+        "zone_size": 0.00145,
+        "status": "open",
+        "timeframe": "1h",
+        "origin_time": "2026-03-07T06:00:00Z"
+      },
+      {
+        "id": "fvg_007",
+        "fvg_type": "bearish_fvg",
+        "zone_high": 1.09140,
+        "zone_low": 1.09010,
+        "zone_size": 0.00130,
+        "status": "partially_filled",
+        "timeframe": "4h",
+        "origin_time": "2026-03-06T12:00:00Z"
+      }
+    ]
+  }
 }
 ```
 
-Active zones = `open` + `partially_filled` only. `invalidated` and `archived` zones are not in this registry.
-
 ---
 
-## Structure packet — 3C additions
+## Structure block — unavailable state
 
-The packet envelope gains two new keys: `imbalance` and `active_zones`.
+When structure packets are missing or stale:
 
 ```json
-{
-  "schema_version": "structure_packet_v1",
-  "instrument": "EURUSD",
-  "timeframe": "1h",
-  "as_of": "2026-03-07T10:15:00Z",
-  "build": {
-    "engine_version": "phase_3c",
-    "source_archive": "canonical_1m",
-    "quality_flag": "trusted"
-  },
-  "swings": [...],
-  "events": [...],
-  "liquidity": [...],
-  "imbalance": [...],
-  "active_zones": {
-    "count": 2,
-    "zones": [...]
-  },
-  "regime": {...},
-  "diagnostics": {}
+"structure": {
+  "available": false,
+  "source_engine_version": null,
+  "as_of": null,
+  "regime": null,
+  "recent_events": null,
+  "liquidity": null,
+  "active_fvg_zones": null
 }
 ```
 
-### `imbalance`
-
-Full list of all FVG objects for this timeframe — all statuses including invalidated. Same pattern as `liquidity` array in 3A/3B.
-
-### `active_zones`
-
-Compact registry of only `open` and `partially_filled` zones. Downstream agents read this for current live imbalance state without filtering the full `imbalance` array.
+The Officer must produce a valid v2 packet in this state. No crash, no exception propagation.
 
 ---
 
-## StructureConfig — 3C additions
+## Python dataclasses — Phase 3D additions
+
+Add to `officer/contracts.py`:
 
 ```python
+from dataclasses import dataclass, field
+from typing import Optional
+
 @dataclass
-class StructureConfig:
-    # --- existing 3A fields ---
-    pivot_left_bars: int = 3
-    pivot_right_bars: int = 3
-    eqh_eql_tolerance_eurusd: float = 0.0005
-    eqh_eql_tolerance_xauusd: float = 0.50
+class StructureRegime:
+    bias: str                          # "bullish" | "bearish" | "neutral"
+    last_bos_direction: Optional[str]
+    last_mss_direction: Optional[str]
+    trend_state: str                   # "trending" | "ranging" | "unknown"
+    structure_quality: str             # "clean" | "choppy" | "unknown"
+    source_timeframe: str              # "4h" | "1h" | "15m"
 
-    # --- existing 3B fields ---
-    allow_same_bar_reclaim: bool = True
-    reclaim_window_bars: int = 1
+@dataclass
+class StructureRecentEvent:
+    type: str                          # "bos_bull" | "bos_bear" | "mss_bull" | "mss_bear"
+    time: str                          # ISO8601 UTC
+    timeframe: str
+    reference_price: float
 
-    # --- 3C additions ---
-    fvg_min_size_eurusd: float = 0.0003    # 3 pips minimum gap
-    fvg_min_size_xauusd: float = 0.30      # 30 cents minimum gap
-    fvg_use_body_only: bool = True          # always True in 3C, wick mode deferred
+@dataclass
+class LiquidityNearest:
+    type: str                          # level type e.g. "prior_day_high"
+    price: float
+    scope: str                         # "external_liquidity" | "internal_liquidity" | "unclassified"
+    status: str                        # "active" | "swept"
+
+@dataclass
+class LiquidityTimeframeSummary:
+    active_count: int
+    nearest_above: Optional[LiquidityNearest]
+    nearest_below: Optional[LiquidityNearest]
+
+@dataclass
+class ActiveFVGZone:
+    id: str
+    fvg_type: str                      # "bullish_fvg" | "bearish_fvg"
+    zone_high: float
+    zone_low: float
+    zone_size: float
+    status: str                        # "open" | "partially_filled"
+    timeframe: str
+    origin_time: str                   # ISO8601 UTC
+
+@dataclass
+class StructureBlock:
+    available: bool
+    source_engine_version: Optional[str] = None
+    as_of: Optional[str] = None
+    regime: Optional[StructureRegime] = None
+    recent_events: Optional[list[StructureRecentEvent]] = None
+    liquidity: Optional[dict[str, LiquidityTimeframeSummary]] = None
+    active_fvg_zones: Optional[list[ActiveFVGZone]] = None
+
+    @classmethod
+    def unavailable(cls) -> "StructureBlock":
+        """Factory for the unavailable state."""
+        return cls(available=False)
+
+@dataclass
+class MarketPacketV2:
+    # --- all Phase 2 / v1 fields preserved ---
+    instrument: str
+    as_of_utc: str
+    source: dict
+    timeframes: dict
+    features: "FeatureBlock"
+    state_summary: "StateSummary"
+    quality: "QualityBlock"
+
+    # --- v2 addition ---
+    structure: StructureBlock
+
+    def to_dict(self) -> dict:
+        """Serialize to Market Packet v2 JSON structure."""
+        ...
+
+    def is_trusted(self) -> bool:
+        """True if packet is validated, not stale, not partial."""
+        return (
+            not self.quality.stale
+            and not self.quality.partial
+            and self.quality.manifest_valid
+            and self.state_summary.data_quality == "validated"
+        )
+
+    def has_structure(self) -> bool:
+        """
+        True if structure block is available AND at least one sub-field is non-null.
+        available=True with all null sub-fields is treated as unavailable.
+        """
+        return (
+            self.structure.available
+            and any([
+                self.structure.regime is not None,
+                self.structure.recent_events is not None,
+                self.structure.liquidity is not None,
+                self.structure.active_fvg_zones is not None,
+            ])
+        )
 ```
-
-`fvg_use_body_only` is always `True` in 3C. It is exposed as a config field to make future wick-mode extension clean, but must not be set to `False` in Phase 3C. The acceptance tests will assert this.
 
 ---
 
-## FVG detection reference implementation
+## Structure reader API (`structure/reader.py`)
 
 ```python
-def detect_fvg(bars: pd.DataFrame, config: StructureConfig,
-               instrument: str) -> list[FairValueGap]:
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+
+STRUCTURE_OUTPUT_DIR = Path("market_data_officer/structure/output")
+STRUCTURE_STALENESS_MINUTES = 120  # configurable
+
+def load_structure_packet(instrument: str, timeframe: str) -> dict | None:
     """
-    Detect Fair Value Gaps using body-only logic.
-    A zone is not emitted until candle 3 closes (no lookahead).
-    Minimum gap size filtered per instrument config.
+    Load the latest structure packet JSON for an instrument/timeframe.
+    Returns None if file does not exist or cannot be parsed.
+    Never raises on missing files.
     """
-    min_size = (config.fvg_min_size_xauusd
-                if instrument == "XAUUSD"
-                else config.fvg_min_size_eurusd)
+    path = STRUCTURE_OUTPUT_DIR / f"{instrument.lower()}_{timeframe}_structure.json"
+    if not path.exists():
+        return None
+    try:
+        import json
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
-    zones = []
-    for i in range(2, len(bars)):
-        c1 = bars.iloc[i - 2]
-        c3 = bars.iloc[i]
+def load_structure_summary(instrument: str,
+                           timeframes: list[str] = ("15m", "1h", "4h")) -> dict:
+    """
+    Load and merge structure packets across timeframes into a summary dict.
+    Missing timeframes are skipped — not an error.
+    """
+    return {
+        tf: load_structure_packet(instrument, tf)
+        for tf in timeframes
+        if load_structure_packet(instrument, tf) is not None
+    }
 
-        # Body boundaries
-        c1_body_high = max(c1["open"], c1["close"])
-        c1_body_low  = min(c1["open"], c1["close"])
-        c3_body_high = max(c3["open"], c3["close"])
-        c3_body_low  = min(c3["open"], c3["close"])
+def structure_is_available(instrument: str,
+                            timeframes: list[str] = ("15m", "1h", "4h")) -> bool:
+    """
+    Returns True if at least one valid, non-stale structure packet exists.
+    """
+    for tf in timeframes:
+        packet = load_structure_packet(instrument, tf)
+        if packet and _is_fresh(packet):
+            return True
+    return False
 
-        # Bullish FVG: gap between c1 body top and c3 body low
-        if c3_body_low > c1_body_high:
-            gap_size = c3_body_low - c1_body_high
-            if gap_size >= min_size:
-                zones.append(FairValueGap(
-                    id=generate_id("fvg"),
-                    fvg_type="bullish_fvg",
-                    zone_high=c3_body_low,
-                    zone_low=c1_body_high,
-                    zone_size=gap_size,
-                    origin_time=bars.index[i - 1],   # candle 2
-                    confirm_time=bars.index[i],       # candle 3
-                    timeframe=...,
-                    status="open",
-                    fill_high=None, fill_low=None,
-                    first_touch_time=None,
-                    partial_fill_time=None,
-                    full_fill_time=None,
+def _is_fresh(packet: dict) -> bool:
+    """Returns True if packet as_of is within staleness threshold."""
+    try:
+        as_of = datetime.fromisoformat(packet["as_of"].replace("Z", "+00:00"))
+        age_minutes = (datetime.now(timezone.utc) - as_of).total_seconds() / 60
+        return age_minutes <= STRUCTURE_STALENESS_MINUTES
+    except Exception:
+        return False
+```
+
+---
+
+## `recent_events` assembly rule
+
+Select last 5 BOS/MSS events across all active timeframes, sorted by time descending:
+
+```python
+def assemble_recent_events(packets: dict[str, dict],
+                           max_events: int = 5) -> list[StructureRecentEvent]:
+    all_events = []
+    for tf, packet in packets.items():
+        for event in packet.get("events", []):
+            if event["type"] in ("bos_bull", "bos_bear", "mss_bull", "mss_bear"):
+                all_events.append(StructureRecentEvent(
+                    type=event["type"],
+                    time=event["time"],
+                    timeframe=tf,
+                    reference_price=event["reference_price"],
                 ))
-
-        # Bearish FVG: gap between c3 body high and c1 body low
-        elif c3_body_high < c1_body_low:
-            gap_size = c1_body_low - c3_body_high
-            if gap_size >= min_size:
-                zones.append(FairValueGap(
-                    id=generate_id("fvg"),
-                    fvg_type="bearish_fvg",
-                    zone_high=c1_body_low,
-                    zone_low=c3_body_high,
-                    zone_size=gap_size,
-                    origin_time=bars.index[i - 1],
-                    confirm_time=bars.index[i],
-                    timeframe=...,
-                    status="open",
-                    fill_high=None, fill_low=None,
-                    first_touch_time=None,
-                    partial_fill_time=None,
-                    full_fill_time=None,
-                ))
-
-    return zones
+    all_events.sort(key=lambda e: e.time, reverse=True)
+    return all_events[:max_events]
 ```
 
 ---
 
-## Fill tracking reference implementation
+## `liquidity` summary assembly rule
+
+For each timeframe, find the nearest active level above and below current price:
 
 ```python
-def update_fvg_fills(zone: FairValueGap, bars: pd.DataFrame) -> FairValueGap:
-    """
-    Process subsequent bars after zone confirmation.
-    Tracks partial and full fill transitions in order.
-    A zone cannot skip from open to fully_filled without partial_fill.
-    """
-    if zone.status == "invalidated":
-        return zone  # terminal state — do not reprocess
+def assemble_liquidity_summary(packets: dict[str, dict],
+                                current_price: float) -> dict[str, LiquidityTimeframeSummary]:
+    summary = {}
+    for tf, packet in packets.items():
+        active_levels = [l for l in packet.get("liquidity", [])
+                         if l["status"] == "active"]
+        above = [l for l in active_levels if l["price"] > current_price]
+        below = [l for l in active_levels if l["price"] < current_price]
 
-    subsequent = bars[bars.index > zone.confirm_time]
+        nearest_above = min(above, key=lambda l: l["price"] - current_price) if above else None
+        nearest_below = max(below, key=lambda l: l["price"]) if below else None
 
-    for ts, bar in subsequent.iterrows():
-        close = bar["close"]
-
-        if zone.fvg_type == "bullish_fvg":
-            if zone.status == "open" and close < zone.zone_high:
-                # Entered the zone
-                zone.status = "partially_filled"
-                zone.first_touch_time = ts
-                zone.partial_fill_time = ts
-                zone.fill_low = close
-
-            if zone.status == "partially_filled":
-                zone.fill_low = min(zone.fill_low or close, close)
-                if close <= zone.zone_low:
-                    # Fully filled
-                    zone.status = "invalidated"
-                    zone.full_fill_time = ts
-                    return zone
-
-        elif zone.fvg_type == "bearish_fvg":
-            if zone.status == "open" and close > zone.zone_low:
-                zone.status = "partially_filled"
-                zone.first_touch_time = ts
-                zone.partial_fill_time = ts
-                zone.fill_high = close
-
-            if zone.status == "partially_filled":
-                zone.fill_high = max(zone.fill_high or close, close)
-                if close >= zone.zone_high:
-                    zone.status = "invalidated"
-                    zone.full_fill_time = ts
-                    return zone
-
-    return zone
+        summary[tf] = LiquidityTimeframeSummary(
+            active_count=len(active_levels),
+            nearest_above=_to_liquidity_nearest(nearest_above),
+            nearest_below=_to_liquidity_nearest(nearest_below),
+        )
+    return summary
 ```
 
 ---
 
-## Lifecycle allowed transitions
+## Schema evolution rule
 
-```python
-ALLOWED_FVG_TRANSITIONS = {
-    "open":             {"partially_filled"},
-    "partially_filled": {"invalidated"},
-    "invalidated":      {"archived"},
-}
-```
+`market_packet_v1` consumers are not broken by v2. The only change is:
+- `schema_version` string changes from `market_packet_v1` to `market_packet_v2`
+- New top-level key `structure` is added
 
-Note: `open` → `partially_filled` → `invalidated` can occur on the same bar if price blows through the zone. Both transitions must fire in sequence, not skipped.
-
----
-
-## Schema evolution note
-
-`imbalance` and `active_zones` are new top-level packet keys. Existing consumers reading `swings`, `events`, `liquidity`, and `regime` are unaffected. `engine_version` updates to `phase_3c`.
+All existing v1 keys (`source`, `timeframes`, `features`, `state_summary`, `quality`) are present and unchanged in v2.

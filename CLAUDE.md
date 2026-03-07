@@ -1,12 +1,12 @@
-# CLAUDE.md — Structure Engine: Phase 3C
+# CLAUDE.md — Phase 3D: Officer Integration
 
 ## Role
 
 You are a principal Python/data engineer working inside the **AI Trade Analyst** repository.
 
-Your job in this task is to build the **imbalance engine** — Phase 3C of the Structure Engine. Phases 3A and 3B are complete and merged. You are adding a new module, not rewriting anything that exists.
+Phase 3D is the first cross-layer integration task. You are connecting the Structure Engine (Phases 3A–3C) into the Market Data Officer (Phase 2), producing Market Packet v2.
 
-Read this file first. Then read the supporting spec files in order before writing any code.
+Read `ARCHITECTURE.md` first — it is the full system map. Then read this file and the supporting spec files before writing any code.
 
 ---
 
@@ -14,68 +14,59 @@ Read this file first. Then read the supporting spec files in order before writin
 
 Repo: `https://github.com/DaW25Pinescript/AI-trade-analyst`
 
-**Already complete — do not touch:**
-- `market_data_officer/feed/` — Phase 1A–1D feed pipeline
-- `market_data_officer/officer/` — Phase 2 Market Data Officer
-- `market_data_officer/structure/swings.py` — confirmed swing detection
-- `market_data_officer/structure/events.py` — BOS/MSS close-confirmed
-- `market_data_officer/structure/liquidity.py` — prior H/L, EQH/EQL, sweeps, reclaim, lifecycle
-- `market_data_officer/structure/regime.py` — bias, trend state, structure quality
-- `market_data_officer/structure/schemas.py` — all 3A/3B typed objects
-- `market_data_officer/structure/config.py` — StructureConfig with 3A/3B parameters
-- `market_data_officer/structure/io.py` — bar loading, atomic JSON writes
-- `market_data_officer/structure/engine.py` — orchestration
+**Already complete — do not rewrite:**
+- `market_data_officer/feed/` — feed pipeline, all phases
+- `market_data_officer/officer/` — Market Data Officer, Phase 2
+- `market_data_officer/structure/` — Structure Engine, Phases 3A–3C
+- All existing JSON output packets and hot packages
 
-**What you are building in Phase 3C:**
-- `structure/imbalance.py` — FVG detection, fill tracking, invalidation, zone registry
-- `structure/schemas.py` — extend with `FairValueGap` dataclass
-- `structure/config.py` — add narrow 3C config surface
-- `structure/engine.py` — integrate imbalance into orchestration and packet output
-- `tests/` — add 3C test groups
+**What you are building in Phase 3D:**
+- `structure/reader.py` — NEW: structure read API (Officer-facing loader)
+- `officer/contracts.py` — extend: add `StructureBlock`, `MarketPacketV2`
+- `officer/service.py` — extend: integrate structure state into packet assembly
+- `officer/loader.py` — minor: add structure manifest loading if needed
+- `run_officer.py` — extend: emit v2 packets
+- `tests/` — add 3D test groups
 
 ---
 
-## Phase 3A and 3B decisions that are locked
+## Locked decisions across all prior phases
 
-| Decision | Value |
+Do not reopen anything from 3A, 3B, 3C, Phase 2, or the feed pipeline. Specifically:
+
+| Layer | Locked |
 |---|---|
-| Swing confirmation | Fixed left/right pivot only |
-| BOS/MSS confirmation | Close beyond prior swing only |
-| EQH/EQL tolerance | Fixed per-instrument in config |
-| Reclaim rule | Close confirmation only |
-| Reclaim window | `allow_same_bar_reclaim` + `reclaim_window_bars` |
-| Active timeframes | 15m, 1h, 4h |
-| Output format | JSON only, pretty-printed, UTF-8, atomic |
-| Officer integration | Not in scope |
-| Cross-timeframe synthesis | Not in scope |
-| Parquet output | Deferred to Phase 3D |
-
-Do not reopen any of these.
+| Feed | All fetch, decode, validate, archive logic |
+| Officer v1 | `MarketPacketV1` fields — do not rename or remove |
+| Structure 3A | Swing detection, BOS/MSS, confirmed-only rule |
+| Structure 3B | Reclaim logic, lifecycle, internal/external tagging |
+| Structure 3C | FVG body-only, fill progression, invalidation rule |
+| Output format | JSON only, atomic writes |
+| Active TFs | 15m, 1h, 4h |
 
 ---
 
-## 3C decisions locked in this spec
+## 3D decisions locked in this spec
 
 | Decision | Value |
 |---|---|
-| FVG definition | Body-only (open-to-close gap between candle 1 and candle 3) |
-| Wick-inclusive mode | Deferred to later phase |
-| Fill progression | Partial + full tracked as separate states |
-| Invalidation rule | Zone invalidated when fully filled |
-| 50% threshold mode | Not in scope for 3C |
-| Config-selectable invalidation | Not in scope for 3C |
+| Packet schema | Bump to `market_packet_v2` |
+| Structure placement | New top-level `structure` block |
+| Structure contents | regime, recent_events, liquidity summary, active_fvg_zones |
+| Officer reads structure via | `structure/reader.py` read API — not raw JSON file paths |
+| Runtime unavailability | `structure.available = false`, all sub-fields null — no crash |
+| v1 fields | All preserved unchanged in v2 |
 
 ---
 
 ## File reading order
 
-Before writing any code, read in order:
-
-1. `CLAUDE.md` ← you are here
-2. `OBJECTIVE.md` — what 3C builds and the FVG detection contract
-3. `CONSTRAINTS.md` — hard rules, schema evolution, config surface
-4. `CONTRACTS.md` — FairValueGap schema, lifecycle, packet integration
-5. `ACCEPTANCE_TESTS.md` — 7 test groups you must pass
+1. `ARCHITECTURE.md` ← read first — full system map
+2. `CLAUDE.md` ← you are here
+3. `OBJECTIVE.md` — what 3D integrates and why
+4. `CONSTRAINTS.md` — hard rules, boundary enforcement
+5. `CONTRACTS.md` — v2 packet schema, StructureBlock, reader API
+6. `ACCEPTANCE_TESTS.md` — test groups
 
 ---
 
@@ -84,23 +75,23 @@ Before writing any code, read in order:
 ```
 market_data_officer/
   structure/
-    schemas.py        ← add FairValueGap dataclass
-    config.py         ← add 3C config fields
-    imbalance.py      ← NEW: FVG detection, fill tracking, zone registry
-    engine.py         ← extend to include imbalance in packet output
+    reader.py          ← NEW: Officer-facing structure read API
+    ...                ← existing 3A/3B/3C modules, untouched
+  officer/
+    contracts.py       ← extend: StructureBlock, MarketPacketV2
+    service.py         ← extend: integrate structure into packet assembly
+    loader.py          ← minor extension if needed
+    ...                ← existing Phase 2 modules
   tests/
-    test_structure_swings.py       ← existing, must still pass
-    test_structure_events.py       ← existing, must still pass
-    test_structure_liquidity.py    ← existing, must still pass
-    test_structure_regime.py       ← existing, must still pass
-    test_structure_replay.py       ← existing, must still pass
-    test_structure_eurusd.py       ← extend with 3C coverage
-    test_structure_xauusd.py       ← extend with 3C coverage
-    test_structure_imbalance.py    ← NEW: all 3C test groups
+    test_officer_v2.py          ← NEW: v2 packet tests
+    test_structure_reader.py    ← NEW: reader API tests
+    test_3d_integration.py      ← NEW: cross-layer integration tests
+    ...                         ← all existing tests, must still pass
+  run_officer.py       ← extend: emit v2 packet
 ```
 
 ---
 
 ## When you are done
 
-Run Group 0 regression first. If anything fails there, stop and report before proceeding to 3C tests. Then run Groups A through G. Report pass/fail per group before declaring Phase 3C complete.
+Run Group 0 regression first — all prior tests must pass before any 3D tests run. Then Groups A through G. Report pass/fail per group before declaring Phase 3D complete.

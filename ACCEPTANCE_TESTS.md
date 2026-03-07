@@ -1,14 +1,14 @@
-# ACCEPTANCE_TESTS.md — Phase 3C Exit Criteria
+# ACCEPTANCE_TESTS.md — Phase 3D Exit Criteria
 
 ## How to use this file
 
-Run Group 0 first. If anything fails, stop and report before proceeding. Then run Groups A through G. Report pass/fail per group before declaring Phase 3C complete.
+Run Group 0 first. Any failure there stops all further work. Then Groups A through G. Report pass/fail per group before declaring Phase 3D complete.
 
 ---
 
-## Group 0 — Full 3A + 3B regression
+## Group 0 — Full regression (all prior phases)
 
-### T0.1 — All prior test files pass
+### T0.1 — All structure engine tests pass
 
 ```bash
 pytest market_data_officer/tests/test_structure_swings.py
@@ -16,336 +16,312 @@ pytest market_data_officer/tests/test_structure_events.py
 pytest market_data_officer/tests/test_structure_liquidity.py
 pytest market_data_officer/tests/test_structure_regime.py
 pytest market_data_officer/tests/test_structure_replay.py
+pytest market_data_officer/tests/test_structure_imbalance.py
 pytest market_data_officer/tests/test_structure_eurusd.py
 pytest market_data_officer/tests/test_structure_xauusd.py
 # All must pass — 0 failures
 ```
 
-### T0.2 — Engine version updated
+### T0.2 — All Phase 2 Officer tests pass
+
+```bash
+pytest market_data_officer/tests/test_loader.py
+pytest market_data_officer/tests/test_features.py
+pytest market_data_officer/tests/test_summarizer.py
+pytest market_data_officer/tests/test_quality.py
+pytest market_data_officer/tests/test_contracts.py
+# All must pass — 0 failures
+```
+
+### T0.3 — Feed pipeline and structure engine modules untouched
+
+This check guards the feed pipeline and existing structure engine modules only.
+Officer files (`officer/`), tests (`tests/`), and the new `structure/reader.py` are
+all legitimately modified in 3D — do not include them in this check.
+
+```bash
+git diff --name-only HEAD | grep "feed/"
+# Must return no output — feed pipeline is never touched
+
+git diff --name-only HEAD | grep "structure/" \
+  | grep -v "reader.py"
+# Must return no output — only reader.py is a permitted addition to structure/
+```
+
+---
+
+## Group A — Structure reader API
+
+### TA.1 — `load_structure_packet` returns dict for existing packet
+
+```python
+from structure.reader import load_structure_packet
+
+packet = load_structure_packet("EURUSD", "1h")
+assert packet is not None
+assert isinstance(packet, dict)
+assert "instrument" in packet
+assert "regime" in packet
+```
+
+### TA.2 — `load_structure_packet` returns None for missing instrument
+
+```python
+result = load_structure_packet("FAKEINSTRUMENT", "1h")
+assert result is None
+```
+
+### TA.3 — `load_structure_packet` returns None for missing timeframe
+
+```python
+result = load_structure_packet("EURUSD", "1d")  # 1d not an active structure TF
+assert result is None
+```
+
+### TA.4 — `load_structure_packet` returns None for corrupt JSON, not exception
+
+```python
+# Write a corrupt JSON file to the structure output path
+# Then call load_structure_packet
+result = load_structure_packet("EURUSD", "1h")
+assert result is None  # graceful, not exception
+```
+
+### TA.5 — `structure_is_available` returns True when fresh packets exist
+
+```python
+from structure.reader import structure_is_available
+assert structure_is_available("EURUSD") is True
+```
+
+### TA.6 — `structure_is_available` returns False when no packets exist
+
+```python
+assert structure_is_available("FAKEINSTRUMENT") is False
+```
+
+### TA.7 — Reader does not import or call structure engine modules
+
+```bash
+grep -n "from structure.engine\|import engine\|run_engine" \
+  market_data_officer/structure/reader.py
+# Must return no matches
+```
+
+---
+
+## Group B — StructureBlock assembly
+
+### TB.1 — StructureBlock.unavailable() produces correct shape
+
+```python
+from officer.contracts import StructureBlock
+
+block = StructureBlock.unavailable()
+assert block.available is False
+assert block.source_engine_version is None
+assert block.regime is None
+assert block.recent_events is None
+assert block.liquidity is None
+assert block.active_fvg_zones is None
+```
+
+### TB.2 — Available StructureBlock has all fields populated
+
+```python
+block = assemble_structure_block("EURUSD")
+assert block.available is True
+assert block.source_engine_version is not None
+assert block.regime is not None
+assert block.recent_events is not None
+assert block.liquidity is not None
+assert block.active_fvg_zones is not None
+```
+
+### TB.3 — `recent_events` capped at 5
+
+```python
+block = assemble_structure_block("EURUSD")
+assert len(block.recent_events) <= 5
+```
+
+### TB.4 — `recent_events` sorted time descending
+
+```python
+times = [e.time for e in block.recent_events]
+assert times == sorted(times, reverse=True)
+```
+
+### TB.5 — `active_fvg_zones` contains only open and partially_filled
+
+```python
+for zone in block.active_fvg_zones:
+    assert zone.status in ("open", "partially_filled")
+```
+
+### TB.6 — Regime source timeframe follows 4h → 1h → 15m preference
+
+```python
+# When 4h packet exists
+assert block.regime.source_timeframe == "4h"
+
+# When only 1h exists (simulate missing 4h)
+block_no_4h = assemble_structure_block("EURUSD", available_timeframes=["15m", "1h"])
+assert block_no_4h.regime.source_timeframe == "1h"
+```
+
+### TB.7 — Liquidity summary has nearest_above and nearest_below per timeframe
+
+```python
+current_price = 1.0842
+block = assemble_structure_block("EURUSD", current_price=current_price)
+
+for tf, summary in block.liquidity.items():
+    if summary.nearest_above:
+        assert summary.nearest_above.price > current_price
+    if summary.nearest_below:
+        assert summary.nearest_below.price < current_price
+```
+
+---
+
+## Group C — Market Packet v2 schema
+
+### TC.1 — `schema_version` is `market_packet_v2`
+
+```python
+from officer.service import build_market_packet
+
+packet = build_market_packet("EURUSD")
+d = packet.to_dict()
+assert d["schema_version"] == "market_packet_v2"
+```
+
+### TC.2 — All v1 fields present in v2
+
+```python
+v1_required_keys = {
+    "instrument", "as_of_utc", "source",
+    "timeframes", "features", "state_summary", "quality"
+}
+assert v1_required_keys.issubset(d.keys())
+```
+
+### TC.3 — `structure` is a top-level key
+
+```python
+assert "structure" in d
+assert "available" in d["structure"]
+```
+
+### TC.4 — v2 serializes to valid JSON
 
 ```python
 import json
-with open("structure/output/eurusd_1h_structure.json") as f:
-    packet = json.load(f)
-assert packet["build"]["engine_version"] == "phase_3c"
+json_str = json.dumps(packet.to_dict())  # must not raise
+assert len(json_str) > 100
 ```
 
-### T0.3 — `fvg_use_body_only` is True in config
+### TC.5 — `has_structure()` returns True when structure is available
 
 ```python
-from structure.config import StructureConfig
-config = StructureConfig()
-assert config.fvg_use_body_only is True
+assert packet.has_structure() is True
+```
+
+### TC.6 — `is_trusted()` still works on v2 packet
+
+```python
+assert packet.is_trusted() is True
 ```
 
 ---
 
-## Group A — FVG detection
+## Group D — Graceful degradation
 
-### TA.1 — Bullish FVG detected correctly from body boundaries
+### TD.1 — Packet builds successfully when no structure packets exist
 
 ```python
-# Fixture: 3-bar sequence
-# c1: open=1.0820, close=1.0840  → body_high=1.0840
-# c2: open=1.0845, close=1.0880  → impulse candle
-# c3: open=1.0882, close=1.0895  → body_low=1.0882
-# Gap: c3_body_low (1.0882) > c1_body_high (1.0840) → bullish FVG
+# Simulate: rename structure output directory temporarily
+packet = build_market_packet("EURUSD")
+d = packet.to_dict()
 
-zones = detect_fvg(fixture_bars, config, "EURUSD")
-assert len(zones) == 1
-assert zones[0].fvg_type == "bullish_fvg"
-assert zones[0].zone_low == 1.0840
-assert zones[0].zone_high == 1.0882
-assert zones[0].zone_size == pytest.approx(0.0042, abs=1e-5)
+assert d["schema_version"] == "market_packet_v2"
+assert d["structure"]["available"] is False
+assert d["structure"]["regime"] is None
+assert d["structure"]["active_fvg_zones"] is None
 ```
 
-### TA.2 — Bearish FVG detected correctly from body boundaries
+### TD.2 — `has_structure()` returns False when unavailable
 
 ```python
-# c1: open=1.0900, close=1.0880  → body_low=1.0880
-# c2: open=1.0875, close=1.0840  → impulse candle
-# c3: open=1.0838, close=1.0820  → body_high=1.0838
-# Gap: c3_body_high (1.0838) < c1_body_low (1.0880) → bearish FVG
-
-zones = detect_fvg(fixture_bars, config, "EURUSD")
-assert zones[0].fvg_type == "bearish_fvg"
-assert zones[0].zone_high == 1.0880
-assert zones[0].zone_low == 1.0838
+# Same simulation as TD.1
+assert packet.has_structure() is False
 ```
 
-### TA.3 — Wick extension does not create false FVG
+### TD.3 — Feed features and state summary still populated when structure missing
 
 ```python
-# c1: open=1.0820, close=1.0840, high=1.0860  (wick extends higher)
-# c3: open=1.0855, close=1.0865, low=1.0842   (wick dips lower)
-# Body gap: c3_body_low=1.0855 > c1_body_high=1.0840 → valid bullish FVG
-# But wick-based gap would be different — confirm body is used
-
-zones = detect_fvg(fixture_bars, config, "EURUSD")
-assert zones[0].zone_low == 1.0840   # c1 body high, not wick
-assert zones[0].zone_high == 1.0855  # c3 body low, not wick
+# With structure unavailable:
+assert d["features"]["core"]["atr_14"] > 0
+assert d["state_summary"]["trend_1h"] in ("bullish", "bearish", "neutral")
+assert d["quality"]["manifest_valid"] is True
 ```
 
-### TA.4 — Zone below minimum size is filtered out
+### TD.4 — Stale structure packets treated as unavailable
 
 ```python
-# EURUSD min size = 0.0003
-# Create a 3-bar sequence with gap of 0.0001 (below minimum)
-
-zones = detect_fvg(tiny_gap_bars, config, "EURUSD")
-assert len(zones) == 0
-```
-
-### TA.5 — Zone above minimum size passes through
-
-```python
-# Gap = 0.0005 (above EURUSD minimum of 0.0003)
-zones = detect_fvg(valid_gap_bars, config, "EURUSD")
-assert len(zones) == 1
-```
-
-### TA.6 — `confirm_time` equals candle 3 timestamp
-
-```python
-zones = detect_fvg(fixture_bars, config, "EURUSD")
-assert zones[0].confirm_time == fixture_bars.index[2]  # candle 3
-assert zones[0].origin_time == fixture_bars.index[1]   # candle 2
-```
-
-### TA.7 — No zone emitted from first two bars (no lookahead)
-
-```python
-# Only 2 bars available — no candle 3 yet
-zones = detect_fvg(fixture_bars.head(2), config, "EURUSD")
-assert len(zones) == 0
+# Simulate: set structure packet as_of to 3 hours ago
+# structure_is_available() must return False
+# structure block must have available=False
 ```
 
 ---
 
-## Group B — Fill progression
+## Group E — Determinism
 
-### TB.1 — Bullish FVG transitions to partially_filled on close into zone
-
-```python
-# Zone: zone_low=1.0840, zone_high=1.0882
-# Subsequent bar: close=1.0855 (inside zone — below zone_high, above zone_low)
-
-zone = update_fvg_fills(zone, subsequent_bars)
-assert zone.status == "partially_filled"
-assert zone.partial_fill_time is not None
-assert zone.fill_low == 1.0855
-```
-
-### TB.2 — Bearish FVG transitions to partially_filled on close into zone
-
-```python
-# Zone: zone_low=1.0838, zone_high=1.0880
-# Subsequent bar: close=1.0860 (inside zone)
-
-zone = update_fvg_fills(zone, subsequent_bars)
-assert zone.status == "partially_filled"
-assert zone.fill_high == 1.0860
-```
-
-### TB.3 — fill_low tracks the lowest close reached (bullish FVG)
-
-```python
-# Two bars close into bullish zone: 1.0865, then 1.0850
-zone = update_fvg_fills(zone, two_bar_sequence)
-assert zone.fill_low == 1.0850  # lowest, not first
-```
-
-### TB.4 — Full fill triggers invalidation (bullish FVG)
-
-```python
-# Zone: zone_low=1.0840
-# Bar closes at 1.0838 (at or below zone_low)
-
-zone = update_fvg_fills(zone_partially_filled, full_fill_bars)
-assert zone.status == "invalidated"
-assert zone.full_fill_time is not None
-```
-
-### TB.5 — Price blowthrough fires partial then full on same bar
-
-```python
-# Zone: open status, zone_low=1.0840, zone_high=1.0882
-# Single bar: close=1.0835 (blows through entire zone)
-
-zone = update_fvg_fills(open_zone, blowthrough_bar)
-assert zone.status == "invalidated"
-assert zone.partial_fill_time is not None  # must have fired
-assert zone.full_fill_time is not None
-assert zone.partial_fill_time == zone.full_fill_time  # same bar
-```
-
-### TB.6 — No fill processing on invalidated zone
-
-```python
-invalidated_zone = zone_with_status("invalidated")
-result = update_fvg_fills(invalidated_zone, more_bars)
-assert result.status == "invalidated"
-assert result.full_fill_time == invalidated_zone.full_fill_time  # unchanged
-```
-
----
-
-## Group C — Zone lifecycle
-
-### TC.1 — Only allowed transitions occur
-
-```python
-ALLOWED = {
-    "open": {"partially_filled"},
-    "partially_filled": {"invalidated"},
-    "invalidated": {"archived"},
-}
-# For every zone in packet, verify all observed transitions are in ALLOWED
-```
-
-### TC.2 — Reruns do not alter invalidated zones
-
-```python
-zone_run1 = run_and_get_zone("fvg_001", bars)
-zone_run2 = run_and_get_zone("fvg_001", bars)
-assert zone_run1.status == zone_run2.status == "invalidated"
-assert zone_run1.full_fill_time == zone_run2.full_fill_time
-```
-
-### TC.3 — Open zones remain open when price does not enter
-
-```python
-# Zone exists but subsequent bars close outside the zone
-zone = update_fvg_fills(open_zone, bars_outside_zone)
-assert zone.status == "open"
-assert zone.first_touch_time is None
-```
-
-### TC.4 — Partially filled zones resolve correctly when new bars arrive
-
-```python
-# Day 1: zone is partially_filled
-# Day 2: price closes through opposite edge → invalidated
-
-zone_day1 = run_and_get_zone("fvg_002", bars_day1)
-assert zone_day1.status == "partially_filled"
-
-zone_day2 = run_and_get_zone("fvg_002", bars_day1_plus_day2)
-assert zone_day2.status == "invalidated"
-```
-
----
-
-## Group D — Active zone registry
-
-### TD.1 — Active registry contains only open and partially_filled zones
-
-```python
-packet = run_engine("EURUSD", "1h", bars)
-active_ids = {z["id"] for z in packet["active_zones"]["zones"]}
-all_zones = {z["id"]: z for z in packet["imbalance"]}
-
-for zone_id in active_ids:
-    assert all_zones[zone_id]["status"] in ("open", "partially_filled")
-```
-
-### TD.2 — Invalidated zones not in active registry
-
-```python
-invalidated_ids = {z["id"] for z in packet["imbalance"]
-                   if z["status"] == "invalidated"}
-active_ids = {z["id"] for z in packet["active_zones"]["zones"]}
-
-assert invalidated_ids.isdisjoint(active_ids)
-```
-
-### TD.3 — Active zone count matches registry count field
-
-```python
-assert packet["active_zones"]["count"] == len(packet["active_zones"]["zones"])
-```
-
-### TD.4 — Registry updates correctly after new bar invalidates a zone
-
-```python
-active_before = {z["id"] for z in run_engine("EURUSD","1h",bars_day1)["active_zones"]["zones"]}
-active_after  = {z["id"] for z in run_engine("EURUSD","1h",bars_day1_plus_day2)["active_zones"]["zones"]}
-
-# Any zone that was invalidated in day 2 must no longer be in active
-for zone_id in (active_before - active_after):
-    zone = get_zone_by_id(run_engine("EURUSD","1h",bars_day1_plus_day2), zone_id)
-    assert zone["status"] == "invalidated"
-```
-
----
-
-## Group E — Determinism and replay stability
-
-### TE.1 — Identical inputs produce identical packets
+### TE.1 — Identical inputs produce identical v2 packets
 
 ```python
 import json, hashlib
 
-def packet_hash(instrument, timeframe, bars):
-    packet = run_engine(instrument, timeframe, bars)
-    return hashlib.md5(json.dumps(packet, sort_keys=True).encode()).hexdigest()
+def packet_hash(instrument):
+    p = build_market_packet(instrument)
+    return hashlib.md5(
+        json.dumps(p.to_dict(), sort_keys=True).encode()
+    ).hexdigest()
 
-assert packet_hash("EURUSD", "1h", fixture_bars) == packet_hash("EURUSD", "1h", fixture_bars)
+assert packet_hash("EURUSD") == packet_hash("EURUSD")
 ```
 
-### TE.2 — Reruns do not mutate resolved zones
+### TE.2 — `active_fvg_zones` order is deterministic
 
 ```python
-packet_a = run_engine("EURUSD", "1h", bars)
-packet_b = run_engine("EURUSD", "1h", bars)
-
-resolved_a = [z for z in packet_a["imbalance"] if z["status"] == "invalidated"]
-resolved_b = [z for z in packet_b["imbalance"] if z["status"] == "invalidated"]
-assert resolved_a == resolved_b
-```
-
-### TE.3 — Appending bars only adds or advances, never rewrites
-
-```python
-zones_day1 = {z["id"]: z for z in run_engine("EURUSD","1h",bars_day1)["imbalance"]}
-zones_day2 = {z["id"]: z for z in run_engine("EURUSD","1h",bars_day1_plus_day2)["imbalance"]}
-
-for zone_id, zone in zones_day1.items():
-    if zone["status"] == "invalidated":
-        # Must still be invalidated after day 2
-        assert zones_day2[zone_id]["status"] == "invalidated"
-        assert zones_day2[zone_id]["full_fill_time"] == zone["full_fill_time"]
+zones_a = build_market_packet("EURUSD").to_dict()["structure"]["active_fvg_zones"]
+zones_b = build_market_packet("EURUSD").to_dict()["structure"]["active_fvg_zones"]
+assert [z["id"] for z in zones_a] == [z["id"] for z in zones_b]
 ```
 
 ---
 
 ## Group F — Cross-instrument coverage
 
-### TF.1 — EURUSD passes all Groups A–E
+### TF.1 — EURUSD v2 packet builds and passes all groups
 
 ```bash
-pytest market_data_officer/tests/test_structure_eurusd.py -k "3c"
+pytest market_data_officer/tests/test_officer_v2.py -k "eurusd"
 ```
 
-### TF.2 — XAUUSD passes all Groups A–E
+### TF.2 — XAUUSD v2 packet builds and passes all groups
 
 ```bash
-pytest market_data_officer/tests/test_structure_xauusd.py -k "3c"
+pytest market_data_officer/tests/test_officer_v2.py -k "xauusd"
 ```
 
-### TF.3 — XAUUSD uses its own minimum gap size
+### TF.3 — XAUUSD active FVG prices are in plausible range
 
 ```python
-eurusd_config = get_config("EURUSD")
-xauusd_config = get_config("XAUUSD")
-assert eurusd_config.fvg_min_size != xauusd_config.fvg_min_size
-assert xauusd_config.fvg_min_size == pytest.approx(0.30)
-```
-
-### TF.4 — XAUUSD FVG prices are in plausible gold range
-
-```python
-for zone in xauusd_packet["imbalance"]:
+xauusd_packet = build_market_packet("XAUUSD").to_dict()
+for zone in xauusd_packet["structure"]["active_fvg_zones"]:
     assert 1_500.0 < zone["zone_low"] < 3_500.0
     assert 1_500.0 < zone["zone_high"] < 3_500.0
 ```
@@ -354,68 +330,64 @@ for zone in xauusd_packet["imbalance"]:
 
 ## Group G — Output and boundaries
 
-### TG.1 — Packet contains `imbalance` and `active_zones` keys
+### TG.1 — v2 packet written to correct path
 
 ```python
-packet = run_engine("EURUSD", "1h", bars)
-assert "imbalance" in packet
-assert "active_zones" in packet
-assert "count" in packet["active_zones"]
-assert "zones" in packet["active_zones"]
+import os
+assert os.path.exists("market_data_officer/state/packets/EURUSD_market_packet.json")
+
+with open("market_data_officer/state/packets/EURUSD_market_packet.json") as f:
+    saved = json.load(f)
+assert saved["schema_version"] == "market_packet_v2"
 ```
 
-### TG.2 — All FVG objects have required fields
-
-```python
-required = {
-    "id", "fvg_type", "zone_high", "zone_low", "zone_size",
-    "origin_time", "confirm_time", "timeframe", "status",
-    "fill_high", "fill_low",
-    "first_touch_time", "partial_fill_time", "full_fill_time"
-}
-for zone in packet["imbalance"]:
-    assert required.issubset(zone.keys()), f"Missing fields in {zone['id']}"
-```
-
-### TG.3 — CLI runs end-to-end for both instruments
+### TG.2 — CLI runs end-to-end for both instruments
 
 ```bash
-python run_structure.py --instrument EURUSD
-python run_structure.py --instrument XAUUSD
+python run_officer.py --instrument EURUSD
+python run_officer.py --instrument XAUUSD
+# Both must complete without exception
 ```
 
-### TG.4 — Officer and feed untouched
+### TG.3 — Feed pipeline untouched (final check)
 
 ```bash
-git diff --name-only HEAD | grep -E "officer/|feed/"
+git diff --name-only HEAD | grep "feed/"
 # Must return no output
 ```
 
-### TG.5 — `engine_version` is `phase_3c` in all output packets
+### TG.4 — Structure engine modules untouched (final check)
 
-```python
-for instrument in ["EURUSD", "XAUUSD"]:
-    for tf in ["15m", "1h", "4h"]:
-        with open(f"structure/output/{instrument.lower()}_{tf}_structure.json") as f:
-            p = json.load(f)
-        assert p["build"]["engine_version"] == "phase_3c"
+```bash
+git diff --name-only HEAD | grep "structure/" | grep -v "reader.py"
+# Must return no output
+```
+
+### TG.5 — `run_officer.py --help` works
+
+```bash
+python run_officer.py --help
+# Must exit 0
 ```
 
 ---
 
-## Phase 3C sign-off checklist
+## Phase 3D sign-off checklist
 
-- [ ] Group 0 — Full 3A + 3B regression: 0 failures
-- [ ] Group A — FVG detection: all pass
-- [ ] Group B — Fill progression: all pass
-- [ ] Group C — Zone lifecycle: all pass
-- [ ] Group D — Active zone registry: all pass
-- [ ] Group E — Determinism and replay stability: all pass
-- [ ] Group F — EURUSD + XAUUSD cross-instrument: all pass
+- [ ] Group 0 — Full regression (all prior phases): 0 failures
+- [ ] Group A — Structure reader API: all pass
+- [ ] Group B — StructureBlock assembly: all pass
+- [ ] Group C — Market Packet v2 schema: all pass
+- [ ] Group D — Graceful degradation: all pass
+- [ ] Group E — Determinism: all pass
+- [ ] Group F — Cross-instrument coverage: all pass
 - [ ] Group G — Output and boundaries: all pass
-- [ ] `fvg_use_body_only` is `True` in StructureConfig
-- [ ] `engine_version` updated to `phase_3c` in all packets
-- [ ] No Officer or feed files modified
-- [ ] No wick-inclusive logic, no 50% threshold, no config-selectable invalidation
-- [ ] Blowthrough fires partial then full in sequence on same bar
-- [ ] Active registry contains only `open` and `partially_filled` zones
+- [ ] `schema_version` is `market_packet_v2` in all Officer output
+- [ ] All v1 fields preserved and unchanged
+- [ ] `structure` is top-level key with correct shape
+- [ ] `StructureBlock.unavailable()` factory works correctly
+- [ ] `has_structure()` reliable in both available and unavailable states
+- [ ] No hardcoded structure JSON file paths in Officer modules
+- [ ] Feed pipeline files: 0 modifications
+- [ ] Structure engine files: 0 modifications (reader.py only new file)
+- [ ] ARCHITECTURE.md committed to repo root
