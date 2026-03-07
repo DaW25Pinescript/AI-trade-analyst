@@ -1,14 +1,14 @@
-# ACCEPTANCE_TESTS.md — Phase 3B Exit Criteria
+# ACCEPTANCE_TESTS.md — Phase 3C Exit Criteria
 
 ## How to use this file
 
-Run Group 0 first (3A regression). If anything fails there, stop — do not proceed to 3B tests until 3A is clean. Then run Groups A through G. Report pass/fail per group before declaring Phase 3B complete.
+Run Group 0 first. If anything fails, stop and report before proceeding. Then run Groups A through G. Report pass/fail per group before declaring Phase 3C complete.
 
 ---
 
-## Group 0 — Phase 3A full regression (run first)
+## Group 0 — Full 3A + 3B regression
 
-### T0.1 — All 3A test files pass
+### T0.1 — All prior test files pass
 
 ```bash
 pytest market_data_officer/tests/test_structure_swings.py
@@ -18,259 +18,263 @@ pytest market_data_officer/tests/test_structure_regime.py
 pytest market_data_officer/tests/test_structure_replay.py
 pytest market_data_officer/tests/test_structure_eurusd.py
 pytest market_data_officer/tests/test_structure_xauusd.py
-# All must pass — 48/48
+# All must pass — 0 failures
 ```
 
-### T0.2 — Engine version updated in packet output
+### T0.2 — Engine version updated
 
 ```python
 import json
 with open("structure/output/eurusd_1h_structure.json") as f:
     packet = json.load(f)
-assert packet["build"]["engine_version"] == "phase_3b"
+assert packet["build"]["engine_version"] == "phase_3c"
+```
+
+### T0.3 — `fvg_use_body_only` is True in config
+
+```python
+from structure.config import StructureConfig
+config = StructureConfig()
+assert config.fvg_use_body_only is True
 ```
 
 ---
 
-## Group A — Reclaim detection
+## Group A — FVG detection
 
-### TA.1 — High-side reclaim confirmed when close returns below level
+### TA.1 — Bullish FVG detected correctly from body boundaries
 
 ```python
-# Fixture: prior_day_high at 1.08720
-# Sweep bar: high = 1.08731, close = 1.08740 (close above — no same-bar reclaim)
-# Next bar: close = 1.08695 (close below level — reclaim confirmed)
+# Fixture: 3-bar sequence
+# c1: open=1.0820, close=1.0840  → body_high=1.0840
+# c2: open=1.0845, close=1.0880  → impulse candle
+# c3: open=1.0882, close=1.0895  → body_low=1.0882
+# Gap: c3_body_low (1.0882) > c1_body_high (1.0840) → bullish FVG
 
-level = get_level("liq_001")
-assert level.outcome == "reclaimed"
-assert level.reclaim_time == next_bar_timestamp
-assert level.status == "reclaimed"
+zones = detect_fvg(fixture_bars, config, "EURUSD")
+assert len(zones) == 1
+assert zones[0].fvg_type == "bullish_fvg"
+assert zones[0].zone_low == 1.0840
+assert zones[0].zone_high == 1.0882
+assert zones[0].zone_size == pytest.approx(0.0042, abs=1e-5)
 ```
 
-### TA.2 — Low-side reclaim confirmed when close returns above level
+### TA.2 — Bearish FVG detected correctly from body boundaries
 
 ```python
-# Fixture: prior_day_low at 1.07500
-# Sweep bar: low = 1.07488, close = 1.07470 (close below — no same-bar reclaim)
-# Next bar: close = 1.07530 (close above level — reclaim confirmed)
+# c1: open=1.0900, close=1.0880  → body_low=1.0880
+# c2: open=1.0875, close=1.0840  → impulse candle
+# c3: open=1.0838, close=1.0820  → body_high=1.0838
+# Gap: c3_body_high (1.0838) < c1_body_low (1.0880) → bearish FVG
 
-level = get_level("liq_002")
-assert level.outcome == "reclaimed"
-assert level.reclaim_time == next_bar_timestamp
+zones = detect_fvg(fixture_bars, config, "EURUSD")
+assert zones[0].fvg_type == "bearish_fvg"
+assert zones[0].zone_high == 1.0880
+assert zones[0].zone_low == 1.0838
 ```
 
-### TA.3 — Same-bar reclaim when enabled
+### TA.3 — Wick extension does not create false FVG
 
 ```python
-# Fixture: prior_day_high at 1.08720
-# Sweep bar: high = 1.08731, close = 1.08690 (same bar closes below level)
-# allow_same_bar_reclaim = True
+# c1: open=1.0820, close=1.0840, high=1.0860  (wick extends higher)
+# c3: open=1.0855, close=1.0865, low=1.0842   (wick dips lower)
+# Body gap: c3_body_low=1.0855 > c1_body_high=1.0840 → valid bullish FVG
+# But wick-based gap would be different — confirm body is used
 
-level = get_level("liq_003")
-assert level.outcome == "reclaimed"
-assert level.reclaim_time == sweep_bar_timestamp
+zones = detect_fvg(fixture_bars, config, "EURUSD")
+assert zones[0].zone_low == 1.0840   # c1 body high, not wick
+assert zones[0].zone_high == 1.0855  # c3 body low, not wick
 ```
 
-### TA.4 — Same-bar reclaim blocked when disabled
+### TA.4 — Zone below minimum size is filtered out
 
 ```python
-# Same fixture but allow_same_bar_reclaim = False
-# Sweep bar closes below level — should NOT count as reclaim on sweep bar itself
-# Next bar closes above level — outcome depends on next bar only
+# EURUSD min size = 0.0003
+# Create a 3-bar sequence with gap of 0.0001 (below minimum)
 
-config = StructureConfig(allow_same_bar_reclaim=False, reclaim_window_bars=1)
-# Run engine
-level = get_level("liq_003")
-# Same-bar reclaim must not have fired
-assert level.reclaim_time != sweep_bar_timestamp
+zones = detect_fvg(tiny_gap_bars, config, "EURUSD")
+assert len(zones) == 0
 ```
 
-### TA.5 — No false reclaim when wick crosses but close does not
+### TA.5 — Zone above minimum size passes through
 
 ```python
-# Fixture: prior_day_high at 1.08720
-# Sweep bar: high = 1.08731, close = 1.08750 (close above)
-# Next bar: high = 1.08700 (wick below), close = 1.08730 (close above level)
-
-level = get_level("liq_004")
-# Wick crossed but close did not — must NOT be reclaimed
-assert level.outcome != "reclaimed"
+# Gap = 0.0005 (above EURUSD minimum of 0.0003)
+zones = detect_fvg(valid_gap_bars, config, "EURUSD")
+assert len(zones) == 1
 ```
 
-### TA.6 — `accepted_beyond` after window exhausted
+### TA.6 — `confirm_time` equals candle 3 timestamp
 
 ```python
-# Fixture: prior_day_high at 1.08720
-# Sweep bar: high = 1.08731, close = 1.08740
-# Next bar: close = 1.08738 (still above — window exhausted)
-# reclaim_window_bars = 1
-
-level = get_level("liq_005")
-assert level.outcome == "accepted_beyond"
-assert level.reclaim_time is None
+zones = detect_fvg(fixture_bars, config, "EURUSD")
+assert zones[0].confirm_time == fixture_bars.index[2]  # candle 3
+assert zones[0].origin_time == fixture_bars.index[1]   # candle 2
 ```
 
-### TA.7 — `unresolved` when window not yet closed
+### TA.7 — No zone emitted from first two bars (no lookahead)
 
 ```python
-# Fixture: sweep detected but only sweep bar exists — no subsequent bars yet
-
-level = get_level("liq_006")
-assert level.outcome == "unresolved"
-assert level.reclaim_time is None
+# Only 2 bars available — no candle 3 yet
+zones = detect_fvg(fixture_bars.head(2), config, "EURUSD")
+assert len(zones) == 0
 ```
 
 ---
 
-## Group B — Post-sweep classification
+## Group B — Fill progression
 
-### TB.1 — Classification is mutually exclusive
+### TB.1 — Bullish FVG transitions to partially_filled on close into zone
 
 ```python
-# For any swept level, outcome must be exactly one of:
-assert level.outcome in ("reclaimed", "accepted_beyond", "unresolved")
+# Zone: zone_low=1.0840, zone_high=1.0882
+# Subsequent bar: close=1.0855 (inside zone — below zone_high, above zone_low)
+
+zone = update_fvg_fills(zone, subsequent_bars)
+assert zone.status == "partially_filled"
+assert zone.partial_fill_time is not None
+assert zone.fill_low == 1.0855
 ```
 
-### TB.2 — SweepEvent outcome mirrors LiquidityLevel outcome
+### TB.2 — Bearish FVG transitions to partially_filled on close into zone
 
 ```python
-sweep = get_sweep_event("sw_ev_001")
-level = get_level(sweep.linked_liquidity_id)
-assert sweep.outcome == level.outcome
-assert sweep.reclaim_time == level.reclaim_time
+# Zone: zone_low=1.0838, zone_high=1.0880
+# Subsequent bar: close=1.0860 (inside zone)
+
+zone = update_fvg_fills(zone, subsequent_bars)
+assert zone.status == "partially_filled"
+assert zone.fill_high == 1.0860
 ```
 
-### TB.3 — `post_sweep_close` is populated after resolution
+### TB.3 — fill_low tracks the lowest close reached (bullish FVG)
 
 ```python
-# For reclaimed or accepted_beyond outcome:
-sweep = get_sweep_event("sw_ev_001")
-assert sweep.outcome in ("reclaimed", "accepted_beyond")
-assert sweep.post_sweep_close is not None
-assert isinstance(sweep.post_sweep_close, float)
+# Two bars close into bullish zone: 1.0865, then 1.0850
+zone = update_fvg_fills(zone, two_bar_sequence)
+assert zone.fill_low == 1.0850  # lowest, not first
 ```
 
-### TB.4 — `post_sweep_close` is null while unresolved
+### TB.4 — Full fill triggers invalidation (bullish FVG)
 
 ```python
-sweep = get_unresolved_sweep()
-assert sweep.outcome == "unresolved"
-assert sweep.post_sweep_close is None
+# Zone: zone_low=1.0840
+# Bar closes at 1.0838 (at or below zone_low)
+
+zone = update_fvg_fills(zone_partially_filled, full_fill_bars)
+assert zone.status == "invalidated"
+assert zone.full_fill_time is not None
 ```
 
-### TB.5 — Classification timing is deterministic
+### TB.5 — Price blowthrough fires partial then full on same bar
 
 ```python
-# Run engine twice on identical bar set
-outcome_a = run_engine_get_outcome("liq_001")
-outcome_b = run_engine_get_outcome("liq_001")
-assert outcome_a == outcome_b
+# Zone: open status, zone_low=1.0840, zone_high=1.0882
+# Single bar: close=1.0835 (blows through entire zone)
+
+zone = update_fvg_fills(open_zone, blowthrough_bar)
+assert zone.status == "invalidated"
+assert zone.partial_fill_time is not None  # must have fired
+assert zone.full_fill_time is not None
+assert zone.partial_fill_time == zone.full_fill_time  # same bar
+```
+
+### TB.6 — No fill processing on invalidated zone
+
+```python
+invalidated_zone = zone_with_status("invalidated")
+result = update_fvg_fills(invalidated_zone, more_bars)
+assert result.status == "invalidated"
+assert result.full_fill_time == invalidated_zone.full_fill_time  # unchanged
 ```
 
 ---
 
-## Group C — Liquidity lifecycle
+## Group C — Zone lifecycle
 
-### TC.1 — Levels only transition through allowed states
+### TC.1 — Only allowed transitions occur
 
 ```python
-ALLOWED_TRANSITIONS = {
-    "active": {"swept", "invalidated"},
-    "swept": {"reclaimed", "accepted_beyond"},
-    "reclaimed": {"archived"},
-    "accepted_beyond": {"archived"},
+ALLOWED = {
+    "open": {"partially_filled"},
+    "partially_filled": {"invalidated"},
     "invalidated": {"archived"},
 }
-
-# For every level in packet, verify all observed transitions are in ALLOWED_TRANSITIONS
+# For every zone in packet, verify all observed transitions are in ALLOWED
 ```
 
-### TC.2 — Reruns do not create backward transitions
+### TC.2 — Reruns do not alter invalidated zones
 
 ```python
-# Run engine on day 1 — level is reclaimed
-# Run engine again on same bars
-# Level must still be reclaimed, not reset to swept or active
-
-first_run_outcome = run_and_get_outcome("liq_001", bars_day1)
-second_run_outcome = run_and_get_outcome("liq_001", bars_day1)
-assert first_run_outcome == second_run_outcome == "reclaimed"
+zone_run1 = run_and_get_zone("fvg_001", bars)
+zone_run2 = run_and_get_zone("fvg_001", bars)
+assert zone_run1.status == zone_run2.status == "invalidated"
+assert zone_run1.full_fill_time == zone_run2.full_fill_time
 ```
 
-### TC.3 — Historical resolved levels not mutated on new bar append
+### TC.3 — Open zones remain open when price does not enter
 
 ```python
-# Run engine through day 1 — liq_001 is accepted_beyond
-# Append day 2 bars — liq_001 must remain accepted_beyond
-
-outcome_before = run_and_get_outcome("liq_001", bars_day1)
-outcome_after = run_and_get_outcome("liq_001", bars_day1_plus_day2)
-assert outcome_before == outcome_after == "accepted_beyond"
+# Zone exists but subsequent bars close outside the zone
+zone = update_fvg_fills(open_zone, bars_outside_zone)
+assert zone.status == "open"
+assert zone.first_touch_time is None
 ```
 
-### TC.4 — Unresolved levels resolve correctly as new bars arrive
+### TC.4 — Partially filled zones resolve correctly when new bars arrive
 
 ```python
-# Day 1: sweep detected, no subsequent bars — outcome is unresolved
-# Day 2: subsequent bar closes back below level — outcome becomes reclaimed
+# Day 1: zone is partially_filled
+# Day 2: price closes through opposite edge → invalidated
 
-outcome_day1 = run_and_get_outcome("liq_007", bars_day1)
-assert outcome_day1 == "unresolved"
+zone_day1 = run_and_get_zone("fvg_002", bars_day1)
+assert zone_day1.status == "partially_filled"
 
-outcome_day2 = run_and_get_outcome("liq_007", bars_day1_plus_day2)
-assert outcome_day2 == "reclaimed"
+zone_day2 = run_and_get_zone("fvg_002", bars_day1_plus_day2)
+assert zone_day2.status == "invalidated"
 ```
 
 ---
 
-## Group D — Internal/external tagging
+## Group D — Active zone registry
 
-### TD.1 — Prior day/week levels tagged as external
+### TD.1 — Active registry contains only open and partially_filled zones
 
 ```python
-for level in packet["liquidity"]:
-    if level["type"] in ("prior_day_high", "prior_day_low",
-                          "prior_week_high", "prior_week_low"):
-        assert level["liquidity_scope"] == "external_liquidity", \
-            f"{level['id']} should be external_liquidity"
+packet = run_engine("EURUSD", "1h", bars)
+active_ids = {z["id"] for z in packet["active_zones"]["zones"]}
+all_zones = {z["id"]: z for z in packet["imbalance"]}
+
+for zone_id in active_ids:
+    assert all_zones[zone_id]["status"] in ("open", "partially_filled")
 ```
 
-### TD.2 — EQH above most recent swing high tagged as external
+### TD.2 — Invalidated zones not in active registry
 
 ```python
-# Fixture: confirmed swing_high at 1.08500
-# EQH cluster at 1.08720 (above swing high)
+invalidated_ids = {z["id"] for z in packet["imbalance"]
+                   if z["status"] == "invalidated"}
+active_ids = {z["id"] for z in packet["active_zones"]["zones"]}
 
-eqh_level = get_level_by_type("equal_highs")
-assert eqh_level["liquidity_scope"] == "external_liquidity"
+assert invalidated_ids.isdisjoint(active_ids)
 ```
 
-### TD.3 — EQH below most recent swing high tagged as internal
+### TD.3 — Active zone count matches registry count field
 
 ```python
-# Fixture: confirmed swing_high at 1.09000
-# EQH cluster at 1.08720 (below swing high)
-
-eqh_level = get_level_by_type("equal_highs")
-assert eqh_level["liquidity_scope"] == "internal_liquidity"
+assert packet["active_zones"]["count"] == len(packet["active_zones"]["zones"])
 ```
 
-### TD.4 — EQH/EQL without relevant confirmed swing tagged as unclassified
+### TD.4 — Registry updates correctly after new bar invalidates a zone
 
 ```python
-# Fixture: EQH exists but no confirmed swing_high in the timeframe window
+active_before = {z["id"] for z in run_engine("EURUSD","1h",bars_day1)["active_zones"]["zones"]}
+active_after  = {z["id"] for z in run_engine("EURUSD","1h",bars_day1_plus_day2)["active_zones"]["zones"]}
 
-eqh_level = get_level_by_type("equal_highs")
-assert eqh_level["liquidity_scope"] == "unclassified"
-```
-
-### TD.5 — `liquidity_scope` is set at creation time, not post-sweep
-
-```python
-# Level should have liquidity_scope populated before any sweep occurs
-active_level = get_active_level("liq_010")
-assert active_level["liquidity_scope"] is not None
-assert active_level["status"] == "active"
+# Any zone that was invalidated in day 2 must no longer be in active
+for zone_id in (active_before - active_after):
+    zone = get_zone_by_id(run_engine("EURUSD","1h",bars_day1_plus_day2), zone_id)
+    assert zone["status"] == "invalidated"
 ```
 
 ---
@@ -286,33 +290,31 @@ def packet_hash(instrument, timeframe, bars):
     packet = run_engine(instrument, timeframe, bars)
     return hashlib.md5(json.dumps(packet, sort_keys=True).encode()).hexdigest()
 
-hash_a = packet_hash("EURUSD", "1h", fixture_bars)
-hash_b = packet_hash("EURUSD", "1h", fixture_bars)
-assert hash_a == hash_b
+assert packet_hash("EURUSD", "1h", fixture_bars) == packet_hash("EURUSD", "1h", fixture_bars)
 ```
 
-### TE.2 — Reruns on unchanged bars produce no changes to resolved objects
+### TE.2 — Reruns do not mutate resolved zones
 
 ```python
-packet_run1 = run_engine("EURUSD", "1h", bars)
-packet_run2 = run_engine("EURUSD", "1h", bars)
+packet_a = run_engine("EURUSD", "1h", bars)
+packet_b = run_engine("EURUSD", "1h", bars)
 
-resolved_run1 = [l for l in packet_run1["liquidity"] if l["outcome"] != "unresolved"]
-resolved_run2 = [l for l in packet_run2["liquidity"] if l["outcome"] != "unresolved"]
-
-assert resolved_run1 == resolved_run2
+resolved_a = [z for z in packet_a["imbalance"] if z["status"] == "invalidated"]
+resolved_b = [z for z in packet_b["imbalance"] if z["status"] == "invalidated"]
+assert resolved_a == resolved_b
 ```
 
-### TE.3 — Appending new bars only resolves unresolved outcomes, not rewrites resolved
+### TE.3 — Appending bars only adds or advances, never rewrites
 
 ```python
-unresolved_before = [l["id"] for l in packet_day1["liquidity"] if l["outcome"] == "unresolved"]
-packet_day2 = run_engine("EURUSD", "1h", bars_day1_plus_day2)
+zones_day1 = {z["id"]: z for z in run_engine("EURUSD","1h",bars_day1)["imbalance"]}
+zones_day2 = {z["id"]: z for z in run_engine("EURUSD","1h",bars_day1_plus_day2)["imbalance"]}
 
-for level_id in unresolved_before:
-    level_after = get_level_by_id(packet_day2, level_id)
-    # Outcome may now be resolved — that is correct
-    # But previously resolved levels must not have changed
+for zone_id, zone in zones_day1.items():
+    if zone["status"] == "invalidated":
+        # Must still be invalidated after day 2
+        assert zones_day2[zone_id]["status"] == "invalidated"
+        assert zones_day2[zone_id]["full_fill_time"] == zone["full_fill_time"]
 ```
 
 ---
@@ -322,90 +324,98 @@ for level_id in unresolved_before:
 ### TF.1 — EURUSD passes all Groups A–E
 
 ```bash
-pytest market_data_officer/tests/test_structure_eurusd.py -k "3b"
-# All pass
+pytest market_data_officer/tests/test_structure_eurusd.py -k "3c"
 ```
 
 ### TF.2 — XAUUSD passes all Groups A–E
 
 ```bash
-pytest market_data_officer/tests/test_structure_xauusd.py -k "3b"
-# All pass
+pytest market_data_officer/tests/test_structure_xauusd.py -k "3c"
 ```
 
-### TF.3 — XAUUSD uses its own tolerance, not EURUSD tolerance
+### TF.3 — XAUUSD uses its own minimum gap size
 
 ```python
 eurusd_config = get_config("EURUSD")
 xauusd_config = get_config("XAUUSD")
-assert eurusd_config.eqh_eql_tolerance != xauusd_config.eqh_eql_tolerance
+assert eurusd_config.fvg_min_size != xauusd_config.fvg_min_size
+assert xauusd_config.fvg_min_size == pytest.approx(0.30)
+```
+
+### TF.4 — XAUUSD FVG prices are in plausible gold range
+
+```python
+for zone in xauusd_packet["imbalance"]:
+    assert 1_500.0 < zone["zone_low"] < 3_500.0
+    assert 1_500.0 < zone["zone_high"] < 3_500.0
 ```
 
 ---
 
 ## Group G — Output and boundaries
 
-### TG.1 — JSON packets are schema-complete
+### TG.1 — Packet contains `imbalance` and `active_zones` keys
 
 ```python
-required_liquidity_fields = {
-    "id", "type", "price", "origin_time", "timeframe", "status",
-    "swept_time",
-    "liquidity_scope", "outcome", "reclaim_time", "reclaim_window_bars"
-}
-
-required_sweep_fields = {
-    "id", "type", "time", "timeframe", "sweep_price", "linked_liquidity_id",
-    "post_sweep_close", "reclaim_time", "outcome", "reclaim_window_bars"
-}
-
-for level in packet["liquidity"]:
-    assert required_liquidity_fields.issubset(level.keys())
-
-for sweep in packet["events"]:
-    if sweep["type"] in ("sweep_high", "sweep_low"):
-        assert required_sweep_fields.issubset(sweep.keys())
+packet = run_engine("EURUSD", "1h", bars)
+assert "imbalance" in packet
+assert "active_zones" in packet
+assert "count" in packet["active_zones"]
+assert "zones" in packet["active_zones"]
 ```
 
-### TG.2 — CLI runs end-to-end for both instruments
+### TG.2 — All FVG objects have required fields
+
+```python
+required = {
+    "id", "fvg_type", "zone_high", "zone_low", "zone_size",
+    "origin_time", "confirm_time", "timeframe", "status",
+    "fill_high", "fill_low",
+    "first_touch_time", "partial_fill_time", "full_fill_time"
+}
+for zone in packet["imbalance"]:
+    assert required.issubset(zone.keys()), f"Missing fields in {zone['id']}"
+```
+
+### TG.3 — CLI runs end-to-end for both instruments
 
 ```bash
 python run_structure.py --instrument EURUSD
 python run_structure.py --instrument XAUUSD
-# Both must complete without exception
 ```
 
-### TG.3 — Officer and feed modules untouched
+### TG.4 — Officer and feed untouched
 
 ```bash
 git diff --name-only HEAD | grep -E "officer/|feed/"
 # Must return no output
 ```
 
-### TG.4 — `engine_version` is `phase_3b` in all output packets
+### TG.5 — `engine_version` is `phase_3c` in all output packets
 
 ```python
 for instrument in ["EURUSD", "XAUUSD"]:
     for tf in ["15m", "1h", "4h"]:
         with open(f"structure/output/{instrument.lower()}_{tf}_structure.json") as f:
-            packet = json.load(f)
-        assert packet["build"]["engine_version"] == "phase_3b"
+            p = json.load(f)
+        assert p["build"]["engine_version"] == "phase_3c"
 ```
 
 ---
 
-## Phase 3B sign-off checklist
+## Phase 3C sign-off checklist
 
-- [ ] Group 0 — 3A regression: 48/48 pass
-- [ ] Group A — Reclaim detection: all pass
-- [ ] Group B — Post-sweep classification: all pass
-- [ ] Group C — Liquidity lifecycle: all pass
-- [ ] Group D — Internal/external tagging: all pass
+- [ ] Group 0 — Full 3A + 3B regression: 0 failures
+- [ ] Group A — FVG detection: all pass
+- [ ] Group B — Fill progression: all pass
+- [ ] Group C — Zone lifecycle: all pass
+- [ ] Group D — Active zone registry: all pass
 - [ ] Group E — Determinism and replay stability: all pass
 - [ ] Group F — EURUSD + XAUUSD cross-instrument: all pass
 - [ ] Group G — Output and boundaries: all pass
-- [ ] `engine_version` updated to `phase_3b` in all packets
+- [ ] `fvg_use_body_only` is `True` in StructureConfig
+- [ ] `engine_version` updated to `phase_3c` in all packets
 - [ ] No Officer or feed files modified
-- [ ] Both `allow_same_bar_reclaim` and `reclaim_window_bars` present in StructureConfig
-- [ ] No ATR-scaled parameters, wick BOS mode, or FVG logic introduced
-- [ ] JSON packets pretty-printed, UTF-8, atomically written
+- [ ] No wick-inclusive logic, no 50% threshold, no config-selectable invalidation
+- [ ] Blowthrough fires partial then full in sequence on same bar
+- [ ] Active registry contains only `open` and `partially_filled` zones

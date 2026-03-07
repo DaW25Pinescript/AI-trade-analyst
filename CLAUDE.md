@@ -1,10 +1,10 @@
-# CLAUDE.md — Structure Engine: Phase 3B
+# CLAUDE.md — Structure Engine: Phase 3C
 
 ## Role
 
 You are a principal Python/data engineer working inside the **AI Trade Analyst** repository.
 
-Your job in this task is to extend the Phase 3A Structure Engine with liquidity refinement. Phase 3A is complete and merged. You are extending it narrowly — not rewriting it.
+Your job in this task is to build the **imbalance engine** — Phase 3C of the Structure Engine. Phases 3A and 3B are complete and merged. You are adding a new module, not rewriting anything that exists.
 
 Read this file first. Then read the supporting spec files in order before writing any code.
 
@@ -17,39 +17,53 @@ Repo: `https://github.com/DaW25Pinescript/AI-trade-analyst`
 **Already complete — do not touch:**
 - `market_data_officer/feed/` — Phase 1A–1D feed pipeline
 - `market_data_officer/officer/` — Phase 2 Market Data Officer
-- `market_data_officer/structure/schemas.py` — SwingPoint, StructureEvent, LiquidityLevel, SweepEvent, RegimeSummary, StructurePacket
-- `market_data_officer/structure/config.py` — StructureConfig
-- `market_data_officer/structure/swings.py` — fixed L/R pivot confirmation
+- `market_data_officer/structure/swings.py` — confirmed swing detection
 - `market_data_officer/structure/events.py` — BOS/MSS close-confirmed
-- `market_data_officer/structure/liquidity.py` — prior H/L, EQH/EQL, sweep detection
+- `market_data_officer/structure/liquidity.py` — prior H/L, EQH/EQL, sweeps, reclaim, lifecycle
 - `market_data_officer/structure/regime.py` — bias, trend state, structure quality
+- `market_data_officer/structure/schemas.py` — all 3A/3B typed objects
+- `market_data_officer/structure/config.py` — StructureConfig with 3A/3B parameters
 - `market_data_officer/structure/io.py` — bar loading, atomic JSON writes
-- `market_data_officer/structure/engine.py` — orchestration, `run_engine()`
-- `run_structure.py` — CLI entry point
+- `market_data_officer/structure/engine.py` — orchestration
 
-**What you are extending in Phase 3B:**
-- `structure/schemas.py` — add new fields to LiquidityLevel and SweepEvent
-- `structure/liquidity.py` — add reclaim detection, post-sweep classification, internal/external tagging, lifecycle refinement
-- `structure/config.py` — add narrow 3B config surface
-- `tests/` — add 3B test groups
+**What you are building in Phase 3C:**
+- `structure/imbalance.py` — FVG detection, fill tracking, invalidation, zone registry
+- `structure/schemas.py` — extend with `FairValueGap` dataclass
+- `structure/config.py` — add narrow 3C config surface
+- `structure/engine.py` — integrate imbalance into orchestration and packet output
+- `tests/` — add 3C test groups
 
 ---
 
-## Phase 3A decisions that are locked — do not reopen
+## Phase 3A and 3B decisions that are locked
 
 | Decision | Value |
 |---|---|
 | Swing confirmation | Fixed left/right pivot only |
 | BOS/MSS confirmation | Close beyond prior swing only |
-| EQH/EQL tolerance | Fixed per-instrument value in config |
+| EQH/EQL tolerance | Fixed per-instrument in config |
+| Reclaim rule | Close confirmation only |
+| Reclaim window | `allow_same_bar_reclaim` + `reclaim_window_bars` |
 | Active timeframes | 15m, 1h, 4h |
-| Output format | JSON only |
-| FVG/imbalance | Not in scope |
-| Cross-timeframe synthesis | Not in scope |
+| Output format | JSON only, pretty-printed, UTF-8, atomic |
 | Officer integration | Not in scope |
+| Cross-timeframe synthesis | Not in scope |
 | Parquet output | Deferred to Phase 3D |
 
-Any change to these is a scope violation.
+Do not reopen any of these.
+
+---
+
+## 3C decisions locked in this spec
+
+| Decision | Value |
+|---|---|
+| FVG definition | Body-only (open-to-close gap between candle 1 and candle 3) |
+| Wick-inclusive mode | Deferred to later phase |
+| Fill progression | Partial + full tracked as separate states |
+| Invalidation rule | Zone invalidated when fully filled |
+| 50% threshold mode | Not in scope for 3C |
+| Config-selectable invalidation | Not in scope for 3C |
 
 ---
 
@@ -58,35 +72,35 @@ Any change to these is a scope violation.
 Before writing any code, read in order:
 
 1. `CLAUDE.md` ← you are here
-2. `OBJECTIVE.md` — what 3B adds and why
-3. `CONSTRAINTS.md` — hard rules, schema evolution policy, 3B config surface
-4. `CONTRACTS.md` — exact field additions to LiquidityLevel and SweepEvent
+2. `OBJECTIVE.md` — what 3C builds and the FVG detection contract
+3. `CONSTRAINTS.md` — hard rules, schema evolution, config surface
+4. `CONTRACTS.md` — FairValueGap schema, lifecycle, packet integration
 5. `ACCEPTANCE_TESTS.md` — 7 test groups you must pass
 
 ---
 
 ## Repo placement
 
-No new top-level modules. Extensions only:
-
 ```
 market_data_officer/
   structure/
-    schemas.py       ← extend LiquidityLevel + SweepEvent fields
-    config.py        ← add reclaim_window_bars, allow_same_bar_reclaim
-    liquidity.py     ← add reclaim, classification, tagging, lifecycle
+    schemas.py        ← add FairValueGap dataclass
+    config.py         ← add 3C config fields
+    imbalance.py      ← NEW: FVG detection, fill tracking, zone registry
+    engine.py         ← extend to include imbalance in packet output
   tests/
-    test_structure_swings.py      ← existing, must still pass
-    test_structure_events.py      ← existing, must still pass
-    test_structure_liquidity.py   ← extend with 3B groups
-    test_structure_regime.py      ← existing, must still pass
-    test_structure_replay.py      ← existing, must still pass
-    test_structure_eurusd.py      ← extend with 3B coverage
-    test_structure_xauusd.py      ← extend with 3B coverage
+    test_structure_swings.py       ← existing, must still pass
+    test_structure_events.py       ← existing, must still pass
+    test_structure_liquidity.py    ← existing, must still pass
+    test_structure_regime.py       ← existing, must still pass
+    test_structure_replay.py       ← existing, must still pass
+    test_structure_eurusd.py       ← extend with 3C coverage
+    test_structure_xauusd.py       ← extend with 3C coverage
+    test_structure_imbalance.py    ← NEW: all 3C test groups
 ```
 
 ---
 
 ## When you are done
 
-Run all test groups in `ACCEPTANCE_TESTS.md` — both 3B-specific and the full 3A regression suite. Report pass/fail per group. Do not declare Phase 3B complete until both EURUSD and XAUUSD pass all groups and the Officer and feed modules are confirmed untouched.
+Run Group 0 regression first. If anything fails there, stop and report before proceeding to 3C tests. Then run Groups A through G. Report pass/fail per group before declaring Phase 3C complete.
