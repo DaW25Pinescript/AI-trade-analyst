@@ -125,6 +125,7 @@ async def call_with_fallback(task_type: str, messages: list, **kwargs) -> Any:
                 messages=messages,
                 api_base=route["base_url"],
                 api_key=route["api_key"],
+                custom_llm_provider="openai",
                 **kwargs,
             )
             return response
@@ -153,6 +154,7 @@ async def call_with_fallback(task_type: str, messages: list, **kwargs) -> Any:
             messages=messages,
             api_base=route["base_url"],
             api_key=route["api_key"],
+            custom_llm_provider="openai",
             **kwargs,
         )
         return response
