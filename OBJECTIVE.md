@@ -1,209 +1,139 @@
-# OBJECTIVE.md — Phase 3E: Analyst Structure Consumption
+# OBJECTIVE.md — Phase 3F: Multi-Analyst Consensus Layer
 
-## Why Phase 3E exists
+## Why Phase 3F exists
 
-By the end of Phase 3D the system has:
-- A trusted feed producing canonical OHLCV
-- An Officer producing Market Packet v2 with core features and structure state
-- A structure engine computing confirmed swings, BOS/MSS, liquidity, FVGs, and regime
+Phase 3E proved that a single LLM analyst can consume a deterministic `StructureDigest` and produce a validated structured verdict. The single-analyst model works. But it has one structural weakness: a single LLM call has no internal disagreement. If the prompt nudges toward a bullish read, nothing pushes back on timing or execution quality.
 
-But nothing downstream is consuming that structure yet. The structure block in every v2 packet is populated, deterministic, and auditable — and completely ignored by any reasoning layer.
+3F introduces controlled disagreement. Two analyst personas read the same digest from different professional perspectives and produce separate verdicts. An Arbiter synthesizes them. That creates:
 
-Phase 3E closes that gap. It builds the analyst layer that turns structured market state into verdicts. Not by re-deriving structure from scratch via chart interpretation, but by reading the pre-computed structure block and reasoning over it explicitly.
+- **Better explainability** — you can see exactly where the two personas agree or conflict
+- **Stronger decision discipline** — conflicts force the system toward caution, not false confidence
+- **Auditable reasoning** — every component of the final decision is preserved and inspectable
+- **Replayable structure** — same digest produces same contract shape every time
 
-This is the payoff of the entire Phase 3 investment.
+## What the two personas are
 
----
+### Persona A — Technical Structure Analyst
 
-## The hybrid architecture
+**Focus:** Is the structural case valid?
 
-### Layer 1 — Python pre-filter (`pre_filter.py`)
+- HTF regime consistency
+- BOS/MSS direction and quality
+- Liquidity positioning (internal vs external)
+- FVG zone context (discount/premium)
+- Sweep/reclaim outcome interpretation
 
-Reads `MarketPacketV2.structure` and produces a `StructureDigest` — a compact, deterministic, machine-readable summary of what the structure block says about current market context.
-
-The pre-filter:
-- Applies the HTF regime gate (hard: pass / fail / no-data)
-- Extracts and classifies recent BOS/MSS direction
-- Identifies nearest liquidity above and below current price
-- Classifies active FVG context (discount / premium / none)
-- Summarises sweep/reclaim outcomes
-- Produces explicit `structure_supports` and `structure_conflicts` lists
-- Sets `structure_gate` status
-
-This layer is deterministic. Same v2 packet → same digest, every time. It is fully testable without an LLM.
-
-### Layer 2 — LLM analyst (`analyst.py`)
-
-Receives the `StructureDigest` plus selected context from the v2 packet (core features, state summary, timeframes if needed). Does not receive the raw structure block directly — the digest is the only structure input.
-
-The LLM:
-- Synthesises the digest into a coherent directional view
-- Weighs mixed or conflicting signals
-- Produces a structured `AnalystVerdict` JSON block
-- Produces a compact `ReasoningBlock` in plain English
-
-The LLM must not re-derive structure from raw OHLCV or attempt chart interpretation. Its structural knowledge comes exclusively from the digest.
+**Prompt emphasis:** Assess directional structure alignment. Judge regime consistency. Weigh BOS/MSS, liquidity, FVG, and sweep context. Avoid execution micro-optimism — this persona does not care whether now is a good time to enter, only whether the structural case is sound.
 
 ---
 
-## What the pre-filter computes
+### Persona B — Execution/Timing Analyst
 
-### HTF regime gate
+**Focus:** Is this a good place and time to act?
 
-The hard gate. If HTF regime is unavailable or contradicts the proposed direction, the gate fails.
+- Proximity and quality of nearby liquidity barriers
+- FVG positioning relative to current price
+- Reclaim vs acceptance outcome interpretation
+- Execution cleanliness (is price extended, compressed, crowded?)
+- Short-term conflict signals (LTF MSS, partial FVG fill, unresolved sweeps)
+
+**Prompt emphasis:** Assess timing quality and execution risk. Judge whether the entry context is clean, late, risky, or weak. Focus on nearby barriers, FVG positioning, and reclaim outcome. Avoid over-extending into structural narrative — this persona does not re-assess HTF regime, only execution context.
+
+**The intended tension:** Persona A answers "is the idea structurally valid?" Persona B answers "is this a good place/time to act?" These two questions can and will disagree. That disagreement is the signal.
+
+---
+
+## The Arbiter
+
+The Arbiter is not a third LLM opinion. It is a synthesis layer that applies deterministic conflict rules where possible and uses a constrained LLM call for the synthesis narrative only.
+
+### Arbiter responsibilities
+
+1. Read both `PersonaVerdict` outputs
+2. Identify consensus state (see taxonomy below)
+3. Apply conflict rules deterministically
+4. Produce `ArbiterDecision` with final direction and confidence
+5. Record which persona(s) contributed to the final verdict and why
+6. Enforce Python hard-constraint layer — no persona enthusiasm can override a no-trade flag
+
+### Consensus state taxonomy
+
+Evaluated in this exact order — first match wins:
+
+| Priority | State | Condition |
+|---|---|---|
+| 1 | `no_trade` | `digest.has_hard_no_trade()` is True — overrides everything |
+| 2 | `blocked` | Either persona returns `no_trade` or `no_data` |
+| 3 | `full_alignment` | Both personas directional, same direction, same confidence tier |
+| 4 | `directional_alignment_confidence_split` | Both personas directional, same direction, different confidence |
+| 5 | `mixed` | Both personas directional, opposite directions |
+| 6 | `conditional` | One or both personas return `conditional` (and neither is `no_trade`/`no_data`) |
+
+**Explicit case resolution:**
+
+| Persona A | Persona B | State | Final verdict | Final confidence |
+|---|---|---|---|---|
+| `long_bias` high | `long_bias` high | `full_alignment` | `long_bias` | `high` |
+| `long_bias` high | `long_bias` moderate | `directional_alignment_confidence_split` | `long_bias` | `moderate` |
+| `long_bias` | `short_bias` | `mixed` | `conditional` | `low` |
+| `long_bias` | `conditional` | `conditional` | `conditional` | `low` |
+| `conditional` | `conditional` | `conditional` | `conditional` | `low` |
+| `long_bias` | `no_trade` | `blocked` | `no_trade` | `none` |
+| `no_trade` | `no_trade` | `blocked` | `no_trade` | `none` |
+| any | any + hard flag | `no_trade` | `no_trade` | `none` |
+
+### Arbiter conflict rules (deterministic)
 
 ```
-structure_gate = "pass"     → HTF regime is present and internally consistent
-structure_gate = "fail"     → HTF regime contradicts trade direction
-structure_gate = "no_data"  → structure block unavailable or stale
-structure_gate = "mixed"    → 4h and 1h regimes conflict
+if digest.has_hard_no_trade():
+    final = no_trade, confidence = none, state = no_trade
+
+elif consensus_state == full_alignment:
+    final = persona direction, can upgrade confidence slightly
+
+elif consensus_state == directional_alignment_confidence_split:
+    final = persona direction, use lower confidence
+
+elif consensus_state == mixed:
+    final = conditional, confidence = low, caution flag added
+
+elif consensus_state == blocked:
+    final = no_trade or conditional depending on severity
 ```
 
-Gate logic:
-- Check `structure.available` — if False, gate = `no_data`
-- Read `structure.regime.bias` from the 4h-preferred source
-- If `bias == "neutral"` → gate = `mixed`
-- If `bias` conflicts with proposed direction → gate = `fail`
-- If `bias` aligns or no direction yet proposed → gate = `pass`
+The Arbiter LLM call — if used — receives only:
+- The `ArbiterDecision` skeleton (pre-computed fields above)
+- Both `PersonaVerdict` summaries
+- A prompt to write the `synthesis_notes` and `winning_rationale_summary` fields only
 
-### BOS/MSS direction summary
-
-From `structure.recent_events`, extract the most recent BOS and MSS:
-- `last_bos`: `"bullish"` / `"bearish"` / `None`
-- `last_mss`: `"bullish"` / `"bearish"` / `None`
-- `bos_mss_alignment`: `"aligned"` / `"conflicted"` / `"incomplete"`
-
-### Liquidity context
-
-From `structure.liquidity` on the primary timeframe (1h preferred):
-- `nearest_liquidity_above`: type, price, scope
-- `nearest_liquidity_below`: type, price, scope
-- `liquidity_bias`: `"above_closer"` / `"below_closer"` / `"balanced"`
-
-### FVG context
-
-From `structure.active_fvg_zones`:
-- `active_fvg_context`: `"discount_bullish"` / `"premium_bearish"` / `"at_fvg"` / `"none"`
-- Discount = price inside or below a bullish FVG
-- Premium = price inside or above a bearish FVG
-
-### Sweep/reclaim summary
-
-From `structure.liquidity` levels with sweep outcomes:
-- `recent_sweep_signal`: `"bullish_reclaim"` / `"bearish_reclaim"` / `"accepted_beyond"` / `"none"`
-- Bullish reclaim = low-side sweep reclaimed = bullish signal
-- Bearish reclaim = high-side sweep reclaimed = bearish signal
-
-### Supports and conflicts
-
-Plain-language strings describing what structure supports or conflicts with a bullish or bearish case:
-
-```python
-structure_supports = [
-    "bullish 4h regime",
-    "active discount FVG at 1.08475",
-    "bullish BOS on 1h"
-]
-structure_conflicts = [
-    "bearish MSS on 15m against HTF bullish regime",
-    "external liquidity above at prior_day_high 1.08720"
-]
-```
+The Arbiter LLM never recomputes direction or confidence. Those are pre-determined by the rules above.
 
 ---
 
-## AnalystVerdict schema
-
-```json
-{
-  "instrument": "EURUSD",
-  "as_of_utc": "2026-03-07T10:15:00Z",
-  "verdict": "long_bias",
-  "confidence": "moderate",
-  "structure_gate": "pass",
-  "htf_bias": "bullish",
-  "ltf_structure_alignment": "mixed",
-  "active_fvg_context": "discount_bullish",
-  "recent_sweep_signal": "bullish_reclaim",
-  "structure_supports": ["bullish 4h regime", "active discount FVG"],
-  "structure_conflicts": ["bearish MSS on 15m"],
-  "no_trade_flags": [],
-  "caution_flags": ["ltf_mss_conflict"]
-}
-```
-
-### Verdict values
-- `long_bias` — structure supports bullish
-- `short_bias` — structure supports bearish
-- `no_trade` — gate fail or too many conflicts
-- `conditional` — mixed signals, conditional entry criteria needed
-- `no_data` — structure unavailable
-
-### Confidence values
-- `high` — gate pass, strong alignment across HTF + LTF
-- `moderate` — gate pass, some conflict at LTF
-- `low` — gate pass but significant conflict
-- `none` — gate fail or no_data
-
----
-
-## ReasoningBlock schema
-
-```json
-{
-  "summary": "Bullish bias on EURUSD. HTF 4h regime is bullish with recent bullish BOS on 1h confirming directional momentum. Price is trading near an active discount FVG at 1.08475–1.08620, providing a potential area of interest for continuation. A recent bullish reclaim of prior low-side liquidity adds conviction. Caution: 15m shows a bearish MSS, which introduces short-term conflict. Overall structure supports a long bias with moderate confidence, contingent on LTF stabilisation.",
-  "htf_context": "4h regime: bullish. Last BOS: bullish (1h). Last MSS: bearish (15m) — minor conflict.",
-  "liquidity_context": "Nearest above: prior_day_high at 1.08720 (external). Nearest below: equal_lows at 1.08410 (internal). Liquidity bias: above is closer — potential draw on liquidity above.",
-  "fvg_context": "Active bullish FVG at 1.08475–1.08620 (1h, open). Price approaching from above — discount zone in play.",
-  "sweep_context": "Recent bullish reclaim of equal_lows. Supportive of bullish continuation.",
-  "verdict_rationale": "Long bias with moderate confidence. HTF gate passes. LTF MSS conflict noted but does not override HTF alignment. No hard no-trade flags."
-}
-```
-
----
-
-## No-trade and caution flags
-
-The pre-filter must emit explicit flags when conditions warrant:
-
-### No-trade flags (hard — LLM must respect these)
-- `htf_gate_fail` — HTF regime contradicts direction
-- `no_structure_data` — structure block unavailable
-- `htf_regime_neutral` — no directional bias available
-
-### Caution flags (advisory — LLM weighs these)
-- `ltf_mss_conflict` — LTF MSS against HTF direction
-- `liquidity_above_close` — significant external liquidity just above price
-- `fvg_partially_filled` — nearest FVG is partially filled, may have less magnetic pull
-- `sweep_unresolved` — recent sweep with unresolved outcome
-- `htf_mss_present` — HTF MSS fired recently, possible trend change
-
----
-
-## What Phase 3E explicitly does NOT include
+## What 3F explicitly does NOT include
 
 | Out of scope | Phase |
 |---|---|
-| Multiple analyst personas | 3F |
-| Arbiter / Senate layer | Future |
-| Backtesting / performance tracking | Future |
-| Trade entry / exit logic | Never in analyst layer |
-| Confluence scoring system | Future |
-| New structure features | 4A+ |
-| Officer or feed modifications | Not needed |
-| Cross-timeframe structure synthesis | 4A |
+| Senate / full council layer | Future |
+| Open-ended agent debate | Future |
+| Macro Alignment persona | Deferred until macro is in packet form |
+| Memory or cross-session state | Future |
+| Model routing / provider selection logic | Future |
+| Changes to pre-filter, feed, Officer, structure engine | Never in 3F |
+| Modifying `analyst/service.py` or any 3E module | Never in 3F |
 
 ---
 
 ## Definition of done
 
-Phase 3E is complete when:
-- `pre_filter.py` produces deterministic `StructureDigest` from any v2 packet
-- HTF gate logic is correct and testable without LLM
-- `AnalystVerdict` and `ReasoningBlock` schemas are defined and populated
-- LLM analyst receives digest only — never raw structure block
-- No-trade flags from pre-filter are respected in LLM output
-- Verdict changes deterministically when structure inputs change
-- Both EURUSD and XAUUSD produce coherent verdicts
+Phase 3F is complete when:
+
+- Both personas consume the same `StructureDigest` — no direct packet access in persona prompts
+- Persona outputs conform to `PersonaVerdict` schema
+- Arbiter applies conflict rules deterministically before any LLM synthesis call
+- Python hard-constraint layer overrides all persona outputs
+- `MultiAnalystOutput` is written atomically to file
+- `analyst/service.py` (3E single-analyst) runs unchanged
+- Both EURUSD and XAUUSD produce valid `MultiAnalystOutput`
 - All test groups pass
 - All prior phase tests pass

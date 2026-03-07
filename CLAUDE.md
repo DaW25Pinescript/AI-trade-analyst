@@ -1,10 +1,10 @@
-# CLAUDE.md — Phase 3E: Analyst Structure Consumption
+# CLAUDE.md — Phase 3F: Multi-Analyst Consensus Layer
 
 ## Role
 
-You are a principal Python/data engineer and prompt architect working inside the **AI Trade Analyst** repository.
+You are a principal Python/prompt architect working inside the **AI Trade Analyst** repository.
 
-Phase 3E is the first phase where structure state actively influences analyst reasoning and verdict generation. The feed, Officer, and structure engine are all complete. Your job now is to wire them into a working analyst layer that produces testable, auditable verdicts.
+Phase 3F extends the single-analyst 3E pipeline into a controlled multi-analyst architecture. Two LLM personas consume the same deterministic `StructureDigest`, produce separate structured verdicts, and an Arbiter synthesizes them into one final decision — all governed by the existing Python hard-constraint layer.
 
 Read `ARCHITECTURE.md` first. Then read this file and the supporting spec files before writing any code or prompts.
 
@@ -15,65 +15,66 @@ Read `ARCHITECTURE.md` first. Then read this file and the supporting spec files 
 Repo: `https://github.com/DaW25Pinescript/AI-trade-analyst`
 
 **Already complete — do not touch:**
-- `market_data_officer/feed/` — feed pipeline
-- `market_data_officer/officer/` — Market Data Officer, Market Packet v2
-- `market_data_officer/structure/` — Structure Engine, Phases 3A–3D including `reader.py`
+- `market_data_officer/feed/`
+- `market_data_officer/officer/`
+- `market_data_officer/structure/`
+- `analyst/pre_filter.py` — deterministic digest engine
+- `analyst/contracts.py` — StructureDigest, AnalystVerdict, ReasoningBlock
+- `analyst/prompt_builder.py`
+- `analyst/analyst.py` — single-persona LLM analyst
+- `analyst/service.py` — single-analyst orchestrator
 
-**What you are building in Phase 3E:**
+**What you are building in Phase 3F:**
 ```
 analyst/
-  __init__.py
-  pre_filter.py        ← Python structure digest + gate engine
-  contracts.py         ← StructureDigest, AnalystVerdict, ReasoningBlock dataclasses
-  prompt_builder.py    ← assembles LLM context from digest + packet
-  analyst.py           ← LLM analyst call + response parsing
-  service.py           ← top-level: run_analyst(instrument) orchestrator
+  multi_contracts.py       ← PersonaVerdict, ArbiterDecision, MultiAnalystOutput dataclasses
+  personas.py              ← persona definitions and per-persona prompt policies
+  arbiter.py               ← Arbiter synthesis logic
+  multi_analyst_service.py ← top-level orchestrator: run_multi_analyst(instrument)
 tests/
-  test_pre_filter.py
-  test_analyst_verdict.py
-  test_analyst_integration.py
-run_analyst.py         ← CLI entry point
+  test_personas.py
+  test_arbiter.py
+  test_multi_analyst_integration.py
+run_multi_analyst.py       ← CLI entry point
 ```
+
+Do not modify any existing `analyst/` modules. Extend only.
 
 ---
 
-## Architecture for 3E
+## Locked decisions for 3F
 
-Two-layer hybrid:
+| Decision | Value |
+|---|---|
+| Number of personas | 2 — Technical Structure Analyst, Execution/Timing Analyst |
+| Digest sharing | All personas consume the same `StructureDigest` — no exceptions |
+| Data access parity | Personas differ by prompt/policy only, not by data access |
+| Arbiter | Required — only the Arbiter produces the final exported verdict |
+| Python hard constraints | Supreme — Arbiter cannot override deterministic no-trade conditions |
+| 3E pipeline | Preserved — `analyst/service.py` continues to work unchanged |
+| Senate/swarm layer | Explicitly out of scope for 3F |
+
+---
+
+## Architecture
 
 ```
 MarketPacketV2
     ↓
-Python Pre-filter (pre_filter.py)
-  - reads structure block
-  - applies HTF regime gate
-  - computes structure digest
-  - flags supports and conflicts
-    ↓
-StructureDigest (compact, deterministic)
-    ↓
-LLM Analyst (analyst.py)
-  - receives digest + selected packet context
-  - produces JSON verdict + reasoning block
-    ↓
-AnalystVerdict + ReasoningBlock
+pre_filter.py  →  StructureDigest (deterministic, shared)
+    ↓                      ↓
+    ↓          ┌───────────┴───────────┐
+    ↓    Technical Structure     Execution/Timing
+    ↓        Analyst                Analyst
+    ↓          └───────────┬───────────┘
+    ↓               PersonaVerdict × 2
+    ↓                      ↓
+    ↓                 arbiter.py
+    ↓                      ↓
+    ↓              ArbiterDecision
+    ↓                      ↓
+    └──────────→  MultiAnalystOutput (saved to file)
 ```
-
-The Python layer owns: gating, normalization, digest compression, hard constraints.
-The LLM owns: synthesis, conflict weighting, verdict text, reasoning quality.
-
----
-
-## Locked decisions for 3E
-
-| Decision | Value |
-|---|---|
-| Analyst architecture | Single persona in 3E, multi-persona deferred to 3F |
-| Structure influence mode | Gating for HTF regime, advisory for LTF detail |
-| Active structure fields | HTF regime, recent BOS/MSS, nearest liquidity, active FVGs, sweep reclaim outcomes |
-| Output format | JSON verdict block + human-readable reasoning block |
-| Analyst mechanism | Hybrid: Python pre-filter → LLM |
-| LLM re-deriving structure | Explicitly forbidden — structure comes from digest only |
 
 ---
 
@@ -81,13 +82,13 @@ The LLM owns: synthesis, conflict weighting, verdict text, reasoning quality.
 
 1. `ARCHITECTURE.md` ← read first
 2. `CLAUDE.md` ← you are here
-3. `OBJECTIVE.md` — what 3E builds and the hybrid architecture contract
-4. `CONSTRAINTS.md` — hard rules, gate logic, prompt engineering standards
-5. `CONTRACTS.md` — StructureDigest, AnalystVerdict, ReasoningBlock schemas
-6. `ACCEPTANCE_TESTS.md` — test groups
+3. `OBJECTIVE.md`
+4. `CONSTRAINTS.md`
+5. `CONTRACTS.md`
+6. `ACCEPTANCE_TESTS.md`
 
 ---
 
 ## When you are done
 
-Run Group 0 regression first. Any failure stops all further work. Then Groups A through G. Report pass/fail per group before declaring Phase 3E complete.
+Run Group 0 regression first. Any failure stops all further work. Then Groups A through G. Report pass/fail per group before declaring Phase 3F complete.

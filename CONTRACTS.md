@@ -1,266 +1,232 @@
-# CONTRACTS.md — Phase 3E: StructureDigest, AnalystVerdict, ReasoningBlock
+# CONTRACTS.md — Phase 3F: PersonaVerdict, ArbiterDecision, MultiAnalystOutput
 
-## StructureDigest dataclass
+## New file: `analyst/multi_contracts.py`
 
-`analyst/contracts.py`:
+3F dataclasses live in a **new file only**. `analyst/contracts.py` is not modified.
+Import existing 3E types from `analyst.contracts` as needed.
 
 ```python
+# analyst/multi_contracts.py
 from dataclasses import dataclass, field
 from typing import Optional
+from analyst.contracts import StructureDigest, AnalystVerdict, ReasoningBlock
 
+```python
 @dataclass
-class LiquidityRef:
-    type: str                  # e.g. "prior_day_high"
-    price: float
-    scope: str                 # "external_liquidity" | "internal_liquidity" | "unclassified"
-    status: str                # "active" | "swept"
-
-@dataclass
-class StructureDigest:
+class PersonaVerdict:
     """
-    Deterministic, compact summary of structure block state.
-    Produced by pre_filter.py. Consumed by prompt_builder.py and analyst.py.
-    Never produced by the LLM.
+    Structured verdict from a single LLM persona.
+    Produced by analyst/personas.py. Never produced by Arbiter or pre-filter.
     """
+    persona_name: str            # "technical_structure" | "execution_timing"
     instrument: str
     as_of_utc: str
-    structure_available: bool
 
-    # Gate
-    structure_gate: str              # "pass" | "fail" | "no_data" | "mixed"
-    gate_reason: Optional[str]       # human-readable reason for gate result
+    verdict: str                 # same taxonomy as AnalystVerdict
+    confidence: str              # "high" | "moderate" | "low" | "none"
+    directional_bias: str        # "bullish" | "bearish" | "neutral" | "none"
 
-    # Regime
-    htf_bias: Optional[str]          # "bullish" | "bearish" | "neutral" | None
-    htf_source_timeframe: Optional[str]
-    last_bos: Optional[str]          # "bullish" | "bearish" | None
-    last_mss: Optional[str]          # "bullish" | "bearish" | None
-    bos_mss_alignment: Optional[str] # "aligned" | "conflicted" | "incomplete" | None
+    structure_gate: str          # echoed from digest — must not differ
+    persona_supports: list[str]  # what this persona found supportive
+    persona_conflicts: list[str] # what this persona found conflicting
+    persona_cautions: list[str]  # persona-specific caution flags
 
-    # Liquidity
-    nearest_liquidity_above: Optional[LiquidityRef]
-    nearest_liquidity_below: Optional[LiquidityRef]
-    liquidity_bias: Optional[str]    # "above_closer" | "below_closer" | "balanced" | None
+    reasoning: ReasoningBlock    # reuse existing ReasoningBlock schema
 
-    # FVG
-    active_fvg_context: Optional[str]  # "discount_bullish" | "premium_bearish" | "at_fvg" | "none"
-    active_fvg_count: int
+    def is_directional(self) -> bool:
+        return self.verdict in ("long_bias", "short_bias")
 
-    # Sweep/reclaim
-    recent_sweep_signal: Optional[str] # "bullish_reclaim" | "bearish_reclaim" | "accepted_beyond" | "none"
-
-    # Signal lists
-    structure_supports: list[str] = field(default_factory=list)
-    structure_conflicts: list[str] = field(default_factory=list)
-
-    # Flags
-    no_trade_flags: list[str] = field(default_factory=list)
-    caution_flags: list[str] = field(default_factory=list)
-
-    def has_hard_no_trade(self) -> bool:
-        return len(self.no_trade_flags) > 0
-
-    def to_prompt_dict(self) -> dict:
-        """Compact dict for LLM prompt injection. Excludes raw packet data."""
-        ...
+    def is_blocked(self) -> bool:
+        return self.verdict in ("no_trade", "no_data")
 ```
 
 ---
 
-## AnalystVerdict dataclass
+## ArbiterDecision dataclass
 
 ```python
 @dataclass
-class AnalystVerdict:
+class ArbiterDecision:
     """
-    Structured machine-readable verdict. Produced by LLM, parsed by analyst.py.
-    Authoritative contract for downstream systems.
+    Final synthesized decision from the Arbiter.
+    Directional fields are pre-determined by Python conflict rules.
+    LLM writes synthesis_notes and winning_rationale_summary only.
     """
     instrument: str
     as_of_utc: str
 
-    verdict: str                     # "long_bias" | "short_bias" | "no_trade" | "conditional" | "no_data"
-    confidence: str                  # "high" | "moderate" | "low" | "none"
+    # Pre-determined by Python conflict rules (no LLM involvement)
+    consensus_state: str         # see taxonomy in OBJECTIVE.md
+    final_verdict: str           # "long_bias" | "short_bias" | "no_trade" | "conditional" | "no_data"
+    final_confidence: str        # "high" | "moderate" | "low" | "none"
+    final_directional_bias: str  # "bullish" | "bearish" | "neutral" | "none"
+    no_trade_enforced: bool      # True if Python hard-constraint triggered override
 
-    structure_gate: str              # echoed from digest
-    htf_bias: Optional[str]
-    ltf_structure_alignment: str     # "aligned" | "mixed" | "conflicted" | "unknown"
-    active_fvg_context: Optional[str]
-    recent_sweep_signal: Optional[str]
+    # Agreement/conflict record
+    personas_agree_direction: bool
+    personas_agree_confidence: bool
+    confidence_spread: str       # e.g. "high vs moderate" or "aligned"
 
-    structure_supports: list[str]
-    structure_conflicts: list[str]
-    no_trade_flags: list[str]
-    caution_flags: list[str]
+    # LLM-written fields (synthesis call only — given the pre-computed skeleton above)
+    synthesis_notes: str         # plain English: what aligned, what conflicted, how resolved
+    winning_rationale_summary: str  # why final_verdict was the right outcome
 
     def is_actionable(self) -> bool:
-        """True if verdict is long_bias or short_bias with at least moderate confidence."""
         return (
-            self.verdict in ("long_bias", "short_bias")
-            and self.confidence in ("high", "moderate")
-            and not self.no_trade_flags
+            self.final_verdict in ("long_bias", "short_bias")
+            and self.final_confidence in ("high", "moderate")
+            and not self.no_trade_enforced
         )
 ```
 
 ---
 
-## ReasoningBlock dataclass
+## MultiAnalystOutput dataclass
 
 ```python
 @dataclass
-class ReasoningBlock:
+class MultiAnalystOutput:
     """
-    Human-readable explanation of how structure influenced the verdict.
-    Produced by LLM alongside AnalystVerdict.
+    Top-level container for one full multi-analyst run.
+    Preserved entirely for audit and replay.
     """
-    summary: str              # 2-4 sentence overall verdict explanation
-    htf_context: str          # regime, BOS/MSS direction
-    liquidity_context: str    # nearest levels, liquidity bias
-    fvg_context: str          # active zones, discount/premium
-    sweep_context: str        # sweep/reclaim signal
-    verdict_rationale: str    # why verdict and confidence were assigned
-```
+    instrument: str
+    as_of_utc: str
 
----
-
-## AnalystOutput — top-level container
-
-```python
-@dataclass
-class AnalystOutput:
-    verdict: AnalystVerdict
-    reasoning: ReasoningBlock
-    digest: StructureDigest    # preserved for audit/replay
+    digest: StructureDigest           # shared input — identical for both personas
+    persona_outputs: list[PersonaVerdict]  # ordered: [technical_structure, execution_timing]
+    arbiter_decision: ArbiterDecision
+    final_verdict: AnalystVerdict      # Arbiter decision re-expressed as AnalystVerdict for downstream compat
 
     def to_dict(self) -> dict:
         ...
 ```
 
+The `final_verdict` field re-expresses the `ArbiterDecision` in `AnalystVerdict` schema so downstream systems (and the 3E contract) remain unchanged.
+
 ---
 
-## Full AnalystOutput JSON
+## Persona prompt contracts
+
+### Technical Structure Analyst system prompt
+
+```
+You are a disciplined ICT-style technical structure analyst.
+Your job is to assess whether the structural case for a trade is valid.
+You do not re-derive structure from raw price data.
+Your structural knowledge comes exclusively from the structure digest provided.
+
+You assess: HTF regime consistency, BOS/MSS direction and quality,
+liquidity positioning (internal vs external), FVG zone context (discount/premium),
+and sweep/reclaim outcomes.
+
+You do not optimise for timing or execution cleanliness.
+You answer only: is the structural case for a directional bias sound?
+
+Output only valid JSON matching PersonaVerdict schema. No preamble. No markdown.
+```
+
+### Execution/Timing Analyst system prompt
+
+```
+You are a disciplined ICT-style execution and timing analyst.
+Your job is to assess whether the current context is a good place and time to act.
+You do not re-derive structure from raw price data.
+Your structural knowledge comes exclusively from the structure digest provided.
+
+You assess: proximity and quality of nearby liquidity barriers, FVG positioning
+relative to current price, reclaim vs acceptance outcomes, execution cleanliness,
+and short-term conflict signals (LTF MSS, partial FVG fills, unresolved sweeps).
+
+You do not re-assess HTF regime validity. You take the HTF gate result as given
+and focus entirely on execution context quality.
+
+You answer only: is this a good place and time to act on the structural case?
+
+Output only valid JSON matching PersonaVerdict schema. No preamble. No markdown.
+```
+
+### Arbiter system prompt
+
+```
+You are the Arbiter. You do not form opinions about the market.
+You have been given a pre-computed ArbiterDecision skeleton:
+- consensus_state, final_verdict, final_confidence, no_trade_enforced are already determined.
+
+Your only job is to write:
+1. synthesis_notes: 2-4 sentences explaining what aligned, what conflicted, and how it resolved.
+2. winning_rationale_summary: 1-2 sentences stating why the final verdict is the right outcome.
+
+Do not change final_verdict. Do not change final_confidence.
+Do not argue against no_trade_enforced if it is True.
+Output only valid JSON with exactly two fields: synthesis_notes, winning_rationale_summary.
+```
+
+---
+
+## Full MultiAnalystOutput JSON example
 
 ```json
 {
-  "verdict": {
-    "instrument": "EURUSD",
-    "as_of_utc": "2026-03-07T10:15:00Z",
+  "instrument": "EURUSD",
+  "as_of_utc": "2026-03-07T10:15:00Z",
+
+  "digest": { "...": "same StructureDigest as 3E" },
+
+  "persona_outputs": [
+    {
+      "persona_name": "technical_structure",
+      "verdict": "long_bias",
+      "confidence": "high",
+      "directional_bias": "bullish",
+      "structure_gate": "pass",
+      "persona_supports": ["bullish 4h regime", "bullish BOS on 1h", "active discount FVG"],
+      "persona_conflicts": ["bearish MSS on 15m"],
+      "persona_cautions": ["ltf_mss_conflict"],
+      "reasoning": { "...": "ReasoningBlock" }
+    },
+    {
+      "persona_name": "execution_timing",
+      "verdict": "conditional",
+      "confidence": "moderate",
+      "directional_bias": "bullish",
+      "structure_gate": "pass",
+      "persona_supports": ["price approaching discount FVG", "bullish reclaim of equal_lows"],
+      "persona_conflicts": ["external liquidity (prior_day_high) close above — potential barrier"],
+      "persona_cautions": ["liquidity_above_close", "entry may be late relative to FVG"],
+      "reasoning": { "...": "ReasoningBlock" }
+    }
+  ],
+
+  "arbiter_decision": {
+    "consensus_state": "directional_alignment_confidence_split",
+    "final_verdict": "long_bias",
+    "final_confidence": "moderate",
+    "final_directional_bias": "bullish",
+    "no_trade_enforced": false,
+    "personas_agree_direction": true,
+    "personas_agree_confidence": false,
+    "confidence_spread": "high vs moderate",
+    "synthesis_notes": "Both personas agree on a bullish directional bias. Technical structure sees a clean HTF alignment with minor LTF conflict. Execution timing notes the prior_day_high as a nearby barrier and rates the setup conditional. Arbiter resolves to long_bias at moderate confidence — lower confidence tier honoured due to timing caution.",
+    "winning_rationale_summary": "Directional alignment holds across both personas. Confidence is moderated by execution timing concern. Long bias at moderate confidence is the defensible output."
+  },
+
+  "final_verdict": {
     "verdict": "long_bias",
     "confidence": "moderate",
     "structure_gate": "pass",
     "htf_bias": "bullish",
-    "ltf_structure_alignment": "mixed",
-    "active_fvg_context": "discount_bullish",
-    "recent_sweep_signal": "bullish_reclaim",
-    "structure_supports": [
-      "bullish 4h regime",
-      "active discount FVG at 1.08475",
-      "bullish BOS on 1h",
-      "bullish reclaim of equal_lows"
-    ],
-    "structure_conflicts": [
-      "bearish MSS on 15m against HTF bullish regime"
-    ],
-    "no_trade_flags": [],
-    "caution_flags": ["ltf_mss_conflict"]
-  },
-
-  "reasoning": {
-    "summary": "Bullish bias on EURUSD with moderate confidence. HTF 4h regime is bullish with recent bullish BOS on 1h confirming directional momentum. LTF 15m shows a bearish MSS which introduces short-term conflict but does not override HTF alignment.",
-    "htf_context": "4h regime: bullish. Last BOS: bullish (1h). Last MSS: bearish (15m) — minor conflict present.",
-    "liquidity_context": "Nearest above: prior_day_high at 1.08720 (external). Nearest below: equal_lows at 1.08410 (internal). Liquidity draw is toward the prior_day_high above.",
-    "fvg_context": "Active bullish FVG at 1.08475–1.08620 (1h, open). Price approaching from above — discount zone in play for potential continuation.",
-    "sweep_context": "Recent bullish reclaim of equal_lows. Supportive of bullish continuation narrative.",
-    "verdict_rationale": "Long bias with moderate confidence. HTF gate passes. LTF MSS conflict noted as caution. No hard no-trade flags present."
-  },
-
-  "digest": {
-    "instrument": "EURUSD",
-    "as_of_utc": "2026-03-07T10:15:00Z",
-    "structure_available": true,
-    "structure_gate": "pass",
-    "gate_reason": "4h regime bullish, no contradiction",
-    "htf_bias": "bullish",
-    "htf_source_timeframe": "4h",
-    "last_bos": "bullish",
-    "last_mss": "bearish",
-    "bos_mss_alignment": "conflicted",
-    "nearest_liquidity_above": {
-      "type": "prior_day_high", "price": 1.08720,
-      "scope": "external_liquidity", "status": "active"
-    },
-    "nearest_liquidity_below": {
-      "type": "equal_lows", "price": 1.08410,
-      "scope": "internal_liquidity", "status": "active"
-    },
-    "liquidity_bias": "above_closer",
-    "active_fvg_context": "discount_bullish",
-    "active_fvg_count": 2,
-    "recent_sweep_signal": "bullish_reclaim",
-    "structure_supports": ["bullish 4h regime", "active discount FVG at 1.08475", "bullish BOS on 1h", "bullish reclaim of equal_lows"],
-    "structure_conflicts": ["bearish MSS on 15m against HTF bullish regime"],
-    "no_trade_flags": [],
-    "caution_flags": ["ltf_mss_conflict"]
+    "...": "full AnalystVerdict schema"
   }
 }
 ```
 
 ---
 
-## LLM prompt contract
-
-### System prompt (locked — do not deviate)
-
-```
-You are a disciplined ICT-style market analyst. You reason over structured market state only.
-You do not re-derive structure from raw price data. You do not interpret charts.
-Your structural knowledge comes exclusively from the structure digest provided.
-
-Your output must always contain two parts:
-1. A JSON verdict block matching the AnalystVerdict schema exactly.
-2. A JSON reasoning block matching the ReasoningBlock schema exactly.
-
-Output only valid JSON. No preamble. No markdown. No commentary outside the JSON.
-```
-
-### User prompt shape
-
-```
-Instrument: {instrument}
-As of: {as_of_utc}
-
---- STRUCTURE DIGEST ---
-{digest.to_prompt_dict() as formatted JSON}
-
---- MARKET CONTEXT ---
-Session: {state_summary.session_context}
-Volatility: {state_summary.volatility_regime}
-Momentum: {state_summary.momentum_state}
-ATR (14): {features.core.atr_14}
-MA50 / MA200: {features.core.ma_50} / {features.core.ma_200}
-
---- HARD CONSTRAINTS ---
-{if digest.has_hard_no_trade():}
-  HARD NO-TRADE FLAGS PRESENT: {digest.no_trade_flags}
-  You must set verdict = "no_trade" and confidence = "none".
-  Do not override this constraint.
-
-Produce the AnalystVerdict and ReasoningBlock JSON now.
-```
-
-### Hard constraint enforcement
-
-If `digest.has_hard_no_trade()` is True:
-- The prompt must explicitly state the no-trade constraint
-- The LLM must set `verdict = "no_trade"` and `confidence = "none"`
-- The post-parse validator must assert this — if the LLM overrides it, raise a `ValueError`
-
----
-
 ## Output file path
 
 ```
-analyst/output/{instrument}_analyst_output.json
+analyst/output/{instrument}_multi_analyst_output.json
 ```
 
-One file per instrument. Overwritten on each run. Preserved for audit alongside the digest.
+Single-analyst 3E output at `{instrument}_analyst_output.json` is preserved and unchanged.
