@@ -5,7 +5,10 @@ They live in a separate file — analyst/contracts.py is not modified.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from analyst.explain_contracts import ExplainabilityBlock
 
 from analyst.contracts import AnalystVerdict, ReasoningBlock, StructureDigest
 
@@ -120,8 +123,10 @@ class MultiAnalystOutput:
     arbiter_decision: ArbiterDecision
     final_verdict: AnalystVerdict  # Arbiter decision re-expressed as AnalystVerdict
 
+    explanation: Optional["ExplainabilityBlock"] = None  # Phase 3G additive field
+
     def to_dict(self) -> dict:
-        return {
+        d = {
             "instrument": self.instrument,
             "as_of_utc": self.as_of_utc,
             "digest": self.digest.to_dict(),
@@ -129,3 +134,6 @@ class MultiAnalystOutput:
             "arbiter_decision": self.arbiter_decision.to_dict(),
             "final_verdict": self.final_verdict.to_dict(),
         }
+        if self.explanation is not None:
+            d["explanation"] = self.explanation.to_dict()
+        return d
