@@ -314,11 +314,10 @@ async def triage_smoke():
     except Exception as e:
         diag["llm_config_error"] = f"{type(e).__name__}: {str(e)[:300]}"
 
-    # Perform the loopback call
-    session = _current_session()
+    # Perform the loopback call — deterministic payload, no auto-detection
     files = [
         ("instrument", (None, symbol)),
-        ("session", (None, session)),
+        ("session", (None, "London")),
         ("timeframes", (None, '["H4","H1","M15"]')),
         ("account_balance", (None, "10000")),
         ("min_rr", (None, "2.0")),
