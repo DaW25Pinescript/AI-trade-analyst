@@ -35,7 +35,7 @@ def main() -> None:
     instrument = args.instrument.upper()
     output_dir = Path(args.output_path)
 
-    print(f"[officer] Building market packet for {instrument}...")
+    print(f"[officer] Building market packet v2 for {instrument}...")
 
     packet = build_market_packet(instrument)
 
@@ -44,13 +44,16 @@ def main() -> None:
     print(f"[officer] Packet written to: {output_path}")
 
     # Print summary
-    print(f"\nMarket packet built: {instrument}")
+    print(f"\nMarket packet v2 built: {instrument}")
+    print(f"  schema_version: market_packet_v2")
     print(f"  as_of_utc: {packet.as_of_utc}")
     print(f"  data_quality: {packet.state_summary.data_quality}")
     print(f"  stale: {packet.quality.stale}")
     print(f"  partial: {packet.quality.partial}")
     print(f"  flags: {packet.quality.flags}")
     print(f"  trusted: {packet.is_trusted()}")
+    print(f"  structure_available: {packet.structure.available}")
+    print(f"  has_structure: {packet.has_structure()}")
 
 
 if __name__ == "__main__":
