@@ -1,198 +1,103 @@
-# OBJECTIVE.md — Phase 3G: Explainability / Audit Layer
+# OBJECTIVE.md
 
-## Why Phase 3G exists
+# AI Trade Analyst – Objective
+Version: 1.0
 
-By the end of Phase 3F the system produces a rich decision artifact: digest, two persona verdicts, an Arbiter synthesis, and a final verdict. But most of the reasoning is trapped inside prose fields and JSON blobs. A human reviewing the output — or a downstream system consuming it — cannot easily answer:
+## 1. Primary Objective
 
-- Why was the verdict `long_bias` and not `conditional`?
-- Which signal most influenced the outcome?
-- Did the Execution Timing persona constrain confidence, or did the Arbiter?
-- Was the Python hard-constraint layer involved?
-- If I replay this tomorrow, will I get the same explanation?
-
-3G closes that gap. It adds a structured, deterministic, replay-safe explanation layer that answers all of these questions from saved artifacts alone — no re-running models, no LLM calls, no reinterpretation.
-
-The key design principle: **3G explains decisions already made. It does not make new ones.**
+Transform AI Trade Analyst from a static analysis form into a guided **Trade Ideation Journey**: a stage-based trading workspace that pre-loads market, macro, and structure intelligence, triages assets by relevance, and guides the user through a disciplined, auditable trade-construction flow.
 
 ---
 
-## The four explanation outputs
+## 2. Product Outcome
 
-### 1. Signal Influence Ranking
+The app should no longer feel like a blank page waiting for manual setup.
 
-A ranked list of which structure signals had the most influence on the final verdict, with direction and magnitude classification for each.
-
-Signals ranked:
-- HTF regime
-- BOS/MSS direction
-- Liquidity positioning
-- FVG context
-- Sweep/reclaim outcome
-- Active no-trade flags
-- Active caution flags
-
-Influence is classified, not scored with fake precision:
-- `dominant` — signal was the primary driver
-- `supporting` — signal reinforced the verdict
-- `conflicting` — signal worked against the verdict
-- `neutral` — signal was present but did not materially shift outcome
-- `absent` — signal was unavailable
+It should feel like:
+- a live market workspace
+- a triage-first analyst desk
+- a controlled decision pipeline
+- a journal-ready decision system
+- a transparent review engine foundation
 
 ---
 
-### 2. Persona Dominance Record
+## 3. Specific Objectives
 
-A compact record of how each persona contributed to, constrained, or was overridden in the final decision.
+### 3.1 Replace blank-form entry with pre-loaded intelligence
+The landing experience should open into a useful market overview where each asset answers: **Why should I care about this right now?**
 
-Fields:
-- Which persona drove the directional verdict
-- Which persona drove (or caused the downgrade of) the final confidence
-- Whether the Arbiter used the stricter or more lenient confidence tier
-- Whether the Python hard-constraint layer overrode both personas
-- Consensus state classification and its downstream effect
+### 3.2 Introduce a staged ideation workflow
+The selected asset should enter a structured journey with explicit stages for context, structure, macro alignment, gate review, verdict, and journal capture.
 
-This is computed from `ArbiterDecision` and `PersonaVerdict` fields — no interpretation needed.
+### 3.3 Preserve auditability
+The system must preserve a frozen decision record that captures what the system recommended, what the user decided, and what execution plan was committed.
 
----
+### 3.4 Enable later review and self-critique
+The architecture must support transparent review flows such as override analysis, gate failure patterns, rule refinement, and planned-vs-actual comparison.
 
-### 3. Confidence Provenance
-
-A step-by-step trace of how `final_confidence` was determined.
-
-```
-Step 1: Technical Structure Analyst → high
-Step 2: Execution/Timing Analyst    → moderate
-Step 3: Consensus state             → directional_alignment_confidence_split
-Step 4: Arbiter rule applied        → use lower confidence
-Step 5: Final confidence            → moderate
-Step 6: Python override             → not triggered
-```
-
-Each step records the rule applied and the input values. Fully reconstructible from saved `MultiAnalystOutput`.
+### 3.5 Ground the UI in repo reality
+Before major UI implementation, complete a formal interface audit so the frontend builds against real repo inputs/outputs rather than guessed payloads.
 
 ---
 
-### 4. No-Trade / Caution Driver List
+## 4. Success Criteria
 
-An explicit, machine-readable list of what blocked or weakened the setup, with source attribution for each entry.
-
-```json
-{
-  "no_trade_drivers": [],
-  "caution_drivers": [
-    {
-      "flag": "ltf_mss_conflict",
-      "source": "digest",
-      "raised_by": "pre_filter",
-      "effect": "caution — did not block verdict"
-    },
-    {
-      "flag": "liquidity_above_close",
-      "source": "digest",
-      "raised_by": "pre_filter",
-      "effect": "caution — contributed to execution persona confidence downgrade"
-    }
-  ]
-}
-```
+This objective is achieved when:
+- the product has a triage-first landing surface
+- the journey stages are coherent and auditable
+- gate checks behave like a control boundary
+- system verdict and user decision are distinct and persisted separately
+- a decision snapshot can be saved and reviewed later
+- the UI contract layer is derived from audited repo interfaces
 
 ---
 
-## The human-readable audit summary
+## 5. Stage-by-Stage Delivery Objective
 
-On top of the four structured fields above, 3G renders a human-readable audit summary using deterministic templates — no LLM.
+### Phase 0
+Complete the interface audit and freeze v1 contracts.
 
-Templates use saved field values to produce strings like:
+### Phase 1
+Define the journey domain model, shared types, and store API.
 
-```
-HTF Context: 4h regime was bullish. Last confirmed BOS was bullish on 1h.
-Last MSS was bearish on 15m — classified as minor LTF conflict.
+### Phase 2
+Build the shell, routes, and step navigation.
 
-Liquidity: Nearest overhead level was prior_day_high at 1.08720 (external).
-Nearest support was equal_lows at 1.08410 (internal). Liquidity draw above.
+### Phase 3
+Build the landing triage board.
 
-FVG Context: Active bullish FVG at 1.08475–1.08620 (1h, open).
-Price approaching from above — discount zone in play.
+### Phase 4
+Build context, structure/liquidity, and macro alignment screens.
 
-Sweep/Reclaim: Bullish reclaim of equal_lows confirmed. Supportive.
+### Phase 5
+Implement gate checks as a strict discipline checkpoint.
 
-Persona Summary: Technical Structure returned long_bias at high confidence.
-Execution/Timing returned conditional at moderate confidence.
-Consensus: directional alignment, confidence split. Arbiter used lower tier.
+### Phase 6
+Implement verdict separation and execution planning.
 
-Final Verdict: long_bias — moderate confidence.
-Caution: ltf_mss_conflict, liquidity_above_close.
-No hard no-trade flags were active.
-```
+### Phase 7
+Implement journal capture and frozen decision snapshot persistence.
 
-This is a template fill-in, not generation. The same saved output always produces the same audit text.
+### Phase 8
+Add the first review engine surface.
 
----
+### Phase 9
+Harden contracts, resolve adapter gaps, clean placeholder drift, and stabilise the review surface.
 
-## Output artifacts
-
-### Embedded in `MultiAnalystOutput`
-
-```python
-@dataclass
-class MultiAnalystOutput:
-    ...
-    explanation: Optional[ExplainabilityBlock] = None  # new in 3G
-```
-
-This is the authoritative explanation contract.
-
-### Standalone file
-
-```
-analyst/output/{instrument}_multi_analyst_explainability.json
-```
-
-Derived from the embedded `explanation` field. Written at the same time as the main output. Not a separate source of truth — if they diverge, the embedded version wins.
+Outputs:
+- contract conformance tests for each stage
+- resolved or explicitly deferred `requires_adapter` fields
+- no silent mock values remaining in production paths
+- review surface traceable to saved `decisionSnapshot` and `ExplainabilityBlock` fields
+- transport pattern locked and consistent across all service calls
 
 ---
 
-## Replay mode
+## 6. Long-Term Direction
 
-`run_explain.py` must support:
-
-```bash
-python run_explain.py --instrument EURUSD
-# Re-derive explanation from saved multi_analyst_output.json without any model calls
-
-python run_explain.py --file analyst/output/EURUSD_multi_analyst_output.json
-# Same, explicit file path
-```
-
-Given any saved `MultiAnalystOutput`, the explanation engine must reproduce the identical `ExplainabilityBlock` deterministically. This is the core replay guarantee.
-
----
-
-## What 3G explicitly does NOT include
-
-| Out of scope | Phase |
-|---|---|
-| New structure signals or features | 4A+ |
-| LLM-generated explanation prose | Never in 3G |
-| Multi-session memory or trend tracking | Future |
-| UI rendering layer | Future |
-| Performance scoring / backtesting | Future |
-| Senate / governance layer | Future |
-| Any modification to feed, Officer, structure engine | Never |
-
----
-
-## Definition of done
-
-Phase 3G is complete when:
-
-- `ExplainabilityBlock` is produced deterministically from any saved `MultiAnalystOutput`
-- All four explanation fields are Python-computed: signal ranking, persona dominance, confidence provenance, no-trade/caution drivers
-- Human-readable audit summary is template-rendered, no LLM
-- `MultiAnalystOutput.explanation` is populated on every 3F run going forward
-- Standalone `_explainability.json` file is written alongside `_multi_analyst_output.json`
-- Replay mode reproduces identical output from saved file
-- `analyst/multi_contracts.py` gains `explanation` field — no other existing file modified
-- Both EURUSD and XAUUSD produce valid `ExplainabilityBlock`
-- All test groups pass
-- All prior phase tests pass
+The long-term intent is not just a nicer frontend. It is a controlled trading decision environment where:
+- intelligence is pre-loaded
+- decisions are staged and reviewable
+- human overrides are measurable
+- policy refinement is possible without black-box claims

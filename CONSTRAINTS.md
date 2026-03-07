@@ -1,170 +1,99 @@
-# CONSTRAINTS.md — Phase 3G Hard Rules
+# CONSTRAINTS.md
 
-## RULE 1 — Zero LLM calls in the explanation path
+# AI Trade Analyst – Constraints
+Version: 1.0
 
-No LLM call of any kind is permitted inside:
-- `explainability.py`
-- `explain_contracts.py`
-- `templates.py`
-- `explain_service.py`
-- `run_explain.py`
+## 1. Core Constraints
 
-This is absolute. If any function in these files makes an HTTP call, imports an LLM client, or calls any function that eventually reaches an LLM, that is a violation.
+### 1.1 No guessed payloads
+The frontend must not invent backend payload shapes. All serious UI work must follow the interface audit and contract freeze.
 
-Human-readable prose in `audit_summary` is produced by `templates.py` using string formatting over saved field values. It is not generated.
+### 1.2 No broad unrelated rewrites
+This initiative is a journey/UI architecture upgrade, not permission to refactor unrelated repo areas.
 
-```python
-# Correct
-def render_htf_context(digest: StructureDigest) -> str:
-    return (
-        f"HTF Context: {digest.htf_source_timeframe} regime was {digest.htf_bias}. "
-        f"Last confirmed BOS was {digest.last_bos}."
-    )
+### 1.3 No fake production logic in v1 scaffolding
+Component and route scaffolds may use typed placeholders, but they must not masquerade as real backend behavior.
 
-# Wrong — never do this
-def render_htf_context(digest: StructureDigest) -> str:
-    return call_llm(f"Describe the HTF context: {digest}")
-```
+### 1.4 No premature chart-tool complexity
+Initial implementation may use placeholder chart containers and annotation regions. Heavy charting logic is out of scope for the first pass.
 
----
+### 1.5 No multi-persona workflow expansion in v1 UI
+The multi-analyst/persona backend may exist, but the first-pass UI should not attempt to expose a full multi-persona orchestration surface.
 
-## RULE 2 — Replay produces identical output from saved artifacts
+### 1.6 No collapse of recommendation and commitment
+`systemVerdict`, `userDecision`, and `executionPlan` must remain distinct.
 
-Given a saved `MultiAnalystOutput` JSON file, `run_explain.py --file <path>` must produce the identical `ExplainabilityBlock` as was produced at run time. No field may differ.
-
-This means:
-- All classification logic must be pure functions of the saved fields
-- No timestamps, random values, or external lookups in explanation construction
-- Template strings are fixed — they do not vary by run
-
-Test: save output → re-run from file → assert byte-level equality on all structured fields.
+### 1.7 No black-box learning claims
+The review/refinement loop must be framed as transparent review and policy refinement, not mysterious self-learning.
 
 ---
 
-## RULE 3 — Influence classification is rule-based, not heuristic
+## 2. UX Constraints
 
-Signal influence (`dominant`, `supporting`, `conflicting`, `neutral`, `absent`) must be computed from the explicit rule table in `CONTRACTS.md`. It is not inferred, scored with floating point, or approximated.
+### 2.1 No blank-page landing
+The landing surface must be triage-oriented, not a blank ticket form.
 
-```python
-# Correct
-def classify_htf_regime(digest: StructureDigest, verdict: str) -> str:
-    if not digest.structure_available:
-        return "absent"
-    if digest.structure_gate == "pass" and digest.htf_bias in verdict:
-        return "dominant"
-    if digest.structure_gate == "fail":
-        return "conflicting"
-    return "neutral"
+### 2.2 No decorative gate checks
+Gate checks must act as a real control boundary with severe visual treatment and policy-aware progression.
 
-# Wrong
-def classify_htf_regime(digest, verdict):
-    score = 0.3 * regime_strength + 0.7 * alignment  # no float scoring
-    return "dominant" if score > 0.6 else "supporting"
-```
+### 2.3 No stage chaos
+The journey must keep strong inter-stage structure even if local stage fields remain flexible.
 
----
+### 2.4 No ambiguity about who said what
+AI-prefilled vs user-confirmed vs user-overridden vs manual fields must be distinguishable through provenance.
 
-## RULE 4 — `audit_summary` is a template fill-in, not freeform generation
+### 2.5 Visual treatment must follow the style guide
+The dark institutional workspace aesthetic, semantic color roles, surface system, and severity model defined in `UI_STYLE_GUIDE.md` are not optional style preferences — they are part of the product contract.
 
-`templates.py` must contain named template functions, one per section. Each function takes structured inputs and returns a formatted string. The templates themselves are fixed strings with interpolated values.
-
-```python
-# templates.py — correct pattern
-def render_persona_summary(pa: PersonaVerdict, pb: PersonaVerdict, arbiter: ArbiterDecision) -> str:
-    return (
-        f"Persona Summary: Technical Structure returned {pa.verdict} at {pa.confidence} confidence. "
-        f"Execution/Timing returned {pb.verdict} at {pb.confidence} confidence. "
-        f"Consensus: {arbiter.consensus_state}. Arbiter used {arbiter.final_confidence} confidence."
-    )
-```
-
-Templates may use conditionals (`if`/`else`) to vary phrasing based on field values. They must not produce freeform text beyond what the field values determine.
+Specifically:
+- Gate Checks must use `SeverityCard` treatment, not standard card styling
+- `SplitVerdictPanel` must keep System Verdict, User Decision, and Execution Plan visually distinct
+- Provenance markers must distinguish AI content from user action on every surface where both appear
+- Color usage must follow the semantic roles in Section 5 — emerald/amber/rose/indigo are state signals, not decoration
 
 ---
 
-## RULE 5 — Standalone file is derived from embedded field, not independently computed
+## 3. Technical Constraints
 
-`_multi_analyst_explainability.json` must be written as:
+### 3.1 Typed modular structure
+Types, stores, components, routes, and service interfaces should remain separated.
 
-```python
-with open(explainability_path, "w") as f:
-    json.dump(output.explanation.to_dict(), f, indent=2)
-```
+### 3.2 Thin service layer
+Future API calls should sit behind explicit service functions rather than being scattered inside components.
 
-Where `output.explanation` is the same `ExplainabilityBlock` object embedded in `MultiAnalystOutput`. It must never be recomputed separately. If `output.explanation` is `None`, do not write the standalone file — raise instead.
+### 3.3 Snapshot persistence
+The system must persist a save-time decision snapshot instead of relying on future reconstruction from mutable live state.
 
----
+### 3.4 Adapter visibility
+If a frontend need depends on an unstable or missing backend producer, it must be surfaced as an explicit adapter/gap rather than hidden in component logic.
 
-## RULE 6 — `multi_contracts.py` additive extension only
-
-The only permitted change to any existing file is adding one optional field to `MultiAnalystOutput` in `analyst/multi_contracts.py`:
-
-```python
-explanation: Optional["ExplainabilityBlock"] = None
-```
-
-No other field, method, or import in any existing file may be modified. If a change to another file seems necessary, it is a design error — solve it in the new 3G modules.
-
-```bash
-git diff --name-only HEAD | grep -E "feed/|officer/|structure/|analyst/pre_filter|analyst/contracts\.py|analyst/prompt_builder|analyst/analyst\.py|analyst/service|analyst/personas|analyst/arbiter|analyst/multi_analyst_service"
-# Must return no output
-# Only permitted diff: analyst/multi_contracts.py (additive field only)
-```
+### 3.5 No direct Python execution from the browser
+The UI must not import Python modules, call subprocess, or invoke the analyst pipeline from browser context. The UI consumes backend output through one of two permitted patterns: (A) reading saved JSON artifacts via a file-based service layer, or (B) calling a thin API layer that wraps the Python services. Establish which pattern is in use during the interface audit. This is a hard constraint — it determines how every service call in the frontend is shaped.
 
 ---
 
-## RULE 7 — Confidence provenance must be step-complete
+## 4. Scope Constraints for Initial Upgrade
 
-Every step in the confidence chain must be recorded, even if the value did not change:
-
-```
-Step 1: Technical persona confidence
-Step 2: Execution persona confidence
-Step 3: Consensus state classification
-Step 4: Arbiter rule and result
-Step 5: Python override check (even if not triggered)
-```
-
-A provenance chain missing any step is invalid. Post-construction validator must assert `len(provenance.steps) >= 5`.
+Out of scope for the first major UI pass:
+- advanced mobile-first redesign
+- collaborative workflows
+- excessive settings/configuration surfaces
+- full chart drawing tool suite
+- auto-learning claims or optimization engines
+- any build sequence that skips the interface audit gate
 
 ---
 
-## RULE 8 — Signal ranking must cover all seven signals
+## 5. Process Constraints
 
-The `SignalInfluenceRanking.signals` list must always contain exactly seven entries — one per signal in the defined set:
+### 5.1 Audit before build
+The interface audit is a hard gating phase before serious UI implementation.
 
-```python
-REQUIRED_SIGNALS = {
-    "htf_regime", "bos_mss", "liquidity", "fvg_context",
-    "sweep_reclaim", "no_trade_flags", "caution_flags"
-}
-```
+### 5.2 Staged delivery only
+Implementation should follow staged milestones rather than a big-bang rewrite.
 
-If a signal is unavailable, classify it as `"absent"` — do not omit it. Post-construction validator must assert all seven are present.
+### 5.3 Reviewable increments
+Each phase must leave behind files and structures that are reviewable, testable, and ready for the next pass.
 
----
-
-## RULE 9 — `ExplainabilityBlock` construction from file must not touch the network or filesystem beyond the input file
-
-`run_explain --file <path>` must:
-1. Load the JSON file
-2. Deserialise to `MultiAnalystOutput`
-3. Re-derive `ExplainabilityBlock` from the in-memory object
-4. Write standalone file
-
-It must not re-fetch market data, re-run Officer, re-run structure engine, or make any calls to external services.
-
----
-
-## Common failure modes to avoid
-
-| Failure | Guard |
-|---|---|
-| LLM call sneaks into template rendering | Rule 1 — static template functions only |
-| Replay produces different output | Rule 2 — assert equality in tests |
-| Signal classification uses heuristic scoring | Rule 3 — rule table only |
-| Standalone file recomputed independently | Rule 5 — derive from embedded field |
-| `multi_contracts.py` modified beyond additive field | Rule 6 — git diff check |
-| Confidence provenance missing steps | Rule 7 — validator asserts `len >= 5` |
-| Signal ranking missing entries | Rule 8 — validator asserts all 7 present |
-| Explain-from-file fetches live data | Rule 9 — no network/filesystem beyond input |
+### 5.4 Preserve repo realism
+All documentation and scaffolding should reflect the repo as it exists, with uncertainty marked explicitly rather than smoothed over.

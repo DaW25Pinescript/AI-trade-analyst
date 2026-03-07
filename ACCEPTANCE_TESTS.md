@@ -1,391 +1,236 @@
-# ACCEPTANCE_TESTS.md — Phase 3G Exit Criteria
+# ACCEPTANCE_TESTS.md
 
-## How to use this file
+# AI Trade Analyst – Acceptance Tests
+Version: 1.0
 
-Run Group 0 first. Any failure stops all further work. All Groups A–G are pure Python — no LLM calls are required or permitted anywhere in this test suite. Report pass/fail per group before declaring Phase 3G complete.
+## 1. Purpose
 
----
-
-## Group 0 — Full regression
-
-### T0.1 — All prior phase tests pass
-
-```bash
-pytest market_data_officer/tests/ tests/test_pre_filter.py tests/test_analyst_verdict.py tests/test_analyst_integration.py tests/test_personas.py tests/test_arbiter.py tests/test_multi_analyst_integration.py
-# All must pass — 0 failures
-```
-
-### T0.2 — 3F multi-analyst service runs unchanged
-
-```python
-from analyst.multi_analyst_service import run_multi_analyst
-output = run_multi_analyst("EURUSD")
-assert output.arbiter_decision is not None
-assert len(output.persona_outputs) == 2
-```
-
-### T0.3 — Existing modules not modified (additive field on multi_contracts.py expected)
-
-```bash
-git diff --name-only HEAD | grep -E "feed/|officer/|structure/|analyst/pre_filter|analyst/contracts\.py|analyst/prompt_builder|analyst/analyst\.py|analyst/service|analyst/personas|analyst/arbiter|analyst/multi_analyst_service"
-# Must return no output
-```
-
-`analyst/multi_contracts.py` IS expected to appear in the diff — it gains one additive optional field.
-If it does not appear, the `explanation` field was not added and 3G is incomplete.
-All other analyst modules above must show zero modifications.
+These acceptance tests define what “done” means for the Trade Ideation Journey rollout. They are written to enforce staged delivery and to prevent the UI from drifting away from real repo contracts.
 
 ---
 
-## Group A — ExplainabilityBlock construction
+## 2. Phase 0 — Interface Audit and Contract Freeze
 
-### TA.1 — ExplainabilityBlock produced from valid MultiAnalystOutput
+### AT-0.1 Interface inventory exists
+Pass when:
+- the repo has a documented inventory of journey-relevant inputs/outputs
+- each producer/consumer can be traced to a real file/module
 
-```python
-from analyst.explainability import build_explanation
-from analyst.multi_analyst_service import run_multi_analyst
+### AT-0.2 Availability matrix exists
+Pass when:
+- fields needed by the triage board and journey stages are marked as available, derivable, missing, unstable, deprecated, or adapter-required
 
-output = run_multi_analyst("EURUSD")
-block = build_explanation(output)
+### AT-0.3 Contract freeze exists
+Pass when:
+- a v1 frontend-safe contract layer is documented
+- audit ambiguity is explicit rather than hidden
 
-assert block is not None
-assert block.instrument == "EURUSD"
-assert block.source_verdict == output.arbiter_decision.final_verdict
-assert block.source_confidence == output.arbiter_decision.final_confidence
-```
-
-### TA.2 — All seven signals present in ranking
-
-```python
-from analyst.explainability import REQUIRED_SIGNALS
-
-signal_names = {s.signal for s in block.signal_ranking.signals}
-assert signal_names == REQUIRED_SIGNALS
-```
-
-### TA.3 — All influence values are valid
-
-```python
-valid_influences = {"dominant", "supporting", "conflicting", "neutral", "absent"}
-for s in block.signal_ranking.signals:
-    assert s.influence in valid_influences
-```
-
-### TA.4 — Confidence provenance has at least 5 steps
-
-```python
-assert len(block.confidence_provenance.steps) >= 5
-assert block.confidence_provenance.final_confidence == output.arbiter_decision.final_confidence
-```
-
-### TA.5 — Causal chain distinguishes no-trade from caution drivers
-
-```python
-assert isinstance(block.causal_chain.no_trade_drivers, list)
-assert isinstance(block.causal_chain.caution_drivers, list)
-# no overlap between the two lists
-nt_flags = {d.flag for d in block.causal_chain.no_trade_drivers}
-caution_flags = {d.flag for d in block.causal_chain.caution_drivers}
-assert nt_flags.isdisjoint(caution_flags)
-```
-
-### TA.6 — `audit_summary` is a non-empty string
-
-```python
-assert isinstance(block.audit_summary, str)
-assert len(block.audit_summary) > 100
-```
+### AT-0.4 No major UI build before audit exit
+Pass when:
+- serious UI implementation is sequenced after the audit gate, not before it
 
 ---
 
-## Group B — Signal influence classification
+## 3. Phase 1 — Domain Model and Store
 
-### TB.1 — Bullish HTF regime with pass gate → `dominant` bullish
+### AT-1.1 Shared journey types exist
+Pass when:
+- the repo contains journey-related frontend types for status, stages, provenance, gates, snapshots, and core journey state
 
-```python
-from analyst.explainability import classify_signal_influence
+### AT-1.2 Semantic stage keys are used
+Pass when:
+- stage identity uses semantic names such as `market_overview` and `gate_checks`, not anonymous numeric tabs in the domain model
 
-influence = classify_signal_influence("htf_regime", bullish_pass_digest, verdict="long_bias")
-assert influence == "dominant"
-```
-
-### TB.2 — Unavailable structure → htf_regime `absent`
-
-```python
-influence = classify_signal_influence("htf_regime", no_structure_digest, verdict="long_bias")
-assert influence == "absent"
-```
-
-### TB.3 — External liquidity just above price (bullish verdict) → `conflicting`
-
-```python
-influence = classify_signal_influence("liquidity", liquidity_above_close_digest, verdict="long_bias")
-assert influence == "conflicting"
-```
-
-### TB.4 — Discount FVG active (bullish verdict) → `supporting`
-
-```python
-influence = classify_signal_influence("fvg_context", discount_fvg_digest, verdict="long_bias")
-assert influence in ("dominant", "supporting")
-```
-
-### TB.5 — No active FVG → `neutral` or `absent`
-
-```python
-influence = classify_signal_influence("fvg_context", no_fvg_digest, verdict="long_bias")
-assert influence in ("neutral", "absent")
-```
-
-### TB.6 — Active no-trade flag → no_trade_flags `conflicting`
-
-```python
-influence = classify_signal_influence("no_trade_flags", no_trade_digest, verdict="no_trade")
-assert influence == "conflicting"
-```
-
-### TB.7 — No flags → no_trade_flags `neutral`
-
-```python
-influence = classify_signal_influence("no_trade_flags", clean_digest, verdict="long_bias")
-assert influence == "neutral"
-```
+### AT-1.3 Journey store exists
+Pass when:
+- a typed journey store supports stage changes, asset selection, triage updates, notes, overrides, evidence, gates, verdict, decision, execution plan, snapshot creation, and reset
 
 ---
 
-## Group C — Persona dominance
+## 4. Phase 2 — Shell and Route Backbone
 
-### TC.1 — Both personas agree direction → `direction_driver = "both"`
+### AT-2.1 Route scaffolds exist
+Pass when:
+- the repo contains route/page stubs for dashboard, journey, journal, and review surfaces
 
-```python
-from analyst.explainability import compute_persona_dominance
+### AT-2.2 Stage shell exists
+Pass when:
+- a reusable stage shell provides progress, content layout, and navigation actions
 
-dominance = compute_persona_dominance(aligned_persona_outputs, aligned_arbiter)
-assert dominance.direction_driver == "both"
-```
-
-### TC.2 — Confidence split → stricter persona identified
-
-```python
-# technical=high, execution=moderate
-dominance = compute_persona_dominance(split_confidence_outputs, split_arbiter)
-assert dominance.stricter_persona == "execution_timing"
-assert dominance.confidence_driver == "execution_timing"
-assert dominance.confidence_effect == "downgraded"
-```
-
-### TC.3 — Python override active → `direction_driver = "arbiter_override"`
-
-```python
-dominance = compute_persona_dominance(no_trade_outputs, no_trade_arbiter)
-assert dominance.direction_driver == "arbiter_override"
-assert dominance.python_override_active is True
-assert dominance.confidence_effect == "overridden_by_python"
-```
-
-### TC.4 — Dominance `note` field is a non-empty string
-
-```python
-assert isinstance(dominance.note, str)
-assert len(dominance.note) > 10
-```
+### AT-2.3 Progress stepper exists
+Pass when:
+- the journey has a visible stepper or equivalent stage navigation aid
 
 ---
 
-## Group D — Confidence provenance
+## 5. Phase 3 — Triage Board
 
-### TD.1 — Full alignment path produces correct steps
+### AT-3.1 Landing is triage-first
+Pass when:
+- the default entry surface is a market/asset overview rather than a blank form
 
-```python
-from analyst.explainability import compute_confidence_provenance
+### AT-3.2 Triage cards explain relevance
+Pass when:
+- each triage card shows at least symbol, triage status, why-interesting tags, and a rationale placeholder or equivalent
 
-# Fixture: both personas high, full_alignment, final=high
-prov = compute_confidence_provenance(aligned_outputs, full_alignment_arbiter, clean_digest)
-
-assert prov.steps[0].value == "high"   # technical
-assert prov.steps[1].value == "high"   # execution
-assert prov.steps[2].value == "full_alignment"
-assert prov.final_confidence == "high"
-assert prov.python_override is False
-```
-
-### TD.2 — Confidence split path records downgrade
-
-```python
-prov = compute_confidence_provenance(split_outputs, split_arbiter, clean_digest)
-
-assert prov.steps[0].value == "high"
-assert prov.steps[1].value == "moderate"
-assert "lower" in prov.steps[3].rule.lower()
-assert prov.final_confidence == "moderate"
-```
-
-### TD.3 — Python override path records override
-
-```python
-prov = compute_confidence_provenance(any_outputs, any_arbiter, no_trade_digest)
-
-assert prov.python_override is True
-assert prov.final_confidence == "none"
-assert prov.override_reason is not None
-assert len(prov.steps) >= 5
-```
+### AT-3.3 Triage data is contract-safe
+Pass when:
+- card data is sourced through a typed service or explicitly marked mock interface rather than freehand component objects
 
 ---
 
-## Group E — Replay determinism
+## 6. Phase 4 — Context, Structure, and Macro Screens
 
-### TE.1 — Same MultiAnalystOutput produces identical ExplainabilityBlock
+### AT-4.1 Asset context stage exists
+Pass when:
+- the journey includes a stage for base analytical context and quick summary
 
-```python
-from analyst.explainability import build_explanation
+### AT-4.2 Structure/liquidity stage exists
+Pass when:
+- the journey includes a stage for chart structure, liquidity, and evidence capture placeholders
 
-block_a = build_explanation(output)
-block_b = build_explanation(output)
-
-assert block_a.to_dict() == block_b.to_dict()
-```
-
-### TE.2 — Replay from saved file produces identical block
-
-```python
-import json, tempfile, os
-from analyst.explainability import build_explanation_from_dict
-from analyst.multi_contracts import MultiAnalystOutput
-
-# Save output to temp file
-with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-    json.dump(output.to_dict(), f)
-    tmp_path = f.name
-
-# Reload and re-derive
-with open(tmp_path) as f:
-    saved_dict = json.load(f)
-
-reloaded_output = MultiAnalystOutput.from_dict(saved_dict)
-replayed_block = build_explanation(reloaded_output)
-
-assert block_a.to_dict() == replayed_block.to_dict()
-os.unlink(tmp_path)
-```
-
-### TE.3 — Different structure inputs produce different signal rankings
-
-```python
-block_bullish = build_explanation(bullish_output)
-block_bearish = build_explanation(bearish_output)
-
-assert block_bullish.signal_ranking.dominant_signal != block_bearish.signal_ranking.dominant_signal or \
-       block_bullish.confidence_provenance.final_confidence != block_bearish.confidence_provenance.final_confidence
-```
+### AT-4.3 Macro alignment stage exists
+Pass when:
+- the journey includes a stage for macro/news alignment and conflict framing
 
 ---
 
-## Group F — Output files
+## 7. Phase 5 — Gate Checks
 
-### TF.1 — `explanation` field populated in MultiAnalystOutput after full run
+### AT-5.1 Gate states exist
+Pass when:
+- gate rows support `passed`, `conditional`, and `blocked`
 
-```python
-from analyst.multi_analyst_service import run_multi_analyst
-output = run_multi_analyst("EURUSD")
-assert output.explanation is not None
-assert isinstance(output.explanation.audit_summary, str)
-```
+### AT-5.2 Non-passed gates support justification
+Pass when:
+- blocked/conditional gate states can capture justification or rationale
 
-### TF.2 — Standalone explainability file written
+### AT-5.3 Progression respects policy hooks
+Pass when:
+- the journey has a clear mechanism to disable or restrict forward movement when gate policy requires it
 
-```python
-import os
-assert os.path.exists("analyst/output/EURUSD_multi_analyst_explainability.json")
-```
-
-### TF.3 — Standalone file matches embedded block
-
-```python
-import json
-with open("analyst/output/EURUSD_multi_analyst_explainability.json") as f:
-    standalone = json.load(f)
-
-assert standalone == output.explanation.to_dict()
-```
-
-### TF.4 — Main output file also contains explanation field
-
-```python
-with open("analyst/output/EURUSD_multi_analyst_output.json") as f:
-    main = json.load(f)
-
-assert "explanation" in main
-assert main["explanation"]["source_verdict"] == output.arbiter_decision.final_verdict
-```
-
-### TF.5 — JSON serialisation roundtrip is lossless
-
-```python
-import json
-block = output.explanation
-serialized = json.dumps(block.to_dict())
-restored = json.loads(serialized)
-assert restored["confidence_provenance"]["final_confidence"] == block.confidence_provenance.final_confidence
-assert len(restored["signal_ranking"]["signals"]) == 7
-```
+### AT-5.4 Gate UI treatment is structurally distinct from content cards
+Pass when:
+- blocked gate rows render a visually distinct state (e.g. error/warning colour token, not the default card style)
+- the forward-progression action (Next / Continue) is visibly disabled or absent when any gate is `blocked`
+- a `conditional` gate state renders differently from both `passed` and `blocked` (three distinct states are visually distinguishable)
+- gate justification input is surfaced inline on the gate row, not buried in a separate settings panel
 
 ---
 
-## Group G — CLI and cross-instrument coverage
+## 8. Phase 6 — Verdict and Plan
 
-### TG.1 — CLI run-time generation works
+### AT-6.1 Verdict split exists
+Pass when:
+- the UI renders distinct sections for `systemVerdict`, `userDecision`, and `executionPlan`
 
-```bash
-python run_explain.py --instrument EURUSD
-python run_explain.py --instrument XAUUSD
-# Both must complete without exception and write explainability files
-```
-
-### TG.2 — CLI replay from file works
-
-```bash
-python run_explain.py --file analyst/output/EURUSD_multi_analyst_output.json
-# Must produce identical explainability output as TG.1 EURUSD run
-```
-
-### TG.3 — No LLM calls made in any explain path
-
-```python
-# Mock LLM client — must not be called
-with mock.patch("anthropic.Anthropic") as mock_client:
-    from analyst.explainability import build_explanation
-    block = build_explanation(output)
-    mock_client.assert_not_called()
-```
-
-### TG.4 — Final: no existing modules modified (additive field on multi_contracts.py expected)
-
-```bash
-git diff --name-only HEAD | grep -E "feed/|officer/|structure/|analyst/pre_filter|analyst/contracts\.py|analyst/prompt_builder|analyst/analyst\.py|analyst/service|analyst/personas|analyst/arbiter|analyst/multi_analyst_service"
-# Must return no output
-```
-
-`analyst/multi_contracts.py` IS expected in the diff — additive `explanation` field only.
-Verify the change is additive: `git diff HEAD analyst/multi_contracts.py` must show only the new field, no deletions or modifications to existing fields.
+### AT-6.2 Recommendation and commitment are separated in state
+Pass when:
+- the underlying state model does not collapse system output and human commitment into a single object
 
 ---
 
-## Phase 3G sign-off checklist
+## 9. Phase 7 — Journal Capture and Snapshots
 
-- [ ] Group 0 — Full regression + 3F service: 0 failures
-- [ ] Group A — ExplainabilityBlock construction: all pass
-- [ ] Group B — Signal influence classification: all pass
-- [ ] Group C — Persona dominance: all pass
-- [ ] Group D — Confidence provenance: all pass
-- [ ] Group E — Replay determinism: all pass
-- [ ] Group F — Output files: all pass
-- [ ] Group G — CLI and cross-instrument: all pass
-- [ ] Zero LLM calls in entire explain path — verified by mock test TG.3
-- [ ] All 7 signals present in every ranking — validator asserts
-- [ ] Confidence provenance has ≥ 5 steps — validator asserts
-- [ ] Standalone file derived from embedded field — not independently computed
-- [ ] Replay from saved file produces byte-identical structured fields
-- [ ] `audit_summary` is template-rendered, not generated
-- [ ] Only change to existing files: `multi_contracts.py` additive field
-- [ ] Both EURUSD and XAUUSD produce valid ExplainabilityBlock
+### AT-7.1 Evidence capture exists
+Pass when:
+- the journey supports file/evidence attachment in some baseline form
+
+### AT-7.2 Decision snapshot exists
+Pass when:
+- the save flow produces a frozen decision snapshot object or explicit placeholder for one
+
+### AT-7.3 Snapshot preview exists
+Pass when:
+- the user can review what is about to be frozen before save/commit
+
+---
+
+## 10. Phase 8 — Review Engine Surface
+
+### AT-8.1 Review route exists
+Pass when:
+- a review page/surface exists in scaffold or implemented form
+
+### AT-8.2 Planned vs actual framing exists
+Pass when:
+- the review surface is designed around comparison and policy review, not black-box model mystique
+
+### AT-8.3 Override and gate pattern placeholders exist
+Pass when:
+- the review surface makes room for override-frequency and gate-failure analysis
+
+---
+
+## 11. Cross-Cutting Acceptance Tests
+
+### AT-X.1 Provenance support exists
+Pass when:
+- AI-prefilled vs user-confirmed vs user-overridden vs manual fields are representable in the state model
+
+### AT-X.2 Service layer exists and transport pattern is declared
+Pass when:
+- future API calls are stubbed or implemented through a thin typed service layer
+- the service layer declares which transport pattern is in use: file-based (reads saved JSON artifacts) or API-based (calls a thin Python wrapper)
+- no component contains raw fetch logic or direct Python execution
+
+### AT-X.2a Transport pattern is consistent
+Pass when:
+- all service calls in the frontend use the same transport pattern declared in the audit
+- no component bypasses the service layer to read files or call endpoints directly
+
+### AT-X.3 Placeholder honesty is preserved
+Pass when:
+- placeholders are clearly marked and do not pretend to be final backend truth
+
+### AT-X.4 Non-goals remain out of scope
+Pass when:
+- the first-pass implementation does not sprawl into multi-persona UI, advanced chart tooling, collaborative workflows, or opaque auto-learning claims
+
+### AT-X.5 Visual language conformance
+Pass when (per `UI_STYLE_GUIDE.md` Section 17):
+- the UI clearly resembles the approved V1 mockup aesthetic — dark, premium, institutional workspace tone
+- semantic state colors are used consistently: emerald for passed/aligned, amber for conditional, rose for blocked, indigo for AI/system context
+- gate checks are rendered with visibly higher severity than normal content cards (distinct surface treatment, not just a color change)
+- `SplitVerdictPanel` renders System Verdict, User Decision, and Execution Plan as three visually distinct sections
+- AI-prefilled content and user-entered content are visually distinguishable via provenance markers
+- snapshot and audit framing is preserved — nothing looks like mutable live state when it represents a frozen record
+- no unnecessary visual invention outside the established component and color language
+
+---
+
+## 12. Phase 9 — Hardening and Policy Refinement
+
+### AT-9.1 Contract conformance tests exist
+Pass when:
+- at least one test per journey stage validates that required contract fields are present in the service layer response
+- missing or `undefined` fields from the backend do not silently produce broken UI state
+
+### AT-9.2 Adapter gaps are resolved or explicitly deferred
+Pass when:
+- every field marked `requires_adapter` or `missing` in the availability matrix has a resolution: implemented, explicitly deferred with a dated note, or removed from scope
+- no unresolved `requires_adapter` field is silently consumed as if it were `available_now`
+
+### AT-9.3 Placeholder drift is cleaned
+Pass when:
+- no component or store field uses a hardcoded mock value that was intended as a temporary stub but was never replaced
+- placeholder fields are either wired to real data, explicitly typed as `null | undefined` with a TODO, or removed
+
+### AT-9.4 Review surface is not a black box
+Pass when:
+- every signal shown on the review surface can be traced to a specific field in a saved `decisionSnapshot` or `ExplainabilityBlock`
+- no review insight is generated by freeform LLM summarisation without a traceable source field
+
+---
+
+## 13. Final Acceptance
+
+The Trade Ideation Journey package is accepted when:
+- the interface audit has grounded the contract layer
+- the staged journey exists as a coherent frontend scaffold or implementation
+- gate checks act as a real control boundary
+- the system verdict and user decision are preserved separately
+- a decision snapshot can be frozen for later review
+- the review direction remains transparent, rule-based, and auditable
+- transport pattern is declared and consistent across the service layer
+- Phase 9 hardening tests pass
