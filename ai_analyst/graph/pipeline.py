@@ -63,7 +63,7 @@ async def validate_input_node(state: GraphState) -> GraphState:
         raise ValueError("GroundTruthPacket.instrument must not be empty.")
     if not gt.timeframes:
         raise ValueError("GroundTruthPacket.timeframes must not be empty.")
-    if not gt.charts:
+    if not gt.charts and not getattr(gt, "triage_mode", False):
         raise ValueError("GroundTruthPacket.charts must contain at least one clean price chart.")
     if len(gt.screenshot_metadata) != len(gt.charts):
         raise ValueError(

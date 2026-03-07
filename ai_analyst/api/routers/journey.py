@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
@@ -186,22 +187,69 @@ async def watchlist_triage():
 # ── POST /triage ─────────────────────────────────────────────────────────────
 
 
-def _stub_triage_artifact(symbol: str) -> dict:
-    """TEMPORARY STUB — replace with real multi-analyst pipeline output."""
+def _current_session() -> str:
+    """Return the active trading session based on current UTC hour."""
+    hour = datetime.now(timezone.utc).hour
+    if 0 <= hour < 7:
+        return "Asia"
+    if 7 <= hour < 12:
+        return "London"
+    if 12 <= hour < 21:
+        return "NY"
+    return "Off"
+
+
+async def run_real_triage_for_symbol(symbol: str) -> dict:
+    """Call the /analyse endpoint for a single symbol and normalise the result."""
+    session = _current_session()
+    files = [
+        ("instrument", (None, symbol)),
+        ("session", (None, session)),
+        ("timeframes", (None, '["H4","H1","M15"]')),
+        ("account_balance", (None, "10000")),
+        ("min_rr", (None, "2.0")),
+        ("max_risk_per_trade", (None, "0.5")),
+        ("triage_mode", (None, "true")),
+    ]
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "http://127.0.0.1:8000/analyse",
+                files=files,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "Triage /analyse call failed for %s: %s %s",
+            symbol, e.response.status_code, e.response.text,
+        )
+        raise
+
+    verdict = result.get("verdict", {})
+    decision = verdict.get("decision", "WAIT_FOR_CONFIRMATION")
+    confidence_raw = verdict.get("overall_confidence", 0.5)
+
     return {
         "symbol": symbol,
+        "bias": verdict.get("final_bias", "neutral"),
+        "triage_status": (
+            "no_trade" if decision == "NO_TRADE"
+            else "conditional" if decision == "WAIT_FOR_CONFIRMATION"
+            else "watch"
+        ),
+        "confidence": (
+            "high" if confidence_raw >= 0.7
+            else "moderate" if confidence_raw >= 0.4
+            else "low"
+        ),
+        "rationale_summary": verdict.get("arbiter_notes") or (
+            verdict.get("no_trade_conditions", [""])[0] if decision == "NO_TRADE" else ""
+        ),
+        "why_interesting_tags": [decision] + verdict.get("no_trade_conditions", [])[:2],
+        "no_trade_enforced": decision == "NO_TRADE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "triage_status": "conditional",
-        "bias": "bullish",
-        "confidence": "moderate",
-        "consensus_state": "partial_agreement",
-        "verdict": "conditional",
-        "no_trade_enforced": False,
-        "rationale_summary": f"[STUB] Mock triage artifact for {symbol}. Wire real pipeline to replace.",
-        "why_interesting_tags": ["stub_data", "pipeline_not_wired"],
-        "analysts": ["stub"],
-        "gates_passed": [],
-        "gates_failed": [],
+        "run_id": result.get("run_id"),
     }
 
 
@@ -210,8 +258,8 @@ async def run_triage(request: Request):
     """
     POST /triage — Trigger triage artifact production.
 
-    TEMPORARY STUB: writes mock artifacts until real pipeline is wired in.
-    Replace _stub_triage_artifact() with real analyst pipeline call.
+    Calls the /analyse endpoint for each symbol and writes the normalised
+    result as a multi_analyst_output JSON file.
     """
     try:
         body = await request.json()
@@ -227,8 +275,7 @@ async def run_triage(request: Request):
 
     for symbol in symbols:
         try:
-            # TODO: replace with real pipeline: result = await run_analyst_pipeline(symbol)
-            result = _stub_triage_artifact(symbol)
+            result = await run_real_triage_for_symbol(symbol)
             ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             filename = f"multi_analyst_output_{symbol}_{ts}.json"
             path = os.path.join(output_dir, filename)
@@ -237,7 +284,7 @@ async def run_triage(request: Request):
             written.append(symbol)
         except Exception as e:
             failed.append(symbol)
-            print(f"[triage] {symbol} failed: {e}")
+            logger.error("[triage] %s failed: %s", symbol, e)
 
     if not written:
         from fastapi import HTTPException

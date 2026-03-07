@@ -71,6 +71,7 @@ class GroundTruthPacket(BaseModel):
     risk_constraints: RiskConstraints
     context: MarketContext
     generated_by: str = "api"
+    triage_mode: bool = False          # when True, charts are optional (headless triage)
 
     model_config = {"frozen": True}   # immutable after creation — see design rule #1
 

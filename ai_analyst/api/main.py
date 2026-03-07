@@ -559,6 +559,14 @@ async def analyse(
             "and may revise or reaffirm its analysis. Arbiter weights Round 2 at 1.5x Round 1."
         ),
     ),
+    # ─── triage mode (chartless) ────────────────────────────────────────────
+    triage_mode: bool = Form(
+        False,
+        description=(
+            "When true, skips the chart-upload requirement and runs the pipeline "
+            "without visual evidence. Used by POST /triage for headless batch runs."
+        ),
+    ),
 ):
     # ── Rate limit check (HIGH-7) ────────────────────────────────────────────
     client_ip = request.client.host if request.client else "unknown"
@@ -608,7 +616,7 @@ async def analyse(
                 )
             )
 
-    if not charts:
+    if not charts and not triage_mode:
         raise HTTPException(
             status_code=422,
             detail=(
@@ -675,6 +683,7 @@ async def analyse(
                 account_balance=account_balance,
                 open_positions=open_pos_list,
             ),
+            triage_mode=triage_mode,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Ground Truth Packet validation failed: {e}")
