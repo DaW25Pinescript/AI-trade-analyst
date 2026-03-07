@@ -117,3 +117,66 @@ class TestGroupF4_Tolerance:
             if ref_swing:
                 assert event.time >= ref_swing.confirm_time, \
                     f"Event {event.id} fires before reference swing confirmed"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3B — XAUUSD cross-instrument tests (Groups F, G)
+# ---------------------------------------------------------------------------
+
+class TestGroup3B_F2_XAUUSD:
+    """TF.2 — XAUUSD passes all 3B Groups A–E."""
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_xauusd_liquidity_scope_populated(self, config, tf):
+        """3B F.2 — All XAUUSD liquidity levels have liquidity_scope."""
+        bars = generate_xauusd_bars(tf)
+        packet = compute_structure_packet("XAUUSD", tf, config, bars=bars)
+
+        for level in packet.liquidity:
+            assert level.liquidity_scope is not None, \
+                f"Level {level.id} missing liquidity_scope"
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_xauusd_prior_levels_external(self, config, tf):
+        """3B F.2 — Prior day/week levels tagged external for XAUUSD."""
+        bars = generate_xauusd_bars(tf)
+        packet = compute_structure_packet("XAUUSD", tf, config, bars=bars)
+
+        for level in packet.liquidity:
+            if level.type in ("prior_day_high", "prior_day_low",
+                              "prior_week_high", "prior_week_low"):
+                assert level.liquidity_scope == "external_liquidity"
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_xauusd_sweep_outcome_consistency(self, config, tf):
+        """3B F.2 — Sweep outcome mirrors level outcome for XAUUSD."""
+        bars = generate_xauusd_bars(tf)
+        packet = compute_structure_packet("XAUUSD", tf, config, bars=bars)
+
+        level_map = {l.id: l for l in packet.liquidity}
+        for sw in packet.sweep_events:
+            linked = level_map.get(sw.linked_liquidity_id)
+            if linked:
+                assert sw.outcome == linked.outcome
+                assert sw.reclaim_time == linked.reclaim_time
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_xauusd_classification_valid(self, config, tf):
+        """3B F.2 — All swept XAUUSD levels have valid outcome."""
+        bars = generate_xauusd_bars(tf)
+        packet = compute_structure_packet("XAUUSD", tf, config, bars=bars)
+
+        for level in packet.liquidity:
+            if level.outcome is not None:
+                assert level.outcome in ("reclaimed", "accepted_beyond", "unresolved")
+
+    def test_3b_tf3_xauusd_uses_own_tolerance(self, config):
+        """TF.3 — XAUUSD uses its own tolerance, not EURUSD tolerance."""
+        assert config.eqh_eql_tolerance["EURUSD"] != config.eqh_eql_tolerance["XAUUSD"]
+
+    @pytest.mark.parametrize("tf", ["15m", "1h", "4h"])
+    def test_3b_xauusd_engine_version(self, config, tf):
+        """TG.4 — engine_version is phase_3b in XAUUSD packets."""
+        bars = generate_xauusd_bars(tf)
+        packet = compute_structure_packet("XAUUSD", tf, config, bars=bars)
+        assert packet.build["engine_version"] == "phase_3b"

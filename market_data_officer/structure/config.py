@@ -1,4 +1,4 @@
-"""Engine configuration surface for Phase 3A.
+"""Engine configuration surface for Phase 3A/3B.
 
 Exposes only the narrow set of parameters defined in CONSTRAINTS.md.
 No configuration sprawl — keep it minimal until logic is proven.
@@ -31,3 +31,7 @@ class StructureConfig:
     # Session calendar for prior high/low derivation (UTC hour of day session open)
     day_session_open_utc: int = 21  # Sunday 21:00 UTC = start of FX week
     week_session_open_day: int = 6  # Sunday = 6 (ISO weekday)
+
+    # Phase 3B — Reclaim detection
+    allow_same_bar_reclaim: bool = True
+    reclaim_window_bars: int = 1
