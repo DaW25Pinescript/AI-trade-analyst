@@ -1,9 +1,13 @@
 """Chart-analysis orchestration nodes for the LangGraph runtime."""
 from __future__ import annotations
 
+import logging
+
 from .analyst_nodes import parallel_analyst_node
 from .state import GraphState
 from ..core.chart_analysis_runtime import resolve_chart_lenses
+
+logger = logging.getLogger(__name__)
 
 
 async def chart_base_node(state: GraphState) -> dict:
@@ -64,6 +68,10 @@ async def chart_lenses_node(state: GraphState) -> dict:
     merge after the macro_context ∥ chart_setup parallel branches applies
     analyst results cleanly without overwriting unrelated state keys.
     """
+    logger.info(
+        "[DEBUG] chart_lenses_node ENTRY: len(state.get('analyst_outputs', []))=%d state_keys=%s",
+        len(state.get("analyst_outputs", [])), sorted(state.keys()),
+    )
     result_state = await parallel_analyst_node(state)
     update: dict = {
         "analyst_outputs": result_state["analyst_outputs"],
@@ -72,6 +80,12 @@ async def chart_lenses_node(state: GraphState) -> dict:
     # Smoke mode: propagate captured error if the analyst LLM failed
     if "_smoke_error" in result_state:
         update["_smoke_error"] = result_state["_smoke_error"]
+    logger.info(
+        "[DEBUG] chart_lenses_node DONE: len(update['analyst_outputs'])=%d _smoke_error_present=%s",
+        len(update["analyst_outputs"]), "_smoke_error" in update,
+    )
+    # Stash count for debug_analyst_counts in smoke response
+    update["_debug_after_parallel"] = len(update["analyst_outputs"])
     return update
 
 

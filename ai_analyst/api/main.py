@@ -734,6 +734,8 @@ async def analyse(
         # Phase 3: timing fields (populated by validate_input_node)
         "_pipeline_start_ts": None,
         "_node_timings": None,
+        # Debug — temporary analyst output persistence investigation
+        "_debug_after_parallel": None,
     }
 
     # Phase 3: set correlation context for structured logging
@@ -742,7 +744,16 @@ async def analyse(
         final_state = await request.app.state.graph.ainvoke(initial_state)
     except RuntimeError as e:
         if _smoke_mode:
-            return JSONResponse(content={"smoke_error": _mask_secrets(str(e)), "run_id": ground_truth.run_id})
+            return JSONResponse(content={
+                "smoke_error": _mask_secrets(str(e)),
+                "run_id": ground_truth.run_id,
+                "debug_analyst_counts": {
+                    "after_parallel_analyst_node": 0,
+                    "at_chart_lenses_entry": 0,
+                    "at_arbiter_entry": 0,
+                    "note": "pipeline raised RuntimeError before completion",
+                },
+            })
         # Propagate pipeline failures (e.g. insufficient analysts) as 503
         raise HTTPException(status_code=503, detail=_mask_secrets(str(e)))
     except Exception as exc:
@@ -750,17 +761,31 @@ async def analyse(
             return JSONResponse(content={
                 "smoke_error": {"error_type": type(exc).__name__, "message": _mask_secrets(str(exc))[:500]},
                 "run_id": ground_truth.run_id,
+                "debug_analyst_counts": {
+                    "after_parallel_analyst_node": 0,
+                    "at_chart_lenses_entry": 0,
+                    "at_arbiter_entry": 0,
+                    "note": f"pipeline raised {type(exc).__name__} before completion",
+                },
             })
         logger.error("Pipeline error: %s: %s", type(exc).__name__, _mask_secrets(str(exc)))
         raise HTTPException(status_code=500, detail="Internal pipeline error. Check server logs.")
     finally:
         correlation_ctx.reset(ctx_token)
 
+    # Build debug_analyst_counts from final pipeline state
+    _debug_counts = {
+        "after_parallel_analyst_node": final_state.get("_debug_after_parallel", -1),
+        "at_chart_lenses_entry": final_state.get("_debug_after_parallel", -1),  # same node
+        "at_arbiter_entry": len(final_state.get("analyst_outputs", [])),
+    }
+
     # Smoke mode: if _smoke_error was captured, return it instead of crashing
     if _smoke_mode and final_state.get("_smoke_error"):
         return JSONResponse(content={
             "smoke_error": final_state["_smoke_error"],
             "run_id": ground_truth.run_id,
+            "debug_analyst_counts": _debug_counts,
         })
 
     verdict: FinalVerdict = final_state["final_verdict"]
@@ -778,7 +803,11 @@ async def analyse(
         source_ticket_id=ground_truth.source_ticket_id,
         usage_summary=usage_summary,
     )
-    return JSONResponse(content=response.model_dump())
+    resp_data = response.model_dump()
+    # Smoke mode: inject debug_analyst_counts into successful response too
+    if _smoke_mode:
+        resp_data["debug_analyst_counts"] = _debug_counts
+    return JSONResponse(content=resp_data)
 
 
 # ── v2.2 SSE streaming endpoint ───────────────────────────────────────────────
@@ -978,6 +1007,8 @@ async def analyse_stream(
         # Phase 3: timing fields (populated by validate_input_node)
         "_pipeline_start_ts": None,
         "_node_timings": None,
+        # Debug — temporary analyst output persistence investigation
+        "_debug_after_parallel": None,
     }
 
     # Phase 3: set correlation context for structured logging

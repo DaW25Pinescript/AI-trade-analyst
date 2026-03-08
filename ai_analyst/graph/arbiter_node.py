@@ -104,6 +104,10 @@ async def arbiter_node(state: GraphState) -> GraphState:
     can apply peer-informed weighting (Round 2 outputs weighted at 1.5x Round 1).
     """
     analyst_outputs = state["analyst_outputs"]
+    logger.info(
+        "[DEBUG] arbiter_node ENTRY: len(analyst_outputs)=%d",
+        len(analyst_outputs),
+    )
     ground_truth = state["ground_truth"]
     overlay_delta_reports = state.get("overlay_delta_reports") or []
     overlay_was_provided = ground_truth.m15_overlay is not None
