@@ -17,23 +17,28 @@ Usage:
 
     # Or load the analyst roster:
     roster = router.get_analyst_roster()
-    # roster = [{"model": "gpt-4o", "persona": PersonaType.DEFAULT_ANALYST}, ...]
+    # roster = [{"profile": "claude_sonnet", "persona": PersonaType.DEFAULT_ANALYST}, ...]
 """
 import logging
 from typing import Any
 
 from .config_loader import load_config
+from .model_profiles import resolve_profile
 from .task_types import ALL_TASK_TYPES
 
 logger = logging.getLogger(__name__)
 
+_TASK_MODEL_PROFILES: dict[str, str] = {
+    "analyst_reasoning": "claude_sonnet",
+    "arbiter_decision": "claude_opus",
+}
+
 # Hardcoded default roster — used when analyst_roster is absent from YAML.
-# Keeps backwards compatibility with configs that predate Phase 9.
 _DEFAULT_ANALYST_ROSTER: list[dict[str, str]] = [
-    {"model": "gpt-4o", "persona": "default_analyst"},
-    {"model": "claude-sonnet-4-6", "persona": "risk_officer"},
-    {"model": "gemini/gemini-1.5-pro", "persona": "prosecutor"},
-    {"model": "xai/grok-vision-beta", "persona": "ict_purist"},
+    {"profile": "claude_sonnet", "persona": "default_analyst"},
+    {"profile": "claude_sonnet", "persona": "risk_officer"},
+    {"profile": "claude_sonnet", "persona": "prosecutor"},
+    {"profile": "claude_sonnet", "persona": "ict_purist"},
 ]
 
 
@@ -53,9 +58,18 @@ def resolve(task_type: str) -> dict[str, Any]:
     backend = config["llm_backend"]
     task_cfg = config["task_routing"][task_type]
 
+    profile_name = _TASK_MODEL_PROFILES.get(task_type)
+    if profile_name:
+        profile = resolve_profile(profile_name)
+        model = profile.model
+        fallback_model = profile.model
+    else:
+        model = task_cfg["primary_model"]
+        fallback_model = task_cfg["fallback_model"]
+
     route = {
-        "model": task_cfg["primary_model"],
-        "fallback_model": task_cfg["fallback_model"],
+        "model": model,
+        "fallback_model": fallback_model,
         "retries": task_cfg["retries"],
         "base_url": backend["base_url"],
         "api_key": backend["api_key"],
@@ -74,33 +88,25 @@ def resolve(task_type: str) -> dict[str, Any]:
 def get_analyst_roster() -> list[dict]:
     """Load the analyst roster from llm_routing.yaml.
 
-    Returns a list of dicts with 'model' (str) and 'persona' (PersonaType).
+    Returns a list of dicts with 'profile' (str) and 'persona' (PersonaType).
     Falls back to _DEFAULT_ANALYST_ROSTER if the YAML has no analyst_roster key.
-
-    The model for ALL personas is resolved from task_routing.analyst_reasoning
-    — per-persona model fields in the roster are ignored. This ensures the
-    router config remains the single source of truth for model selection.
     """
     from ..models.persona import PersonaType
-    from .task_types import ANALYST_REASONING
 
     config = load_config()
     raw_roster = config.get("analyst_roster", _DEFAULT_ANALYST_ROSTER)
 
-    # Single source of truth: the model configured for analyst_reasoning
-    resolved_model = config["task_routing"][ANALYST_REASONING]["primary_model"]
-
     roster: list[dict] = []
     for entry in raw_roster:
         roster.append({
-            "model": resolved_model,
+            "profile": entry["profile"],
             "persona": PersonaType(entry["persona"]),
         })
 
     logger.info(
         "[router] analyst_roster loaded: %d analysts — %s",
         len(roster),
-        [f"{r['persona'].value}={r['model']}" for r in roster],
+        [f"{r['persona'].value}={r['profile']}" for r in roster],
     )
     return roster
 

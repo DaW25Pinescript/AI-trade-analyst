@@ -9,8 +9,8 @@ llm_backend:
 
 task_routing:
   analyst_reasoning:
-    primary_model: "openai/claude-sonnet-4-6"
-    fallback_model: "openai/claude-sonnet-4-6"
+    primary_model: "resolved_by_profile_registry"
+    fallback_model: "resolved_by_profile_registry"
     retries: 1
 
   chart_extract:
@@ -24,8 +24,8 @@ task_routing:
     retries: 1
 
   arbiter_decision:
-    primary_model: "openai/claude-sonnet-4-6"
-    fallback_model: "openai/claude-sonnet-4-6"
+    primary_model: "resolved_by_profile_registry"
+    fallback_model: "resolved_by_profile_registry"
     retries: 1
 
   json_repair:
@@ -33,15 +33,13 @@ task_routing:
     fallback_model: "openai/claude-sonnet-4-6"
     retries: 1
 
-# Analyst roster — maps persona to the LLM model used for fan-out analysis.
-# Each entry defines the model identifier (routed through LiteLLM) and the
-# persona type constant from ai_analyst.models.persona.PersonaType.
+# Analyst roster — maps persona to runtime model profile used for fan-out analysis.
 analyst_roster:
-  - model: "gpt-4o"
+  - profile: "claude_sonnet"
     persona: "default_analyst"
-  - model: "claude-sonnet-4-6"
+  - profile: "claude_sonnet"
     persona: "risk_officer"
-  - model: "gemini/gemini-1.5-pro"
+  - profile: "claude_sonnet"
     persona: "prosecutor"
-  - model: "xai/grok-vision-beta"
+  - profile: "claude_sonnet"
     persona: "ict_purist"
