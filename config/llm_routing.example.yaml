@@ -1,3 +1,7 @@
+# LLM Backend — connection settings for the OpenAI-compatible proxy.
+# The api_key below is a placeholder. For real proxy auth, set the env var:
+#   export LOCAL_LLM_PROXY_API_KEY="your-real-key"
+# The env var always takes precedence over the value in this file.
 llm_backend:
   mode: local_claude_proxy
   base_url: "http://127.0.0.1:8317/v1"
