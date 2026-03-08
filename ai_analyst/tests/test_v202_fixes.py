@@ -1,7 +1,7 @@
 """
 Regression tests for v2.0.2 fixes: HIGH-1, HIGH-5, HIGH-6.
 
-HIGH-5: Grok model string updated to xai/grok-vision-beta
+HIGH-5: Analyst roster uses persona+profile and no legacy raw model field
 HIGH-6: Image size guard (422 on oversized upload) + per-run cost ceiling
 HIGH-1: Non-retriable exceptions fail immediately; retriable exceptions use
         exponential backoff (not linear/fixed 0.4 s).
@@ -17,26 +17,27 @@ import pytest
 # ── HIGH-5 ───────────────────────────────────────────────────────────────────
 
 
-def test_analyst_configs_grok_model_is_xai_prefixed():
-    """ANALYST_CONFIGS must not contain the defunct 'grok/grok-4-vision' identifier."""
+def test_analyst_roster_uses_profiles_not_raw_models():
+    """ANALYST_CONFIGS contract is persona+profile, with no legacy raw model field."""
     from ai_analyst.graph.analyst_nodes import ANALYST_CONFIGS
-
-    model_ids = [c["model"] for c in ANALYST_CONFIGS]
-    assert "grok/grok-4-vision" not in model_ids, (
-        "grok/grok-4-vision is not a valid LiteLLM model — "
-        "it must be replaced with the correct xai/ prefix model."
-    )
-    # Verify the ICT_PURIST slot uses the correct xAI vision model
     from ai_analyst.models.persona import PersonaType
 
-    ict_configs = [c for c in ANALYST_CONFIGS if c["persona"] == PersonaType.ICT_PURIST]
-    assert len(ict_configs) == 1
-    assert ict_configs[0]["model"].startswith("xai/"), (
-        f"ICT_PURIST analyst should use an xai/ prefixed model; got {ict_configs[0]['model']!r}"
-    )
+    assert ANALYST_CONFIGS, "ANALYST_CONFIGS should not be empty"
+    personas = {c["persona"] for c in ANALYST_CONFIGS}
+    expected = {
+        PersonaType.DEFAULT_ANALYST,
+        PersonaType.RISK_OFFICER,
+        PersonaType.PROSECUTOR,
+        PersonaType.ICT_PURIST,
+    }
+    assert expected.issubset(personas)
+
+    for config in ANALYST_CONFIGS:
+        assert "profile" in config
+        assert "model" not in config
 
 
-def test_api_key_manager_grok_model_is_xai_prefixed():
+def test_api_key_manager_legacy_grok_string_not_present():
     """SUPPORTED_MODELS and get_model_for_analyst_index must not reference grok/grok-4-vision."""
     from ai_analyst.core.api_key_manager import SUPPORTED_MODELS, get_model_for_analyst_index
 

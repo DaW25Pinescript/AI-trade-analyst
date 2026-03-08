@@ -148,11 +148,11 @@ class TestParallelAnalystNodeConfigTracking:
 
     async def test_configs_used_parallel_to_outputs(self, monkeypatch):
         """analyst_configs_used[i] is always the config that produced analyst_outputs[i]."""
-        outputs_by_model = {}
+        outputs_by_profile = {}
 
         async def mock_run_analyst(config, prompt, run_id):
-            out = _sample_analyst_output(notes=f"from-{config['model']}")
-            outputs_by_model[config["model"]] = out
+            out = _sample_analyst_output(notes=f"from-{config['profile']}")
+            outputs_by_profile[config["profile"]] = out
             return out
 
         monkeypatch.setattr(
@@ -163,7 +163,7 @@ class TestParallelAnalystNodeConfigTracking:
 
         for i, output in enumerate(result["analyst_outputs"]):
             cfg = result["analyst_configs_used"][i]
-            assert output.notes == f"from-{cfg['model']}"
+            assert output.notes == f"from-{cfg['profile']}"
 
 
 # ── Phase 2: overlay_delta_node uses correct configs ──────────────────────
@@ -173,13 +173,13 @@ class TestOverlayDeltaConfigAlignment:
     async def test_uses_configs_used_not_positional_index(self, monkeypatch):
         """
         Core CRITICAL-4 regression test: after Phase 1 partial failure where
-        analysts 0 (gpt-4o) and 2 (gemini) fail, Phase 2 must use configs 1
-        (claude-sonnet) and 3 (grok) — NOT re-index to configs 0 and 1.
+        analysts 0 and 2 fail, Phase 2 must use survivor configs 1 and 3 —
+        not re-index to configs 0 and 1.
         """
-        called_with_models: list[str] = []
+        called_with_profiles: list[str] = []
 
         async def mock_run_overlay_delta(config, prompt, run_id):
-            called_with_models.append(config["model"])
+            called_with_profiles.append(config["profile"])
             return _sample_overlay_delta()
 
         monkeypatch.setattr(
@@ -194,18 +194,18 @@ class TestOverlayDeltaConfigAlignment:
 
         result = await overlay_delta_node(state)
 
-        assert called_with_models == [
-            ANALYST_CONFIGS[1]["model"],  # claude-sonnet-4-6
-            ANALYST_CONFIGS[3]["model"],  # grok/grok-4-vision
+        assert called_with_profiles == [
+            ANALYST_CONFIGS[1]["profile"],
+            ANALYST_CONFIGS[3]["profile"],
         ]
         assert len(result["overlay_delta_reports"]) == 2
 
     async def test_single_survivor_uses_its_original_config(self, monkeypatch):
         """When only one analyst survives Phase 1, Phase 2 uses that analyst's config."""
-        called_with_models: list[str] = []
+        called_with_profiles: list[str] = []
 
         async def mock_run_overlay_delta(config, prompt, run_id):
-            called_with_models.append(config["model"])
+            called_with_profiles.append(config["profile"])
             return _sample_overlay_delta()
 
         monkeypatch.setattr(
@@ -213,22 +213,22 @@ class TestOverlayDeltaConfigAlignment:
             mock_run_overlay_delta,
         )
 
-        # Only analyst 2 (gemini) survived
+        # Only analyst 2 survived
         state = _make_state(with_overlay=True)
         state["analyst_outputs"] = [_sample_analyst_output()]
         state["analyst_configs_used"] = [ANALYST_CONFIGS[2]]
 
         result = await overlay_delta_node(state)
 
-        assert called_with_models == ["gemini/gemini-1.5-pro"]
+        assert called_with_profiles == [ANALYST_CONFIGS[2]["profile"]]
         assert len(result["overlay_delta_reports"]) == 1
 
     async def test_all_succeed_models_match_analyst_configs_order(self, monkeypatch):
-        """When all analysts succeed, overlay delta models follow ANALYST_CONFIGS order."""
-        called_with_models: list[str] = []
+        """When all analysts succeed, overlay delta profiles follow ANALYST_CONFIGS order."""
+        called_with_profiles: list[str] = []
 
         async def mock_run_overlay_delta(config, prompt, run_id):
-            called_with_models.append(config["model"])
+            called_with_profiles.append(config["profile"])
             return _sample_overlay_delta()
 
         monkeypatch.setattr(
@@ -242,8 +242,8 @@ class TestOverlayDeltaConfigAlignment:
 
         result = await overlay_delta_node(state)
 
-        expected = [cfg["model"] for cfg in ANALYST_CONFIGS]
-        assert called_with_models == expected
+        expected = [cfg["profile"] for cfg in ANALYST_CONFIGS]
+        assert called_with_profiles == expected
 
     async def test_no_overlay_returns_empty_reports(self, monkeypatch):
         """overlay_delta_node with no m15_overlay skips Phase 2 entirely."""
@@ -283,5 +283,5 @@ class TestOverlayDeltaConfigAlignment:
 
         # MED-3: warnings now go to the logging system (not stdout).
         # The warning should reference claude-sonnet-4-6 (configs_used[0]), not gpt-4o.
-        assert ANALYST_CONFIGS[1]["model"] in caplog.text
+        assert "claude-sonnet-4-6" in caplog.text
         assert len(result["overlay_delta_reports"]) == 1

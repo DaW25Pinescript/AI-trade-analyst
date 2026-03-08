@@ -41,6 +41,7 @@ from ..core.usage_meter import acompletion_metered
 from ..core import progress_store
 from ..core.json_extractor import extract_json
 from ..llm_router import router
+from ..llm_router.model_profiles import resolve_profile
 from ..llm_router.task_types import ANALYST_REASONING
 from .state import GraphState
 
@@ -68,7 +69,7 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
         _key_val = route.get("api_key") or ""
         logger.info(
             "[run_analyst] LLM call — model=%s base_url=%s api_key_env=%s key_present=%s persona=%s",
-            config["model"],
+            resolve_profile(config["profile"]).model,
             route.get("base_url"),
             _api_key_env,
             bool(_key_val and len(str(_key_val)) > 0),
@@ -81,7 +82,7 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
         run_id=run_id,
         stage="phase1_analyst",
         node=config["persona"].value,
-        model=config["model"],
+        model=resolve_profile(config["profile"]).model,
         messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,   # low temperature for determinism
@@ -98,7 +99,7 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
         "type": "analyst_done",
         "stage": "phase1",
         "persona": config["persona"].value,
-        "model": config["model"],
+        "model": resolve_profile(config["profile"]).model,
         "action": result.recommended_action,
         "confidence": result.confidence,
     })
@@ -123,7 +124,7 @@ async def run_overlay_delta(
         run_id=run_id,
         stage="phase2_overlay",
         node=config["persona"].value,
-        model=config["model"],
+        model=resolve_profile(config["profile"]).model,
         messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,
@@ -138,7 +139,7 @@ async def run_overlay_delta(
         "type": "analyst_done",
         "stage": "phase2_overlay",
         "persona": config["persona"].value,
-        "model": config["model"],
+        "model": resolve_profile(config["profile"]).model,
         "contradictions": len(result.contradicts),
     })
     return result
@@ -168,7 +169,7 @@ async def run_deliberation_round(
         run_id=run_id,
         stage="phase3_deliberation",
         node=config["persona"].value,
-        model=config["model"],
+        model=resolve_profile(config["profile"]).model,
         messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,
@@ -183,7 +184,7 @@ async def run_deliberation_round(
         "type": "analyst_done",
         "stage": "deliberation",
         "persona": config["persona"].value,
-        "model": config["model"],
+        "model": resolve_profile(config["profile"]).model,
         "action": result.recommended_action,
         "confidence": result.confidence,
     })
@@ -211,7 +212,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     configs_to_run = ANALYST_CONFIGS
     if effective_smoke:
         configs_to_run = ANALYST_CONFIGS[:1]
-        logger.info("[smoke] smoke mode active — running only first analyst: %s", configs_to_run[0]["model"])
+        logger.info("[smoke] smoke mode active — running only first analyst: %s", resolve_profile(configs_to_run[0]["profile"]).model)
     logger.info("[analyst_fan_out] effective analyst_count=%d", len(configs_to_run))
 
     tasks = [
@@ -229,7 +230,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     configs_used: list[dict] = []
     for i, result in enumerate(results):
         config = configs_to_run[i]
-        model = config["model"]
+        model = resolve_profile(config["profile"]).model
         # DEBUG: log the type and keys/attrs of each gather result
         logger.info(
             "[DEBUG] parallel_analyst_node result[%d]: type=%s isinstance_AnalystOutput=%s isinstance_ValidationError=%s",
@@ -257,7 +258,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
             smoke_error = {
                 "error_type": type(err).__name__,
                 "status_code": getattr(err, "status_code", None),
-                "model_attempted": configs_to_run[0]["model"],
+                "model_attempted": resolve_profile(configs_to_run[0]["profile"]).model,
                 "base_url_attempted": route.get("base_url"),
                 "message": str(err)[:500],
             }
@@ -324,7 +325,7 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
 
     delta_reports: list[OverlayDeltaReport] = []
     for i, result in enumerate(results):
-        model = configs_used[i]["model"]
+        model = resolve_profile(configs_used[i]["profile"]).model
         if isinstance(result, OverlayDeltaReport):
             delta_reports.append(result)
         elif isinstance(result, ValidationError):
@@ -379,7 +380,7 @@ async def deliberation_node(state: GraphState) -> GraphState:
 
     delib_outputs: list[AnalystOutput] = []
     for i, result in enumerate(results):
-        model = configs_used[i]["model"]
+        model = resolve_profile(configs_used[i]["profile"]).model
         if isinstance(result, AnalystOutput):
             delib_outputs.append(result)
         elif isinstance(result, ValidationError):

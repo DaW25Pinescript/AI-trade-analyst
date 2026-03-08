@@ -13,6 +13,7 @@ from typing import Any
 import yaml
 
 from .task_types import ALL_TASK_TYPES
+from .model_profiles import MODEL_PROFILES
 
 logger = logging.getLogger(__name__)
 
@@ -85,14 +86,19 @@ def _validate_analyst_roster(roster: Any) -> None:
     for i, entry in enumerate(roster):
         if not isinstance(entry, dict):
             raise ConfigurationError(f"analyst_roster[{i}] must be a mapping")
-        if "model" not in entry:
-            raise ConfigurationError(f"analyst_roster[{i}] missing required key: 'model'")
+        if "profile" not in entry:
+            raise ConfigurationError(f"analyst_roster[{i}] missing required key: 'profile'")
         if "persona" not in entry:
             raise ConfigurationError(f"analyst_roster[{i}] missing required key: 'persona'")
         if entry["persona"] not in valid_personas:
             raise ConfigurationError(
                 f"analyst_roster[{i}] has invalid persona '{entry['persona']}'. "
                 f"Valid: {sorted(valid_personas)}"
+            )
+        if entry["profile"] not in MODEL_PROFILES:
+            raise ConfigurationError(
+                f"analyst_roster[{i}] has invalid profile '{entry['profile']}'. "
+                f"Valid: {sorted(MODEL_PROFILES)}"
             )
 
 
