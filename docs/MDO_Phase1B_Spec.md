@@ -5,7 +5,7 @@
 **Project:** AI Trade Analyst
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Date:** 8 March 2026
-**Status:** ⏳ In Progress — spec drafted, implementation pending
+**Status:** ✅ Complete — implemented and verified 8 March 2026 (364/364 tests, zero regressions)
 
 **Context:** Phase 1A proved the deterministic relay from feed artifacts into analyst consumption for EURUSD (359/359 tests). Phase 1B extends the same proven spine to **XAUUSD**. The decode layer, price-scale verification, instrument config, and structure engine already support XAUUSD — the remaining gap is the hot-package fixture → officer → analyst relay proof.
 
@@ -124,16 +124,16 @@ Before writing any code, run diagnostics against each gate. Report which are cur
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-1 | `run_feed.py --fixture` | Completes successfully for XAUUSD with no unhandled exceptions | ⏳ Pending |
-| AC-2 | Artifact writes | Expected hot-package artifacts written under `market_data/packages/latest/` with XAUUSD prefix | ⏳ Pending |
-| AC-3 | MarketPacketV2 | `refresh_from_latest_exports("XAUUSD")` returns valid MarketPacketV2 (no FileNotFoundError, no price-range violation) | ⏳ Pending |
-| AC-4 | Timeframe coverage | MarketPacketV2 includes all 4 expected timeframes: `15m`, `1h`, `4h`, `1d` | ⏳ Pending |
-| AC-5 | Price plausibility | All OHLC values in fixture data fall within `PRICE_RANGES["XAUUSD"]` ($1,500–$3,500) | ⏳ Pending |
-| AC-6 | Analyst consumption | `run_analyst()` completes and returns a structured result without FileNotFoundError or packet-schema exception — packet schema is validated, not just non-null | ⏳ Pending |
-| AC-7 | Contract tests | Two targeted tests pass: **Test A** (officer relay) — seed XAUUSD fixture → `refresh_from_latest_exports("XAUUSD")` → assert valid MarketPacketV2 → assert 4 timeframes (15m, 1h, 4h, 1d) → assert prices in range. **Test B** (analyst consumption) — call `run_analyst()` with injected XAUUSD packet + mocked LLM → assert no crash / structured result returned. Deterministic with no live LLM or provider dependency. | ⏳ Pending |
-| AC-8 | No SQLite | No SQLite introduced — confirmed by `grep -r sqlite market_data_officer/` | ⏳ Pending |
-| AC-9 | No new module | No new top-level module — work confined to `market_data_officer/` | ⏳ Pending |
-| AC-10 | No regressions | All pre-existing tests (359+) remain green | ⏳ Pending |
+| AC-1 | `run_feed.py --fixture` | Completes successfully for XAUUSD with no unhandled exceptions | ✅ Done |
+| AC-2 | Artifact writes | Expected hot-package artifacts written under `market_data/packages/latest/` with XAUUSD prefix | ✅ Done |
+| AC-3 | MarketPacketV2 | `refresh_from_latest_exports("XAUUSD")` returns valid MarketPacketV2 (no FileNotFoundError, no price-range violation) | ✅ Done |
+| AC-4 | Timeframe coverage | MarketPacketV2 includes all 4 expected timeframes: `15m`, `1h`, `4h`, `1d` | ✅ Done |
+| AC-5 | Price plausibility | All OHLC values in fixture data fall within `PRICE_RANGES["XAUUSD"]` ($1,500–$3,500) | ✅ Done |
+| AC-6 | Analyst consumption | `run_analyst()` completes and returns a structured result without FileNotFoundError or packet-schema exception — packet schema is validated, not just non-null | ✅ Done |
+| AC-7 | Contract tests | Two targeted tests pass: **Test A** (officer relay) — seed XAUUSD fixture → `refresh_from_latest_exports("XAUUSD")` → assert valid MarketPacketV2 → assert 4 timeframes (15m, 1h, 4h, 1d) → assert prices in range. **Test B** (analyst consumption) — call `run_analyst()` with injected XAUUSD packet + mocked LLM → assert no crash / structured result returned. Deterministic with no live LLM or provider dependency. | ✅ Done |
+| AC-8 | No SQLite | No SQLite introduced — confirmed by `grep -r sqlite market_data_officer/` | ✅ Done |
+| AC-9 | No new module | No new top-level module — work confined to `market_data_officer/` | ✅ Done |
+| AC-10 | No regressions | All pre-existing tests (359+) remain green | ✅ Done |
 
 ---
 
@@ -251,15 +251,15 @@ Expected patch size: ~30–50 lines across 3 files (vs ~100–130 lines for Phas
 | Phase | Scope | Status |
 |-------|-------|--------|
 | Phase 1A | EURUSD baseline spine | ✅ Done — 359/359 tests |
-| Phase 1B | XAUUSD spine (this spec) | ⏳ In Progress |
-| Phase E+ | Additional instruments, provider abstraction, alias config | ⏳ Pending |
+| Phase 1B | XAUUSD spine (this spec) | ✅ Done — 364/364 tests |
+| Phase E+ | Additional instruments, provider abstraction, alias config | ⏳ Next |
 | Operationalise | Scheduler / APScheduler integration | Out of scope for 1B |
 
 ---
 
 ## 11. Diagnostic Findings (8 March 2026)
 
-> **Historical record — pre-implementation diagnostics only.** These were the gaps found before any code was changed.
+> **Historical record — pre-implementation diagnostics only.** These were the gaps found before any code was changed. All ACs are now ✅ Done (see Section 5).
 
 **Root cause:** `_seed_fixture()` hardcodes `base_price = 1.0850` and `volatility = 0.0005` (EURUSD values) regardless of instrument. No price-range validation fires at packet-build time — wrong prices produce a plausible-looking but incorrect packet.
 
