@@ -193,6 +193,8 @@ The `_seed_fixture()` function in `run_feed.py` must be updated to use instrumen
 
 Implementation approach: add a simple lookup dict keyed by instrument inside `_seed_fixture()`. No new module, no new config file.
 
+**Strict fixture scope for XAUUSD:** the fixture seeder must write **only the 4 target timeframes** (`15m`, `1h`, `4h`, `1d`) when `--instrument XAUUSD`. Writing 6 TFs and asserting on 4 is not acceptable — it weakens the phase boundary and makes AC-2, AC-4, and AC-7 harder to reason about. The diagnostic confirmed a "superficial pass" risk once already; keep the patch surgical.
+
 ### 7.2 Test Fixture — conftest.py Extension
 
 Add an `xauusd_hot_packages_dir` fixture (or parametrize the existing `hot_packages_dir`) using XAUUSD-appropriate price/volume values. Must use the same manifest/CSV shape as the existing EURUSD fixture.
@@ -255,10 +257,71 @@ Expected patch size: ~30–50 lines across 3 files (vs ~100–130 lines for Phas
 
 ---
 
-## 11. Diagnostic Findings
+## 11. Diagnostic Findings (8 March 2026)
 
-*To be populated after running the pre-code diagnostic protocol (Section 6).*
+> **Historical record — pre-implementation diagnostics only.** These were the gaps found before any code was changed.
+
+**Root cause:** `_seed_fixture()` hardcodes `base_price = 1.0850` and `volatility = 0.0005` (EURUSD values) regardless of instrument. No price-range validation fires at packet-build time — wrong prices produce a plausible-looking but incorrect packet.
+
+**Additional finding:** The officer service does not gate on `PRICE_RANGES` at packet-build time. AC-5 (price plausibility) is therefore the only gate catching this — making it a critical test, not a sanity check.
+
+| AC | Status | Finding |
+|----|--------|---------|
+| AC-1 | PASS (superficial) | No crash, but prices are EURUSD-scale (~$1.08) |
+| AC-2 | PASS (superficial) | 6 CSV files written — wrong TF count + wrong prices |
+| AC-3 | PASS (superficial) | No exception, but prices ~$1.08 not ~$2,700 |
+| AC-4 | PASS | All 4 target TFs present (plus extra 1m, 5m outside scope) |
+| AC-5 | **FAIL** | All OHLC values ~$1.08 — outside $1,500–$3,500 range |
+| AC-6 | UNTESTED | No XAUUSD analyst consumption test exists |
+| AC-7 | **FAIL** | `test_phase1b_relay.py` does not exist |
+| AC-8 | PASS | `grep -r sqlite market_data_officer/` returns nothing |
+| AC-9 | PASS | All work inside `market_data_officer/` |
+| AC-10 | PASS | 359/359 green baseline confirmed |
+
+**Approved patch set:**
+
+| File | Change | Resolves |
+|------|--------|---------|
+| `market_data_officer/run_feed.py` | Instrument-keyed lookup for `base_price`, `volatility`, `volume_range`. XAUUSD: `base_price=2700.0`, `volatility=2.0`, `volume_range=(0.1, 10.0)`. Write **only 4 TFs** (`15m`, `1h`, `4h`, `1d`) for XAUUSD. | AC-1, AC-2, AC-3, AC-5 |
+| `market_data_officer/tests/conftest.py` | Add `xauusd_hot_packages_dir` fixture with XAUUSD prices (~$2,700), volumes, and 4 TFs only | AC-7 prerequisite |
+| `market_data_officer/tests/test_phase1b_relay.py` | New: Test A (officer relay, assert 4 TFs + prices in range) + Test B (analyst consumption, injected packet + mocked LLM) | AC-6, AC-7 |
 
 ---
 
 *Drafted from repo state, closed Phase 1A spec, and progress plan baseline on 8 March 2026.*
+
+---
+
+## Appendix — Implementation Prompt
+
+```
+Read `docs/MDO_Phase1B_Spec.md` and treat it as the controlling spec for this pass.
+
+Diagnostic report is complete (see Section 11). Approved patch set:
+
+Patch 1 — market_data_officer/run_feed.py:
+- Add instrument-keyed lookup dict in _seed_fixture() for base_price, volatility, volume_range
+- XAUUSD: base_price=2700.0, volatility=2.0, volume_range=(0.1, 10.0)
+- Write ONLY 4 TFs (15m, 1h, 4h, 1d) for XAUUSD — not 6
+
+Patch 2 — market_data_officer/tests/conftest.py:
+- Add xauusd_hot_packages_dir fixture with XAUUSD-appropriate prices (~$2,700),
+  volumes, and 4 TFs only. Same manifest/CSV shape as existing hot_packages_dir.
+
+Patch 3 — market_data_officer/tests/test_phase1b_relay.py (new file):
+- Test A (officer relay): seed XAUUSD fixture → refresh_from_latest_exports("XAUUSD")
+  → assert valid MarketPacketV2 → assert exactly 4 TFs (15m, 1h, 4h, 1d)
+  → assert all OHLC prices within $1,500–$3,500
+- Test B (analyst consumption): run_analyst() with injected XAUUSD packet
+  + mocked LLM → assert structured AnalystOutput returned without exception
+
+Hard constraints:
+- no SQLite, no new top-level module, no scheduler
+- changes inside market_data_officer/ only
+- do not touch decode.py, config.py, service.py, structure/ — all verified correct
+- MarketPacketV2 contract locked — no schema changes
+- fixture must write exactly 4 TFs for XAUUSD — asserting on 4 while writing 6 is not acceptable
+
+After implementing, run: pytest market_data_officer/tests/ -v
+Target: 359+ tests green, both new relay tests pass, AC-5 price plausibility confirmed.
+```
