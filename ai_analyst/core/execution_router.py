@@ -11,6 +11,7 @@ In all cases the same Arbiter logic runs once analyst Evidence Objects are colle
 import asyncio
 import json
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -86,7 +87,41 @@ def _safe_excerpt(raw: str, max_chars: int = 256) -> str:
     return excerpt[:max_chars]
 
 
-def _fallback_verdict(run_id: str, reason: str) -> FinalVerdict:
+# Pattern to strip markdown code fences that LLMs commonly wrap JSON in.
+_MD_JSON_RE = re.compile(
+    r"```(?:json)?\s*\n?(.*?)\n?\s*```",
+    re.DOTALL,
+)
+
+
+def _extract_json(raw: str) -> str:
+    """Best-effort extraction of a JSON object from an LLM response.
+
+    Handles two common failure modes:
+      1. Response wrapped in markdown fences: ```json ... ```
+      2. JSON object embedded in surrounding prose.
+    Returns the extracted string (caller still needs json.loads).
+    """
+    stripped = raw.strip()
+    if stripped.startswith("{"):
+        return stripped
+    m = _MD_JSON_RE.search(raw)
+    if m:
+        return m.group(1).strip()
+    start = raw.find("{")
+    if start != -1:
+        end = raw.rfind("}")
+        if end > start:
+            return raw[start : end + 1]
+    return stripped
+
+
+def _fallback_verdict(
+    run_id: str,
+    reason: str,
+    analysts_received: int = 0,
+    analysts_valid: int = 0,
+) -> FinalVerdict:
     return FinalVerdict.model_validate({
         "final_bias": "neutral",
         "decision": "NO_TRADE",
@@ -98,8 +133,8 @@ def _fallback_verdict(run_id: str, reason: str) -> FinalVerdict:
         "arbiter_notes": reason,
         "audit_log": {
             "run_id": run_id,
-            "analysts_received": 0,
-            "analysts_valid": 0,
+            "analysts_received": analysts_received,
+            "analysts_valid": analysts_valid,
             "htf_consensus": False,
             "setup_consensus": False,
             "risk_override": False,
@@ -424,8 +459,10 @@ class ExecutionRouter:
             api_key=route["api_key"],
         )
         raw: str = response.choices[0].message.content
+        n_analysts = len(all_outputs)
         try:
-            payload = json.loads(raw)
+            cleaned = _extract_json(raw)
+            payload = json.loads(cleaned)
         except json.JSONDecodeError:
             error_obj = {
                 "error_type": "JSON_DECODE_ERROR",
@@ -436,6 +473,8 @@ class ExecutionRouter:
             verdict = _fallback_verdict(
                 run_id=self.run_id,
                 reason="Arbiter response malformed; defaulting to NO_TRADE.",
+                analysts_received=n_analysts,
+                analysts_valid=n_analysts,
             )
         else:
             if not payload.get("decision"):
@@ -457,6 +496,8 @@ class ExecutionRouter:
                 verdict = _fallback_verdict(
                     run_id=self.run_id,
                     reason="Arbiter response invalid; defaulting to NO_TRADE.",
+                    analysts_received=n_analysts,
+                    analysts_valid=n_analysts,
                 )
 
         # Save final verdict to disk
