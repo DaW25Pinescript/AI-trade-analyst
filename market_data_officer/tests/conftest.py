@@ -99,6 +99,49 @@ def hot_packages_dir(tmp_path):
 
 
 @pytest.fixture
+def xauusd_hot_packages_dir(tmp_path):
+    """Create a temporary hot packages directory with synthetic XAUUSD data.
+
+    Only the 4 analyst-target timeframes (15m, 1h, 4h, 1d) are written,
+    matching the XAUUSD fixture seeder behaviour.
+    """
+    packages_dir = tmp_path / "packages" / "latest"
+    packages_dir.mkdir(parents=True)
+
+    tf_configs = {
+        "15m": ("15min", 600),
+        "1h": ("1h", 240),
+        "4h": ("4h", 120),
+        "1d": ("1D", 30),
+    }
+
+    windows_manifest = {}
+
+    for tf_label, (freq, count) in tf_configs.items():
+        df = _generate_ohlcv(
+            count, freq, base_price=2700.0, volatility=2.0,
+        )
+        # Scale volume to XAUUSD range (lots, not ticks)
+        df["volume"] = np.random.RandomState(42).uniform(0.1, 10.0, count)
+        filename = f"XAUUSD_{tf_label}_latest.csv"
+        df.to_csv(packages_dir / filename)
+        windows_manifest[tf_label] = {
+            "count": count,
+            "file": filename,
+        }
+
+    manifest = {
+        "instrument": "XAUUSD",
+        "as_of_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "schema": "timestamp_utc,open,high,low,close,volume",
+        "windows": windows_manifest,
+    }
+    (packages_dir / "XAUUSD_hot.json").write_text(json.dumps(manifest, indent=2))
+
+    return packages_dir
+
+
+@pytest.fixture
 def stale_packages_dir(hot_packages_dir):
     """Create hot packages with a stale manifest (3 hours old)."""
     manifest_path = hot_packages_dir / "EURUSD_hot.json"
