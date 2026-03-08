@@ -39,6 +39,7 @@ from ..core.analyst_prompt_builder import (
 from ..core.run_paths import get_run_dir
 from ..core.usage_meter import acompletion_metered
 from ..core import progress_store
+from ..core.json_extractor import extract_json
 from ..llm_router import router
 from ..llm_router.task_types import ANALYST_REASONING
 from .state import GraphState
@@ -89,6 +90,7 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
         api_key=route["api_key"],
     )
     raw: str = response.choices[0].message.content
+    raw = extract_json(raw)
     result = AnalystOutput.model_validate_json(raw)
 
     # v2.2 — push progress event so SSE/CLI consumers can display live progress
@@ -128,6 +130,7 @@ async def run_overlay_delta(
         max_tokens=1000,
     )
     raw: str = response.choices[0].message.content
+    raw = extract_json(raw)
     result = OverlayDeltaReport.model_validate_json(raw)
 
     # v2.2 — push progress event
@@ -172,6 +175,7 @@ async def run_deliberation_round(
         max_tokens=1500,
     )
     raw: str = response.choices[0].message.content
+    raw = extract_json(raw)
     result = AnalystOutput.model_validate_json(raw)
 
     # v2.2 — push progress event
