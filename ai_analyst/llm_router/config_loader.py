@@ -1,7 +1,9 @@
 """Load and validate llm_routing.yaml configuration.
 
 Lazy-loads on first call; caches the result for the process lifetime.
-Supports CLAUDE_PROXY_BASE_URL env var override for the proxy base URL.
+Supports env var overrides for the proxy connection:
+  - CLAUDE_PROXY_BASE_URL  → overrides llm_backend.base_url
+  - LOCAL_LLM_PROXY_API_KEY → overrides llm_backend.api_key
 """
 import logging
 import os
@@ -18,6 +20,25 @@ _CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "llm_r
 _EXAMPLE_PATH = _CONFIG_PATH.with_name("llm_routing.example.yaml")
 
 _cached_config: dict[str, Any] | None = None
+
+# Tokens treated as non-functional placeholders (case-insensitive).
+_PLACEHOLDER_TOKENS = frozenset({
+    "not-needed",
+    "your_proxy_key_here",
+    "changeme",
+    "placeholder",
+    "xxx",
+    "REPLACE_ME",
+})
+
+
+def _classify_api_key(value: str) -> str:
+    """Return a safe classification of an API key value (never the key itself)."""
+    if not value:
+        return "empty"
+    if value.lower() in {t.lower() for t in _PLACEHOLDER_TOKENS}:
+        return "placeholder-like"
+    return "non-empty secret"
 
 
 class ConfigurationError(Exception):
@@ -100,10 +121,29 @@ def load_config(*, force_reload: bool = False) -> dict[str, Any]:
 
     _validate(config)
 
+    backend = config["llm_backend"]
+
     # Apply env var override for base URL
     env_base_url = os.getenv("CLAUDE_PROXY_BASE_URL")
     if env_base_url:
-        config["llm_backend"]["base_url"] = env_base_url
+        backend["base_url"] = env_base_url
+
+    # Apply env var override for API key
+    env_api_key = os.getenv("LOCAL_LLM_PROXY_API_KEY", "")
+    api_key_source: str
+    if env_api_key:
+        backend["api_key"] = env_api_key
+        api_key_source = "env (LOCAL_LLM_PROXY_API_KEY)"
+    else:
+        api_key_source = f"config file ({path.name})"
+
+    # Diagnostic log (never leaks the actual key)
+    logger.info(
+        "[config_loader] config_file=%s | api_key source=%s | api_key class=%s",
+        path,
+        api_key_source,
+        _classify_api_key(backend["api_key"]),
+    )
 
     _cached_config = config
     return _cached_config
