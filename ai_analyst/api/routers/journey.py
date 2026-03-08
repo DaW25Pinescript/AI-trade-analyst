@@ -337,6 +337,7 @@ async def triage_smoke():
                 result = resp.json()
                 diag["llm_call_result"] = result.get("smoke_error") or "success"
                 diag["run_id"] = result.get("run_id")
+                diag["debug_analyst_counts"] = result.get("debug_analyst_counts")
 
                 # Check if validate_input_node was reached (it always runs if we got 200)
                 diag["validate_input_node_reached"] = True
