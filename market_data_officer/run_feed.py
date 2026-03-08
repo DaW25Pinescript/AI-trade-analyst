@@ -17,21 +17,18 @@ def _seed_fixture(instrument: str) -> None:
     officer's standard loader path works unchanged.
     """
     from feed.config import PACKAGES_DIR, HOT_WINDOW_SIZES
+    from instrument_registry import INSTRUMENT_REGISTRY, get_meta
 
     PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Instrument-keyed fixture parameters
-    _FIXTURE_PARAMS = {
-        "EURUSD": {"base_price": 1.0850, "volatility": 0.0005, "volume_range": (100, 5000)},
-        "XAUUSD": {"base_price": 2700.0, "volatility": 2.0, "volume_range": (0.1, 10.0)},
-    }
-    # XAUUSD uses only the 4 analyst-target timeframes
-    _XAUUSD_TIMEFRAMES = {"15m", "1h", "4h", "1d"}
-
-    params = _FIXTURE_PARAMS.get(instrument, _FIXTURE_PARAMS["EURUSD"])
-    base_price = params["base_price"]
-    volatility = params["volatility"]
-    vol_lo, vol_hi = params["volume_range"]
+    # Look up fixture parameters from the central registry
+    meta = INSTRUMENT_REGISTRY.get(instrument)
+    if meta is None:
+        # Fall back to EURUSD defaults for unknown instruments
+        meta = get_meta("EURUSD")
+    base_price = meta.base_price
+    volatility = meta.fixture_volatility
+    vol_lo, vol_hi = meta.fixture_volume_range
 
     rng = np.random.RandomState(42)
     now_utc = datetime.now(timezone.utc).replace(second=0, microsecond=0)
@@ -45,9 +42,10 @@ def _seed_fixture(instrument: str) -> None:
         "1d": ("1D", HOT_WINDOW_SIZES["1d"]),
     }
     # Filter to target timeframes for this instrument
+    target_tfs = set(meta.timeframes) if meta.timeframes else set(all_tf_configs.keys())
     tf_configs = {
         k: v for k, v in all_tf_configs.items()
-        if instrument != "XAUUSD" or k in _XAUUSD_TIMEFRAMES
+        if k in target_tfs
     }
 
     windows_manifest: dict = {}

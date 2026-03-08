@@ -7,6 +7,8 @@ No configuration sprawl — keep it minimal until logic is proven.
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+from instrument_registry import INSTRUMENT_REGISTRY
+
 
 @dataclass
 class StructureConfig:
@@ -19,10 +21,11 @@ class StructureConfig:
     # BOS confirmation mode — "close" only in 3A
     bos_confirmation: str = "close"
 
-    # EQH/EQL tolerance — fixed pip/point value per instrument
+    # EQH/EQL tolerance — derived from central registry
     eqh_eql_tolerance: Dict[str, float] = field(default_factory=lambda: {
-        "EURUSD": 0.00010,  # 1 pip
-        "XAUUSD": 0.50,     # 50 cents
+        sym: meta.eqh_eql_tolerance
+        for sym, meta in INSTRUMENT_REGISTRY.items()
+        if meta.eqh_eql_tolerance > 0
     })
 
     # Enabled timeframes
@@ -36,7 +39,7 @@ class StructureConfig:
     allow_same_bar_reclaim: bool = True
     reclaim_window_bars: int = 1
 
-    # Phase 3C — FVG detection
-    fvg_min_size_eurusd: float = 0.0003    # 3 pips minimum gap
-    fvg_min_size_xauusd: float = 0.30      # 30 cents minimum gap
+    # Phase 3C — FVG detection (derived from central registry)
+    fvg_min_size_eurusd: float = INSTRUMENT_REGISTRY["EURUSD"].fvg_min_size
+    fvg_min_size_xauusd: float = INSTRUMENT_REGISTRY["XAUUSD"].fvg_min_size
     fvg_use_body_only: bool = True          # always True in 3C, wick mode deferred

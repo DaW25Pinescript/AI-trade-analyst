@@ -15,6 +15,8 @@ import pytest
 # Ensure officer module is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from instrument_registry import INSTRUMENT_REGISTRY, get_meta
+
 
 def _generate_ohlcv(
     periods: int,
@@ -102,27 +104,30 @@ def hot_packages_dir(tmp_path):
 def xauusd_hot_packages_dir(tmp_path):
     """Create a temporary hot packages directory with synthetic XAUUSD data.
 
-    Only the 4 analyst-target timeframes (15m, 1h, 4h, 1d) are written,
-    matching the XAUUSD fixture seeder behaviour.
+    Only the analyst-target timeframes are written, matching the registry.
     """
+    meta = get_meta("XAUUSD")
     packages_dir = tmp_path / "packages" / "latest"
     packages_dir.mkdir(parents=True)
 
+    # Map label → (pandas freq, row count) for the registry timeframes
+    _FREQ_MAP = {"1m": "1min", "5m": "5min", "15m": "15min", "1h": "1h", "4h": "4h", "1d": "1D"}
+    _COUNT_MAP = {"1m": 3000, "5m": 1200, "15m": 600, "1h": 240, "4h": 120, "1d": 30}
     tf_configs = {
-        "15m": ("15min", 600),
-        "1h": ("1h", 240),
-        "4h": ("4h", 120),
-        "1d": ("1D", 30),
+        tf: (_FREQ_MAP[tf], _COUNT_MAP[tf])
+        for tf in meta.timeframes
+        if tf in _FREQ_MAP
     }
 
+    vol_lo, vol_hi = meta.fixture_volume_range
     windows_manifest = {}
 
     for tf_label, (freq, count) in tf_configs.items():
         df = _generate_ohlcv(
-            count, freq, base_price=2700.0, volatility=2.0,
+            count, freq, base_price=meta.base_price, volatility=meta.fixture_volatility,
         )
-        # Scale volume to XAUUSD range (lots, not ticks)
-        df["volume"] = np.random.RandomState(42).uniform(0.1, 10.0, count)
+        # Scale volume to instrument range
+        df["volume"] = np.random.RandomState(42).uniform(vol_lo, vol_hi, count)
         filename = f"XAUUSD_{tf_label}_latest.csv"
         df.to_csv(packages_dir / filename)
         windows_manifest[tf_label] = {

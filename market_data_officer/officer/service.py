@@ -30,10 +30,17 @@ from .loader import EXPECTED_TIMEFRAMES, PACKAGES_DIR, load_all_timeframes, load
 from .quality import check_package_quality
 from .summarizer import build_state_summary
 from structure.reader import load_structure_summary, structure_is_available
+from instrument_registry import INSTRUMENT_REGISTRY
 
-# Instruments verified through Phase 1A (EURUSD) and Phase 1B (XAUUSD)
-TRUSTED_INSTRUMENTS = {"EURUSD", "XAUUSD"}
-PROVISIONAL_INSTRUMENTS: set[str] = set()
+# Derive trust sets from the central registry
+TRUSTED_INSTRUMENTS = {
+    sym for sym, meta in INSTRUMENT_REGISTRY.items()
+    if meta.trust_level == "trusted"
+}
+PROVISIONAL_INSTRUMENTS = {
+    sym for sym, meta in INSTRUMENT_REGISTRY.items()
+    if meta.trust_level == "provisional"
+}
 
 
 @dataclass
