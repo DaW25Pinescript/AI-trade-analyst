@@ -315,6 +315,7 @@ def build_market_packet(
         # Try to load data anyway — it may exist even if unverified
         try:
             manifest = load_manifest(instrument, packages_dir)
+            manifest_vendors = manifest.get("vendors", ["dukascopy"])
             quality_block = check_package_quality(instrument, packages_dir, now_utc)
             quality_block.flags.insert(0, "instrument_not_verified")
         except FileNotFoundError:
@@ -364,6 +365,11 @@ def build_market_packet(
             )
     else:
         quality_block = check_package_quality(instrument, packages_dir, now_utc)
+        try:
+            manifest = load_manifest(instrument, packages_dir)
+            manifest_vendors = manifest.get("vendors", ["dukascopy"])
+        except FileNotFoundError:
+            manifest_vendors = ["dukascopy"]
 
     # Determine overall data quality
     if not instrument_verified:
@@ -424,11 +430,17 @@ def build_market_packet(
     else:
         structure_block = StructureBlock.unavailable()
 
+    # Derive vendor label from manifest provenance
+    vendor_label = (
+        manifest_vendors[0] if len(manifest_vendors) == 1
+        else "+".join(manifest_vendors)
+    )
+
     return MarketPacketV2(
         instrument=instrument,
         as_of_utc=as_of_utc,
         source={
-            "vendor": "dukascopy",
+            "vendor": vendor_label,
             "canonical_tf": "1m",
             "quality": source_quality,
         },

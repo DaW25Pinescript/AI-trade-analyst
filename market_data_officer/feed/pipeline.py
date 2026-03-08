@@ -2,9 +2,10 @@
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 import pandas as pd
+import requests
 
 from .aggregate import ticks_to_1m_ohlcv
 from .config import (
@@ -20,6 +21,7 @@ from .decode import decode_dukascopy_ticks, decode_with_diagnostics
 from .diagnostics import DiagnosticsCollector, save_cache_inventory, verify_decode_assumptions
 from .export import export_hot_packages
 from .fetch import build_bi5_url, fetch_bi5, fetch_bi5_detailed
+from .yfinance_fallback import fetch_1m_ohlcv_yfinance
 from .gaps import generate_gap_report, save_gap_report
 from .resample import resample_from_1m
 from .validate import validate_ohlcv
@@ -213,6 +215,7 @@ def run_pipeline(
 
     fetch_count = 0
     skip_count = 0
+    vendors_seen: Set[str] = set()
 
     while current <= end:
         # Incremental: skip hours already covered
@@ -228,8 +231,23 @@ def run_pipeline(
         if collector:
             # Diagnostics-enabled path: use detailed fetch + decode
             try:
-                result = fetch_bi5_detailed(symbol, current, save_raw=save_raw)
-                fetch_count += 1
+                # --- Primary provider: Dukascopy ---
+                dukascopy_failed = False
+                try:
+                    result = fetch_bi5_detailed(symbol, current, save_raw=save_raw)
+                    fetch_count += 1
+                except requests.RequestException as exc:
+                    print(f"[pipeline] dukascopy transport error at {current}: {exc}")
+                    from .fetch import FetchResult
+                    result = FetchResult(
+                        data=b"",
+                        url=build_bi5_url(symbol, current),
+                        http_status=0,
+                        cached_path="",
+                        error=f"transport_error:{exc}",
+                    )
+                    fetch_count += 1
+                    dukascopy_failed = True
 
                 collector.record_fetch(
                     hour_utc=current,
@@ -240,13 +258,18 @@ def run_pipeline(
                     error=result.error,
                 )
 
+                if not result.data:
+                    dukascopy_failed = True
+
                 if result.data:
                     ticks, stats = decode_with_diagnostics(result.data, current, meta)
                     bars_produced = 0
                     if not ticks.empty:
                         bars = ticks_to_1m_ohlcv(ticks)
                         if not bars.empty:
+                            bars["vendor"] = "dukascopy"
                             all_bars.append(bars)
+                            vendors_seen.add("dukascopy")
                             bars_produced = len(bars)
 
                     collector.record_decode(
@@ -265,6 +288,16 @@ def run_pipeline(
                         bars_produced=0,
                         decode_error=result.error or "no_payload",
                     )
+
+                # --- AC-3 fallback: yfinance (transport failures only) ---
+                if dukascopy_failed:
+                    fb = fetch_1m_ohlcv_yfinance(symbol, current)
+                    if not fb.empty:
+                        fb["vendor"] = "yfinance"
+                        all_bars.append(fb)
+                        vendors_seen.add("yfinance")
+                        print(f"[pipeline] fallback: yfinance supplied "
+                              f"{len(fb)} bars for {current}")
             except Exception as exc:
                 print(f"[pipeline] error at {current}: {exc}")
                 collector.record_fetch(
@@ -277,15 +310,39 @@ def run_pipeline(
         else:
             # Standard path: original fetch + decode (no diagnostics overhead)
             try:
-                raw = fetch_bi5(symbol, current, save_raw=save_raw)
-                fetch_count += 1
+                # --- Primary provider: Dukascopy ---
+                dukascopy_failed = False
+                try:
+                    raw = fetch_bi5(symbol, current, save_raw=save_raw)
+                    fetch_count += 1
+                except requests.RequestException as exc:
+                    # Transport-layer failure after SSL retry exhausted
+                    print(f"[pipeline] dukascopy transport error at {current}: {exc}")
+                    raw = b""
+                    fetch_count += 1
+                    dukascopy_failed = True
+
+                if not raw:
+                    dukascopy_failed = True
 
                 if raw:
                     ticks = decode_dukascopy_ticks(raw, current, meta)
                     if not ticks.empty:
                         bars = ticks_to_1m_ohlcv(ticks)
                         if not bars.empty:
+                            bars["vendor"] = "dukascopy"
                             all_bars.append(bars)
+                            vendors_seen.add("dukascopy")
+
+                # --- AC-3 fallback: yfinance (transport failures only) ---
+                if dukascopy_failed:
+                    fb = fetch_1m_ohlcv_yfinance(symbol, current)
+                    if not fb.empty:
+                        fb["vendor"] = "yfinance"
+                        all_bars.append(fb)
+                        vendors_seen.add("yfinance")
+                        print(f"[pipeline] fallback: yfinance supplied "
+                              f"{len(fb)} bars for {current}")
             except Exception as exc:
                 print(f"[pipeline] error at {current}: {exc}")
 
@@ -308,9 +365,12 @@ def run_pipeline(
 
         new_data_start = new_df.index[0]
 
-        # Add metadata columns
-        new_df["vendor"] = "dukascopy"
-        new_df["build_method"] = "tick_to_1m"
+        # Add metadata columns (vendor already set per-batch during fetch)
+        if "vendor" not in new_df.columns:
+            new_df["vendor"] = "dukascopy"
+        new_df["build_method"] = new_df["vendor"].apply(
+            lambda v: "tick_to_1m" if v == "dukascopy" else "yfinance_1m"
+        )
         new_df["quality_flag"] = "ok"
 
         if existing is not None and not existing.empty:
@@ -330,7 +390,7 @@ def run_pipeline(
     _save_canonical(canonical, symbol)
 
     # Rebuild derived timeframes and hot packages
-    _rebuild_derived_and_export(canonical, symbol, new_data_start)
+    _rebuild_derived_and_export(canonical, symbol, new_data_start, vendors_seen)
 
     # Gap report
     if gap_report:
@@ -363,9 +423,17 @@ def _rebuild_derived_and_export(
     canonical: pd.DataFrame,
     symbol: str,
     new_data_start: Optional[pd.Timestamp],
+    vendors: Optional[Set[str]] = None,
 ) -> None:
     """Rebuild derived timeframes (selectively if possible) and export hot packages."""
     canonical_ohlcv = canonical[["open", "high", "low", "close", "volume"]]
+
+    # Determine vendor set from canonical data if not provided
+    if vendors is None:
+        if "vendor" in canonical.columns:
+            vendors = set(canonical["vendor"].dropna().unique())
+        else:
+            vendors = {"dukascopy"}
 
     hot_dfs = {"1m": canonical_ohlcv}
 
@@ -378,7 +446,7 @@ def _rebuild_derived_and_export(
             _save_derived(derived, symbol, tf_label)
             hot_dfs[tf_label] = derived[["open", "high", "low", "close", "volume"]]
 
-    export_hot_packages(hot_dfs, symbol)
+    export_hot_packages(hot_dfs, symbol, vendors=vendors)
 
 
 def _run_gap_report(canonical: pd.DataFrame, symbol: str) -> None:
