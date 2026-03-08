@@ -1,8 +1,67 @@
 """CLI entry point for the market data feed pipeline."""
 
 import argparse
+import json
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+
+def _seed_fixture(instrument: str) -> None:
+    """Write a minimal valid hot package fixture for dev/test use.
+
+    Uses the same manifest/CSV shape as conftest.hot_packages_dir so the
+    officer's standard loader path works unchanged.
+    """
+    from feed.config import PACKAGES_DIR, HOT_WINDOW_SIZES
+
+    PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+    rng = np.random.RandomState(42)
+    now_utc = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    base_price = 1.0850
+    volatility = 0.0005
+
+    tf_configs = {
+        "1m": ("1min", HOT_WINDOW_SIZES["1m"]),
+        "5m": ("5min", HOT_WINDOW_SIZES["5m"]),
+        "15m": ("15min", HOT_WINDOW_SIZES["15m"]),
+        "1h": ("1h", HOT_WINDOW_SIZES["1h"]),
+        "4h": ("4h", HOT_WINDOW_SIZES["4h"]),
+        "1d": ("1D", HOT_WINDOW_SIZES["1d"]),
+    }
+
+    windows_manifest: dict = {}
+    for tf_label, (freq, count) in tf_configs.items():
+        index = pd.date_range(end=now_utc, periods=count, freq=freq, tz="UTC")
+        returns = rng.normal(0, volatility, count)
+        close = base_price + np.cumsum(returns)
+        high = close + rng.uniform(0, volatility * 2, count)
+        low = close - rng.uniform(0, volatility * 2, count)
+        open_ = close + rng.normal(0, volatility * 0.5, count)
+        volume = rng.uniform(100, 5000, count)
+
+        df = pd.DataFrame(
+            {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
+            index=index,
+        )
+        df.index.name = "timestamp_utc"
+
+        filename = f"{instrument}_{tf_label}_latest.csv"
+        df.to_csv(PACKAGES_DIR / filename)
+        windows_manifest[tf_label] = {"count": count, "file": filename}
+
+    manifest = {
+        "instrument": instrument,
+        "as_of_utc": now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "schema": "timestamp_utc,open,high,low,close,volume",
+        "windows": windows_manifest,
+    }
+    (PACKAGES_DIR / f"{instrument}_hot.json").write_text(json.dumps(manifest, indent=2))
+    print(f"[fixture] Wrote {instrument} hot package to {PACKAGES_DIR}")
 
 
 def main() -> None:
@@ -19,13 +78,11 @@ def main() -> None:
     parser.add_argument(
         "--start-date",
         type=str,
-        required=True,
         help="Start date in YYYY-MM-DD format",
     )
     parser.add_argument(
         "--end-date",
         type=str,
-        required=True,
         help="End date in YYYY-MM-DD format",
     )
     parser.add_argument(
@@ -52,8 +109,21 @@ def main() -> None:
         default=False,
         help="Generate cache diagnostics report (per-hour fetch/decode audit trail)",
     )
+    parser.add_argument(
+        "--fixture",
+        action="store_true",
+        default=False,
+        help="Seed a synthetic hot package fixture for dev/test (no network required)",
+    )
 
     args = parser.parse_args()
+
+    if args.fixture:
+        _seed_fixture(args.instrument)
+        return
+
+    if not args.start_date or not args.end_date:
+        parser.error("--start-date and --end-date are required (unless using --fixture)")
 
     try:
         start = datetime.strptime(args.start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
