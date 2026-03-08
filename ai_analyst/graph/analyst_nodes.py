@@ -226,7 +226,16 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     for i, result in enumerate(results):
         config = configs_to_run[i]
         model = config["model"]
+        # DEBUG: log the type and keys/attrs of each gather result
+        logger.info(
+            "[DEBUG] parallel_analyst_node result[%d]: type=%s isinstance_AnalystOutput=%s isinstance_ValidationError=%s",
+            i, type(result).__name__, isinstance(result, AnalystOutput), isinstance(result, ValidationError),
+        )
         if isinstance(result, AnalystOutput):
+            logger.info(
+                "[DEBUG] valid AnalystOutput[%d]: action=%s confidence=%s setup_valid=%s disqualifiers=%s",
+                i, result.recommended_action, result.confidence, result.setup_valid, result.disqualifiers,
+            )
             valid_outputs.append(result)
             configs_used.append(config)
         elif isinstance(result, ValidationError):
@@ -264,6 +273,10 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
 
     state["analyst_outputs"] = valid_outputs
     state["analyst_configs_used"] = configs_used
+    logger.info(
+        "[DEBUG] parallel_analyst_node DONE: len(valid_outputs)=%d len(state['analyst_outputs'])=%d",
+        len(valid_outputs), len(state["analyst_outputs"]),
+    )
     return state
 
 

@@ -27,3 +27,5 @@ class GraphState(TypedDict):
     # Phase 3 — Monitoring & Observability
     _pipeline_start_ts: Optional[float]             # perf_counter() at pipeline entry (for total latency)
     _node_timings: Optional[dict]                   # node_name → elapsed_ms
+    # Debug — temporary counters for analyst output persistence investigation
+    _debug_after_parallel: Optional[int]            # len(analyst_outputs) after parallel_analyst_node
