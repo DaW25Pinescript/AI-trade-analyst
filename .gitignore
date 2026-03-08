@@ -167,3 +167,4 @@ market_data_officer/market_data/
 
 # Analyst — runtime output (generated JSON artifacts)
 analyst/output/
+RUN.local.bat

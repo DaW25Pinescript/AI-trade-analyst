@@ -1,10 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-title AI Trade Analyst Bootstrap v3
+title AI Trade Analyst Bootstrap v4
 
 REM =========================================================
-REM Repo-root bootstrap v3:
+REM Repo-root bootstrap v4:
 REM - creates/uses .venv
 REM - checks/install backend deps (including python-multipart)
 REM - checks/starts CLIProxyAPI first from its own folder
@@ -12,6 +12,7 @@ REM - waits for proxy confirmation on 8317
 REM - starts backend on 8000 and waits for /health
 REM - starts UI static server on 8080
 REM - opens browser pages
+REM - loads local, untracked env vars from RUN.local.bat if present
 REM Put this .bat in the repo root and double-click it.
 REM =========================================================
 
@@ -25,8 +26,35 @@ set "API_DOCS_URL=http://127.0.0.1:8000/docs"
 set "API_HEALTH_URL=http://127.0.0.1:8000/health"
 set "PROXY_UI_URL=http://127.0.0.1:8317/management.html"
 
+REM ---------------------------------------------------------
+REM Optional local env loader (keep RUN.local.bat out of git)
+REM ---------------------------------------------------------
+if exist "%ROOT%\RUN.local.bat" (
+    echo Loading local environment from RUN.local.bat...
+    call "%ROOT%\RUN.local.bat"
+) else (
+    echo RUN.local.bat not found. Continuing with current environment...
+)
+
+REM Backward compatibility alias:
+REM if older setups define CLAUDE_PROXY_API_KEY, copy it into the
+REM currently supported LOCAL_LLM_PROXY_API_KEY name unless already set.
+if not defined LOCAL_LLM_PROXY_API_KEY if defined CLAUDE_PROXY_API_KEY set "LOCAL_LLM_PROXY_API_KEY=%CLAUDE_PROXY_API_KEY%"
+
+if defined LOCAL_LLM_PROXY_API_KEY (
+    echo LOCAL_LLM_PROXY_API_KEY is present.
+) else (
+    echo LOCAL_LLM_PROXY_API_KEY is NOT set.
+)
+
+if defined CLAUDE_PROXY_BASE_URL (
+    echo CLAUDE_PROXY_BASE_URL is present.
+) else (
+    echo CLAUDE_PROXY_BASE_URL is NOT set. Using app default/config.
+)
+
 echo ==============================================
-echo AI Trade Analyst bootstrap v3
+echo AI Trade Analyst bootstrap v4
 echo Repo root: %ROOT%
 echo ==============================================
 echo.
@@ -260,8 +288,30 @@ echo.
 echo [4/5] Ensuring backend server on port 8000...
 call :port_in_use 8000
 if not errorlevel 1 (
-    echo Backend already appears to be running on 8000.
-    exit /b 0
+    call :get_port_pid 8000 BACKEND_PID
+    if defined BACKEND_PID (
+        echo Port 8000 is already in use by PID !BACKEND_PID!.
+        choice /C YN /N /M "Stop that process and restart backend? [Y/N]: "
+        if errorlevel 2 (
+            echo Leaving existing process on port 8000 running.
+            exit /b 0
+        )
+        echo Stopping PID !BACKEND_PID!...
+        taskkill /PID !BACKEND_PID! /T /F >nul 2>nul
+        if errorlevel 1 (
+            echo ERROR: Failed to stop PID !BACKEND_PID!.
+            exit /b 1
+        )
+        echo Waiting for port 8000 to clear...
+        call :wait_for_port_free 8000 15
+        if errorlevel 1 (
+            echo ERROR: Port 8000 did not clear in time.
+            exit /b 1
+        )
+    ) else (
+        echo Port 8000 is in use, but PID could not be determined.
+        exit /b 1
+    )
 )
 
 echo Starting backend...
@@ -284,6 +334,28 @@ exit /b 0
 :port_in_use
 netstat -ano | findstr /R /C:":%~1 .*LISTENING" >nul
 exit /b %errorlevel%
+
+
+:get_port_pid
+set "%~2="
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%~1 .*LISTENING"') do (
+    set "%~2=%%P"
+    goto :eof
+)
+goto :eof
+
+:wait_for_port_free
+set "WAIT_PORT=%~1"
+set "WAIT_SECS=%~2"
+set /a COUNT=0
+:wait_port_free_loop
+call :port_in_use %WAIT_PORT%
+if errorlevel 1 exit /b 0
+if !COUNT! GEQ %WAIT_SECS% exit /b 1
+set /a COUNT+=1
+timeout /t 1 /nobreak >nul
+goto :wait_port_free_loop
+
 
 :wait_for_port
 set "WAIT_PORT=%~1"
