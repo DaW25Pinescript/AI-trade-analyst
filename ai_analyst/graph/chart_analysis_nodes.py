@@ -57,9 +57,22 @@ async def chart_setup_node(state: GraphState) -> dict:
     }
 
 
-async def chart_lenses_node(state: GraphState) -> GraphState:
-    """Run selected chart-analysis lenses via the existing parallel analyst fan-out."""
-    return await parallel_analyst_node(state)
+async def chart_lenses_node(state: GraphState) -> dict:
+    """Run selected chart-analysis lenses via the existing parallel analyst fan-out.
+
+    Returns a PARTIAL state dict (only changed keys) so the LangGraph fan-in
+    merge after the macro_context ∥ chart_setup parallel branches applies
+    analyst results cleanly without overwriting unrelated state keys.
+    """
+    result_state = await parallel_analyst_node(state)
+    update: dict = {
+        "analyst_outputs": result_state["analyst_outputs"],
+        "analyst_configs_used": result_state.get("analyst_configs_used", []),
+    }
+    # Smoke mode: propagate captured error if the analyst LLM failed
+    if "_smoke_error" in result_state:
+        update["_smoke_error"] = result_state["_smoke_error"]
+    return update
 
 
 async def pinekraft_bridge_node(state: GraphState) -> GraphState:
