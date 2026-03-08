@@ -205,6 +205,7 @@ export function adaptJourneyBootstrap(multiOutput, explainBlock, macroSnapshot) 
   }
 
   const digest = multiOutput.digest || {};
+  const camelDigest = deepSnakeToCamel(digest);
   const arbiter = multiOutput.arbiter_decision || {};
   const personas = multiOutput.persona_outputs || [];
   const finalVerdict = multiOutput.final_verdict || {};
@@ -221,13 +222,13 @@ export function adaptJourneyBootstrap(multiOutput, explainBlock, macroSnapshot) 
         marketFeatures: null,
       },
       asset_context: {
-        digest: digest,
+        digest: camelDigest,
         personas: personas,
         finalVerdict: finalVerdict,
         signalRanking: explainBlock?.signal_ranking || null,
       },
       structure_liquidity: {
-        digest: digest,
+        digest: camelDigest,
         htfBias: digest.htf_bias,
         lastBos: digest.last_bos,
         lastMss: digest.last_mss,

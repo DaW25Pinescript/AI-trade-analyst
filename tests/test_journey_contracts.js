@@ -115,15 +115,24 @@ SYSTEM_VERDICT_FIELDS.forEach(field => {
 
 // Validate DecisionSnapshot shape
 const SNAPSHOT_FIELDS = [
-  'snapshotId', 'instrument', 'frozenAt', 'journeyStatus',
+  'snapshotId', 'journeyId', 'instrument', 'frozenAt', 'journeyStatus',
   'systemVerdict', 'userDecision', 'executionPlan', 'gateStates',
+  'gateJustifications', 'provenance',
   'stageData', 'digest', 'macroContext', 'evidenceRefs', 'journalNotes',
 ];
 
 const demoSnapshot = {
-  snapshotId: 'snap_test', instrument: 'EURUSD', frozenAt: '2026-03-07',
-  journeyStatus: 'saved', systemVerdict: null, userDecision: null,
-  executionPlan: null, gateStates: [], stageData: {},
+  snapshotId: 'snap_test', journeyId: 'jrn_test', instrument: 'EURUSD',
+  frozenAt: '2026-03-07', journeyStatus: 'saved',
+  systemVerdict: null, userDecision: { action: 'take_trade', provenance: 'user_manual' },
+  executionPlan: { direction: 'long', provenance: 'user_manual' },
+  gateStates: [
+    { id: 'structure_gate', label: 'Structure Gate', state: 'passed', source: 'system' },
+    { id: 'no_trade_flags', label: 'No-Trade Flags', state: 'blocked', source: 'system', justification: 'High volatility' },
+  ],
+  gateJustifications: { structure_gate: null, no_trade_flags: 'High volatility' },
+  provenance: { systemVerdict: 'ai_prefill', userDecision: 'user_manual', executionPlan: 'user_manual' },
+  stageData: {},
   digest: null, macroContext: null, evidenceRefs: [], journalNotes: '',
 };
 
@@ -201,6 +210,83 @@ group('AT-X.5 — Semantic stage keys');
 EXPECTED_STAGE_KEYS.forEach(key => {
   assert(typeof key === 'string' && key.includes('_'),
     `Stage key is semantic: ${key}`);
+});
+
+// ── H-1: Casing boundary — digest keys must be camelCase in UI layer ─────
+
+group('H-1 — Digest casing boundary');
+
+// Simulate the adapter's deepSnakeToCamel on a raw digest
+function snakeToCamel(s) {
+  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+function deepSnakeToCamelTest(obj) {
+  if (obj === null || obj === undefined || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(deepSnakeToCamelTest);
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[snakeToCamel(key)] = deepSnakeToCamelTest(value);
+  }
+  return result;
+}
+
+const rawDigest = {
+  htf_bias: 'bearish',
+  htf_source_timeframe: 'H4',
+  structure_gate: 'pass',
+  bos_mss_alignment: 'aligned',
+  liquidity_bias: 'bearish',
+  active_fvg_context: 'bullish_fvg_below',
+  active_fvg_count: 2,
+  recent_sweep_signal: 'none',
+};
+
+const camelDigest = deepSnakeToCamelTest(rawDigest);
+
+assert(camelDigest.htfBias === 'bearish', 'Digest htf_bias → htfBias');
+assert(camelDigest.htfSourceTimeframe === 'H4', 'Digest htf_source_timeframe → htfSourceTimeframe');
+assert(camelDigest.structureGate === 'pass', 'Digest structure_gate → structureGate');
+assert(camelDigest.bosMssAlignment === 'aligned', 'Digest bos_mss_alignment → bosMssAlignment');
+assert(camelDigest.liquidityBias === 'bearish', 'Digest liquidity_bias → liquidityBias');
+assert(camelDigest.activeFvgContext === 'bullish_fvg_below', 'Digest active_fvg_context → activeFvgContext');
+assert(camelDigest.activeFvgCount === 2, 'Digest active_fvg_count → activeFvgCount');
+assert(camelDigest.recentSweepSignal === 'none', 'Digest recent_sweep_signal → recentSweepSignal');
+assert(!('htf_bias' in camelDigest), 'No snake_case htf_bias key in converted digest');
+assert(!('active_fvg_count' in camelDigest), 'No snake_case active_fvg_count key in converted digest');
+
+// ── H-2: journeyId present in snapshot ───────────────────────────────────
+
+group('H-2 — journeyId in snapshot');
+
+assert('journeyId' in demoSnapshot, 'Snapshot contains journeyId field');
+assert(typeof demoSnapshot.journeyId === 'string', 'journeyId is a string');
+assert(demoSnapshot.journeyId.length > 0, 'journeyId is not empty');
+
+// ── H-3: gateJustifications as separate map ──────────────────────────────
+
+group('H-3 — gateJustifications map in snapshot');
+
+assert('gateJustifications' in demoSnapshot, 'Snapshot contains gateJustifications field');
+assert(typeof demoSnapshot.gateJustifications === 'object', 'gateJustifications is an object');
+assert(!Array.isArray(demoSnapshot.gateJustifications), 'gateJustifications is a map, not an array');
+assert(demoSnapshot.gateJustifications.structure_gate === null, 'Passed gate has null justification');
+assert(demoSnapshot.gateJustifications.no_trade_flags === 'High volatility', 'Blocked gate has justification text');
+
+// ── H-4: provenance field-level tracking map ─────────────────────────────
+
+group('H-4 — provenance map in snapshot');
+
+assert('provenance' in demoSnapshot, 'Snapshot contains provenance field');
+assert(typeof demoSnapshot.provenance === 'object', 'provenance is an object');
+assert(!Array.isArray(demoSnapshot.provenance), 'provenance is a map, not an array');
+assert(demoSnapshot.provenance.systemVerdict === 'ai_prefill', 'systemVerdict provenance is ai_prefill');
+assert(demoSnapshot.provenance.userDecision === 'user_manual', 'userDecision provenance is user_manual');
+assert(demoSnapshot.provenance.executionPlan === 'user_manual', 'executionPlan provenance is user_manual');
+
+// Validate provenance values are from the allowed enum
+const VALID_PROVENANCES = ['ai_prefill', 'user_confirm', 'user_override', 'user_manual', null];
+Object.values(demoSnapshot.provenance).forEach(p => {
+  assert(VALID_PROVENANCES.includes(p), `Provenance value "${p}" is in the allowed enum`);
 });
 
 // ── Report ──────────────────────────────────────────────────────────────────

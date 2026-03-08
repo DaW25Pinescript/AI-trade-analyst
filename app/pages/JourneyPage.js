@@ -243,7 +243,7 @@ function _renderStructureLiquidity(container, state) {
 
   leftPanel.appendChild(createChartAnnotationLayer({
     instrument: state.selectedAsset,
-    timeframe: data?.digest?.htf_source_timeframe || 'H4',
+    timeframe: data?.digest?.htfSourceTimeframe || 'H4',
     annotations,
   }));
 
@@ -257,7 +257,7 @@ function _renderStructureLiquidity(container, state) {
         { label: 'Last MSS', value: data.lastMss },
         { label: 'Alignment', value: data.bosMssAlignment },
         { label: 'Liquidity Bias', value: data.liquidityBias },
-        { label: 'Active FVGs', value: data.digest?.active_fvg_count },
+        { label: 'Active FVGs', value: data.digest?.activeFvgCount },
       ],
     }));
 
