@@ -225,6 +225,23 @@ Based on Steps 1–3, report:
 - whether existing config modules can absorb the change cleanly
 - whether alias metadata should be data-only in this phase rather than behavior-switching
 
+### Step 4b — Identify flaky baseline test
+
+The diagnostic noted one flaky determinism test that passes on rerun. Before patching:
+- identify it by name
+- run it 3–5 times independently
+- confirm it is baseline flakiness, not a latent defect
+- record the name so it is treated as noise during patching, not a regression signal
+
+### Step 4c — Import graph check (required before P4/P5)
+
+Before making `structure/` consume `feed/config.py` or a shared registry, confirm:
+- does anything under `market_data_officer/feed/` import from `market_data_officer/structure/`?
+- does `officer/service.py` or `loader.py` import from both sides in a way that could become cyclic?
+- can `structure/config.py` safely import from `market_data_officer/instrument_registry.py` at package root?
+
+Report the import graph before P4/P5 are approved.
+
 ### Step 5 — Do not implement until reviewed
 No code changes until the smallest patch set is approved.
 
@@ -250,10 +267,12 @@ The implementer should avoid:
 
 For a refactor touching multiple consumers, order matters. Recommended sequence:
 
-1. Define `INSTRUMENT_REGISTRY` (or `InstrumentConfig` dataclass + dict) with **existing instruments only** (EURUSD, XAUUSD)
+0. **Pre-check:** confirm import graph between `feed/`, `officer/`, `structure/` — verify no circular dependency risk before P4/P5
+1. Create `market_data_officer/instrument_registry.py` with `InstrumentMeta` + `INSTRUMENT_REGISTRY` — **existing instruments only** (EURUSD, XAUUSD) first
 2. Verify **364/364 tests still pass** — no behavior change yet
 3. Add GBPUSD, XAGUSD, XPTUSD to registry
 4. Update `run_feed.py`, `feed/config.py`, `officer/service.py` to read from registry
+   - P4/P5 (`structure/config.py`, `structure/imbalance.py`) only after import graph confirmed clean
 5. Verify **364/364 still pass** — prove refactor is non-breaking
 6. Add new fixture + relay tests for the 3 new instruments
 
