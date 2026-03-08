@@ -76,16 +76,24 @@ def get_analyst_roster() -> list[dict]:
 
     Returns a list of dicts with 'model' (str) and 'persona' (PersonaType).
     Falls back to _DEFAULT_ANALYST_ROSTER if the YAML has no analyst_roster key.
+
+    The model for ALL personas is resolved from task_routing.analyst_reasoning
+    — per-persona model fields in the roster are ignored. This ensures the
+    router config remains the single source of truth for model selection.
     """
     from ..models.persona import PersonaType
+    from .task_types import ANALYST_REASONING
 
     config = load_config()
     raw_roster = config.get("analyst_roster", _DEFAULT_ANALYST_ROSTER)
 
+    # Single source of truth: the model configured for analyst_reasoning
+    resolved_model = config["task_routing"][ANALYST_REASONING]["primary_model"]
+
     roster: list[dict] = []
     for entry in raw_roster:
         roster.append({
-            "model": entry["model"],
+            "model": resolved_model,
             "persona": PersonaType(entry["persona"]),
         })
 
