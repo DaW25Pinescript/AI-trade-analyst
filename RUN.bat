@@ -294,8 +294,25 @@ echo.
 echo [4/5] Ensuring backend server on port 8000...
 call :port_in_use 8000
 if not errorlevel 1 (
-    echo Backend already appears to be running on 8000.
-    exit /b 0
+    call :get_port_pid 8000 BACKEND_PID
+    if defined BACKEND_PID (
+        echo Stale backend found on port 8000 ^(PID !BACKEND_PID!^). Killing...
+        taskkill /PID !BACKEND_PID! /T /F >nul 2>nul
+        if errorlevel 1 (
+            echo ERROR: Failed to stop PID !BACKEND_PID!. Try running as Administrator.
+            exit /b 1
+        )
+        echo Waiting for port 8000 to clear...
+        call :wait_for_port_free 8000 15
+        if errorlevel 1 (
+            echo ERROR: Port 8000 did not clear in time.
+            exit /b 1
+        )
+        echo Port 8000 cleared.
+    ) else (
+        echo Port 8000 is in use but PID could not be determined. Cannot clear.
+        exit /b 1
+    )
 )
 
 echo Starting backend...
@@ -342,6 +359,26 @@ if !COUNT! GEQ %WAIT_SECS% exit /b 1
 set /a COUNT+=1
 timeout /t 1 /nobreak >nul
 goto :wait_http_loop
+
+:get_port_pid
+set "%~2="
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%~1 .*LISTENING"') do (
+    set "%~2=%%P"
+    goto :eof
+)
+goto :eof
+
+:wait_for_port_free
+set "WAIT_PORT=%~1"
+set "WAIT_SECS=%~2"
+set /a COUNT=0
+:wait_port_free_loop
+call :port_in_use %WAIT_PORT%
+if errorlevel 1 exit /b 0
+if !COUNT! GEQ %WAIT_SECS% exit /b 1
+set /a COUNT+=1
+timeout /t 1 /nobreak >nul
+goto :wait_port_free_loop
 
 :fail
 echo.
