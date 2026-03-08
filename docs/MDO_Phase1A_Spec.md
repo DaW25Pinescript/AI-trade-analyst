@@ -40,14 +40,15 @@ Derived from actual codebase state, not the abstract spec in section 8 of the se
 | Runtime artifacts root | `market_data/` (created at runtime) |
 | Canonical / derived storage | Parquet/CSV via pipeline — no SQLite |
 | Hot package location | `market_data/packages/latest/` |
-| EURUSD yFinance ticker | `EURUSD=X` |
+| EURUSD yFinance alias (future/optional) | `EURUSD=X` — not active in current MDO implementation |
 | Target timeframe set | `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
 | Ingestion trigger | CLI / manual — `run_feed.py` |
 | Contract path | `build_market_packet()` / `refresh_from_latest_exports()` |
 | Packet schema | `MarketPacketV2` in `officer/contracts.py` |
 | Analyst consumption path | `run_analyst()` → `build_market_packet()` if no packet injected |
-| Provider (primary) | yFinance |
-| Provider (stub) | Finnhub — `NotImplementedError` |
+| Provider (primary) | Dukascopy (bi5 format) |
+| Provider (yFinance) | Optional dep (`mro` group in `pyproject.toml`) — not imported by `market_data_officer/` |
+| Provider (stub) | Finnhub — not present in current codebase |
 
 ---
 
@@ -100,7 +101,7 @@ Analogy: the officer (vending machine) works correctly — it refuses to dispens
 | AC-3 | `MarketPacketV2` | `refresh_from_latest_exports("EURUSD")` returns valid `MarketPacketV2` (no `FileNotFoundError`) | ⏳ Next |
 | AC-4 | Timeframe coverage | `MarketPacketV2` includes all 6 expected timeframes: `1m`, `5m`, `15m`, `1h`, `4h`, `1d` | ⏳ Next |
 | AC-5 | Analyst consumption | `run_analyst()` completes and returns a structured result without `FileNotFoundError` or packet-schema exception — packet schema is validated, not just non-null | ⏳ Next |
-| AC-6 | Contract tests | Targeted tests pass: feed write, packet assembly, timeframe coverage, serialization | ⏳ Next |
+| AC-6 | Contract tests | Two targeted tests pass: **Test A (officer relay)** — seed fixture → `refresh_from_latest_exports("EURUSD")` → assert valid `MarketPacketV2` → assert 6 timeframes. **Test B (analyst consumption)** — call `run_analyst()` with injected packet + mocked LLM → assert no crash / structured result returned. Keeps AC-6 deterministic with no live LLM or provider dependency. | ⏳ Next |
 | AC-7 | No SQLite | No SQLite introduced — confirmed by `grep -r sqlite market_data_officer/` | ⏳ Next |
 | AC-8 | No new module | No new top-level module — work confined to `market_data_officer/` | ⏳ Next |
 
@@ -135,17 +136,16 @@ Expected: manifest JSON + CSV files for EURUSD across all 6 timeframes. If missi
 
 **POSIX:**
 ```bash
-python market_data_officer/run_feed.py --instrument EURUSD
+python market_data_officer/run_feed.py --instrument EURUSD --start-date 2026-03-03 --end-date 2026-03-07
 ```
 
 **Windows:**
 ```cmd
-python market_data_officer\run_feed.py --instrument EURUSD
+python market_data_officer\run_feed.py --instrument EURUSD --start-date 2026-03-03 --end-date 2026-03-07
 ```
 
 > **Windows note:** if running inside a venv, activate first: `.venv\Scripts\activate`
-
-Observe: does it complete, raise, or silently fail? Capture full output. Classify failure as: provider/network issue, code defect, or config gap.
+> **Date note:** `--start-date` and `--end-date` are required. Use a recent weekday range — Dukascopy returns empty payloads for weekend hours, which will produce "no data fetched" without error.
 
 ---
 
@@ -193,7 +193,7 @@ Based on Steps 1–4, list the minimum file changes needed to make AC-1 through 
 
 If yFinance/Dukascopy is unreachable during development, choose one of:
 
-**Option A (preferred):** Pre-bake a minimal valid EURUSD hot-package fixture (small real or synthetic candle CSV + manifest JSON). Wire a `--fixture` flag or test factory to seed it. Feed code untouched; officer gets real-shaped artifacts; tests prove the full relay. **The fixture must preserve the exact manifest/CSV shape expected by `refresh_from_latest_exports()` — no fake side-channel loader or alternate read path should be introduced.**
+**Option A (preferred):** Pre-bake a minimal valid EURUSD hot-package fixture (small real or synthetic candle CSV + manifest JSON). Wire a `--fixture` flag on `run_feed.py` or a standalone `seed_fixture.py` script inside `market_data_officer/` that writes to `market_data/packages/latest/`. Feed code untouched; officer gets real-shaped artifacts. **The fixture must preserve the exact manifest/CSV shape expected by `refresh_from_latest_exports()` — no fake side-channel loader or alternate read path should be introduced.** The same fixture logic powers both Test A (officer relay) and Test B (analyst consumption) in AC-6.
 
 **Option B:** Confirm yFinance is wired as default dev provider and switch EURUSD to it if Dukascopy is current primary.
 
@@ -241,6 +241,31 @@ This is the relay race: feed → hot-package → officer → analyst. Phase 1A i
 
 ---
 
+## 10. Diagnostic Findings (8 March 2026)
+
+Diagnostic run completed before implementation. Root cause: no hot-package artifacts exist in dev — Dukascopy returns empty payloads on weekends. Code is not broken.
+
+| AC | Status | Gap Type | Root Cause |
+|----|--------|----------|------------|
+| AC-1 | FAIL | Runtime/provider | Dukascopy weekend + spec omitted `--start-date`/`--end-date` |
+| AC-2 | FAIL | Missing artifact | Blocked by AC-1 — no feed run has produced artifacts |
+| AC-3 | FAIL | Missing artifact | Blocked by AC-2 — `FileNotFoundError` on missing manifest |
+| AC-4 | FAIL | Missing artifact | Blocked by AC-2/AC-3 |
+| AC-5 | FAIL | Missing artifact | Blocked by AC-3 + potential LLM provider dependency |
+| AC-6 | PARTIAL | Test/fixture gap | 354 unit tests pass; integration relay test missing |
+| AC-7 | PASS | None | Clean |
+| AC-8 | PASS | None | Clean |
+
+**Approved patch set:**
+
+| Patch | Files | Est. Lines | Resolves |
+|-------|-------|-----------|----------|
+| Fixture seeding | `run_feed.py` (~20–30 lines) | ~20–30 | AC-1 through AC-5 |
+| Relay + consumption tests | `tests/test_phase1a_relay.py` (new) | ~80–100 | AC-6 (both Test A + Test B) |
+| Spec doc accuracy | `docs/MDO_Phase1A_Spec.md` | ~5 | Doc accuracy (provider, CLI args) |
+
+---
+
 ## Recommended Agent Prompt
 
 Paste this when starting the next session:
@@ -248,23 +273,34 @@ Paste this when starting the next session:
 ```
 Read `docs/MDO_Phase1A_Spec.md` and treat it as the controlling spec for this pass.
 
-First task only:
-Run the diagnostic protocol in Section 6 and report gaps before changing any code.
+Diagnostic report is complete (see Section 10). Approved patch set:
 
-Report:
-- current repo state vs the spec
-- gaps against AC-1 through AC-8
-- whether each gap is a code defect, runtime/provider issue, missing artifact, or test/fixture gap
-- the smallest patch set needed
+Patch 1 — Fixture seeding (~20–30 lines in run_feed.py):
+- Add --fixture flag to run_feed.py that writes a minimal valid EURUSD hot package
+  to market_data/packages/latest/ using the same shape as the existing
+  conftest.py hot_packages_dir fixture. No new loader, no side-channel path.
+
+Patch 2 — Integration tests (~80–100 lines, new file):
+- Create market_data_officer/tests/test_phase1a_relay.py with two tests:
+  Test A (officer relay): seed fixture → refresh_from_latest_exports("EURUSD")
+    → assert valid MarketPacketV2 → assert all 6 timeframes present
+  Test B (analyst consumption): call run_analyst() with injected packet
+    + mocked LLM → assert no crash / structured result returned
+
+Patch 3 — Spec doc (already applied, no code change needed):
+- Provider corrected to Dukascopy, CLI args updated with --start-date/--end-date
 
 Hard constraints:
 - no SQLite
 - no new top-level module
 - no scheduler
-- keep changes inside `market_data_officer/` unless strictly required
+- keep changes inside market_data_officer/ unless strictly required
 - preserve the existing file-based spine and MarketPacketV2 contract path
+- fixture must use the same manifest/CSV shape as existing conftest.py fixture
+- do not introduce a side-channel loader or alternate read path
 
-Do not change code until the diagnostic report is complete.
+After implementing, run: pytest market_data_officer/tests/ -v
+Target: 354+ tests green, both new relay tests pass.
 ```
 
 ---
