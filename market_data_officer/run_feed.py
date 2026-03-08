@@ -20,18 +20,34 @@ def _seed_fixture(instrument: str) -> None:
 
     PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
 
+    # Instrument-keyed fixture parameters
+    _FIXTURE_PARAMS = {
+        "EURUSD": {"base_price": 1.0850, "volatility": 0.0005, "volume_range": (100, 5000)},
+        "XAUUSD": {"base_price": 2700.0, "volatility": 2.0, "volume_range": (0.1, 10.0)},
+    }
+    # XAUUSD uses only the 4 analyst-target timeframes
+    _XAUUSD_TIMEFRAMES = {"15m", "1h", "4h", "1d"}
+
+    params = _FIXTURE_PARAMS.get(instrument, _FIXTURE_PARAMS["EURUSD"])
+    base_price = params["base_price"]
+    volatility = params["volatility"]
+    vol_lo, vol_hi = params["volume_range"]
+
     rng = np.random.RandomState(42)
     now_utc = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    base_price = 1.0850
-    volatility = 0.0005
 
-    tf_configs = {
+    all_tf_configs = {
         "1m": ("1min", HOT_WINDOW_SIZES["1m"]),
         "5m": ("5min", HOT_WINDOW_SIZES["5m"]),
         "15m": ("15min", HOT_WINDOW_SIZES["15m"]),
         "1h": ("1h", HOT_WINDOW_SIZES["1h"]),
         "4h": ("4h", HOT_WINDOW_SIZES["4h"]),
         "1d": ("1D", HOT_WINDOW_SIZES["1d"]),
+    }
+    # Filter to target timeframes for this instrument
+    tf_configs = {
+        k: v for k, v in all_tf_configs.items()
+        if instrument != "XAUUSD" or k in _XAUUSD_TIMEFRAMES
     }
 
     windows_manifest: dict = {}
@@ -42,7 +58,7 @@ def _seed_fixture(instrument: str) -> None:
         high = close + rng.uniform(0, volatility * 2, count)
         low = close - rng.uniform(0, volatility * 2, count)
         open_ = close + rng.normal(0, volatility * 0.5, count)
-        volume = rng.uniform(100, 5000, count)
+        volume = rng.uniform(vol_lo, vol_hi, count)
 
         df = pd.DataFrame(
             {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
