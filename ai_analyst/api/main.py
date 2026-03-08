@@ -567,10 +567,18 @@ async def analyse(
             "without visual evidence. Used by POST /triage for headless batch runs."
         ),
     ),
+    # ─── smoke mode (single-analyst, no quorum) ─────────────────────────────
+    smoke_mode: bool = Form(
+        False,
+        description=(
+            "When true, runs only the first analyst and bypasses quorum enforcement. "
+            "Used by POST /triage/smoke for diagnostic probes."
+        ),
+    ),
 ):
     # ── Triage-path entry log ──────────────────────────────────────────────
-    logger.info("[analyse] POST /analyse received — instrument=%s triage_mode=%s ts=%s",
-                instrument, triage_mode, datetime.now(timezone.utc).isoformat())
+    logger.info("[analyse] POST /analyse received — instrument=%s triage_mode=%s smoke_mode=%s ts=%s",
+                instrument, triage_mode, smoke_mode, datetime.now(timezone.utc).isoformat())
 
     # ── Rate limit check (HIGH-7) ────────────────────────────────────────────
     client_ip = request.client.host if request.client else "unknown"
@@ -703,6 +711,11 @@ async def analyse(
         VolumeProfile=lens_volume_profile,
     )
 
+    # Effective smoke mode: request param OR env var
+    _smoke_mode = smoke_mode or os.getenv("TRIAGE_SMOKE_MODE", "").lower() == "true"
+    logger.info("[analyse] smoke_mode: request_param=%s env_var=%s effective=%s",
+                smoke_mode, os.getenv("TRIAGE_SMOKE_MODE", ""),  _smoke_mode)
+
     initial_state: GraphState = {
         "ground_truth": ground_truth,
         "lens_config": lens_config,
@@ -713,6 +726,7 @@ async def analyse(
         "error": None,
         "enable_deliberation": enable_deliberation,   # v2.1b
         "deliberation_outputs": [],                   # v2.1b
+        "smoke_mode": _smoke_mode,                    # single-analyst, quorum bypass
         # Phase 2a: inject live feeder context if available
         "_feeder_context": getattr(request.app.state, "feeder_context", None),
         "_feeder_ingested_at": getattr(request.app.state, "feeder_ingested_at", None),
@@ -720,8 +734,6 @@ async def analyse(
         "_pipeline_start_ts": None,
         "_node_timings": None,
     }
-
-    _smoke_mode = os.getenv("TRIAGE_SMOKE_MODE", "").lower() == "true"
 
     # Phase 3: set correlation context for structured logging
     ctx_token = correlation_ctx.set(ground_truth.run_id)

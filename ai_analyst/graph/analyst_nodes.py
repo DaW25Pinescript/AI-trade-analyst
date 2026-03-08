@@ -199,10 +199,16 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     ground_truth = state["ground_truth"]
     lens_config = state["lens_config"]
 
+    # Effective smoke mode: per-request state flag OR module-level env var
+    effective_smoke = state.get("smoke_mode", False) or _TRIAGE_SMOKE_MODE
+    logger.info("[analyst_fan_out] smoke_mode: state=%s env=%s effective=%s",
+                state.get("smoke_mode"), _TRIAGE_SMOKE_MODE, effective_smoke)
+
     configs_to_run = ANALYST_CONFIGS
-    if _TRIAGE_SMOKE_MODE:
+    if effective_smoke:
         configs_to_run = ANALYST_CONFIGS[:1]
-        logger.info("[smoke] TRIAGE_SMOKE_MODE — running only first analyst: %s", configs_to_run[0]["model"])
+        logger.info("[smoke] smoke mode active — running only first analyst: %s", configs_to_run[0]["model"])
+    logger.info("[analyst_fan_out] effective analyst_count=%d", len(configs_to_run))
 
     tasks = [
         run_analyst(
@@ -228,10 +234,12 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
         else:
             logger.warning("Analyst '%s' Phase 1 failed with error: %s", model, result)
 
-    if _TRIAGE_SMOKE_MODE:
+    if effective_smoke:
+        logger.info("[smoke] quorum bypass active — skipping quorum enforcement")
         if not valid_outputs:
             # In smoke mode, capture the error instead of raising
             err = results[0] if results else Exception("no results")
+            logger.info("[smoke] first analyst result/error before aggregation: %s", err)
             route = router.resolve(ANALYST_REASONING)
             smoke_error = {
                 "error_type": type(err).__name__,
@@ -245,7 +253,9 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
             state["analyst_outputs"] = []
             state["analyst_configs_used"] = []
             return state
-        # Smoke mode: skip quorum check
+        # Smoke mode: log first result and skip quorum check
+        logger.info("[smoke] first analyst result before aggregation: action=%s confidence=%s",
+                    valid_outputs[0].recommended_action, valid_outputs[0].confidence)
     elif len(valid_outputs) < MINIMUM_VALID_ANALYSTS:
         raise RuntimeError(
             f"Insufficient analyst responses: {len(valid_outputs)} valid out of "

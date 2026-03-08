@@ -323,6 +323,7 @@ async def triage_smoke():
         ("min_rr", (None, "2.0")),
         ("max_risk_per_trade", (None, "0.5")),
         ("triage_mode", (None, "true")),
+        ("smoke_mode", (None, "true")),
     ]
 
     try:
