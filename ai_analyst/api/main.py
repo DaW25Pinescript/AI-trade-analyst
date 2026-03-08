@@ -720,6 +720,7 @@ async def analyse(
         "ground_truth": ground_truth,
         "lens_config": lens_config,
         "analyst_outputs": [],
+        "analyst_configs_used": [],                    # populated by chart_lenses_node
         "overlay_delta_reports": [],
         "macro_context": None,      # populated by macro_context_node
         "final_verdict": None,
@@ -964,6 +965,7 @@ async def analyse_stream(
         "ground_truth": ground_truth,
         "lens_config": lens_config,
         "analyst_outputs": [],
+        "analyst_configs_used": [],
         "overlay_delta_reports": [],
         "macro_context": None,
         "final_verdict": None,

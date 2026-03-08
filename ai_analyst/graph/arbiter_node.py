@@ -185,5 +185,23 @@ async def arbiter_node(state: GraphState) -> GraphState:
     if overlay_was_provided and not verdict.overlay_was_provided:
         verdict = verdict.model_copy(update={"overlay_was_provided": True})
 
+    # Enforce audit_log analyst counts from Python-side truth.
+    # The LLM populates these fields in its JSON output, but may miscount
+    # (especially in smoke mode where N=1).  Python len(analyst_outputs) is
+    # the authoritative source.
+    audit_update = {
+        "analysts_received": n_analysts,
+        "analysts_valid": n_analysts,
+    }
+    if (verdict.audit_log.analysts_received != n_analysts
+            or verdict.audit_log.analysts_valid != n_analysts):
+        logger.info(
+            "Arbiter audit_log analyst counts corrected: received %d->%d valid %d->%d",
+            verdict.audit_log.analysts_received, n_analysts,
+            verdict.audit_log.analysts_valid, n_analysts,
+        )
+        updated_log = verdict.audit_log.model_copy(update=audit_update)
+        verdict = verdict.model_copy(update={"audit_log": updated_log})
+
     state["final_verdict"] = verdict
     return state
