@@ -47,7 +47,7 @@ Derived from actual codebase state — cross-referenced against Phase 1A baselin
 | Instrument | `XAUUSD` |
 | Price scale | 1,000 (raw ticks ÷ 1000 = USD price) |
 | Plausible price range | $1,500–$3,500 (enforced in `feed/config.py`) |
-| Target timeframe set | `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
+| Target timeframe set | `15m`, `1h`, `4h`, `1d` |
 | Ingestion trigger | CLI / manual — `run_feed.py` |
 | Contract path | `build_market_packet()` / `refresh_from_latest_exports()` |
 | Packet schema | `MarketPacketV2` in `officer/contracts.py` |
@@ -127,10 +127,10 @@ Before writing any code, run diagnostics against each gate. Report which are cur
 | AC-1 | `run_feed.py --fixture` | Completes successfully for XAUUSD with no unhandled exceptions | ⏳ Pending |
 | AC-2 | Artifact writes | Expected hot-package artifacts written under `market_data/packages/latest/` with XAUUSD prefix | ⏳ Pending |
 | AC-3 | MarketPacketV2 | `refresh_from_latest_exports("XAUUSD")` returns valid MarketPacketV2 (no FileNotFoundError, no price-range violation) | ⏳ Pending |
-| AC-4 | Timeframe coverage | MarketPacketV2 includes all 6 expected timeframes: `1m`, `5m`, `15m`, `1h`, `4h`, `1d` | ⏳ Pending |
+| AC-4 | Timeframe coverage | MarketPacketV2 includes all 4 expected timeframes: `15m`, `1h`, `4h`, `1d` | ⏳ Pending |
 | AC-5 | Price plausibility | All OHLC values in fixture data fall within `PRICE_RANGES["XAUUSD"]` ($1,500–$3,500) | ⏳ Pending |
 | AC-6 | Analyst consumption | `run_analyst()` completes and returns a structured result without FileNotFoundError or packet-schema exception — packet schema is validated, not just non-null | ⏳ Pending |
-| AC-7 | Contract tests | Two targeted tests pass: **Test A** (officer relay) — seed XAUUSD fixture → `refresh_from_latest_exports("XAUUSD")` → assert valid MarketPacketV2 → assert 6 timeframes → assert prices in range. **Test B** (analyst consumption) — call `run_analyst()` with injected XAUUSD packet + mocked LLM → assert no crash / structured result returned. Deterministic with no live LLM or provider dependency. | ⏳ Pending |
+| AC-7 | Contract tests | Two targeted tests pass: **Test A** (officer relay) — seed XAUUSD fixture → `refresh_from_latest_exports("XAUUSD")` → assert valid MarketPacketV2 → assert 4 timeframes (15m, 1h, 4h, 1d) → assert prices in range. **Test B** (analyst consumption) — call `run_analyst()` with injected XAUUSD packet + mocked LLM → assert no crash / structured result returned. Deterministic with no live LLM or provider dependency. | ⏳ Pending |
 | AC-8 | No SQLite | No SQLite introduced — confirmed by `grep -r sqlite market_data_officer/` | ⏳ Pending |
 | AC-9 | No new module | No new top-level module — work confined to `market_data_officer/` | ⏳ Pending |
 | AC-10 | No regressions | All pre-existing tests (359+) remain green | ⏳ Pending |
@@ -147,7 +147,7 @@ Run these steps before changing any code. Report findings against AC-1 through A
 ls market_data/packages/latest/XAUUSD*
 ```
 
-Expected: `XAUUSD_hot.json` manifest + 6 CSV files (`XAUUSD_1m_latest.csv`, etc.). If missing: fixture has not been seeded — proceed to Step 2.
+Expected: `XAUUSD_hot.json` manifest + 4 CSV files (`XAUUSD_15m_latest.csv`, etc.). If missing: fixture has not been seeded — proceed to Step 2.
 
 ### Step 2 — Run the fixture seeder for XAUUSD
 
@@ -224,7 +224,7 @@ market_data_officer/tests/test_phase1b_relay.py  # new — XAUUSD relay + consum
 
 Phase 1B is done when:
 
-`run_feed.py --fixture --instrument XAUUSD` writes XAUUSD artifacts with plausible prices → `refresh_from_latest_exports("XAUUSD")` returns valid `MarketPacketV2` → `run_analyst()` consumes it without crashing → all 6 timeframes present → prices within $1,500–$3,500 → targeted tests pass → 359+ tests green → no SQLite introduced → no new module created.
+`run_feed.py --fixture --instrument XAUUSD` writes XAUUSD artifacts with plausible prices → `refresh_from_latest_exports("XAUUSD")` returns valid `MarketPacketV2` → `run_analyst()` consumes it without crashing → all 4 timeframes present (15m, 1h, 4h, 1d) → prices within $1,500–$3,500 → targeted tests pass → 359+ tests green → no SQLite introduced → no new module created.
 
 This is the same relay race as Phase 1A: feed → hot-package → officer → analyst. Phase 1B is proven when each handoff is confirmed by a test for XAUUSD specifically.
 
