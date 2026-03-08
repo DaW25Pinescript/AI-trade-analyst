@@ -8,6 +8,7 @@ import pandas as pd
 
 from .config import StructureConfig
 from .schemas import FairValueGap
+from instrument_registry import INSTRUMENT_REGISTRY
 
 
 def _compact_ts(ts) -> str:
@@ -26,9 +27,12 @@ def detect_fvg(
     A zone is not emitted until candle 3 closes (no lookahead).
     Minimum gap size filtered per instrument config.
     """
-    min_size = (config.fvg_min_size_xauusd
-                if instrument == "XAUUSD"
-                else config.fvg_min_size_eurusd)
+    # Look up per-instrument FVG min size from the registry; fall back to EURUSD
+    registry_meta = INSTRUMENT_REGISTRY.get(instrument)
+    if registry_meta is not None and registry_meta.fvg_min_size > 0:
+        min_size = registry_meta.fvg_min_size
+    else:
+        min_size = config.fvg_min_size_eurusd
 
     zones = []
     for i in range(2, len(bars)):
