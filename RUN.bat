@@ -181,6 +181,12 @@ if errorlevel 1 (
     set "MISSING=1"
 )
 
+"%VENV_PY%" -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('litellm') else 1)" >nul 2>nul
+if errorlevel 1 (
+    echo - Missing: litellm
+    set "MISSING=1"
+)
+
 "%VENV_PY%" -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('multipart') else 1)" >nul 2>nul
 if errorlevel 1 (
     echo - Missing: python-multipart
@@ -199,7 +205,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-"%VENV_PY%" -m pip install --quiet fastapi "uvicorn[standard]" python-dotenv langgraph python-multipart
+"%VENV_PY%" -m pip install --quiet fastapi "uvicorn[standard]" python-dotenv langgraph litellm python-multipart
 if errorlevel 1 (
     echo ERROR: dependency installation failed.
     exit /b 1
@@ -288,30 +294,8 @@ echo.
 echo [4/5] Ensuring backend server on port 8000...
 call :port_in_use 8000
 if not errorlevel 1 (
-    call :get_port_pid 8000 BACKEND_PID
-    if defined BACKEND_PID (
-        echo Port 8000 is already in use by PID !BACKEND_PID!.
-        choice /C YN /N /M "Stop that process and restart backend? [Y/N]: "
-        if errorlevel 2 (
-            echo Leaving existing process on port 8000 running.
-            exit /b 0
-        )
-        echo Stopping PID !BACKEND_PID!...
-        taskkill /PID !BACKEND_PID! /T /F >nul 2>nul
-        if errorlevel 1 (
-            echo ERROR: Failed to stop PID !BACKEND_PID!.
-            exit /b 1
-        )
-        echo Waiting for port 8000 to clear...
-        call :wait_for_port_free 8000 15
-        if errorlevel 1 (
-            echo ERROR: Port 8000 did not clear in time.
-            exit /b 1
-        )
-    ) else (
-        echo Port 8000 is in use, but PID could not be determined.
-        exit /b 1
-    )
+    echo Backend already appears to be running on 8000.
+    exit /b 0
 )
 
 echo Starting backend...
@@ -334,28 +318,6 @@ exit /b 0
 :port_in_use
 netstat -ano | findstr /R /C:":%~1 .*LISTENING" >nul
 exit /b %errorlevel%
-
-
-:get_port_pid
-set "%~2="
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%~1 .*LISTENING"') do (
-    set "%~2=%%P"
-    goto :eof
-)
-goto :eof
-
-:wait_for_port_free
-set "WAIT_PORT=%~1"
-set "WAIT_SECS=%~2"
-set /a COUNT=0
-:wait_port_free_loop
-call :port_in_use %WAIT_PORT%
-if errorlevel 1 exit /b 0
-if !COUNT! GEQ %WAIT_SECS% exit /b 1
-set /a COUNT+=1
-timeout /t 1 /nobreak >nul
-goto :wait_port_free_loop
-
 
 :wait_for_port
 set "WAIT_PORT=%~1"
