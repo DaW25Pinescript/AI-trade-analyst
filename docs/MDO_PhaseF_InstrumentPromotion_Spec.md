@@ -1,7 +1,7 @@
 # Instrument Promotion Spec — GBPUSD / XAGUSD / XPTUSD Relay Proof & Trust-Level Promotion
 
-**Status:** Spec drafted — implementation pending  
-**Date:** 8 March 2026  
+**Status:** ✅ Complete
+**Date:** 8 March 2026 (drafted) · 9 March 2026 (closed)
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 
 ---
@@ -175,18 +175,18 @@ Before writing any code, diagnostics must report which of these are already true
 
 | Gate / Check | Acceptance Condition | Status |
 |-------------|----------------------|--------|
-| AC-1: fixture seeding works | `run_feed.py --fixture --instrument <instrument>` completes cleanly for each candidate instrument | ⏳ Next |
-| AC-2: artifact shape correct | latest package artifacts are written in the expected canonical shape for each candidate instrument | ⏳ Next |
-| AC-3: packet assembly works | `refresh_from_latest_exports("<instrument>")` returns valid `MarketPacketV2` for each candidate instrument | ⏳ Next |
-| AC-4: timeframe coverage correct | packet includes the expected timeframe set for each instrument family | ⏳ Next |
-| AC-5: price plausibility holds | OHLC ranges are plausible for each candidate instrument according to registry/config rules | ⏳ Next |
-| AC-6: analyst consumption works | `run_analyst()` can consume injected packets for each candidate instrument without crash (LLM mocked) | ⏳ Next |
-| AC-7: promotion decision justified | each candidate instrument ends the phase with an explicit result: remain unverified / promote provisional / promote trusted | ⏳ Next |
-| AC-8: deterministic tests | acceptance is proven by deterministic fixture/mock tests, not live provider dependency | ⏳ Next |
-| AC-9: regression safety | existing EURUSD/XAUUSD relay tests still pass | ⏳ Next |
-| AC-10: no SQLite | no SQLite or DB layer introduced | ⏳ Next |
-| AC-11: no new top-level module | work stays inside existing repo/module boundaries | ⏳ Next |
-| AC-12: no scheduler | no scheduling/orchestration automation introduced | ⏳ Next |
+| AC-1: fixture seeding works | `run_feed.py --fixture --instrument <instrument>` completes cleanly for each candidate instrument | ✅ Done |
+| AC-2: artifact shape correct | latest package artifacts are written in the expected canonical shape for each candidate instrument | ✅ Done |
+| AC-3: packet assembly works | `refresh_from_latest_exports("<instrument>")` returns valid `MarketPacketV2` for each candidate instrument | ✅ Done |
+| AC-4: timeframe coverage correct | packet includes the expected timeframe set for each instrument family | ✅ Done |
+| AC-5: price plausibility holds | OHLC ranges are plausible for each candidate instrument according to registry/config rules | ✅ Done |
+| AC-6: analyst consumption works | `run_analyst()` can consume injected packets for each candidate instrument without crash (LLM mocked) | ✅ Done |
+| AC-7: promotion decision justified | each candidate instrument ends the phase with an explicit result: remain unverified / promote provisional / promote trusted | ✅ Done |
+| AC-8: deterministic tests | acceptance is proven by deterministic fixture/mock tests, not live provider dependency | ✅ Done |
+| AC-9: regression safety | existing EURUSD/XAUUSD relay tests still pass | ✅ Done |
+| AC-10: no SQLite | no SQLite or DB layer introduced | ✅ Done |
+| AC-11: no new top-level module | work stays inside existing repo/module boundaries | ✅ Done |
+| AC-12: no scheduler | no scheduling/orchestration automation introduced | ✅ Done |
 
 ---
 
@@ -317,7 +317,68 @@ With Instrument Promotion:
 
 ## 12. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 8).*
+### Registry values — confirmed correct, no corrections needed
+
+| Field | GBPUSD | XAGUSD | XPTUSD |
+|-------|--------|--------|--------|
+| price_scale | 100,000 | 1,000 | 1,000 |
+| price_range | (1.15, 1.45) | (18.00, 40.00) | (700.00, 1,400.00) |
+| base_price | 1.2700 | 28.00 | 980.00 |
+| fixture_volatility | 0.0005 | 0.15 | 3.00 |
+| fixture_volume_range | (100, 5000) | (0.1, 50.0) | (0.01, 5.0) |
+| timeframes | 6 (FX set) | 4 (metals set) | 4 (metals set) |
+| yfinance_alias | GBPUSD=X | SI=F | PL=F |
+| eqh_eql_tolerance | 0.00010 | 0.10 | 0.50 |
+| fvg_min_size | 0.0003 | 0.05 | 0.30 |
+
+All values are plausible and internally consistent with family baselines (GBPUSD ↔ EURUSD, XAGUSD/XPTUSD ↔ XAUUSD).
+
+### Spec discrepancy — GBPUSD timeframes
+
+The §3 candidate table listed GBPUSD with 4 timeframes (15m, 1h, 4h, 1d). The registry assigns `_FX_TIMEFRAMES` = 6 TFs (1m, 5m, 15m, 1h, 4h, 1d), which is structurally correct — GBPUSD is FX, not metals. The registry is treated as source of truth; the spec table was a drafting error.
+
+### Plausibility assessment
+
+All 3 instruments passed deterministic price-range plausibility tests using registry `price_range` bounds. Every generated OHLC value falls within the declared range. Fixture volatility and volume ranges are internally consistent with their family baselines.
+
+### AC gap table (pre-implementation)
+
+| AC | Pre-impl status | Gap |
+|----|----------------|-----|
+| AC-1 through AC-6 | Infrastructure existed but no tests | No conftest fixtures; no relay tests for GBPUSD/XAGUSD/XPTUSD |
+| AC-7 | No promotion decision recorded | trust_level still "unverified" |
+| AC-8 | Infra deterministic | Gap: no test file |
+| AC-9 | 404/404 green | No gap |
+| AC-10–12 | Constraints held | No gap |
+
+### Final patch set
+
+| File | Change | Delta |
+|------|--------|-------|
+| `market_data_officer/instrument_registry.py` | trust_level: "unverified" → "trusted" for GBPUSD, XAGUSD, XPTUSD | 3 lines changed |
+| `market_data_officer/tests/conftest.py` | Generic `_instrument_hot_packages()` helper + 3 new fixtures | +42 lines |
+| `market_data_officer/tests/test_promotion_relay.py` | **New file** — 15 tests across 6 classes | +213 lines |
+| `market_data_officer/tests/test_phase_e_registry.py` | Updated trust-level assertions for promoted instruments | 4 lines changed |
+| `market_data_officer/tests/test_contracts.py` | Changed unverified-instrument test to use NZDUSD (GBPUSD now trusted) | 1 line changed |
+| `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` | Closed spec | doc only |
+| `docs/README_specs.md` | Updated completed/current phase | doc only |
+| `docs/AI_TradeAnalyst_Progress.md` | Updated progress table | doc only |
+
+### Regression gate results
+
+| Gate | Test count | Result |
+|------|-----------|--------|
+| Baseline (pre-work) | 404/404 | ✅ Green |
+| After relay tests added | 419/419 | ✅ Green |
+| After all 3 promotions | 419/419 | ✅ Green |
+
+### Trust-level decisions
+
+| Instrument | Decision | Justification |
+|------------|----------|---------------|
+| **GBPUSD** | `unverified` → `trusted` | Structurally identical to trusted EURUSD: same price_scale (100k), same 6 TFs, same tolerance/FVG values. Full relay proven: fixture → artifact → packet → analyst. All prices within declared range. No material ambiguity. |
+| **XAGUSD** | `unverified` → `trusted` | Structurally parallel to trusted XAUUSD: same price_scale (1k), same 4 TFs. Appropriately scaled tolerances for silver price level. Full relay proven. No material ambiguity. |
+| **XPTUSD** | `unverified` → `trusted` | Structurally parallel to trusted XAUUSD: same price_scale (1k), same 4 TFs, same tolerance values. Full relay proven. No material ambiguity. |
 
 ---
 
@@ -329,7 +390,7 @@ With Instrument Promotion:
 | Phase 1B | XAUUSD baseline spine | ✅ Done |
 | Phase E+ | Additional instruments / provider abstraction | ✅ Done |
 | Provider Switchover | yFinance fallback / per-instrument switching | ✅ Done |
-| Instrument Promotion | GBPUSD / XAGUSD / XPTUSD trust-level promotion | ⏳ Next |
+| Instrument Promotion | GBPUSD / XAGUSD / XPTUSD trust-level promotion | ✅ Done |
 | Operationalise | Scheduler / APScheduler integration | Out of scope for this phase |
 
 ---
