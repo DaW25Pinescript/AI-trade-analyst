@@ -187,17 +187,23 @@ class TestGuardRails:
         assert hits == [], f"sqlite import found in: {hits}"
 
     def test_no_scheduler_import(self):
-        """AC-10: No APScheduler or similar in any market_data_officer module."""
+        """AC-10: No APScheduler imports outside the designated scheduler module."""
         import subprocess
         mdo_root = Path(__file__).resolve().parent.parent
         this_file = str(Path(__file__).resolve())
+        # scheduler.py and run_scheduler.py are the designated scheduler modules
+        allowed = {
+            str(mdo_root / "scheduler.py"),
+            str(mdo_root / "run_scheduler.py"),
+        }
         result = subprocess.run(
             ["grep", "-r", "-i", "import apscheduler\\|from apscheduler",
              str(mdo_root), "--include=*.py", "-l"],
             capture_output=True, text=True,
         )
-        hits = [f for f in result.stdout.strip().split("\n") if f and f != this_file]
-        assert hits == [], f"apscheduler import found in: {hits}"
+        hits = [f for f in result.stdout.strip().split("\n")
+                if f and f != this_file and f not in allowed]
+        assert hits == [], f"apscheduler import found outside scheduler modules: {hits}"
 
     def test_registry_is_inside_package(self):
         """AC-9: instrument_registry.py lives inside market_data_officer/, not top-level."""

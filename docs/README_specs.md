@@ -10,14 +10,15 @@ Tracks active specs, current phase, and source of truth for each subsystem.
 | Provider Switchover | `docs/MDO_ProviderSwitchover_Spec.md` | yFinance fallback — vendor provenance in MarketPacketV2 | ✅ Complete |
 | Instrument Promotion | `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` | Phase F — GBPUSD/XAGUSD/XPTUSD trust-level promotion | ✅ Complete |
 | Per-Instrument Provider Routing | `docs/MDO_ProviderRouting_Spec.md` | Per-instrument provider policy | ✅ Complete |
+| Operationalise Phase 1 | `docs/MDO_Operationalise_Spec.md` | APScheduler feed refresh | ✅ Complete |
 
 ---
 
 ## Current Phase
 
-**Operationalise** — scheduler / APScheduler integration
+**Operationalise Phase 2** — market-hours awareness, alerting, remote deployment
 Spec: TBD — draft before implementation
-Goal: automate feed runs via scheduling layer
+Goal: market-hours gating, alerting on failure, remote deployment readiness
 
 ## Completed Phases
 
@@ -32,11 +33,12 @@ Goal: automate feed runs via scheduling layer
 | Phase E+ | Instrument registry + GBPUSD/XAGUSD/XPTUSD — 404/404 tests | `docs/MDO_PhaseE_Spec.md` |
 | Instrument Promotion | GBPUSD/XAGUSD/XPTUSD promoted to trusted — 419/419 tests | `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` |
 | Per-Instrument Provider Routing | Explicit per-instrument provider policy — 468/468 tests | `docs/MDO_ProviderRouting_Spec.md` |
+| Operationalise Phase 1 | APScheduler feed refresh — 494/494 tests | `docs/MDO_Operationalise_Spec.md` |
 
 ## Pending
 
 | Phase | Description |
 |-------|-------------|
-| Operationalise | Scheduler / APScheduler integration |
+| Operationalise Phase 2 | Market-hours awareness, alerting, remote deployment |
 | Tidy | Async marker cleanup (4 files) |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) |

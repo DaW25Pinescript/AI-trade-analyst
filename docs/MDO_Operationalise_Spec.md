@@ -5,7 +5,7 @@
 **Project:** AI Trade Analyst  
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Date:** 8 March 2026  
-**Status:** ⏳ Spec drafted — implementation pending
+**Status:** ✅ Complete — 494/494 tests green
 
 > **Context:** All five trusted instruments have proven relay spines, explicit provider policy, and 468/468 green tests. Every phase so far has answered "does one run work?" This phase answers "does the system stay fresh over time?" It introduces scheduled feed refresh using APScheduler — local/dev-friendly first, no cloud deployment, no service rewrite, no UI changes.
 
@@ -215,21 +215,21 @@ Structured log entry per run:
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|----------------------|--------|
-| AC-1 | APScheduler installed | `import apscheduler` succeeds in the MDO environment | ⏳ Pending |
-| AC-2 | Scheduler module exists | `market_data_officer/scheduler.py` with `BackgroundScheduler` and per-instrument jobs | ⏳ Pending |
-| AC-3 | No-overlap policy enforced | Overlapping refreshes for the same instrument are prevented — skip or coalesce, not stack | ⏳ Pending |
-| AC-4 | Per-family cadence configured | FX instruments on 1h interval, Metals on 4h — driven by config, not hardcoded | ⏳ Pending |
-| AC-5 | Job isolation proven | A failure in one instrument's job does not crash the scheduler or affect other jobs | ⏳ Pending |
-| AC-6 | Last-known-good preserved | Artifacts are not overwritten with partial/empty data on failure | ⏳ Pending |
-| AC-7 | Schedule logging | Each run produces a structured log entry: instrument, outcome, vendor, duration | ⏳ Pending |
-| AC-8 | CLI entrypoint works | `python market_data_officer/run_scheduler.py` starts the scheduler without error | ⏳ Pending |
-| AC-9 | Pipeline unchanged — manual path preserved | Existing `run_feed.py` manual entrypoint still works; no pipeline contract changes | ⏳ Pending |
-| AC-10 | Artifact contracts unchanged | Hot-package shape, manifest schema, `MarketPacketV2` contract all unchanged | ⏳ Pending |
-| AC-11 | Provider policy and provenance preserved in scheduled runs | Scheduled runs still obey registry-driven provider policy; correct vendor/source in artifacts | ⏳ Pending |
-| AC-12 | Deterministic tests | Schedule config, job isolation, and failure handling proven by mock-driven tests — no live scheduler in CI | ⏳ Pending |
-| AC-13 | Regression safety | 468/468 existing tests remain green | ⏳ Pending |
-| AC-14 | No SQLite | No DB layer introduced | ⏳ Pending |
-| AC-15 | No new top-level module | Scheduler module inside `market_data_officer/` only | ⏳ Pending |
+| AC-1 | APScheduler installed | `import apscheduler` succeeds in the MDO environment | ✅ Done — v3.11.2, added to pyproject.toml `[mdo]` |
+| AC-2 | Scheduler module exists | `market_data_officer/scheduler.py` with `BackgroundScheduler` and per-instrument jobs | ✅ Done |
+| AC-3 | No-overlap policy enforced | Overlapping refreshes for the same instrument are prevented — skip or coalesce, not stack | ✅ Done — `max_instances=1`, `coalesce=True` per job |
+| AC-4 | Per-family cadence configured | FX instruments on 1h interval, Metals on 4h — driven by config, not hardcoded | ✅ Done — `SCHEDULE_CONFIG` dict with `interval_hours` + `window_hours` |
+| AC-5 | Job isolation proven | A failure in one instrument's job does not crash the scheduler or affect other jobs | ✅ Done — 7 isolation tests (ValueError, RuntimeError, ConnectionError, generic Exception) |
+| AC-6 | Last-known-good preserved | Artifacts are not overwritten with partial/empty data on failure | ✅ Done — pipeline only writes on success; job boundary catches all exceptions |
+| AC-7 | Schedule logging | Each run produces a structured log entry: instrument, outcome, vendor, duration | ✅ Done — `logging.getLogger(__name__)`, INFO on success, ERROR on failure |
+| AC-8 | CLI entrypoint works | `python market_data_officer/run_scheduler.py` starts the scheduler without error | ✅ Done — signal-based shutdown (SIGINT/SIGTERM) |
+| AC-9 | Pipeline unchanged — manual path preserved | Existing `run_feed.py` manual entrypoint still works; no pipeline contract changes | ✅ Done — zero changes to pipeline.py |
+| AC-10 | Artifact contracts unchanged | Hot-package shape, manifest schema, `MarketPacketV2` contract all unchanged | ✅ Done — no contract changes |
+| AC-11 | Provider policy and provenance preserved in scheduled runs | Scheduled runs still obey registry-driven provider policy; correct vendor/source in artifacts | ✅ Done — scheduler calls `run_pipeline()` which uses registry-driven policy |
+| AC-12 | Deterministic tests | Schedule config, job isolation, and failure handling proven by mock-driven tests — no live scheduler in CI | ✅ Done — 26 new tests, no APScheduler instance started in any test |
+| AC-13 | Regression safety | 468/468 existing tests remain green | ✅ Done — 494/494 (468 existing + 26 new) |
+| AC-14 | No SQLite | No DB layer introduced | ✅ Done |
+| AC-15 | No new top-level module | Scheduler module inside `market_data_officer/` only | ✅ Done |
 
 ---
 
@@ -383,14 +383,73 @@ With Operationalise Phase 1:
 | Provider Switchover | yFinance fallback + vendor provenance | ✅ Done — 404/404 |
 | Phase F | Instrument Promotion — all 5 trusted | ✅ Done — 419/419 |
 | Per-Instrument Provider Routing | Explicit policy per instrument | ✅ Done — 468/468 |
-| Operationalise Phase 1 | APScheduler feed refresh (this spec) | ⏳ Spec drafted — implementation pending |
+| Operationalise Phase 1 | APScheduler feed refresh (this spec) | ✅ Done — 494/494 |
 | Operationalise Phase 2 | Market-hours awareness, alerting, remote deployment | ⏳ Pending |
 
 ---
 
 ## 13. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 8).*
+### APScheduler version
+- **APScheduler 3.11.2** — installed via `pip install apscheduler`, declared as `apscheduler>=3.10.0,<4.0` in `pyproject.toml [project.optional-dependencies.mdo]`
+
+### Callable pipeline interface found
+- `feed.pipeline.run_pipeline(symbol, start_date, end_date, ...)` — clean synchronous function, callable directly from the scheduler job without any CLI wrapper
+
+### Exception paths identified
+- `ValueError` at `pipeline.py:174` (unknown instrument) — **propagates uncaught** → must be caught at job boundary
+- `requests.RequestException` at `pipeline.py:239,318` — **caught** internally, triggers yFinance fallback
+- Broad `except Exception` at `pipeline.py:301,346` — **caught** per-hour, logs and continues
+- Any exception outside the per-hour loop (canonical save, derived rebuild, export) — **propagates uncaught** → must be caught at job boundary
+
+**Resolution:** Single `try/except Exception` wrapping the entire `run_pipeline()` call in `refresh_instrument()`.
+
+### Cadence config chosen
+```
+EURUSD:  interval=1h  window=24h  family=FX
+GBPUSD:  interval=1h  window=24h  family=FX
+XAUUSD:  interval=4h  window=48h  family=Metals
+XAGUSD:  interval=4h  window=48h  family=Metals
+XPTUSD:  interval=4h  window=48h  family=Metals
+```
+No deviations from family defaults. Window size is 24× the interval for FX, 12× for metals.
+
+### Logging infrastructure
+- Existing pattern: `logging.getLogger(__name__)` in `feed/yfinance_fallback.py`
+- Scheduler uses the same pattern: `logging.getLogger(__name__)` with INFO (success) and ERROR (failure)
+
+### AC gap table (pre-implementation)
+| AC | Pre-impl status |
+|----|----------------|
+| AC-1 | GAP — not installed |
+| AC-2 | GAP — no scheduler module |
+| AC-3 | GAP — no overlap policy |
+| AC-4 | GAP — no cadence config |
+| AC-5 | GAP — no job isolation |
+| AC-6 | OK — pipeline writes only on success |
+| AC-7 | GAP — no schedule logging |
+| AC-8 | GAP — no CLI entrypoint |
+| AC-9 | OK — pipeline unchanged |
+| AC-10 | OK — contracts unchanged |
+| AC-11 | OK — policy preserved |
+| AC-12 | GAP — no scheduler tests |
+| AC-13 | OK — 468/468 green |
+| AC-14 | OK — no SQLite |
+| AC-15 | OK — no new top-level module |
+
+### Patch set (files + line delta)
+| File | Description | Lines |
+|------|-------------|-------|
+| `pyproject.toml` | Add `apscheduler` to `[mdo]` optional deps | +3 |
+| `market_data_officer/scheduler.py` | BackgroundScheduler, `refresh_instrument()`, `SCHEDULE_CONFIG`, job isolation, logging | +97 |
+| `market_data_officer/run_scheduler.py` | CLI entrypoint: build scheduler, start, block on signal | +53 |
+| `market_data_officer/tests/test_scheduler.py` | 26 deterministic tests: config, isolation, logging, last-known-good, build_scheduler | +277 |
+| `market_data_officer/tests/test_phase_e_registry.py` | Updated guardrail to allow scheduler modules | +6 / −3 |
+
+### Regression gate results
+- **Pre-implementation:** 468/468 green
+- **Post-implementation:** 494/494 green (468 existing + 26 new)
+- **Gates passed:** pyproject.toml (468/468) → scheduler.py (468/468) → run_scheduler.py (468/468) → test_scheduler.py (494/494)
 
 ---
 
