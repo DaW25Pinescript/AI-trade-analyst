@@ -3,7 +3,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional, Set
 
 import pandas as pd
 
@@ -15,11 +15,13 @@ def export_hot_packages(
     dataframes: Dict[str, pd.DataFrame],
     symbol: str,
     output_dir: Path = PACKAGES_DIR,
+    vendors: Optional[Set[str]] = None,
 ) -> None:
     """Export rolling tail CSVs and a JSON manifest for agent consumption.
 
     dataframes: mapping from timeframe label (e.g. "1m", "5m") to DataFrame.
     Only OHLCV columns are exported in the CSVs (no metadata columns).
+    vendors: set of data vendor names used (e.g. {"dukascopy", "yfinance"}).
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -52,6 +54,7 @@ def export_hot_packages(
         "instrument": symbol,
         "as_of_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "schema": "timestamp_utc,open,high,low,close,volume",
+        "vendors": sorted(vendors) if vendors else ["dukascopy"],
         "windows": windows_manifest,
     }
 
