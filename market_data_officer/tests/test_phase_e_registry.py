@@ -102,11 +102,11 @@ class TestTrustLevels:
 
     def test_trusted_set(self):
         trusted = {s for s, m in INSTRUMENT_REGISTRY.items() if m.trust_level == "trusted"}
-        assert trusted == {"EURUSD", "XAUUSD"}
+        assert trusted == {"EURUSD", "XAUUSD", "GBPUSD", "XAGUSD", "XPTUSD"}
 
-    def test_new_instruments_unverified(self):
-        for sym in ("GBPUSD", "XAGUSD", "XPTUSD"):
-            assert get_meta(sym).trust_level == "unverified"
+    def test_no_unverified_instruments(self):
+        unverified = {s for s, m in INSTRUMENT_REGISTRY.items() if m.trust_level == "unverified"}
+        assert unverified == set()
 
 
 # ── AC-3 / AC-4: Consumer derivation ─────────────────────────────────
@@ -125,7 +125,7 @@ class TestConsumerDerivation:
 
     def test_officer_trusted_from_registry(self):
         from officer.service import TRUSTED_INSTRUMENTS
-        assert TRUSTED_INSTRUMENTS == {"EURUSD", "XAUUSD"}
+        assert TRUSTED_INSTRUMENTS == {"EURUSD", "XAUUSD", "GBPUSD", "XAGUSD", "XPTUSD"}
 
     def test_officer_provisional_from_registry(self):
         from officer.service import PROVISIONAL_INSTRUMENTS

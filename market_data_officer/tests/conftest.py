@@ -146,6 +146,60 @@ def xauusd_hot_packages_dir(tmp_path):
     return packages_dir
 
 
+def _instrument_hot_packages(tmp_path, instrument: str):
+    """Generic fixture builder: seed a hot packages dir for any registered instrument."""
+    meta = get_meta(instrument)
+    packages_dir = tmp_path / "packages" / "latest"
+    packages_dir.mkdir(parents=True)
+
+    _FREQ_MAP = {"1m": "1min", "5m": "5min", "15m": "15min", "1h": "1h", "4h": "4h", "1d": "1D"}
+    _COUNT_MAP = {"1m": 3000, "5m": 1200, "15m": 600, "1h": 240, "4h": 120, "1d": 30}
+    tf_configs = {
+        tf: (_FREQ_MAP[tf], _COUNT_MAP[tf])
+        for tf in meta.timeframes
+        if tf in _FREQ_MAP
+    }
+
+    vol_lo, vol_hi = meta.fixture_volume_range
+    windows_manifest = {}
+
+    for tf_label, (freq, count) in tf_configs.items():
+        df = _generate_ohlcv(
+            count, freq, base_price=meta.base_price, volatility=meta.fixture_volatility,
+        )
+        df["volume"] = np.random.RandomState(42).uniform(vol_lo, vol_hi, count)
+        filename = f"{instrument}_{tf_label}_latest.csv"
+        df.to_csv(packages_dir / filename)
+        windows_manifest[tf_label] = {"count": count, "file": filename}
+
+    manifest = {
+        "instrument": instrument,
+        "as_of_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "schema": "timestamp_utc,open,high,low,close,volume",
+        "windows": windows_manifest,
+    }
+    (packages_dir / f"{instrument}_hot.json").write_text(json.dumps(manifest, indent=2))
+    return packages_dir
+
+
+@pytest.fixture
+def gbpusd_hot_packages_dir(tmp_path):
+    """Create a temporary hot packages directory with synthetic GBPUSD data."""
+    return _instrument_hot_packages(tmp_path, "GBPUSD")
+
+
+@pytest.fixture
+def xagusd_hot_packages_dir(tmp_path):
+    """Create a temporary hot packages directory with synthetic XAGUSD data."""
+    return _instrument_hot_packages(tmp_path, "XAGUSD")
+
+
+@pytest.fixture
+def xptusd_hot_packages_dir(tmp_path):
+    """Create a temporary hot packages directory with synthetic XPTUSD data."""
+    return _instrument_hot_packages(tmp_path, "XPTUSD")
+
+
 @pytest.fixture
 def stale_packages_dir(hot_packages_dir):
     """Create hot packages with a stale manifest (3 hours old)."""

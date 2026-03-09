@@ -8,6 +8,7 @@ Tracks active specs, current phase, and source of truth for each subsystem.
 | Market Data Officer Phase 1B | `docs/MDO_Phase1B_Spec.md` | Phase 1B — XAUUSD spine | ✅ Complete |
 | Market Data Officer Phase E+ | `docs/MDO_PhaseE_Spec.md` | Phase E+ — instrument registry + GBPUSD/XAGUSD/XPTUSD | ✅ Complete |
 | Provider Switchover | `docs/MDO_ProviderSwitchover_Spec.md` | yFinance fallback — vendor provenance in MarketPacketV2 | ✅ Complete |
+| Instrument Promotion | `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` | Phase F — GBPUSD/XAGUSD/XPTUSD trust-level promotion | ✅ Complete |
 
 ---
 
@@ -28,6 +29,7 @@ Goal: build on the now-working fallback to support explicit per-instrument provi
 | Phase 1A | EURUSD baseline spine — 359/359 tests | `docs/MDO_Phase1A_Spec.md` |
 | Phase 1B | XAUUSD spine — 364/364 tests | `docs/MDO_Phase1B_Spec.md` |
 | Phase E+ | Instrument registry + GBPUSD/XAGUSD/XPTUSD — 404/404 tests | `docs/MDO_PhaseE_Spec.md` |
+| Instrument Promotion | GBPUSD/XAGUSD/XPTUSD promoted to trusted — 419/419 tests | `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` |
 
 ## Pending
 

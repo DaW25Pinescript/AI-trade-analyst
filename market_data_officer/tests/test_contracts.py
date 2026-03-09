@@ -133,6 +133,6 @@ class TestUnverifiedInstrument:
 
     def test_unknown_instrument_unverified(self, hot_packages_dir):
         """Unknown instrument (not in TRUSTED or PROVISIONAL) returns unverified."""
-        packet = build_market_packet("GBPUSD", hot_packages_dir)
+        packet = build_market_packet("NZDUSD", hot_packages_dir)
         assert packet.quality.flags  # must have at least one flag
         assert packet.state_summary.data_quality in ("unverified", "partial")
