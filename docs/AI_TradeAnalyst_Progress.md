@@ -1,8 +1,12 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
+**Last updated:** 9 March 2026  
 **Review date:** 9 March 2026  
+**Current phase:** Operationalise Phase 2 — market-hours awareness, alerting, remote deployment  
 **Planning horizon:** Next 6–8 weeks
+
+> This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
 
 ---
 
@@ -11,20 +15,39 @@
 The repository is in a **strong implementation state**:
 
 - Core architecture is present and coherent across UI (`app/`), analyst engine (`ai_analyst/`), and market data lane (`market_data_officer/`).
-- The previously tracked MDO build phases (1A, 1B, E+, promotion, provider routing) are marked complete in the specs index.
+- The previously tracked MDO build phases (1A, 1B, E+, promotion, provider routing, Operationalise Phase 1) are complete.
 - Automated test coverage is broad and currently green in this environment:
   - **470 Python tests passing** (`ai_analyst/tests`)
+  - **494 Python tests passing** (`market_data_officer/tests`)
   - **235 Node tests passing** (`tests/*.js`)
 
 ### Current position (plain language)
 
 You are no longer proving basic feasibility. You are in the **operationalisation + hardening** stage: making the system safer, easier to run repeatedly, and more production-ready.
 
+### Phase Status Overview
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase A | Single analyst smoke path | ✅ Complete |
+| Phase B | Central provider/model config | ✅ Complete |
+| Phase C | Quorum/degraded failure handling | ✅ Complete |
+| Phase D | V1.1 snapshot integrity patch (H-1 → H-4) | ✅ Complete |
+| Phase 1A | Market Data Officer — EURUSD baseline spine | ✅ Complete |
+| Phase 1B | Market Data Officer — XAUUSD spine (15m, 1h, 4h, 1d) | ✅ Complete |
+| Phase E+ | Additional instruments, provider abstraction | ✅ Complete |
+| Instrument Promotion | GBPUSD/XAGUSD/XPTUSD → trusted — 419/419 tests | ✅ Complete |
+| Per-Instrument Provider Routing | Explicit per-instrument provider policy — 468/468 tests | ✅ Complete |
+| Operationalise Phase 1 | APScheduler feed refresh — 494/494 tests | ✅ Complete |
+| Tidy | Async marker cleanup (4 files) | ⏳ Pending |
+| Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
+| Operationalise Phase 2 | Market-hours awareness, alerting, remote deployment | ⏳ Pending |
+
 ---
 
 ## 2) Where We Are Now (Grounded Status)
 
-## Architecture and product posture
+### Architecture and product posture
 
 - Project doctrine is clearly data-first (market packets first, screenshots as optional supporting evidence).
 - The product surface includes:
@@ -33,18 +56,28 @@ You are no longer proving basic feasibility. You are in the **operationalisation
   - MDO feed/packet generation
   - Macro Risk Officer context lane
 
-## Delivery maturity indicators
+### Delivery maturity indicators
 
-- `README_specs.md` shows the major MDO implementation phases complete and identifies **Operationalise (scheduler/APScheduler)** as the current phase.
+- `README_specs.md` shows the major implementation phases complete and identifies **Operationalise** as the active hardening lane.
 - `Makefile` defines a practical quality bar (`test-web`, `test-ai`, `test-all`) and reflects current CI/test workflows.
 - Test suites run cleanly in this environment (no red tests observed).
 
-## Known gaps and debt themes
+### Cross-repo test inventory
+
+The project now has multiple important test counts that should be tracked separately:
+
+- `ai_analyst/tests` → **470**
+- `market_data_officer/tests` → **494**
+- `tests/*.js` → **235**
+
+This progress plan should continue to distinguish these suites rather than treating “Python tests” as a single bucket.
+
+### Known gaps and debt themes
 
 From repo docs and current structure, the meaningful remaining work is concentrated in:
 
 1. **Operational automation**
-   - Scheduled market-data feed runs and lifecycle monitoring.
+   - Market-hours awareness, scheduled runs, alerting, and deployment lifecycle confidence.
 2. **Runtime hardening**
    - Security and API operational safeguards.
 3. **Cleanup and consistency**
@@ -56,89 +89,92 @@ From repo docs and current structure, the meaningful remaining work is concentra
 
 ## 3) Where We Should Go Next
 
-## Priority A — Operationalise the data pipeline (highest priority)
+Operationalise Phase 2 is the **active implementation lane**. The other priorities below are the next cross-repo hardening candidates once current operationalisation work closes, or earlier if repo evidence justifies pulling them forward.
 
-### Objective
-Turn manual/fixture-supported feed workflows into a reliable scheduled service.
+### Priority A — Operationalise Phase 2 (highest priority)
 
-### Deliverables
-- Draft and approve an **Operationalise spec** (scheduler scope, cadence, failure policy).
-- Add APScheduler-driven jobs for feed refresh with deterministic logging.
-- Add health/status visibility (last successful run, next run, failure count).
-- Define stale-data thresholds per instrument/timeframe.
+#### Objective
+Extend the scheduler foundation into a more production-usable runtime with market-hours awareness, alerting hooks, and clearer deployment posture.
 
-### Done criteria
-- Scheduled runs produce artifacts without manual intervention for multiple consecutive cycles.
-- Failures are visible and recoverable (retry/backoff + alerting hook).
-- Analyst packet consumers can detect stale/missing artifacts deterministically.
+#### Deliverables
+- Define and implement market-hours awareness behavior per instrument/provider.
+- Add alerting hooks for refresh failures, stale artifacts, or repeated job faults.
+- Document remote deployment/runtime expectations.
+- Clarify stale-data semantics for market-closed vs market-open conditions.
+
+#### Done criteria
+- Off-hours behavior is deterministic and tested.
+- Failures are visible and can trigger alerts rather than failing silently.
+- Operators can run the service repeatedly with a documented deployment path.
 
 ---
 
-## Priority B — Security and production hardening (high priority)
+### Priority B — Security and production hardening (high priority)
 
-### Objective
+#### Objective
 Close known operational risk items before broader live usage.
 
-### Deliverables
+#### Deliverables
 - Enforce upload-size and input guardrails consistently on `/analyse` path.
 - Ensure error surfaces do not leak sensitive runtime internals.
 - Document required production defaults (TLS, strict origin policy, key rotation, spend limits).
 
-### Done criteria
+#### Done criteria
 - Critical API abuse paths are capped with explicit tests.
 - Security checklist items are mapped to concrete config and startup docs.
 
 ---
 
-## Priority C — Observability and reliability confidence (medium/high)
+### Priority C — Observability and reliability confidence (medium/high)
 
-### Objective
+#### Objective
 Move from “tests pass” to “system behavior is observable and debuggable under failure”.
 
-### Deliverables
+#### Deliverables
 - Add one end-to-end integration test chain (validated input → analyst graph → arbiter verdict).
 - Standardize structured event logging for feed runs and analysis requests.
 - Add basic service-level metrics (success rate, latency bands, timeout counts).
 
-### Done criteria
-- A single dashboard/log query can answer: “Is the system healthy right now?”
-- Integration test catches broken orchestration, not only unit regressions.
+#### Done criteria
+- A single dashboard or log view can answer: “Is the system healthy right now?”
+- Integration testing catches broken orchestration, not only unit regressions.
 
 ---
 
-## Priority D — Cleanup and source-of-truth simplification (medium)
+### Priority D — Cleanup and source-of-truth simplification (medium)
 
-### Objective
-Reduce drift between multiple progress/audit docs and remove stale planning artifacts.
+#### Objective
+Reduce drift between progress/audit docs and remove stale planning artifacts.
 
-### Deliverables
-- Keep one canonical progress plan (this file) and treat others as historical snapshots.
+#### Deliverables
+- Keep one canonical progress plan (this file) and treat others as supporting or historical snapshots.
 - Resolve pending async-marker cleanup items.
 - Reconcile duplicate phase summaries across docs.
 
-### Done criteria
-- New contributors can identify current phase and next implementation target in <5 minutes.
+#### Done criteria
+- New contributors can identify current phase and next implementation target in under 5 minutes.
+- There is no ambiguity about which progress document is authoritative.
 
 ---
 
 ## 4) Proposed 6–8 Week Plan
 
-## Weeks 1–2
-- Approve Operationalise spec.
-- Implement scheduler skeleton + config + logging.
-- Add tests for schedule trigger and stale-data detection.
+### Weeks 1–2
+- Finalize and implement Operationalise Phase 2 behavior.
+- Add market-hours awareness rules and stale-data/open-market semantics tests.
+- Add alerting hooks and basic deployment/runtime notes.
 
-## Weeks 3–4
+### Weeks 3–4
 - Harden API guardrails and error handling.
-- Add/expand targeted integration test for orchestration pipeline.
-- Document runtime operations checklist.
+- Add or expand targeted integration test for orchestration pipeline.
+- Document runtime operations and security checklist.
 
-## Weeks 5–6
+### Weeks 5–6
 - Add reliability metrics and basic run-status surface.
 - Complete async-marker tidy.
-- Consolidate planning docs.
+- Consolidate planning docs and confirm this file as the canonical source of truth.
 
-## Stretch (Weeks 7–8)
+### Stretch (Weeks 7–8)
 - Pilot multi-environment config profiles (local/staging/prod).
 - Optional distributed rate-limit/cache groundwork if deployment topology requires multi-worker scaling.
 
@@ -155,10 +191,11 @@ Reduce drift between multiple progress/audit docs and remove stale planning arti
 
 ## 6) Immediate Next Actions (Concrete)
 
-1. Create `docs/MDO_Operationalise_Spec.md` as active implementation spec if not already finalized.
-2. Define scheduler job contract (inputs, artifact location, success/failure semantics).
+1. Confirm that the active Operationalise Phase 2 spec covers market-hours awareness, alerting, and remote deployment clearly enough to implement against.
+2. Define market-hours contract semantics (open, closed, holiday/off-session, stale-but-expected, stale-and-bad).
 3. Add one integration test that proves analyst verdict generation from a deterministic packet under mocked LLM response.
 4. Update `README_specs.md` after each milestone to keep phase tracking accurate.
+5. Decide explicitly whether **Security/API Hardening** becomes the next named phase after Operationalise Phase 2 closes.
 
 ---
 
@@ -167,8 +204,8 @@ Reduce drift between multiple progress/audit docs and remove stale planning arti
 Before claiming full production readiness, require all of the following:
 
 - Operational scheduler running with observable health.
+- Market-hours behavior and stale-data handling tested and deterministic.
 - Critical API guardrails tested and enforced.
 - One orchestration integration path green in CI.
 - Security and deployment checklist completed with explicit config evidence.
 - Single canonical progress/status document maintained.
-

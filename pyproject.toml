@@ -38,6 +38,9 @@ mro = [
     "yfinance>=0.2.40",
     "modal>=0.68.0",
 ]
+mdo = [
+    "apscheduler>=3.10.0,<4.0",
+]
 
 [project.scripts]
 ai-analyst = "ai_analyst.cli:app"
