@@ -1,208 +1,174 @@
-# AI Trade Analyst — Project Progress Plan
+# AI Trade Analyst — Repo Review & Progress Plan
+
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 9 March 2026
-**Current phase:** Operationalise — scheduler / APScheduler integration
+**Review date:** 9 March 2026  
+**Planning horizon:** Next 6–8 weeks
 
 ---
 
-## Overall Architecture
+## 1) Executive Snapshot
 
-The system is a multi-surface trading intelligence workspace with three integrated layers:
+The repository is in a **strong implementation state**:
 
-```
-Static Frontend (UI)
-        ↓
-Python Analyst Engine  ←→  Market Data Officer
-        ↓
-Multi-Agent Governance (Trade Senate / Arbiter)
-        ↓
-LLM Layer (Claude via CLIProxyAPI)
-```
+- Core architecture is present and coherent across UI (`app/`), analyst engine (`ai_analyst/`), and market data lane (`market_data_officer/`).
+- The previously tracked MDO build phases (1A, 1B, E+, promotion, provider routing) are marked complete in the specs index.
+- Automated test coverage is broad and currently green in this environment:
+  - **470 Python tests passing** (`ai_analyst/tests`)
+  - **235 Node tests passing** (`tests/*.js`)
 
----
+### Current position (plain language)
 
-## Phase Status Overview
-
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase A | Single analyst smoke path | ✅ Complete |
-| Phase B | Central provider/model config | ✅ Complete |
-| Phase C | Quorum/degraded failure handling | ✅ Complete |
-| Phase D | V1.1 snapshot integrity patch (H-1 → H-4) | ✅ Complete |
-| Phase 1A | Market Data Officer — EURUSD baseline spine | ✅ Complete |
-| Phase 1B | Market Data Officer — XAUUSD spine (15m, 1h, 4h, 1d) | ✅ Complete |
-| Phase E+ | Additional instruments, provider abstraction | ✅ Complete |
-| Instrument Promotion | GBPUSD/XAGUSD/XPTUSD → trusted — 419/419 tests | ✅ Complete |
-| Per-Instrument Provider Routing | Explicit per-instrument provider policy — 468/468 tests | ✅ Complete |
-| Tidy | Async marker cleanup (4 files) | ⏳ Pending |
-| Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
-| Operationalise | Scheduler / APScheduler integration | ⏳ Pending |
+You are no longer proving basic feasibility. You are in the **operationalisation + hardening** stage: making the system safer, easier to run repeatedly, and more production-ready.
 
 ---
 
-## Completed Phases — Detail
+## 2) Where We Are Now (Grounded Status)
 
-### ✅ Phase A — Single Analyst Smoke Path
-**Goal:** Prove the full `/triage → /analyse → LangGraph → LLM → arbiter` pipeline end-to-end.
+## Architecture and product posture
 
-**What was broken at start:**
-- Triage path entirely stub-based
-- 401 Unauthorized on every LLM attempt
-- 0/4 analysts returning valid responses (503 quorum failure)
-- No logs or visibility
+- Project doctrine is clearly data-first (market packets first, screenshots as optional supporting evidence).
+- The product surface includes:
+  - static browser workflow + gate logic
+  - Python analyst API/CLI pipeline
+  - MDO feed/packet generation
+  - Macro Risk Officer context lane
 
-**Key fixes:**
-- Session validation (`session: "London"` hardcoded for deterministic smoke)
-- `TRIAGE_SMOKE_MODE` propagated per-request through `GraphState`
-- Proxy auth: `LOCAL_LLM_PROXY_API_KEY=qwe123` via `RUN.local.bat`
-- Arbiter JSON fence parsing — `_extract_json()` helper added
-- `chart_lenses_node` fan-in merge fix (partial state dict return)
-- Model routing: all personas now resolve from `llm_routing.yaml` (`openai/claude-sonnet-4-6`)
-- `RUN.bat` stale process auto-kill (no more Y/N prompt)
+## Delivery maturity indicators
 
-**Smoke run result:** 7 runs to get from 422 → 200 with real arbiter verdict (`NO_TRADE`, correct — no chart data).
+- `README_specs.md` shows the major MDO implementation phases complete and identifies **Operationalise (scheduler/APScheduler)** as the current phase.
+- `Makefile` defines a practical quality bar (`test-web`, `test-ai`, `test-all`) and reflects current CI/test workflows.
+- Test suites run cleanly in this environment (no red tests observed).
 
-**Test count:** 121/121 Python + 96/96 JS contract tests.
+## Known gaps and debt themes
 
----
+From repo docs and current structure, the meaningful remaining work is concentrated in:
 
-### ✅ Phase B — Central Provider/Model Config
-**Goal:** Single source of truth for model routing — no hardcoded model strings per persona.
-
-**What changed:** `router.get_analyst_roster()` resolves model from `task_routing.analyst_reasoning.primary_model` in `llm_routing.yaml` for all personas.
-
----
-
-### ✅ Phase C — Quorum/Degraded Failure Handling
-**Goal:** System degrades gracefully when fewer than 4 analysts respond, rather than hard-failing.
-
-**What changed:** Arbiter now accepts partial analyst sets; `_fallback_verdict()` accepts `analysts_received`/`analysts_valid` params; quorum logic made configurable rather than hardcoded.
+1. **Operational automation**
+   - Scheduled market-data feed runs and lifecycle monitoring.
+2. **Runtime hardening**
+   - Security and API operational safeguards.
+3. **Cleanup and consistency**
+   - Pending async-marker tidy and doc consolidation.
+4. **Developer/operator UX**
+   - Easier bootstrap and less manual wiring for local/prod parity.
 
 ---
 
-### ✅ Phase D — V1.1 Snapshot Integrity Patch (H-1 → H-4)
-**Goal:** Fix 4 snapshot integrity issues in the frontend/backend contract.
+## 3) Where We Should Go Next
 
-| Hotfix | Issue | Fix |
-|--------|-------|-----|
-| H-1 | casing boundary | `deepSnakeToCamel(digest)` in `adapters.js` |
-| H-2 | `journeyId` missing | Fixed in prior work, verified + test coverage added |
-| H-3 | `gateJustifications` missing | Fixed in prior work, verified + test coverage added |
-| H-4 | `provenance` missing | Fixed in prior work, verified + test coverage added |
+## Priority A — Operationalise the data pipeline (highest priority)
 
-**Test result:** 96/96 JS contract tests (up from 65, +31 assertions).
+### Objective
+Turn manual/fixture-supported feed workflows into a reliable scheduled service.
 
----
+### Deliverables
+- Draft and approve an **Operationalise spec** (scheduler scope, cadence, failure policy).
+- Add APScheduler-driven jobs for feed refresh with deterministic logging.
+- Add health/status visibility (last successful run, next run, failure count).
+- Define stale-data thresholds per instrument/timeframe.
 
-### ✅ Phase 1A — Market Data Officer: EURUSD Baseline Spine
-**Goal:** Feed a real `MarketPacketV2` into the analyst graph. Analysts were previously reasoning from prompt context only.
-
-**Spec:** `docs/MDO_Phase1A_Spec.md`
-
-**Key findings from diagnostic:**
-- Code was not broken — the "truck hadn't restocked the vending machine"
-- Root cause: no hot-package artifacts in dev (Dukascopy returns empty on weekends)
-- Provider mismatch: spec originally said yFinance primary; actual module uses Dukascopy exclusively
-
-**What was built:**
-- `--fixture` flag on `run_feed.py` — writes synthetic EURUSD hot package to `market_data/packages/latest/` using exact same manifest/CSV shape as existing test fixtures
-- `tests/test_phase1a_relay.py` — two deterministic tests:
-  - **Test A (officer relay):** seed fixture → `refresh_from_latest_exports("EURUSD")` → assert valid `MarketPacketV2` → assert all 6 timeframes (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`)
-  - **Test B (analyst consumption):** `run_analyst()` with injected packet + mocked LLM → assert structured `AnalystOutput` returned
-
-**Test result:** 359/359 (354 baseline + 5 new). Zero regressions.
-
-**Constraints held:** No SQLite, no new top-level module, no scheduler, no side-channel loader.
+### Done criteria
+- Scheduled runs produce artifacts without manual intervention for multiple consecutive cycles.
+- Failures are visible and recoverable (retry/backoff + alerting hook).
+- Analyst packet consumers can detect stale/missing artifacts deterministically.
 
 ---
 
-## Current State — What Works End-to-End Today
+## Priority B — Security and production hardening (high priority)
 
-```
-run_feed.py --fixture
-        ↓
-market_data/packages/latest/  (EURUSD, 6 timeframes)
-        ↓
-refresh_from_latest_exports("EURUSD")
-        ↓
-MarketPacketV2  (trusted, 6 TFs, quality flags clean)
-        ↓
-run_analyst()  (consumes packet, calls LLM via CLIProxyAPI)
-        ↓
-AnalystOutput  (structured result)
-        ↓
-Arbiter  (verdict + artifact written)
-```
+### Objective
+Close known operational risk items before broader live usage.
 
-The full relay is proven. Analysts receive real market data structure. LLM calls are live via `CLIProxyAPI` at `127.0.0.1:8317`.
+### Deliverables
+- Enforce upload-size and input guardrails consistently on `/analyse` path.
+- Ensure error surfaces do not leak sensitive runtime internals.
+- Document required production defaults (TLS, strict origin policy, key rotation, spend limits).
+
+### Done criteria
+- Critical API abuse paths are capped with explicit tests.
+- Security checklist items are mapped to concrete config and startup docs.
 
 ---
 
-## Next Up — Phase 1B+: XAUUSD Spine
+## Priority C — Observability and reliability confidence (medium/high)
 
-**Goal:** Extend the proven EURUSD spine to XAUUSD.
+### Objective
+Move from “tests pass” to “system behavior is observable and debuggable under failure”.
 
-**Spec status:** Not yet drafted — draft spec before any coding (same process as Phase 1A).
+### Deliverables
+- Add one end-to-end integration test chain (validated input → analyst graph → arbiter verdict).
+- Standardize structured event logging for feed runs and analysis requests.
+- Add basic service-level metrics (success rate, latency bands, timeout counts).
 
-**Known scope:**
-- Instruments: XAUUSD
-- Timeframes: `15m`, `1h`, `4h`, `1d`
-- Provider: Dukascopy (same as EURUSD)
-- Storage: file-based spine (same pattern)
-- Interface: same `get_market_snapshot()` / `MarketPacketV2` contract
-
-**Expected effort:** Significantly less than Phase 1A — the spine is proven, the officer contract is locked, and the fixture pattern is in place. Main work is instrument config and ensuring the XAUUSD feed/loader paths are correctly wired.
-
-**First step for next session:**
-```
-Draft docs/MDO_Phase1B_Spec.md using the same structure as Phase 1A.
-Audit XAUUSD-specific config in market_data_officer/ before writing any code.
-```
+### Done criteria
+- A single dashboard/log query can answer: “Is the system healthy right now?”
+- Integration test catches broken orchestration, not only unit regressions.
 
 ---
 
-## Pending Items
+## Priority D — Cleanup and source-of-truth simplification (medium)
 
-### ⏳ Async Marker Cleanup (Low priority)
-4 files have async markers that need cleanup. Non-blocking — no functional impact.
+### Objective
+Reduce drift between multiple progress/audit docs and remove stale planning artifacts.
 
-### ⏳ jCodeMunch API Key Config (Medium priority)
-Configure Anthropic API key and GitHub PAT for jCodeMunch MCP server integration with Claude Desktop.  
-Confirmed exe path: `C:\Users\david\AppData\Roaming\Python\Python314\Scripts\jcodemunch-mcp.exe`
+### Deliverables
+- Keep one canonical progress plan (this file) and treat others as historical snapshots.
+- Resolve pending async-marker cleanup items.
+- Reconcile duplicate phase summaries across docs.
 
-### ⏳ Phase E+ — Additional Instruments & Provider Abstraction (Medium priority)
-After XAUUSD is proven, extend to further instruments and build proper provider abstraction layer (yFinance as alternative to Dukascopy, alias config).
-
-### ⏳ Operationalise — Scheduler (Low priority)
-APScheduler or similar to trigger feed runs automatically. Out of scope until the manual path is fully stable across instruments.
+### Done criteria
+- New contributors can identify current phase and next implementation target in <5 minutes.
 
 ---
 
-## Environment Reference
+## 4) Proposed 6–8 Week Plan
 
-| Component | Value |
-|-----------|-------|
-| Backend port | 8000 |
-| UI port | 8080 |
-| Proxy port | 8317 |
-| Proxy URL | `http://127.0.0.1:8317/v1` |
-| Proxy auth token | `qwe123` (via `RUN.local.bat` — gitignored) |
-| Model | `openai/claude-sonnet-4-6` (all personas) |
-| Model config source | `config/llm_routing.yaml` |
-| Bootstrap | `.\RUN.bat` (auto-kills stale port 8000, loads `RUN.local.bat`) |
-| Python | 3.14 |
-| OS | Windows |
+## Weeks 1–2
+- Approve Operationalise spec.
+- Implement scheduler skeleton + config + logging.
+- Add tests for schedule trigger and stale-data detection.
 
----
+## Weeks 3–4
+- Harden API guardrails and error handling.
+- Add/expand targeted integration test for orchestration pipeline.
+- Document runtime operations checklist.
 
-## Repo Docs Index
+## Weeks 5–6
+- Add reliability metrics and basic run-status surface.
+- Complete async-marker tidy.
+- Consolidate planning docs.
 
-| Doc | Path | Purpose |
-|-----|------|---------|
-| Specs index | `docs/README_specs.md` | Active phase, completed phases, pending |
-| Phase 1A spec (closed) | `docs/MDO_Phase1A_Spec.md` | Controlling spec + closed phase record |
-| Phase 1B+ spec | `docs/MDO_Phase1B_Spec.md` | To be drafted |
+## Stretch (Weeks 7–8)
+- Pilot multi-environment config profiles (local/staging/prod).
+- Optional distributed rate-limit/cache groundwork if deployment topology requires multi-worker scaling.
 
 ---
 
-*Generated from session handoff notes and Phase 1A spec — 8 March 2026*
+## 5) Risks to Manage
+
+- **Doc drift risk:** multiple progress artifacts can diverge and confuse execution priority.
+- **Operational blind spots:** scheduler without visibility/alerts can fail silently.
+- **Confidence gap:** broad unit coverage may still miss cross-module orchestration regressions.
+- **Security lag risk:** known hardening items left open too long increase deployment risk.
+
+---
+
+## 6) Immediate Next Actions (Concrete)
+
+1. Create `docs/MDO_Operationalise_Spec.md` as active implementation spec if not already finalized.
+2. Define scheduler job contract (inputs, artifact location, success/failure semantics).
+3. Add one integration test that proves analyst verdict generation from a deterministic packet under mocked LLM response.
+4. Update `README_specs.md` after each milestone to keep phase tracking accurate.
+
+---
+
+## 7) Decision Gate Before “Production-Ready” Claim
+
+Before claiming full production readiness, require all of the following:
+
+- Operational scheduler running with observable health.
+- Critical API guardrails tested and enforced.
+- One orchestration integration path green in CI.
+- Security and deployment checklist completed with explicit config evidence.
+- Single canonical progress/status document maintained.
+
