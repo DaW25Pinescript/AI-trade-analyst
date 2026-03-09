@@ -13,6 +13,12 @@ from typing import Any, Dict, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from feed.pipeline import run_pipeline
+from market_hours import (
+    MarketState,
+    classify_freshness,
+    get_market_state,
+    INSTRUMENT_FAMILY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,22 +35,47 @@ SCHEDULE_CONFIG: Dict[str, Dict[str, Any]] = {
 }
 
 
-def refresh_instrument(instrument: str, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def refresh_instrument(
+    instrument: str,
+    config: Optional[Dict[str, Any]] = None,
+    *,
+    _now: Optional[datetime] = None,
+) -> Dict[str, Any]:
     """Run the feed pipeline for a single instrument.
 
     This is the job function called by the scheduler. It wraps the entire
     pipeline call in a try/except to guarantee job isolation — no exception
     propagates out to crash the scheduler or affect other jobs.
 
+    The *_now* parameter exists **only** for deterministic testing — production
+    callers must not set it.
+
     Returns a dict with outcome details for testability.
     """
     cfg = config or SCHEDULE_CONFIG.get(instrument, {})
     window_hours = cfg.get("window_hours", 24)
 
-    now = datetime.now(timezone.utc)
+    now = _now if _now is not None else datetime.now(timezone.utc)
     end_date = now
     start_date = now - timedelta(hours=window_hours)
 
+    # ── Market-hours gate ─────────────────────────────────────────────
+    market_state = get_market_state(instrument, now)
+
+    if market_state in (MarketState.CLOSED_EXPECTED,
+                        MarketState.OFF_SESSION_EXPECTED):
+        logger.info(
+            "%s  SKIPPED  market_state=%s  evaluation_ts=%s",
+            instrument, market_state.value, now.isoformat(),
+        )
+        return {
+            "instrument": instrument,
+            "outcome": "skipped",
+            "market_state": market_state.value,
+            "evaluation_ts": now.isoformat(),
+        }
+
+    # ── Execute pipeline (OPEN or UNKNOWN — conservative) ─────────────
     t0 = time.monotonic()
     try:
         run_pipeline(
@@ -53,26 +84,60 @@ def refresh_instrument(instrument: str, config: Optional[Dict[str, Any]] = None)
             end_date=end_date,
         )
         duration = time.monotonic() - t0
+
+        freshness = classify_freshness(
+            instrument=instrument,
+            last_artifact_ts=now,  # just refreshed successfully
+            now=now,
+            market_state=market_state,
+        )
+
         logger.info(
-            "%s  SUCCESS  duration=%.1fs",
+            "%s  SUCCESS  duration=%.1fs  market_state=%s"
+            "  freshness=%s  reason=%s  evaluation_ts=%s",
             instrument, duration,
+            market_state.value,
+            freshness.classification.value,
+            freshness.reason_code.value,
+            now.isoformat(),
         )
         return {
             "instrument": instrument,
             "outcome": "success",
             "duration": round(duration, 1),
+            "market_state": market_state.value,
+            "freshness": freshness.classification.value,
+            "reason_code": freshness.reason_code.value,
+            "evaluation_ts": now.isoformat(),
         }
     except Exception as exc:
         duration = time.monotonic() - t0
+
+        freshness = classify_freshness(
+            instrument=instrument,
+            last_artifact_ts=None,  # conservative: treat as missing
+            now=now,
+            market_state=market_state,
+        )
+
         logger.error(
-            "%s  FAILURE  error=%r  duration=%.1fs",
+            "%s  FAILURE  error=%r  duration=%.1fs  market_state=%s"
+            "  freshness=%s  reason=%s  evaluation_ts=%s",
             instrument, str(exc), duration,
+            market_state.value,
+            freshness.classification.value,
+            freshness.reason_code.value,
+            now.isoformat(),
         )
         return {
             "instrument": instrument,
             "outcome": "failure",
             "error": str(exc),
             "duration": round(duration, 1),
+            "market_state": market_state.value,
+            "freshness": freshness.classification.value,
+            "reason_code": freshness.reason_code.value,
+            "evaluation_ts": now.isoformat(),
         }
 
 
