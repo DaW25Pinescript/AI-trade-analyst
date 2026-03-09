@@ -11,14 +11,15 @@ Tracks active specs, current phase, and source of truth for each subsystem.
 | Instrument Promotion | `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` | Phase F — GBPUSD/XAGUSD/XPTUSD trust-level promotion | ✅ Complete |
 | Per-Instrument Provider Routing | `docs/MDO_ProviderRouting_Spec.md` | Per-instrument provider policy | ✅ Complete |
 | Operationalise Phase 1 | `docs/MDO_Operationalise_Spec.md` | APScheduler feed refresh | ✅ Complete |
+| Operationalise Phase 2 | `docs/MDO_Operationalise_Phase2_Spec.md` | Market-hours awareness, alerting, remote deployment | ⏳ Active |
 
 ---
 
 ## Current Phase
 
-**Operationalise Phase 2** — market-hours awareness, alerting, remote deployment
-Spec: TBD — draft before implementation
-Goal: market-hours gating, alerting on failure, remote deployment readiness
+**Operationalise Phase 2** — market-hours awareness, alerting, remote deployment  
+Spec: `docs/MDO_Operationalise_Phase2_Spec.md`  
+Goal: market-hours gating, alerting on failure, and remote deployment readiness on top of the Phase 1 scheduler base
 
 ## Completed Phases
 
@@ -35,10 +36,11 @@ Goal: market-hours gating, alerting on failure, remote deployment readiness
 | Per-Instrument Provider Routing | Explicit per-instrument provider policy — 468/468 tests | `docs/MDO_ProviderRouting_Spec.md` |
 | Operationalise Phase 1 | APScheduler feed refresh — 494/494 tests | `docs/MDO_Operationalise_Spec.md` |
 
-## Pending
+## Pending / Next Candidates
 
 | Phase | Description |
 |-------|-------------|
-| Operationalise Phase 2 | Market-hours awareness, alerting, remote deployment |
 | Tidy | Async marker cleanup (4 files) |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) |
+| Security/API Hardening | API edge protection, timeout policy, error contracts |
+| CI Seam Hardening | CI coverage for missing Python integration seams and `/analyse/stream` |
