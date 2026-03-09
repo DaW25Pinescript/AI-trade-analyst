@@ -1,36 +1,15 @@
 # AI Trade Analyst — Project Progress Plan
-
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 8 March 2026  
-**Current phase:** **Phase E+ — Additional Instruments / Provider Abstraction** *(spec to be drafted)*
+**Current phase:** Per-Instrument Provider Routing — spec not yet drafted
 
 ---
 
-## 1. Purpose
-
-This document is the high-level project baseline and forward plan for **AI Trade Analyst**.
-
-It is intended to answer four questions quickly:
-
-1. What architecture is already proven?
-2. Which phases are complete?
-3. What is the next approved implementation target?
-4. What environment assumptions matter for getting back to a working baseline?
-
-Use this together with:
-
-- `docs/README_specs.md` — active specs index
-- `docs/MDO_Phase1A_Spec.md` — closed Phase 1A implementation record
-- `docs/MDO_Phase1B_Spec.md` — closed Phase 1B implementation record
-- future phase specs (starting with `docs/PhaseE_Spec.md` or equivalent)
-
----
-
-## 2. Overall Architecture
+## Overall Architecture
 
 The system is a multi-surface trading intelligence workspace with three integrated layers:
 
-```text
+```
 Static Frontend (UI)
         ↓
 Python Analyst Engine  ←→  Market Data Officer
@@ -40,236 +19,164 @@ Multi-Agent Governance (Trade Senate / Arbiter)
 LLM Layer (Claude via CLIProxyAPI)
 ```
 
-### Architecture summary
-
-- The **frontend** provides triage, journey workflow, state snapshots, and review surfaces.
-- The **analyst engine** handles `/triage`, `/analyse`, LangGraph orchestration, persona execution, and arbiter verdict generation.
-- The **Market Data Officer (MDO)** is the deterministic data-preparation lane that produces and loads market artifacts and packet contracts.
-- The **governance layer** turns analyst outputs into structured verdicts, fallback handling, and auditable artifacts.
-- The **LLM layer** currently routes through **CLIProxyAPI** at `127.0.0.1:8317` using the OpenAI-compatible path.
-
 ---
 
-## 3. Phase Status Overview
+## Phase Status Overview
 
 | Phase | Description | Status |
-|------|-------------|--------|
+|-------|-------------|--------|
 | Phase A | Single analyst smoke path | ✅ Complete |
 | Phase B | Central provider/model config | ✅ Complete |
-| Phase C | Quorum / degraded failure handling | ✅ Complete |
+| Phase C | Quorum/degraded failure handling | ✅ Complete |
 | Phase D | V1.1 snapshot integrity patch (H-1 → H-4) | ✅ Complete |
 | Phase 1A | Market Data Officer — EURUSD baseline spine | ✅ Complete |
-| Phase 1B | Market Data Officer — XAUUSD baseline spine | ✅ Complete |
-| Phase E+ | Additional instruments, provider abstraction | ⏳ Next |
-| Operationalise | Scheduler / APScheduler integration | ⏳ Pending |
+| Phase 1B | Market Data Officer — XAUUSD spine (15m, 1h, 4h, 1d) | ✅ Complete |
+| Phase E+ | Additional instruments, provider abstraction | ⏳ Pending |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
+| Operationalise | Scheduler / APScheduler integration | ⏳ Pending |
 
 ---
 
-## 4. Completed Phases — Baseline Record
+## Completed Phases — Detail
 
-### Phase A — Single Analyst Smoke Path ✅
+### ✅ Phase A — Single Analyst Smoke Path
+**Goal:** Prove the full `/triage → /analyse → LangGraph → LLM → arbiter` pipeline end-to-end.
 
-**Goal:** Prove the full `/triage → /analyse → LangGraph → LLM → arbiter` relay end to end.
+**What was broken at start:**
+- Triage path entirely stub-based
+- 401 Unauthorized on every LLM attempt
+- 0/4 analysts returning valid responses (503 quorum failure)
+- No logs or visibility
 
-#### What was broken at the start
-- Triage path was effectively stub-based
-- LLM calls were failing with auth/config issues
-- Analyst quorum failures caused hard 503 outcomes
-- There was no reliable hop-by-hop visibility
+**Key fixes:**
+- Session validation (`session: "London"` hardcoded for deterministic smoke)
+- `TRIAGE_SMOKE_MODE` propagated per-request through `GraphState`
+- Proxy auth: `LOCAL_LLM_PROXY_API_KEY=qwe123` via `RUN.local.bat`
+- Arbiter JSON fence parsing — `_extract_json()` helper added
+- `chart_lenses_node` fan-in merge fix (partial state dict return)
+- Model routing: all personas now resolve from `llm_routing.yaml` (`openai/claude-sonnet-4-6`)
+- `RUN.bat` stale process auto-kill (no more Y/N prompt)
 
-#### What was fixed
-- Deterministic smoke-session handling
-- Smoke-mode propagation through the request/graph path
-- Proxy auth wiring via local environment + startup flow
-- Router/model path centralized through `llm_routing.yaml`
-- Fan-in / merge-path bug fixed so analyst output survives to arbiter
-- Startup reliability improved in `RUN.bat`
+**Smoke run result:** 7 runs to get from 422 → 200 with real arbiter verdict (`NO_TRADE`, correct — no chart data).
 
-#### Result
-The smoke path is now genuinely online:
-- loopback works
-- graph entry works
-- LLM call succeeds
-- analyst output reaches arbiter
-- verdict returns
-- artifact writes successfully
+**Test count:** 121/121 Python + 96/96 JS contract tests.
 
 ---
 
-### Phase B — Central Provider / Model Config ✅
+### ✅ Phase B — Central Provider/Model Config
+**Goal:** Single source of truth for model routing — no hardcoded model strings per persona.
 
-**Goal:** Move model routing out of scattered call sites and into one source of truth.
-
-#### Result
-- Persona/model routing resolves from config rather than hardcoded strings
-- All personas use the same configured model route
-- Local proxy auth is environment-driven rather than hardcoded placeholder behavior
+**What changed:** `router.get_analyst_roster()` resolves model from `task_routing.analyst_reasoning.primary_model` in `llm_routing.yaml` for all personas.
 
 ---
 
-### Phase C — Quorum / Degraded Failure Handling ✅
+### ✅ Phase C — Quorum/Degraded Failure Handling
+**Goal:** System degrades gracefully when fewer than 4 analysts respond, rather than hard-failing.
 
-**Goal:** Make the system degrade gracefully rather than collapsing when analyst responses are partial.
-
-#### Result
-- Smoke mode can bypass full quorum requirements deterministically
-- Quorum/fallback handling is configurable rather than rigid
-- Partial analyst sets no longer necessarily cause opaque hard failure
+**What changed:** Arbiter now accepts partial analyst sets; `_fallback_verdict()` accepts `analysts_received`/`analysts_valid` params; quorum logic made configurable rather than hardcoded.
 
 ---
 
-### Phase D — V1.1 Snapshot Integrity Patch (H-1 → H-4) ✅
+### ✅ Phase D — V1.1 Snapshot Integrity Patch (H-1 → H-4)
+**Goal:** Fix 4 snapshot integrity issues in the frontend/backend contract.
 
-**Goal:** Repair snapshot/state integrity issues in the frontend/backend contract.
+| Hotfix | Issue | Fix |
+|--------|-------|-----|
+| H-1 | casing boundary | `deepSnakeToCamel(digest)` in `adapters.js` |
+| H-2 | `journeyId` missing | Fixed in prior work, verified + test coverage added |
+| H-3 | `gateJustifications` missing | Fixed in prior work, verified + test coverage added |
+| H-4 | `provenance` missing | Fixed in prior work, verified + test coverage added |
 
-#### Fixed hot spots
-- casing boundary cleanup
-- `journeyId` presence
-- `gateJustifications` capture
-- `provenance` field tracking
-
-#### Result
-The snapshot layer now reflects the actual journey state more faithfully and is suitable as the baseline for continued UI/workflow refinement.
+**Test result:** 96/96 JS contract tests (up from 65, +31 assertions).
 
 ---
 
-### Phase 1A — Market Data Officer: EURUSD Baseline Spine ✅
+### ✅ Phase 1A — Market Data Officer: EURUSD Baseline Spine
+**Goal:** Feed a real `MarketPacketV2` into the analyst graph. Analysts were previously reasoning from prompt context only.
 
-**Goal:** Prove the deterministic relay from feed artifacts into analyst consumption using a real `MarketPacketV2`.
+**Spec:** `docs/MDO_Phase1A_Spec.md`
 
-**Source of truth:** `docs/MDO_Phase1A_Spec.md`
+**Key findings from diagnostic:**
+- Code was not broken — the "truck hadn't restocked the vending machine"
+- Root cause: no hot-package artifacts in dev (Dukascopy returns empty on weekends)
+- Provider mismatch: spec originally said yFinance primary; actual module uses Dukascopy exclusively
 
-#### What was implemented
-- `run_feed.py --fixture`
-- deterministic seeding of EURUSD hot-package artifacts under `market_data/packages/latest/`
-- relay tests proving:
-  - officer path
-  - packet assembly
-  - analyst consumption path with injected packet + mocked LLM
+**What was built:**
+- `--fixture` flag on `run_feed.py` — writes synthetic EURUSD hot package to `market_data/packages/latest/` using exact same manifest/CSV shape as existing test fixtures
+- `tests/test_phase1a_relay.py` — two deterministic tests:
+  - **Test A (officer relay):** seed fixture → `refresh_from_latest_exports("EURUSD")` → assert valid `MarketPacketV2` → assert all 6 timeframes (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`)
+  - **Test B (analyst consumption):** `run_analyst()` with injected packet + mocked LLM → assert structured `AnalystOutput` returned
 
-#### Result
-The relay is proven:
+**Test result:** 359/359 (354 baseline + 5 new). Zero regressions.
 
-```text
+**Constraints held:** No SQLite, no new top-level module, no scheduler, no side-channel loader.
+
+---
+
+## Current State — What Works End-to-End Today
+
+```
 run_feed.py --fixture
         ↓
-market_data/packages/latest/
+market_data/packages/latest/  (EURUSD, 6 timeframes)
         ↓
 refresh_from_latest_exports("EURUSD")
         ↓
-MarketPacketV2
+MarketPacketV2  (trusted, 6 TFs, quality flags clean)
         ↓
-run_analyst() with packet
+run_analyst()  (consumes packet, calls LLM via CLIProxyAPI)
         ↓
-AnalystOutput
+AnalystOutput  (structured result)
         ↓
-Arbiter / artifact write
+Arbiter  (verdict + artifact written)
 ```
 
-#### Constraints held
-- no SQLite
-- no new top-level module
-- no scheduler
-- no side-channel loader
-- file-based spine preserved
+The full relay is proven. Analysts receive real market data structure. LLM calls are live via `CLIProxyAPI` at `127.0.0.1:8317`.
 
 ---
 
-### Phase 1B — Market Data Officer: XAUUSD Baseline Spine ✅
+## Next Up — Phase 1B+: XAUUSD Spine
 
-**Goal:** Extend the proven MDO relay to XAUUSD and prove packet plausibility, contract integrity, and analyst consumption.
+**Goal:** Extend the proven EURUSD spine to XAUUSD.
 
-**Source of truth:** `docs/MDO_Phase1B_Spec.md`
+**Spec status:** Not yet drafted — draft spec before any coding (same process as Phase 1A).
 
-#### What was implemented
-- XAUUSD-aware fixture seeding with instrument-appropriate price/volatility/volume defaults
-- strict Phase 1B fixture scope for the target timeframe set
-- relay tests proving:
-  - officer packet path for XAUUSD
-  - price plausibility gates
-  - analyst consumption path with injected packet + mocked LLM
+**Known scope:**
+- Instruments: XAUUSD
+- Timeframes: `15m`, `1h`, `4h`, `1d`
+- Provider: Dukascopy (same as EURUSD)
+- Storage: file-based spine (same pattern)
+- Interface: same `get_market_snapshot()` / `MarketPacketV2` contract
 
-#### Result
-The relay is now proven for **two instruments**:
+**Expected effort:** Significantly less than Phase 1A — the spine is proven, the officer contract is locked, and the fixture pattern is in place. Main work is instrument config and ensuring the XAUUSD feed/loader paths are correctly wired.
 
-- EURUSD
-- XAUUSD
-
-The MDO spine, fixture pattern, officer contract, and analyst packet-consumption path are all now repeatable and tested.
-
----
-
-## 5. Current Working Baseline
-
-The project should now be treated as a **running baseline** rather than a speculative prototype.
-
-### What works end to end today
-
-- `RUN.bat` bootstraps the local environment, backend, UI, and proxy workflow
-- `RUN.local.bat` provides the local secret/config overlay
-- CLIProxyAPI-backed LLM calls are live
-- `/triage` and `/analyse` paths are proven
-- analyst output reaches the arbiter
-- artifacts are written successfully
-- snapshot integrity issues from H-1 → H-4 are closed
-- MDO Phase 1A proves deterministic packet handoff for EURUSD
-- MDO Phase 1B proves deterministic packet handoff for XAUUSD
-
-### What this means operationally
-
-If the repo is restored on the **same machine** and the broader local prerequisites still exist, the project can be brought back to this working baseline with relatively little manual effort.
-
-This is not yet a universal “fresh machine from nothing” bootstrap, but it is a **strong rebuildable baseline**.
+**First step for next session:**
+```
+Draft docs/MDO_Phase1B_Spec.md using the same structure as Phase 1A.
+Audit XAUUSD-specific config in market_data_officer/ before writing any code.
+```
 
 ---
 
-## 6. Next Up — Phase E+ (Additional Instruments / Provider Abstraction)
+## Pending Items
 
-**Status:** Next  
-**Spec:** Not yet drafted  
-**Rule:** **Draft spec first, run diagnostics second, code third**
+### ⏳ Async Marker Cleanup (Low priority)
+4 files have async markers that need cleanup. Non-blocking — no functional impact.
 
-### Goal
-Generalize the proven MDO spine beyond EURUSD and XAUUSD by formalizing additional instrument support and the provider/config abstraction that is currently implicit.
+### ⏳ jCodeMunch API Key Config (Medium priority)
+Configure Anthropic API key and GitHub PAT for jCodeMunch MCP server integration with Claude Desktop.  
+Confirmed exe path: `C:\Users\david\AppData\Roaming\Python\Python314\Scripts\jcodemunch-mcp.exe`
 
-### Expected scope
-- additional instruments beyond EURUSD and XAUUSD
-- provider abstraction cleanup
-- activation of future/optional alias handling where appropriate
-- migration of `_FIXTURE_PARAMS` and similar instrument-specific defaults into a proper config layer
-- preservation of the existing file-based spine and `MarketPacketV2` contract path
+### ⏳ Phase E+ — Additional Instruments & Provider Abstraction (Medium priority)
+After XAUUSD is proven, extend to further instruments and build proper provider abstraction layer (yFinance as alternative to Dukascopy, alias config).
 
-### Current repo-aligned contract path
-The MDO/analyst contract should continue to be described as:
-
-- `build_market_packet()`
-- `refresh_from_latest_exports()`
-- returning `MarketPacketV2`
-
-### First step for the next implementation pass
-1. Draft the Phase E+ spec
-2. Audit the repo state for instrument/provider assumptions
-3. Run diagnostics against the new spec
-4. Only then implement the smallest patch set
+### ⏳ Operationalise — Scheduler (Low priority)
+APScheduler or similar to trigger feed runs automatically. Out of scope until the manual path is fully stable across instruments.
 
 ---
 
-## 7. Pending Work After Phase E+
-
-### Operationalise — Scheduler / APScheduler
-Only after the manual path is stable across instruments.
-
-### Async Marker Cleanup
-Low-priority tidy work on the remaining async-marker follow-up files.
-
-### jCodeMunch Config
-Complete the MCP/API-key setup for Anthropic + GitHub PAT integration.
-
----
-
-## 8. Environment Reference
+## Environment Reference
 
 | Component | Value |
 |-----------|-------|
@@ -277,47 +184,23 @@ Complete the MCP/API-key setup for Anthropic + GitHub PAT integration.
 | UI port | 8080 |
 | Proxy port | 8317 |
 | Proxy URL | `http://127.0.0.1:8317/v1` |
-| Proxy auth token | stored via `RUN.local.bat` *(gitignored local secret)* |
-| Model | `openai/claude-sonnet-4-6` |
+| Proxy auth token | `qwe123` (via `RUN.local.bat` — gitignored) |
+| Model | `openai/claude-sonnet-4-6` (all personas) |
 | Model config source | `config/llm_routing.yaml` |
-| Bootstrap | `RUN.bat` |
-| Local secret overlay | `RUN.local.bat` |
+| Bootstrap | `.\RUN.bat` (auto-kills stale port 8000, loads `RUN.local.bat`) |
 | Python | 3.14 |
 | OS | Windows |
 
-### Startup expectation
-`RUN.bat` is expected to:
-- verify/install core dependencies
-- load local env overrides
-- start or restart local runtime components as needed
-- restore the repo to the current working baseline on the same machine, assuming external prerequisites still exist
-
 ---
 
-## 9. Repo Docs Index
+## Repo Docs Index
 
 | Doc | Path | Purpose |
 |-----|------|---------|
-| Specs index | `docs/README_specs.md` | active phase + completed specs index |
-| Phase 1A closed spec | `docs/MDO_Phase1A_Spec.md` | controlling spec + historical implementation record |
-| Phase 1B closed spec | `docs/MDO_Phase1B_Spec.md` | controlling spec + historical implementation record |
-| Phase E+ spec | `docs/PhaseE_Spec.md` *(or equivalent)* | to be drafted |
-| Progress plan | `docs/AI_TradeAnalyst_Progress.md` | project-level baseline and forward plan |
+| Specs index | `docs/README_specs.md` | Active phase, completed phases, pending |
+| Phase 1A spec (closed) | `docs/MDO_Phase1A_Spec.md` | Controlling spec + closed phase record |
+| Phase 1B+ spec | `docs/MDO_Phase1B_Spec.md` | To be drafted |
 
 ---
 
-## 10. Working Rule for Future Phases
-
-For any new implementation phase:
-
-1. **Draft the spec first**
-2. **Audit repo state against the spec**
-3. **Report gaps before coding**
-4. **Implement the smallest patch set**
-5. **Update the spec and index after completion**
-
-This process is now proven and should be reused for Phase E+ and beyond.
-
----
-
-*Updated to reflect Phase 1B completion and Phase E+ becoming the next active phase.*
+*Generated from session handoff notes and Phase 1A spec — 8 March 2026*
