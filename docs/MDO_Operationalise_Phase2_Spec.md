@@ -246,6 +246,14 @@ Phase 2 turns the scheduler from “it runs” into “it behaves intelligibly u
 
 - **Operationalise Phase 1** — APScheduler feed refresh base — ✅ Complete
 - **Operationalise Phase 2** — market-hours awareness, alerting, remote deployment — ⏳ Active
+  - **PR 1 — Market-Hours Awareness** — ✅ Complete (9 Mar 2026)
+    - Added `market_hours.py`: `MarketState` enum (`OPEN`, `CLOSED_EXPECTED`, `OFF_SESSION_EXPECTED`, `UNKNOWN`), `FreshnessClassification` enum, stable `ReasonCode` enum, `INSTRUMENT_FAMILY` dict, `FAMILY_SESSION_POLICY`, `get_market_state()`, `classify_freshness()` — all pure functions, deterministic, no external dependencies.
+    - Wired `scheduler.py:refresh_instrument()` to skip pipeline on `CLOSED_EXPECTED`/`OFF_SESSION_EXPECTED`, classify freshness on success/failure, emit structured log fields (`market_state`, `freshness`, `reason_code`, `evaluation_ts`).
+    - 55 new deterministic tests (total 549). Full test matrix: market state, freshness classification, reason codes, UNKNOWN conservative path, scheduler skip/proceed integration, structured log fields, artifact preservation.
+    - Known simplification: Metals session hours use FX window (Sun 22:00–Fri 22:00 UTC) as starting estimate. Refine if instrument-specific session data becomes available.
+    - Pipeline contract unchanged. `MarketPacketV2` unchanged. No SQLite. No external calendar. Work confined to `market_data_officer/`.
+  - **PR 2 — Alerting Hooks** — ⏳ Not started
+  - **PR 3 — Remote Deployment/Runtime Guidance** — ⏳ Not started
 - **Next likely phase** — Security/API Hardening — authn/authz, timeout policy, error contract tightening — 🔜 Candidate
 
 ---
