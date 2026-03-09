@@ -1,7 +1,7 @@
 # AI Trade Analyst — Project Progress Plan
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 9 March 2026
-**Current phase:** Per-Instrument Provider Routing — spec not yet drafted
+**Current phase:** Operationalise — scheduler / APScheduler integration
 
 ---
 
@@ -33,6 +33,7 @@ LLM Layer (Claude via CLIProxyAPI)
 | Phase 1B | Market Data Officer — XAUUSD spine (15m, 1h, 4h, 1d) | ✅ Complete |
 | Phase E+ | Additional instruments, provider abstraction | ✅ Complete |
 | Instrument Promotion | GBPUSD/XAGUSD/XPTUSD → trusted — 419/419 tests | ✅ Complete |
+| Per-Instrument Provider Routing | Explicit per-instrument provider policy — 468/468 tests | ✅ Complete |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
 | Operationalise | Scheduler / APScheduler integration | ⏳ Pending |

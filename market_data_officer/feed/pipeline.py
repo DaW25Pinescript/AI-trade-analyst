@@ -267,9 +267,9 @@ def run_pipeline(
                     if not ticks.empty:
                         bars = ticks_to_1m_ohlcv(ticks)
                         if not bars.empty:
-                            bars["vendor"] = "dukascopy"
+                            bars["vendor"] = meta.primary_provider
                             all_bars.append(bars)
-                            vendors_seen.add("dukascopy")
+                            vendors_seen.add(meta.primary_provider)
                             bars_produced = len(bars)
 
                     collector.record_decode(
@@ -289,14 +289,14 @@ def run_pipeline(
                         decode_error=result.error or "no_payload",
                     )
 
-                # --- AC-3 fallback: yfinance (transport failures only) ---
-                if dukascopy_failed:
+                # --- AC-3 fallback: per-instrument policy (transport failures only) ---
+                if dukascopy_failed and meta.fallback_enabled:
                     fb = fetch_1m_ohlcv_yfinance(symbol, current)
                     if not fb.empty:
-                        fb["vendor"] = "yfinance"
+                        fb["vendor"] = meta.fallback_provider
                         all_bars.append(fb)
-                        vendors_seen.add("yfinance")
-                        print(f"[pipeline] fallback: yfinance supplied "
+                        vendors_seen.add(meta.fallback_provider)
+                        print(f"[pipeline] fallback: {meta.fallback_provider} supplied "
                               f"{len(fb)} bars for {current}")
             except Exception as exc:
                 print(f"[pipeline] error at {current}: {exc}")
@@ -330,18 +330,18 @@ def run_pipeline(
                     if not ticks.empty:
                         bars = ticks_to_1m_ohlcv(ticks)
                         if not bars.empty:
-                            bars["vendor"] = "dukascopy"
+                            bars["vendor"] = meta.primary_provider
                             all_bars.append(bars)
-                            vendors_seen.add("dukascopy")
+                            vendors_seen.add(meta.primary_provider)
 
-                # --- AC-3 fallback: yfinance (transport failures only) ---
-                if dukascopy_failed:
+                # --- AC-3 fallback: per-instrument policy (transport failures only) ---
+                if dukascopy_failed and meta.fallback_enabled:
                     fb = fetch_1m_ohlcv_yfinance(symbol, current)
                     if not fb.empty:
-                        fb["vendor"] = "yfinance"
+                        fb["vendor"] = meta.fallback_provider
                         all_bars.append(fb)
-                        vendors_seen.add("yfinance")
-                        print(f"[pipeline] fallback: yfinance supplied "
+                        vendors_seen.add(meta.fallback_provider)
+                        print(f"[pipeline] fallback: {meta.fallback_provider} supplied "
                               f"{len(fb)} bars for {current}")
             except Exception as exc:
                 print(f"[pipeline] error at {current}: {exc}")
@@ -367,9 +367,9 @@ def run_pipeline(
 
         # Add metadata columns (vendor already set per-batch during fetch)
         if "vendor" not in new_df.columns:
-            new_df["vendor"] = "dukascopy"
+            new_df["vendor"] = meta.primary_provider
         new_df["build_method"] = new_df["vendor"].apply(
-            lambda v: "tick_to_1m" if v == "dukascopy" else "yfinance_1m"
+            lambda v: "tick_to_1m" if v == meta.primary_provider else f"{meta.fallback_provider}_1m"
         )
         new_df["quality_flag"] = "ok"
 
@@ -433,7 +433,9 @@ def _rebuild_derived_and_export(
         if "vendor" in canonical.columns:
             vendors = set(canonical["vendor"].dropna().unique())
         else:
-            vendors = {"dukascopy"}
+            from .config import INSTRUMENTS
+            inst_meta = INSTRUMENTS.get(symbol)
+            vendors = {inst_meta.primary_provider} if inst_meta else {"dukascopy"}
 
     hot_dfs = {"1m": canonical_ohlcv}
 

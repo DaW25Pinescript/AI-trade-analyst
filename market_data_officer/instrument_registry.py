@@ -25,6 +25,10 @@ class InstrumentMeta:
         eqh_eql_tolerance: EQH/EQL tolerance for structure engine.
         fvg_min_size: Minimum FVG gap size for structure engine.
         volume_divisor: Optional volume divisor for Dukascopy decoding.
+        primary_provider: Default data provider for this instrument.
+        fallback_provider: Fallback data provider when primary fails.
+        fallback_enabled: Whether fallback is allowed for this instrument.
+        fallback_direction: "one_way" (primary→fallback) or "symmetric".
     """
 
     symbol: str
@@ -39,6 +43,11 @@ class InstrumentMeta:
     eqh_eql_tolerance: float = 0.0
     fvg_min_size: float = 0.0
     volume_divisor: Optional[float] = None
+    # ── Per-instrument provider routing policy ───────────────────────
+    primary_provider: str = "dukascopy"
+    fallback_provider: str = "yfinance"
+    fallback_enabled: bool = True
+    fallback_direction: str = "one_way"  # "one_way" | "symmetric" (schema-only)
 
 
 # ── All timeframes used by the full FX feed pipeline ─────────────────
