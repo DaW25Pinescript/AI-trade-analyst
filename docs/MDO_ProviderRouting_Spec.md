@@ -1,7 +1,7 @@
 # Per-Instrument Provider Routing Spec
 
-**Status:** Spec drafted — implementation pending  
-**Date:** 8 March 2026  
+**Status:** ✅ Complete
+**Date:** 8 March 2026 (implemented 9 March 2026)
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 
 ---
@@ -191,20 +191,20 @@ The diagnostic should determine whether this belongs directly in `instrument_reg
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|----------------------|--------|
-| AC-1 | Explicit provider policy exists | Each trusted instrument has an explicit provider policy in config/registry | ⏳ Next |
-| AC-2 | Default provider is deterministic | Runtime chooses the configured default provider per instrument rather than implicit global behavior | ⏳ Next |
-| AC-3 | Fallback policy is explicit | Fallback enabled/disabled, fallback target, and fallback direction are represented explicitly per instrument | ⏳ Next |
-| AC-4 | Existing fallback semantics preserved | Fallback still triggers only on approved provider failure conditions (empty/no-data or transport exception) — not on arbitrary downstream exceptions | ⏳ Next |
-| AC-5 | `fallback_enabled=False` testable | An instrument with `fallback_enabled=False` does not fall back — negative case proven by test | ⏳ Next |
-| AC-6 | Artifact compatibility preserved | Canonical / derived / package export shape remains compatible with current officer loaders | ⏳ Next |
-| AC-7 | Officer contract preserved | `refresh_from_latest_exports()` / `build_market_packet()` still return valid `MarketPacketV2` | ⏳ Next |
-| AC-8 | Provenance correct | `source.vendor` reflects actual provider used, not configured primary | ⏳ Next |
-| AC-9 | Deterministic tests | Acceptance remains fixture/mock driven; no live provider dependency in CI | ⏳ Next |
-| AC-10 | Live smoke optional only | At most one optional manual live-ingestion smoke; diagnostic only, not a required gate | ⏳ Next |
-| AC-11 | Regression safety | Existing trusted-instrument relay tests still pass | ⏳ Next |
-| AC-12 | No SQLite | No SQLite or DB layer introduced | ⏳ Next |
-| AC-13 | No new top-level module | Work stays inside existing repo/module boundaries | ⏳ Next |
-| AC-14 | No scheduler | No scheduling/orchestration automation introduced | ⏳ Next |
+| AC-1 | Explicit provider policy exists | Each trusted instrument has an explicit provider policy in config/registry | ✅ Done |
+| AC-2 | Default provider is deterministic | Runtime chooses the configured default provider per instrument rather than implicit global behavior | ✅ Done |
+| AC-3 | Fallback policy is explicit | Fallback enabled/disabled, fallback target, and fallback direction are represented explicitly per instrument | ✅ Done |
+| AC-4 | Existing fallback semantics preserved | Fallback still triggers only on approved provider failure conditions (empty/no-data or transport exception) — not on arbitrary downstream exceptions | ✅ Done |
+| AC-5 | `fallback_enabled=False` testable | An instrument with `fallback_enabled=False` does not fall back — negative case proven by test | ✅ Done |
+| AC-6 | Artifact compatibility preserved | Canonical / derived / package export shape remains compatible with current officer loaders | ✅ Done |
+| AC-7 | Officer contract preserved | `refresh_from_latest_exports()` / `build_market_packet()` still return valid `MarketPacketV2` | ✅ Done |
+| AC-8 | Provenance correct | `source.vendor` reflects actual provider used, not configured primary | ✅ Done |
+| AC-9 | Deterministic tests | Acceptance remains fixture/mock driven; no live provider dependency in CI | ✅ Done |
+| AC-10 | Live smoke optional only | At most one optional manual live-ingestion smoke; diagnostic only, not a required gate | ✅ Done |
+| AC-11 | Regression safety | Existing trusted-instrument relay tests still pass | ✅ Done |
+| AC-12 | No SQLite | No SQLite or DB layer introduced | ✅ Done |
+| AC-13 | No new top-level module | Work stays inside existing repo/module boundaries | ✅ Done |
+| AC-14 | No scheduler | No scheduling/orchestration automation introduced | ✅ Done |
 
 ---
 
@@ -340,7 +340,59 @@ With Per-Instrument Provider Routing:
 
 ## 12. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 8).*
+### InstrumentMeta fields added
+
+| Field | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `primary_provider` | `str` | `"dukascopy"` | Default data provider for this instrument |
+| `fallback_provider` | `str` | `"yfinance"` | Fallback provider when primary fails |
+| `fallback_enabled` | `bool` | `True` | Whether fallback is allowed |
+| `fallback_direction` | `str` | `"one_way"` | Schema-only — `"one_way"` or `"symmetric"` |
+
+### Policy decisions per instrument
+
+| Instrument | Primary | Fallback | Enabled | Direction | Justification |
+|-----------|---------|----------|---------|-----------|---------------|
+| EURUSD | dukascopy | yfinance | True | one_way | Reproduces current behavior. Reliable yFinance coverage via `EURUSD=X`. |
+| GBPUSD | dukascopy | yfinance | True | one_way | Same FX family. Reliable yFinance coverage via `GBPUSD=X`. |
+| XAUUSD | dukascopy | yfinance | True | one_way | Reproduces current behavior. Gold futures `GC=F` reliable on yFinance. |
+| XAGUSD | dukascopy | yfinance | True | one_way | Same metals family. Silver futures `SI=F` reliable on yFinance. |
+| XPTUSD | dukascopy | yfinance | True | one_way | Same metals family. Platinum `PL=F` has yFinance coverage. No deviation from family default. |
+
+### AC gap table (pre-implementation)
+
+| # | Gate | Pre-impl State | Gap? |
+|---|------|---------------|------|
+| AC-1 | Explicit provider policy | No policy fields on InstrumentMeta | **GAP** |
+| AC-2 | Default provider deterministic | Implicit — Dukascopy hardcoded | **GAP** |
+| AC-3 | Fallback policy explicit | Unconditional global fallback | **GAP** |
+| AC-4 | Fallback semantics preserved | Triggers on empty/no-data or RequestException only | MET |
+| AC-5 | `fallback_enabled=False` testable | No mechanism to disable fallback | **GAP** |
+| AC-6 | Artifact compatibility | Baseline intact | MET |
+| AC-7 | Officer contract preserved | Baseline intact | MET |
+| AC-8 | Provenance correct | Vendor chain works end-to-end | MET |
+| AC-9 | Deterministic tests | 419/419 fixture/mock | MET |
+| AC-10 | Live smoke optional | No live tests | MET |
+| AC-11 | Regression safety | 419/419 green | MET |
+| AC-12 | No SQLite | None present | MET |
+| AC-13 | No new top-level module | All in market_data_officer/ | MET |
+| AC-14 | No scheduler | None present | MET |
+
+### Patch set (files + line delta)
+
+| File | Description | Delta |
+|------|-------------|-------|
+| `market_data_officer/instrument_registry.py` | +4 policy fields on InstrumentMeta with defaults + docstring | +8 lines |
+| `market_data_officer/feed/pipeline.py` | Vendor stamps read from meta; fallback gated on meta.fallback_enabled | +4 lines, ~10 lines modified |
+| `market_data_officer/tests/test_provider_routing.py` | **New** — 49 tests: policy fields, defaults, AC-4 trigger conditions, AC-5 negative case, provenance, immutability, guard rails | +262 lines |
+
+### Regression gate results
+
+| Gate | Result |
+|------|--------|
+| Step 2 (fields added, not wired) | 419/419 green |
+| Step 4 (wired, before new tests) | 419/419 green |
+| Step 6 (final, with new tests) | 468/468 green |
 
 ---
 
@@ -353,7 +405,7 @@ With Per-Instrument Provider Routing:
 | Phase E+ | Instrument registry + GBPUSD/XAGUSD/XPTUSD | ✅ Done — 404/404 |
 | Provider Switchover | yFinance fallback + vendor provenance | ✅ Done — 404/404 |
 | Phase F | Instrument Promotion — all 5 trusted | ✅ Done — 419/419 |
-| Per-Instrument Provider Routing | Explicit policy per instrument (this spec) | ⏳ Spec drafted — implementation pending |
+| Per-Instrument Provider Routing | Explicit policy per instrument (this spec) | ✅ Done — 468/468 |
 | Operationalise | Scheduler / APScheduler integration | ⏳ Pending |
 
 ---
