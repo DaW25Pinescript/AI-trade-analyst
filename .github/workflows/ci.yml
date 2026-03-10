@@ -64,3 +64,44 @@ jobs:
 
       - name: Run MRO tests with coverage
         run: pytest --cov=macro_risk_officer --cov-report=term-missing --cov-fail-under=70 -q macro_risk_officer/tests
+
+  mdo-tests:
+    name: Market Data Officer tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install MDO dependencies
+        run: pip install -r market_data_officer/requirements.txt
+
+      - name: Install test tooling
+        run: pip install pytest pytest-cov
+
+      - name: Run MDO tests with coverage
+        run: pytest --cov=market_data_officer --cov-report=term-missing -q market_data_officer/tests
+
+  root-python-tests:
+    name: Root Python integration tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r ai_analyst/requirements.txt
+
+      - name: Run root Python tests
+        run: pytest -q tests/*.py

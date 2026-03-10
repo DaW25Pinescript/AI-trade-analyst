@@ -332,3 +332,109 @@ class _StubGraph:
         out = dict(state)
         out["final_verdict"] = self._verdict
         return out
+
+
+class _SlowStubGraph(_StubGraph):
+    """Stub graph with a small delay so the SSE loop emits at least one heartbeat."""
+
+    async def ainvoke(self, state):
+        await asyncio.sleep(0.4)  # > 0.2s heartbeat interval
+        return await super().ainvoke(state)
+
+
+class _ProgressStubGraph(_StubGraph):
+    """Stub graph that pushes an analyst_done event before returning."""
+
+    async def ainvoke(self, state):
+        from ai_analyst.core import progress_store
+        run_id = state["ground_truth"].run_id
+        await progress_store.push_event(run_id, {
+            "type": "analyst_done",
+            "stage": "phase1",
+            "persona": "test_persona",
+            "model": "stub-model",
+            "action": "long",
+            "confidence": 0.85,
+        })
+        return await super().ainvoke(state)
+
+
+# ── Stream event semantics tests ─────────────────────────────────────────────
+
+def _parse_sse_events(response_text: str) -> list[dict]:
+    """Parse SSE data lines into a list of JSON event dicts."""
+    events = []
+    for line in response_text.split("\n"):
+        if line.startswith("data: "):
+            try:
+                events.append(json.loads(line.removeprefix("data: ")))
+            except json.JSONDecodeError:
+                pass
+    return events
+
+
+class TestStreamEventSemantics:
+    """Stream happy-path event semantics: heartbeat, analyst_done shape, verdict."""
+
+    @pytest.fixture(autouse=True)
+    def _bypass_rate_limit(self, monkeypatch):
+        monkeypatch.setattr(api_main, "_check_rate_limit", lambda _ip: None)
+
+    def test_stream_emits_verdict_event_with_expected_shape(self, monkeypatch):
+        """Verdict event is emitted at stream completion with FinalVerdict payload."""
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _StubGraph())
+
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            resp = client.post(
+                "/analyse/stream", data=data, files=files,
+                headers={"X-API-Key": "test-key"},
+            )
+        assert resp.status_code == 200
+        events = _parse_sse_events(resp.text)
+        verdict_events = [e for e in events if e.get("type") == "verdict"]
+        assert len(verdict_events) == 1, f"Expected exactly 1 verdict event, got {len(verdict_events)}"
+        verdict_payload = verdict_events[0]["verdict"]
+        # Verify FinalVerdict shape — required fields present
+        for field in ("final_bias", "decision", "overall_confidence",
+                      "analyst_agreement_pct", "arbiter_notes"):
+            assert field in verdict_payload, f"Missing field: {field}"
+
+    def test_stream_emits_heartbeat_during_processing(self, monkeypatch):
+        """At least one heartbeat event is emitted while the pipeline runs."""
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _SlowStubGraph())
+
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            resp = client.post(
+                "/analyse/stream", data=data, files=files,
+                headers={"X-API-Key": "test-key"},
+            )
+        assert resp.status_code == 200
+        events = _parse_sse_events(resp.text)
+        heartbeats = [e for e in events if e.get("type") == "heartbeat"]
+        assert len(heartbeats) >= 1, "Expected at least one heartbeat event"
+
+    def test_stream_relays_analyst_done_event_shape(self, monkeypatch):
+        """analyst_done events are relayed via SSE with required fields."""
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _ProgressStubGraph())
+
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            resp = client.post(
+                "/analyse/stream", data=data, files=files,
+                headers={"X-API-Key": "test-key"},
+            )
+        assert resp.status_code == 200
+        events = _parse_sse_events(resp.text)
+        analyst_events = [e for e in events if e.get("type") == "analyst_done"]
+        assert len(analyst_events) >= 1, "Expected at least one analyst_done event"
+        evt = analyst_events[0]
+        # Verify analyst_done event shape
+        for field in ("stage", "persona", "model", "action", "confidence"):
+            assert field in evt, f"Missing field in analyst_done: {field}"
+        assert evt["stage"] == "phase1"
+        assert isinstance(evt["confidence"], (int, float))

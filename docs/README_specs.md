@@ -13,13 +13,13 @@ Tracks active specs, current phase, and source of truth for each subsystem.
 | Operationalise Phase 1 | `docs/MDO_Operationalise_Spec.md` | APScheduler feed refresh | ✅ Complete |
 | Operationalise Phase 2 | `docs/MDO_Operationalise_Phase2_Spec.md` | Market-hours awareness, alerting, remote deployment | ✅ Complete |
 | Security/API Hardening | `docs/Security_API_Hardening_Spec.md` | API edge + call_llm safeguards | ✅ Complete |
+| CI Seam Hardening | `docs/CI_Seam_Hardening_Spec.md` | CI-gate Python seams + stream coverage | ✅ Complete |
 
 ---
 
 ## Current Phase
 
-**CI Seam Hardening** — Gate missing Python integration seams in CI, `/analyse/stream` coverage
-Goal: move from "tests pass" to "important runtime seams are CI-gated, observable, and debuggable under failure"
+**Cleanup & Observability** — Async marker tidy, observability improvements, doc consolidation
 
 ## Completed Phases
 
@@ -37,11 +37,11 @@ Goal: move from "tests pass" to "important runtime seams are CI-gated, observabl
 | Operationalise Phase 1 | APScheduler feed refresh — 494/494 tests | `docs/MDO_Operationalise_Spec.md` |
 | Operationalise Phase 2 | Market-hours awareness, alerting, runtime posture — 644/644 tests | `docs/MDO_Operationalise_Phase2_Spec.md` |
 | Security/API Hardening | API edge + call_llm safeguards — 515 tests (485 ai_analyst + 30 analyst) | `docs/Security_API_Hardening_Spec.md` |
+| CI Seam Hardening | CI-gate MDO + root Python seams, stream event semantics — 1743 tests across 5 CI jobs | `docs/CI_Seam_Hardening_Spec.md` |
 
 ## Pending / Next Candidates
 
 | Phase | Description |
 |-------|-------------|
-| CI Seam Hardening | CI coverage for missing Python integration seams and `/analyse/stream` |
 | Tidy | Async marker cleanup (4 files) |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) |
