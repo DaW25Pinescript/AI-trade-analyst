@@ -319,6 +319,56 @@ def _evaluate_alert(
         )
 
 
+def get_scheduler_health(
+    schedule_config: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Return a read-only snapshot of scheduler health.
+
+    This is a pure read — calling it does not trigger a refresh, alter
+    alert state, or cause any side effects.  It is designed to be consumed
+    by future phases that need an HTTP health endpoint or CLI status command.
+
+    Returns a dict with:
+        - ``instruments``: per-instrument status including alert level,
+          consecutive counters, and last success timestamp.
+        - ``configured_instruments``: number of instruments in schedule config.
+        - ``instruments_with_state``: number of instruments that have been
+          evaluated at least once (present in ``_alert_state``).
+    """
+    cfg = schedule_config or SCHEDULE_CONFIG
+    instruments: Dict[str, Any] = {}
+
+    for instrument in cfg:
+        state = _alert_state.get(instrument)
+        if state is not None:
+            instruments[instrument] = {
+                "alert_level": state["last_alert_level"].value,
+                "alert_reason": state["last_alert_reason"],
+                "consecutive_stale_live": state["consecutive_stale_live"],
+                "consecutive_failures": state["consecutive_failures"],
+                "last_success_ts": (
+                    state["last_success_ts"].isoformat()
+                    if state["last_success_ts"] else None
+                ),
+            }
+        else:
+            instruments[instrument] = {
+                "alert_level": AlertLevel.NONE.value,
+                "alert_reason": "",
+                "consecutive_stale_live": 0,
+                "consecutive_failures": 0,
+                "last_success_ts": None,
+            }
+
+    return {
+        "configured_instruments": len(cfg),
+        "instruments_with_state": sum(
+            1 for i in cfg if i in _alert_state
+        ),
+        "instruments": instruments,
+    }
+
+
 def build_scheduler(
     schedule_config: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> BackgroundScheduler:

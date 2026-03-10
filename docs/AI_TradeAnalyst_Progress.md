@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 9 March 2026  
-**Review date:** 9 March 2026  
-**Current phase:** Operationalise Phase 2 — market-hours awareness, alerting, remote deployment  
+**Last updated:** 10 March 2026
+**Review date:** 10 March 2026
+**Current phase:** Security/API Hardening — authn/authz, timeout policy, error contracts  
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -18,7 +18,7 @@ The repository is in a **strong implementation state**:
 - The tracked Market Data Officer build phases through **Operationalise Phase 1** are complete.
 - Automated test coverage is broad and currently green in this environment:
   - **470 Python tests passing** (`ai_analyst/tests`)
-  - **494 Python tests passing** (`market_data_officer/tests`)
+  - **644 Python tests passing** (`market_data_officer/tests`)
   - **235 Node tests passing** (`tests/*.js`)
 
 ### Current position (plain language)
@@ -39,10 +39,10 @@ You are no longer proving basic feasibility. You are in the **operationalisation
 | Instrument Promotion | GBPUSD/XAGUSD/XPTUSD → trusted — 419/419 tests | ✅ Complete |
 | Per-Instrument Provider Routing | Explicit per-instrument provider policy — 468/468 tests | ✅ Complete |
 | Operationalise Phase 1 | APScheduler feed refresh — 494/494 tests | ✅ Complete |
-| Operationalise Phase 2 | Market-hours awareness, alerting, remote deployment | ⏳ Active |
+| Operationalise Phase 2 | Market-hours awareness, alerting, runtime posture — 644/644 tests | ✅ Complete |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
-| Security/API Hardening | API edge protection, timeout policy, error contracts | 🔜 Next candidate |
+| Security/API Hardening | API edge protection, timeout policy, error contracts | ⏳ Active |
 | CI Seam Hardening | Gate missing Python integration seams in CI | 🔜 Next candidate |
 
 ---
@@ -80,7 +80,7 @@ This means Market Data Officer progress is strategically important, but it shoul
 The project has multiple important test counts that should be tracked separately:
 
 - `ai_analyst/tests` → **470**
-- `market_data_officer/tests` → **494**
+- `market_data_officer/tests` → **644**
 - `tests/*.js` → **235**
 
 This progress plan should continue to distinguish these suites rather than treating “Python tests” as a single bucket.

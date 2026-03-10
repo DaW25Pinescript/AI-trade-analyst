@@ -4,10 +4,10 @@
 
 This phase extends the completed APScheduler base from Operationalise Phase 1 into a more production-usable runtime by adding **market-hours awareness**, **alerting hooks**, and **remote deployment/runtime guidance**.
 
-**Status:** Drafted / active implementation target  
-**Depends on:** `docs/MDO_Operationalise_Spec.md` (Operationalise Phase 1 — complete)  
-**Current repo phase:** Operationalise Phase 2  
-**Date:** 9 March 2026
+**Status:** ✅ Complete
+**Depends on:** `docs/MDO_Operationalise_Spec.md` (Operationalise Phase 1 — complete)
+**Completed:** 10 March 2026
+**Final test count:** 644/644 (market_data_officer/tests)
 
 ---
 
@@ -142,14 +142,14 @@ This can live partly in code comments/startup docs, but the phase should leave b
 
 ## 8. Acceptance Criteria
 
-This phase is complete only when all of the following are true:
+All acceptance criteria are met:
 
-1. Market-open vs market-closed behavior is deterministic and covered by tests.
-2. The system distinguishes expected stale state from failure stale state.
-3. Repeated refresh failures or unexpected stale conditions can trigger an alert hook.
-4. Last-known-good artifacts are preserved under closed-market and failure scenarios.
-5. Remote/runtime guidance exists and matches the implemented startup path.
-6. All existing tests remain green, and new tests cover the added operational semantics.
+1. ✅ Done — Market-open vs market-closed behavior is deterministic and covered by tests. (PR 1 — 55 tests)
+2. ✅ Done — The system distinguishes expected stale state from failure stale state. (PR 1 — FreshnessClassification enum + classify_freshness)
+3. ✅ Done — Repeated refresh failures or unexpected stale conditions can trigger an alert hook. (PR 2 — 48 tests)
+4. ✅ Done — Last-known-good artifacts are preserved under closed-market and failure scenarios. (PR 1 + Phase 1 doctrine, regression-tested)
+5. ✅ Done — Remote/runtime guidance exists and matches the implemented startup path. (PR 3 — docs/MDO_Runtime_Guide.md)
+6. ✅ Done — All existing tests remain green, and new tests cover the added operational semantics. (644/644 — 597 baseline + 47 new in PR 3)
 
 ---
 
@@ -245,7 +245,7 @@ Phase 2 turns the scheduler from “it runs” into “it behaves intelligibly u
 ## 13. Phase Roadmap
 
 - **Operationalise Phase 1** — APScheduler feed refresh base — ✅ Complete
-- **Operationalise Phase 2** — market-hours awareness, alerting, remote deployment — ⏳ Active
+- **Operationalise Phase 2** — market-hours awareness, alerting, remote deployment — ✅ Complete
   - **PR 1 — Market-Hours Awareness** — ✅ Complete (9 Mar 2026)
     - Added `market_hours.py`: `MarketState` enum (`OPEN`, `CLOSED_EXPECTED`, `OFF_SESSION_EXPECTED`, `UNKNOWN`), `FreshnessClassification` enum, stable `ReasonCode` enum, `INSTRUMENT_FAMILY` dict, `FAMILY_SESSION_POLICY`, `get_market_state()`, `classify_freshness()` — all pure functions, deterministic, no external dependencies.
     - Wired `scheduler.py:refresh_instrument()` to skip pipeline on `CLOSED_EXPECTED`/`OFF_SESSION_EXPECTED`, classify freshness on success/failure, emit structured log fields (`market_state`, `freshness`, `reason_code`, `evaluation_ts`).
@@ -257,8 +257,51 @@ Phase 2 turns the scheduler from “it runs” into “it behaves intelligibly u
     - Wired `scheduler.py:refresh_instrument()` with per-instrument alert state dict (`_alert_state`), outcome-to-enum mapping (`_map_outcome`), counter update logic per §6.3 (hold during closure, reset on recovery, increment on live stale/failure), `_evaluate_alert()` with edge-triggered structured log emission and try/except isolation (AC-11).
     - 48 new deterministic tests (total 597). Full test matrix: closed suppression, stale-live WARN/CRITICAL escalation, failure escalation, recovery with structured fields, edge-trigger suppression, reason-change re-emit, counter hold through closure, per-instrument isolation, alert eval crash isolation, PR 1 behavior intact.
     - `market_hours.py` unchanged. Pipeline contract unchanged. `MarketPacketV2` unchanged. No SQLite. No notifier transport. No new top-level module. Work confined to `market_data_officer/`.
-  - **PR 3 — Remote Deployment/Runtime Guidance** — ⏳ Not started
+  - **PR 3 — Remote Deployment/Runtime Guidance** — ✅ Complete (10 Mar 2026)
+    - Added `runtime_config.py`: frozen `RuntimeConfig` dataclass, `validate_runtime_config()` with 7-point validation, `load_runtime_config()`. Defaults match all hardcoded values exactly.
+    - Wired `run_scheduler.py` with config validation (fail-fast on bad config), structured startup posture banner, signal-name shutdown logging, clean exit logging.
+    - Added `get_scheduler_health()` to `scheduler.py` — read-only snapshot of per-instrument alert state. No side effects, no refactoring needed.
+    - Added `docs/MDO_Runtime_Guide.md` — operator runbook covering startup, shutdown, steady-state logs, alert escalation/recovery, weekends, health-check, config, troubleshooting. Describes implemented behavior only.
+    - 47 new deterministic tests (total 644). Test matrix: config validation (valid/invalid/cross-ref), startup fail-fast, startup posture logging, shutdown signal handling, health-check shape/read-only/state reflection, PR 1 + PR 2 regression safety.
+    - `market_hours.py` unchanged. `alert_policy.py` unchanged. Pipeline contract unchanged. `MarketPacketV2` unchanged. No SQLite. No new top-level module. Work confined to `market_data_officer/` and `docs/`.
 - **Next likely phase** — Security/API Hardening — authn/authz, timeout policy, error contract tightening — 🔜 Candidate
+
+---
+
+## 15. Diagnostic Findings
+
+### PR 1 — Market-Hours Awareness (9 Mar 2026)
+- Market-hours policy implemented as pure functions in `market_hours.py`
+- `MarketState` enum with 4 states, `FreshnessClassification` with 5 states, `ReasonCode` with 12 stable codes
+- Scheduler wired to skip on closure, classify freshness on all outcomes
+- 55 new tests, baseline moved from 494 to 549
+
+### PR 2 — Alerting Hooks (10 Mar 2026)
+- Alert policy implemented as pure stateless function in `alert_policy.py`
+- Edge-triggered structured log emission with counter hold/reset/escalation semantics
+- Alert evaluation isolated by try/except — never crashes scheduler
+- 48 new tests, baseline moved from 549 to 597
+
+### PR 3 — Remote Deployment/Runtime Guidance (10 Mar 2026)
+- Runtime config validation surface added as `runtime_config.py`
+- Startup fail-fast proven by deterministic tests
+- Shutdown signal handling proven by deterministic tests
+- Health-check function added (read-only, no side effects)
+- Operator runbook added — describes implemented behavior only
+- 47 new tests, baseline moved from 597 to 644
+
+### Final test count
+- **644/644** in `market_data_officer/tests/`
+- Phase 2 total: +150 tests across 3 PRs (55 + 48 + 47)
+
+### Naming and scope decisions
+- **Metals hours:** FX session window (Sun 22:00–Fri 22:00 UTC) used as starting estimate for all metals. Correct for XAUUSD. Refinement deferred until instrument-specific session data is available.
+- **Pure policy modules:** `market_hours.py` and `alert_policy.py` are stateless pure-function modules with no I/O or logging. State management lives in `scheduler.py`.
+- **No notifier transport:** Alert visibility is log-based only. Injectable notifier abstraction deferred to future phases.
+- **Health-check as callable:** `get_scheduler_health()` is a function, not an HTTP endpoint. Future phases can expose it.
+
+### Change surface surprises
+- None. All changes confined to expected surfaces. No pipeline modifications. No PR 1/PR 2 contract changes. No scope violations.
 
 ---
 
