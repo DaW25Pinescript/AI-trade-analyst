@@ -3,7 +3,7 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 10 March 2026  
 **Review date:** 10 March 2026  
-**Current phase:** CI Seam Hardening — Gate missing Python integration seams in CI  
+**Current phase:** Cleanup & Observability — Async marker tidy, observability improvements
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -44,7 +44,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. Y
 | Operationalise Phase 2 | Market-hours awareness, alerting, runtime posture — 644/644 tests | ✅ Complete |
 | TD-1 Micro-PR | Arbiter assert fix — explicit persona contract enforcement — 645 tests | ✅ Complete |
 | Security/API Hardening | Auth gate, graph + LLM timeouts, error contracts, body limits, TD-2 closure — 677 tests | ✅ Complete |
-| CI Seam Hardening | Gate missing Python integration seams in CI | ⏳ Active |
+| CI Seam Hardening | CI-gate MDO + root Python seams, stream event semantics — 1743 tests across 5 CI jobs | ✅ Complete |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
 
@@ -101,14 +101,14 @@ Phase-closure counts should be read as **phase-gate numbers**, not as a single a
 | Operationalise Phase 2 — PR 3 | 644 | Runtime posture, startup validation, health-check, operator runbook |
 | TD-1 | 645 | Arbiter assert fix |
 | Security/API Hardening | 677 | Auth gate, graph + LLM timeouts, error contracts, body limits, TD-2 closure |
+| CI Seam Hardening | 1743 | MDO + root Python seams CI-gated, stream event semantics, 5 CI jobs |
 
 ### Known gaps and debt themes
 
 From repo docs and current structure, the meaningful remaining work is concentrated in:
 
 1. **CI seam hardening / integration confidence**
-   - Missing Python integration seams are not yet consistently gated in CI.
-   - This is now the last major item in the production-readiness gate.
+   - ✅ Resolved — CI Seam Hardening closed 10 March 2026. MDO + root Python seams CI-gated. Stream event semantics covered. Production-readiness gate satisfied.
 2. **Observability and seam visibility**
    - Important runtime paths need clearer pass/fail evidence, especially across orchestration boundaries.
 3. **Cleanup and consistency**
@@ -122,7 +122,7 @@ From repo docs and current structure, the meaningful remaining work is concentra
 
 ## 3) Where We Should Go Next
 
-CI Seam Hardening is the **active implementation lane**. The priorities below reflect the current post-hardening state of the repo.
+CI Seam Hardening is **complete**. The priorities below reflect the current post-seam-hardening state of the repo.
 
 ### Priority A — CI Seam Hardening (highest priority)
 
@@ -229,10 +229,10 @@ Reduce the architectural split between runtime lanes and address the packaging/i
 
 ## 6) Immediate Next Actions (Concrete)
 
-1. Implement against the active **CI Seam Hardening** phase/spec once confirmed in `README_specs.md`.
-2. Gate `market_data_officer/tests` and root Python integration seams in CI where intended.
-3. Add or strengthen direct `/analyse/stream` coverage if the current seam remains under-tested.
-4. Add one deterministic orchestration-path integration test that proves a real Python seam end-to-end.
+1. ~~CI Seam Hardening~~ — ✅ Complete (10 March 2026).
+2. Execute **async-marker tidy** (4 files) if prioritised.
+3. Pick up **TD-5** (enum centralisation) or **TD-9** (unused vars) as micro-PRs.
+4. Plan **observability and seam confidence** improvements (Priority B).
 5. Update `README_specs.md` after each milestone to keep phase tracking accurate.
 6. Keep the technical debt register current as micro-PRs and named cleanup items close.
 
@@ -249,11 +249,11 @@ Most of the earlier production-readiness gate has now been satisfied.
 - `call_llm()` safeguards and resilience coverage shipped.
 - Single canonical progress/status document maintained.
 
-**Remaining gate to close:**
-- Important Python integration seams are CI-gated where intended.
-- At least one orchestration integration path is green in CI.
+**Remaining gate — now closed (CI Seam Hardening, 10 March 2026):**
+- ✅ Important Python integration seams are CI-gated where intended — `mdo-tests` (644 tests) and `root-python-tests` (139 tests) jobs added.
+- ✅ At least one orchestration integration path is green in CI — `test_multi_analyst_integration.py` (make_packet → digest → personas → arbitrate → output) runs in `root-python-tests`.
 
-This is why **CI Seam Hardening** is the active phase.
+**The production-readiness gate is now satisfied.**
 
 ---
 
@@ -291,8 +291,8 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 ### Resolution sequence
 
 1. **Resolved:** TD-1, TD-2, and TD-10 are closed.
-2. **Active implementation lane:** CI Seam Hardening.
-3. **Next significant debt item after seam work:** TD-3 (packaging/import stability).
+2. **Completed:** CI Seam Hardening (10 March 2026) — production-readiness gate satisfied.
+3. **Next significant debt item:** TD-3 (packaging/import stability).
 4. **Opportunistic micro-PRs:** TD-5 (enum centralisation) and TD-9 (unused vars).
 5. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
 6. **Dependent follow-on:** TD-11 resolves when TD-3 is completed.
