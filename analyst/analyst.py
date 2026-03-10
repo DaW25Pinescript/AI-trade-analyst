@@ -8,8 +8,10 @@ Post-parse validates schema compliance and hard constraint enforcement.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
+import time
 from typing import Any
 
 from analyst.contracts import (
@@ -20,9 +22,34 @@ from analyst.contracts import (
 from analyst.prompt_builder import SYSTEM_PROMPT, build_user_prompt
 from market_data_officer.officer.contracts import MarketPacketV2
 
+logger = logging.getLogger(__name__)
+
 VALID_VERDICTS = {"long_bias", "short_bias", "no_trade", "conditional", "no_data"}
 VALID_CONFIDENCES = {"high", "moderate", "low", "none"}
 VALID_LTF_ALIGNMENTS = {"aligned", "mixed", "conflicted", "unknown"}
+
+# ── call_llm transport/runtime settings (TD-2) ────────────────────────────────
+LLM_CALL_TIMEOUT_S: float = float(os.environ.get("LLM_CALL_TIMEOUT_S", "60"))
+LLM_CALL_MAX_RETRIES: int = int(os.environ.get("LLM_CALL_MAX_RETRIES", "2"))
+
+# Exception types that are safe to retry (transient transport/provider errors)
+_RETRIABLE_EXCEPTION_NAMES = frozenset({
+    "Timeout", "APITimeoutError", "RateLimitError",
+    "APIConnectionError", "InternalServerError", "ServiceUnavailableError",
+    "ConnectionError", "TimeoutError",
+})
+
+
+def _is_retriable(exc: Exception) -> bool:
+    """Check if an exception is a transient/transport error safe to retry."""
+    exc_type_name = type(exc).__name__
+    if exc_type_name in _RETRIABLE_EXCEPTION_NAMES:
+        return True
+    # litellm wraps provider errors — check for common transient status codes
+    status = getattr(exc, "status_code", None)
+    if status and status in (408, 429, 500, 502, 503, 504):
+        return True
+    return False
 
 
 def call_llm(system_prompt: str, user_prompt: str) -> str:
@@ -30,19 +57,51 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
 
     Uses litellm for multi-provider support. Falls back to a simple
     openai-compatible call if litellm is not available.
+
+    Transport hardening (TD-2):
+    - Explicit timeout (default 60s) on provider calls
+    - Bounded retry (default 2 retries) for transient transport failures
+    - Non-retriable errors fail immediately
+    - All provider failures mapped to RuntimeError
     """
     model = os.environ.get("ANALYST_LLM_MODEL", "gpt-4o-mini")
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
 
+    last_exc: Exception | None = None
+    for attempt in range(1 + LLM_CALL_MAX_RETRIES):
+        try:
+            return _call_provider(model, messages)
+        except Exception as exc:
+            last_exc = exc
+            if not _is_retriable(exc) or attempt >= LLM_CALL_MAX_RETRIES:
+                break
+            wait = min(2 ** attempt, 8)
+            logger.warning(
+                "call_llm transient failure (attempt %d/%d): %s — retrying in %ds",
+                attempt + 1, 1 + LLM_CALL_MAX_RETRIES,
+                type(exc).__name__, wait,
+            )
+            time.sleep(wait)
+
+    raise RuntimeError(
+        f"LLM call failed after {1 + LLM_CALL_MAX_RETRIES} attempt(s): "
+        f"{type(last_exc).__name__}"
+    )
+
+
+def _call_provider(model: str, messages: list[dict]) -> str:
+    """Single-attempt provider call with timeout."""
     try:
         import litellm
         response = litellm.completion(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             temperature=0.1,
             max_tokens=2000,
+            timeout=LLM_CALL_TIMEOUT_S,
         )
         return response.choices[0].message.content
     except ImportError:
@@ -51,13 +110,10 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
     # Fallback: try openai directly
     try:
         import openai
-        client = openai.OpenAI()
+        client = openai.OpenAI(timeout=LLM_CALL_TIMEOUT_S)
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             temperature=0.1,
             max_tokens=2000,
         )

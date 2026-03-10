@@ -3,7 +3,7 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 10 March 2026
 **Review date:** 10 March 2026
-**Current phase:** Security/API Hardening — authn/authz, timeout policy, error contracts  
+**Current phase:** CI Seam Hardening — Gate missing Python integration seams in CI
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -17,7 +17,7 @@ The repository is in a **strong implementation state**:
 - Core architecture is present across UI (`app/`), analyst engine (`ai_analyst/`), market data lane (`market_data_officer/`), and macro context lane (`macro_risk_officer/`).
 - The tracked Market Data Officer build phases through **Operationalise Phase 1** are complete.
 - Automated test coverage is broad and currently green in this environment:
-  - **470 Python tests passing** (`ai_analyst/tests`)
+  - **485 Python tests passing** (`ai_analyst/tests`)
   - **644 Python tests passing** (`market_data_officer/tests`)
   - **235 Node tests passing** (`tests/*.js`)
 
@@ -42,8 +42,8 @@ You are no longer proving basic feasibility. You are in the **operationalisation
 | Operationalise Phase 2 | Market-hours awareness, alerting, runtime posture — 644/644 tests | ✅ Complete |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
-| Security/API Hardening | API edge protection, timeout policy, error contracts | ⏳ Active |
-| CI Seam Hardening | Gate missing Python integration seams in CI | 🔜 Next candidate |
+| Security/API Hardening | API edge + call_llm safeguards — 515 tests (485 ai_analyst + 30 analyst) | ✅ Complete |
+| CI Seam Hardening | Gate missing Python integration seams in CI | ⏳ Active |
 
 ---
 
@@ -79,7 +79,7 @@ This means Market Data Officer progress is strategically important, but it shoul
 
 The project has multiple important test counts that should be tracked separately:
 
-- `ai_analyst/tests` → **470**
+- `ai_analyst/tests` → **485**
 - `market_data_officer/tests` → **644**
 - `tests/*.js` → **235**
 
@@ -245,7 +245,7 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 | # | Item | Location | Risk | Resolution timing |
 |---|------|----------|------|-------------------|
 | TD-1 | `assert` used for runtime contract enforcement | `analyst/arbiter.py` | Silent contract violation under `-O` flag; invalid state reaches downstream decision logic | **✅ Resolved — 10 March 2026** |
-| TD-2 | `call_llm()` lacks timeout, retry, circuit-breaker | `analyst/analyst.py`, LLM call path | Stalled upstream call blocks processing; unstable tail latency; failure amplification | **Fold into Security/API Hardening** — same risk surface as `/analyse` timeout policy |
+| TD-2 | `call_llm()` lacks timeout, retry, circuit-breaker | `analyst/analyst.py`, LLM call path | Stalled upstream call blocks processing; unstable tail latency; failure amplification | **✅ Resolved — 10 March 2026** — timeout (60s), retry (2 max, exponential backoff), failure mapping to RuntimeError. 17 deterministic resilience tests added. |
 | TD-3 | `sys.path.insert` used as dependency wiring | Multiple core modules | Environment-dependent import resolution; deployment instability; shadowing risk | **Named micro-PR** — prerequisite for multi-environment config profiles; requires proper packaging (`pyproject.toml` / editable install) |
 
 ### Maintenance — resolve opportunistically or as named cleanup
@@ -263,7 +263,7 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 
 | # | Item | Location | Risk | Resolution timing |
 |---|------|----------|------|-------------------|
-| TD-10 | LLM failure modes under-tested | Test suites for analyst path | Tests mock `call_llm` but don't exercise timeout, malformed response, or retry behavior | **Addressed by TD-2 resolution** — when safeguards are added, tests follow |
+| TD-10 | LLM failure modes under-tested | Test suites for analyst path | Tests mock `call_llm` but don't exercise timeout, malformed response, or retry behavior | **✅ Resolved — 10 March 2026** — 17 resilience tests added in `tests/test_call_llm_resilience.py` covering timeout, retry, malformed response, provider failure, and failure mapping |
 | TD-11 | No import-path stability tests | No coverage for `sys.path.insert` patterns | Path mutation normalised in tests; packaging regressions not actively caught | **Addressed by TD-3 resolution** — when packaging is fixed, add environment-matrix tests |
 | TD-12 | Cross-module architecture contracts undocumented | Core service boundaries | Ownership of policy decisions, fallback semantics, scaling expectations embedded in code flow | **Future documentation** — address when runtime lanes converge or during next architecture review |
 

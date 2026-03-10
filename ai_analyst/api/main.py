@@ -36,7 +36,8 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from ai_analyst.api.auth import verify_api_key
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
@@ -190,6 +191,7 @@ def _load_usage_summary(run_id: str) -> dict:
 # MAX_IMAGE_SIZE_MB: per-image upload ceiling (default 5 MB).
 # MAX_COST_PER_RUN_USD: optional per-run cost ceiling (default disabled).
 _MAX_IMAGE_BYTES: int = int(os.environ.get("MAX_IMAGE_SIZE_MB", "5")) * 1024 * 1024
+GRAPH_TIMEOUT_SECONDS: float = float(os.environ.get("GRAPH_TIMEOUT_SECONDS", "120"))
 _MAX_COST_PER_RUN: float | None = (
     float(os.environ["MAX_COST_PER_RUN_USD"])
     if os.environ.get("MAX_COST_PER_RUN_USD")
@@ -327,6 +329,28 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ── Global request body-size limit ────────────────────────────────────────────
+# Caps total request body (including multipart uploads) at MAX_REQUEST_BODY_MB.
+# Per-image limits (_MAX_IMAGE_BYTES) are tighter but only apply after parsing.
+MAX_REQUEST_BODY_BYTES: int = int(os.environ.get("MAX_REQUEST_BODY_MB", "10")) * 1024 * 1024
+
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose Content-Length exceeds the configured cap."""
+
+    async def dispatch(self, request: StarletteRequest, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_REQUEST_BODY_BYTES:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large."},
+            )
+        return await call_next(request)
+
+
+app.add_middleware(BodySizeLimitMiddleware)
 
 # ── Journey router (V1.1) ────────────────────────────────────────────────────
 from .routers.journey import router as journey_router
@@ -490,6 +514,7 @@ async def get_run_usage(run_id: str):
 @app.post("/analyse", response_model=AnalysisResponse)
 async def analyse(
     request: Request,
+    _api_key: str = Depends(verify_api_key),
 
     # Market identity
     instrument: str = Form(..., description="e.g. XAUUSD"),
@@ -741,7 +766,14 @@ async def analyse(
     # Phase 3: set correlation context for structured logging
     ctx_token = correlation_ctx.set(ground_truth.run_id)
     try:
-        final_state = await request.app.state.graph.ainvoke(initial_state)
+        final_state = await asyncio.wait_for(
+            request.app.state.graph.ainvoke(initial_state),
+            timeout=GRAPH_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.error("Graph execution timed out after %.0fs for run_id=%s",
+                      GRAPH_TIMEOUT_SECONDS, ground_truth.run_id)
+        raise HTTPException(status_code=504, detail="Analysis timed out. Please try again later.")
     except RuntimeError as e:
         if _smoke_mode:
             return JSONResponse(content={
@@ -755,7 +787,8 @@ async def analyse(
                 },
             })
         # Propagate pipeline failures (e.g. insufficient analysts) as 503
-        raise HTTPException(status_code=503, detail=_mask_secrets(str(e)))
+        logger.error("Pipeline RuntimeError: %s", _mask_secrets(str(e)))
+        raise HTTPException(status_code=503, detail="Analysis failed. Check server logs.")
     except Exception as exc:
         if _smoke_mode:
             return JSONResponse(content={
@@ -815,6 +848,7 @@ async def analyse(
 @app.post("/analyse/stream")
 async def analyse_stream(
     request: Request,
+    _api_key: str = Depends(verify_api_key),
 
     # Market identity
     instrument: str = Form(..., description="e.g. XAUUSD"),
@@ -1020,7 +1054,10 @@ async def analyse_stream(
 
     async def event_stream():
         pipeline_task = asyncio.create_task(
-            request.app.state.graph.ainvoke(initial_state)
+            asyncio.wait_for(
+                request.app.state.graph.ainvoke(initial_state),
+                timeout=GRAPH_TIMEOUT_SECONDS,
+            )
         )
         try:
             while True:
@@ -1045,9 +1082,15 @@ async def analyse_stream(
             if _MAX_COST_PER_RUN is not None:
                 check_run_cost_ceiling(get_run_dir(run_id), _MAX_COST_PER_RUN)
 
+        except asyncio.TimeoutError:
+            logger.error("Stream graph execution timed out after %.0fs for run_id=%s",
+                          GRAPH_TIMEOUT_SECONDS, run_id)
+            yield f"data: {json.dumps({'type': 'error', 'detail': 'Analysis timed out. Please try again later.'})}\n\n"
         except RuntimeError as exc:
-            yield f"data: {json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
-        except Exception:
+            logger.error("Stream pipeline RuntimeError: %s", _mask_secrets(str(exc)))
+            yield f"data: {json.dumps({'type': 'error', 'detail': 'Analysis failed. Check server logs.'})}\n\n"
+        except Exception as exc:
+            logger.error("Stream pipeline error: %s: %s", type(exc).__name__, _mask_secrets(str(exc)))
             yield "data: {\"type\":\"error\",\"detail\":\"Internal pipeline error\"}\n\n"
         finally:
             progress_store.unregister(run_id)

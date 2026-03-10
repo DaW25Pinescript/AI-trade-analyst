@@ -12,14 +12,14 @@ Tracks active specs, current phase, and source of truth for each subsystem.
 | Per-Instrument Provider Routing | `docs/MDO_ProviderRouting_Spec.md` | Per-instrument provider policy | ✅ Complete |
 | Operationalise Phase 1 | `docs/MDO_Operationalise_Spec.md` | APScheduler feed refresh | ✅ Complete |
 | Operationalise Phase 2 | `docs/MDO_Operationalise_Phase2_Spec.md` | Market-hours awareness, alerting, remote deployment | ✅ Complete |
+| Security/API Hardening | `docs/Security_API_Hardening_Spec.md` | API edge + call_llm safeguards | ✅ Complete |
 
 ---
 
 ## Current Phase
 
-**Security/API Hardening** — authn/authz, timeout policy, error contract tightening
-Spec: TBD
-Goal: close known operational risk items on the production-facing API edge before broader live usage
+**CI Seam Hardening** — Gate missing Python integration seams in CI, `/analyse/stream` coverage
+Goal: move from "tests pass" to "important runtime seams are CI-gated, observable, and debuggable under failure"
 
 ## Completed Phases
 
@@ -36,12 +36,12 @@ Goal: close known operational risk items on the production-facing API edge befor
 | Per-Instrument Provider Routing | Explicit per-instrument provider policy — 468/468 tests | `docs/MDO_ProviderRouting_Spec.md` |
 | Operationalise Phase 1 | APScheduler feed refresh — 494/494 tests | `docs/MDO_Operationalise_Spec.md` |
 | Operationalise Phase 2 | Market-hours awareness, alerting, runtime posture — 644/644 tests | `docs/MDO_Operationalise_Phase2_Spec.md` |
+| Security/API Hardening | API edge + call_llm safeguards — 515 tests (485 ai_analyst + 30 analyst) | `docs/Security_API_Hardening_Spec.md` |
 
 ## Pending / Next Candidates
 
 | Phase | Description |
 |-------|-------------|
+| CI Seam Hardening | CI coverage for missing Python integration seams and `/analyse/stream` |
 | Tidy | Async marker cleanup (4 files) |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) |
-| Security/API Hardening | API edge protection, timeout policy, error contracts |
-| CI Seam Hardening | CI coverage for missing Python integration seams and `/analyse/stream` |
