@@ -122,7 +122,7 @@ Required keys are listed in `ai_analyst/.env.example`. Copy it to
 via `.gitignore`.
 
 **MRO data source keys** (`FINNHUB_API_KEY`, `FRED_API_KEY`) follow the same
-pattern — see `docs/api_key_setup.md`.
+pattern — see `docs/runbooks/api_key_setup.md`.
 
 In production, prefer injecting secrets via your platform's secret manager
 (AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault) rather than

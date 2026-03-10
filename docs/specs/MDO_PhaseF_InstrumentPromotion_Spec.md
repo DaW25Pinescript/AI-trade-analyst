@@ -107,7 +107,7 @@ market_data_officer/instrument_registry.py
 market_data_officer/run_feed.py
 market_data_officer/tests/conftest.py
 market_data_officer/tests/
-docs/README_specs.md
+docs/specs/README.md
 docs/AI_TradeAnalyst_Progress.md
 ```
 
@@ -360,8 +360,8 @@ All 3 instruments passed deterministic price-range plausibility tests using regi
 | `market_data_officer/tests/test_promotion_relay.py` | **New file** — 15 tests across 6 classes | +213 lines |
 | `market_data_officer/tests/test_phase_e_registry.py` | Updated trust-level assertions for promoted instruments | 4 lines changed |
 | `market_data_officer/tests/test_contracts.py` | Changed unverified-instrument test to use NZDUSD (GBPUSD now trusted) | 1 line changed |
-| `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` | Closed spec | doc only |
-| `docs/README_specs.md` | Updated completed/current phase | doc only |
+| `docs/specs/MDO_PhaseF_InstrumentPromotion_Spec.md` | Closed spec | doc only |
+| `docs/specs/README.md` | Updated completed/current phase | doc only |
 | `docs/AI_TradeAnalyst_Progress.md` | Updated progress table | doc only |
 
 ### Regression gate results
@@ -421,7 +421,7 @@ Do not code until the diagnostic report is complete and reviewed.
 
 On completion, close the spec and update docs:
 1. `docs/Instrument_Promotion_Spec.md` — mark status ✅ Complete, flip all AC cells to ✅ Done, populate §12 Diagnostic Findings with: registry values found and any corrections made, plausibility assessment per instrument, AC gap table (pre-impl), final patch set (files + line delta), per-instrument regression gate results, trust_level decision with justification per instrument
-2. `docs/README_specs.md` — move Instrument Promotion to Completed table, update Current Phase block to Per-Instrument Provider Routing
+2. `docs/specs/README.md` — move Instrument Promotion to Completed table, update Current Phase block to Per-Instrument Provider Routing
 3. `docs/AI_TradeAnalyst_Progress.md` — update current phase, add Instrument Promotion completed row with final test count
 
 Commit all doc changes on the same branch as the implementation.

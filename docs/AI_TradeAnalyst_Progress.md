@@ -8,6 +8,13 @@
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
 
+**See also**
+- Docs navigation index: `docs/README.md`
+- Specs inventory: `docs/specs/README.md`
+- Enduring architecture references: `docs/architecture/README.md`
+- Runbooks: `docs/runbooks/README.md`
+- Historical snapshots/audits: `docs/archive/README.md`
+
 ---
 
 ## 1) Executive Snapshot
@@ -74,7 +81,7 @@ This means Market Data Officer progress is strategically important, but it shoul
 
 ### Delivery maturity indicators
 
-- `README_specs.md` should now identify **CI Seam Hardening** as the active phase, with Operationalise Phase 2 and Security/API Hardening recorded as complete.
+- `docs/specs/README.md` now serves as a specs inventory aligned to this canonical progress hub (not a competing status source).
 - Security/API Hardening has now shipped four concrete hardening surfaces:
   - API auth gate
   - graph execution timeout
@@ -233,7 +240,7 @@ Reduce the architectural split between runtime lanes and address the packaging/i
 2. Execute **async-marker tidy** (4 files) if prioritised.
 3. Pick up **TD-5** (enum centralisation) or **TD-9** (unused vars) as micro-PRs.
 4. Plan **observability and seam confidence** improvements (Priority B).
-5. Update `README_specs.md` after each milestone to keep phase tracking accurate.
+5. Update `docs/specs/README.md` after each milestone so the specs inventory remains aligned to this progress hub.
 6. Keep the technical debt register current as micro-PRs and named cleanup items close.
 
 ---

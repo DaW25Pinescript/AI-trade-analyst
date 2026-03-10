@@ -117,7 +117,7 @@ market_data_officer/feed/pipeline.py
 market_data_officer/feed/yfinance_fallback.py
 market_data_officer/tests/conftest.py
 market_data_officer/tests/
-docs/README_specs.md
+docs/specs/README.md
 docs/AI_TradeAnalyst_Progress.md
 ```
 
@@ -413,7 +413,7 @@ With Per-Instrument Provider Routing:
 ## 14. Recommended Agent Prompt
 
 ```
-Read `docs/MDO_ProviderRouting_Spec.md` in full before starting. Treat it as the controlling spec for this pass.
+Read `docs/specs/MDO_ProviderRouting_Spec.md` in full before starting. Treat it as the controlling spec for this pass.
 
 First task only — run the diagnostic protocol in Section 8 and report findings before changing any code:
 
@@ -437,8 +437,8 @@ Hard constraints:
 Do not change any code until the diagnostic report is reviewed and the patch set is approved.
 
 On completion, close the spec and update docs:
-1. `docs/MDO_ProviderRouting_Spec.md` — mark ✅ Complete, flip all AC cells, populate §12 Diagnostic Findings with: InstrumentMeta fields added, policy decisions per instrument with justification, AC gap table (pre-impl), patch set (files + line delta), regression gate results
-2. `docs/README_specs.md` — move to Completed, update Current Phase to Operationalise
+1. `docs/specs/MDO_ProviderRouting_Spec.md` — mark ✅ Complete, flip all AC cells, populate §12 Diagnostic Findings with: InstrumentMeta fields added, policy decisions per instrument with justification, AC gap table (pre-impl), patch set (files + line delta), regression gate results
+2. `docs/specs/README.md` — move to Completed, update Current Phase to Operationalise
 3. `docs/AI_TradeAnalyst_Progress.md` — update current phase, add completed row with test count
 
 Commit all doc changes on the same branch as the implementation.

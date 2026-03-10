@@ -112,7 +112,7 @@ python -c "import os; print('Finnhub:', bool(os.getenv('FINNHUB_API_KEY'))); pri
 ```
 
 Resolution:
-1. Add the missing key to your `.env` file (see `docs/api_key_setup.md`)
+1. Add the missing key to your `.env` file (see `docs/runbooks/api_key_setup.md`)
 2. Restart any long-lived processes (FastAPI server, scheduled jobs)
 3. Run `python -m macro_risk_officer status` to confirm context is now produced
 

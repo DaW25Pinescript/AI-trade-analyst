@@ -1,8 +1,8 @@
 {
   "_comment": "Canonical enum values extracted from ticket.schema.json and aar.schema.json. Single source of truth for UI components and cross-language tests. Do NOT edit values here directly — the schema files are authoritative. Update both together if values change.",
   "_source": {
-    "ticket": "docs/schema/ticket.schema.json",
-    "aar": "docs/schema/aar.schema.json"
+    "ticket": "docs/specs/schemas/ticket.schema.json",
+    "aar": "docs/specs/schemas/aar.schema.json"
   },
   "ticket": {
     "counterTrendMode": ["Strict HTF-only", "Mixed", "Full OK"],

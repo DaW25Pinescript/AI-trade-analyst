@@ -144,13 +144,13 @@ Historical record — pre-implementation diagnostics only. These were the gaps a
 Root cause: no hot-package artifacts existed in dev — Dukascopy returns empty payloads on weekends. Code was not broken.
 ACStatusGap TypeRoot CauseAC-1FAILRuntime/providerDukascopy weekend + spec omitted --start-date/--end-dateAC-2FAILMissing artifactBlocked by AC-1 — no feed run has produced artifactsAC-3FAILMissing artifactBlocked by AC-2 — FileNotFoundError on missing manifestAC-4FAILMissing artifactBlocked by AC-2/AC-3AC-5FAILMissing artifactBlocked by AC-3 + potential LLM provider dependencyAC-6PARTIALTest/fixture gap354 unit tests pass; integration relay test missingAC-7PASSNoneCleanAC-8PASSNoneClean
 Approved patch set:
-PatchFilesEst. LinesResolvesFixture seedingrun_feed.py (~20–30 lines)~20–30AC-1 through AC-5Relay + consumption teststests/test_phase1a_relay.py (new)~80–100AC-6 (both Test A + Test B)Spec doc accuracydocs/MDO_Phase1A_Spec.md~5Doc accuracy (provider, CLI args)
+PatchFilesEst. LinesResolvesFixture seedingrun_feed.py (~20–30 lines)~20–30AC-1 through AC-5Relay + consumption teststests/test_phase1a_relay.py (new)~80–100AC-6 (both Test A + Test B)Spec doc accuracydocs/specs/MDO_Phase1A_Spec.md~5Doc accuracy (provider, CLI args)
 
 Appendix — Historical Implementation Prompt
 
 Archived. This was the prompt used to drive the implementation session. Phase 1A is complete. Preserved for reference.
 
-Read `docs/MDO_Phase1A_Spec.md` and treat it as the controlling spec for this pass.
+Read `docs/specs/MDO_Phase1A_Spec.md` and treat it as the controlling spec for this pass.
 
 Diagnostic report is complete (see Section 10). Approved patch set:
 

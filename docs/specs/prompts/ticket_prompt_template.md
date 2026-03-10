@@ -3,7 +3,7 @@
 Use this template to convert form state into a deterministic AI request.
 
 ## Inputs
-- Ticket object (`docs/schema/ticket.schema.json`)
+- Ticket object (`docs/specs/schemas/ticket.schema.json`)
 - Gate and checklist output
 - Optional scenario branches
 

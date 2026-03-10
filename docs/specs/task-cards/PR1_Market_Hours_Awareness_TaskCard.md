@@ -3,7 +3,7 @@
 **Status:** ⏳ Task card drafted — implementation pending  
 **Branch:** `feat/mdo-operationalise-phase2-market-hours`  
 **Base:** `main` (after docs-only baseline commit)  
-**Spec source of truth:** `docs/MDO_Operationalise_Phase2_Spec.md` — Sections 4.1, 5.1, 5.2, 5.3  
+**Spec source of truth:** `docs/specs/MDO_Operationalise_Phase2_Spec.md` — Sections 4.1, 5.1, 5.2, 5.3  
 **Regression gate:** 494+ (`market_data_officer/tests`)  
 **Package scope:** `market_data_officer/` only
 
@@ -37,7 +37,7 @@ This PR introduces **market-hours awareness**, the foundation needed before aler
 - Preserve last-known-good artifacts under skip/failure conditions
 - Add deterministic tests for state evaluation and freshness classification
 - Emit structured logging fields sufficient for later alerting/observability work
-- Add a progress annotation to `docs/MDO_Operationalise_Phase2_Spec.md`
+- Add a progress annotation to `docs/specs/MDO_Operationalise_Phase2_Spec.md`
 
 ### Out of scope
 - Pager / Slack / email alert delivery
@@ -76,7 +76,7 @@ Can market-hours-aware freshness classification be added without breaking the cu
 
 | Role | Path | Notes |
 |------|------|-------|
-| Read-only spec | `docs/MDO_Operationalise_Phase2_Spec.md` | controlling phase spec |
+| Read-only spec | `docs/specs/MDO_Operationalise_Phase2_Spec.md` | controlling phase spec |
 | Scheduler/runtime | `market_data_officer/scheduler.py` | expected change surface |
 | Scheduler entrypoint | `market_data_officer/run_scheduler.py` | verify in diagnostic |
 | Registry/config | `market_data_officer/instrument_registry.py` | verify whether hours/session metadata exists |
@@ -250,7 +250,7 @@ Expected change surface:
 - `market_data_officer/scheduler.py`
 - `market_data_officer/instrument_registry.py` or config equivalent
 - `market_data_officer/tests/...`
-- `docs/MDO_Operationalise_Phase2_Spec.md` (progress annotation only)
+- `docs/specs/MDO_Operationalise_Phase2_Spec.md` (progress annotation only)
 
 No changes expected to:
 - `ai_analyst/`
@@ -328,13 +328,13 @@ This PR is mergeable when:
 3. Regression gate holds at 494+ existing tests plus all new tests green
 4. No pipeline contract changes were required, or any required deviation was flagged before implementation
 5. `README_specs.md` remains unchanged because phase status is still active
-6. `docs/MDO_Operationalise_Phase2_Spec.md` has a progress annotation for PR 1 completion
+6. `docs/specs/MDO_Operationalise_Phase2_Spec.md` has a progress annotation for PR 1 completion
 
 ---
 
 ## 13. Appendix — Recommended Agent Prompt
 
-Read `docs/MDO_Operationalise_Phase2_Spec.md` in full before starting.  
+Read `docs/specs/MDO_Operationalise_Phase2_Spec.md` in full before starting.  
 Treat it as the controlling spec for this pass.
 
 First task only — run the diagnostic protocol in this task card (D1–D6) and report findings before changing any code.
@@ -358,7 +358,7 @@ Hard constraints:
 Do not change any code until the diagnostic report is reviewed and the patch set is approved.
 
 On completion:
-1. Update `docs/MDO_Operationalise_Phase2_Spec.md` with PR 1 completion/progress notes
-2. Do **not** advance `docs/README_specs.md` yet — Operationalise Phase 2 remains active
+1. Update `docs/specs/MDO_Operationalise_Phase2_Spec.md` with PR 1 completion/progress notes
+2. Do **not** advance `docs/specs/README.md` yet — Operationalise Phase 2 remains active
 3. Do **not** change `AI_TradeAnalyst_Progress.md` unless the implementation reveals a material scope correction
 4. Commit all doc changes on the same branch as the implementation

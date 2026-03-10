@@ -96,9 +96,9 @@ Can we harden `/analyse` and `call_llm()` with explicit guardrails and determini
 | AI analyst tests | `ai_analyst/tests/` | Primary test target |
 | Node tests | `tests/*.js` | Bridge/contract tests — regression check |
 | Arbiter tests | `tests/test_arbiter.py` | Read-only reference unless needed |
-| Specs index | `docs/README_specs.md` | Update on phase closure |
+| Specs index | `docs/specs/README.md` | Update on phase closure |
 | Progress plan | `docs/AI_TradeAnalyst_Progress.md` | Update on phase closure + TD-2 resolution |
-| This phase spec | `docs/Security_API_Hardening_Spec.md` | Phase closure |
+| This phase spec | `docs/specs/Security_API_Hardening_Spec.md` | Phase closure |
 
 ### Read-only references
 - `market_data_officer/` runtime and contracts should remain unchanged in this phase.
@@ -332,9 +332,9 @@ Expected change surface:
 - `analyst/analyst.py` — `call_llm()` timeout/retry wrapper (TD-2)
 - `ai_analyst/tests/` — new hardening tests + existing test fixture updates for auth
 - One or more existing analyst/API test files
-- `docs/Security_Checklist.md` or equivalent — production defaults documentation
-- `docs/Security_API_Hardening_Spec.md` — phase closure
-- `docs/README_specs.md` — phase closure
+- `docs/runbooks/Security_Checklist.md` or equivalent — production defaults documentation
+- `docs/specs/Security_API_Hardening_Spec.md` — phase closure
+- `docs/specs/README.md` — phase closure
 - `docs/AI_TradeAnalyst_Progress.md` — phase closure + TD-2 resolution
 
 No changes expected to:
@@ -431,7 +431,7 @@ The diagnostic discovered two separate LLM call paths:
 
 ## 14. Appendix — Recommended Agent Prompt
 
-Read `docs/Security_API_Hardening_Spec.md` in full before starting.
+Read `docs/specs/Security_API_Hardening_Spec.md` in full before starting.
 Treat it as the controlling spec for this pass.
 
 First task only — run the diagnostic protocol in Section 8 and report findings before changing any code:
@@ -459,10 +459,10 @@ Hard constraints:
 Do not change any code until the diagnostic report is reviewed and the patch set is approved.
 
 On completion, close the spec and update docs:
-1. `docs/Security_API_Hardening_Spec.md` — mark ✅ Complete, flip all AC cells,
+1. `docs/specs/Security_API_Hardening_Spec.md` — mark ✅ Complete, flip all AC cells,
    populate §13 Diagnostic Findings with: auth pattern chosen, timeout values confirmed,
    error leakage paths closed, body-limit value, retry behavior, test count delta
-2. `docs/README_specs.md` — move to Completed, update Current Phase to next candidate
+2. `docs/specs/README.md` — move to Completed, update Current Phase to next candidate
 3. `docs/AI_TradeAnalyst_Progress.md` — update current phase, add completed row with test count
 4. If any Technical Debt Register items (§8 of progress plan) were resolved
    or partially addressed by this work, update their status in the register.

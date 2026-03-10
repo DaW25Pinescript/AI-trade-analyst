@@ -5,7 +5,7 @@
 This phase extends the completed APScheduler base from Operationalise Phase 1 into a more production-usable runtime by adding **market-hours awareness**, **alerting hooks**, and **remote deployment/runtime guidance**.
 
 **Status:** ✅ Complete
-**Depends on:** `docs/MDO_Operationalise_Spec.md` (Operationalise Phase 1 — complete)
+**Depends on:** `docs/specs/MDO_Operationalise_Spec.md` (Operationalise Phase 1 — complete)
 **Completed:** 10 March 2026
 **Final test count:** 644/644 (market_data_officer/tests)
 
@@ -148,7 +148,7 @@ All acceptance criteria are met:
 2. ✅ Done — The system distinguishes expected stale state from failure stale state. (PR 1 — FreshnessClassification enum + classify_freshness)
 3. ✅ Done — Repeated refresh failures or unexpected stale conditions can trigger an alert hook. (PR 2 — 48 tests)
 4. ✅ Done — Last-known-good artifacts are preserved under closed-market and failure scenarios. (PR 1 + Phase 1 doctrine, regression-tested)
-5. ✅ Done — Remote/runtime guidance exists and matches the implemented startup path. (PR 3 — docs/MDO_Runtime_Guide.md)
+5. ✅ Done — Remote/runtime guidance exists and matches the implemented startup path. (PR 3 — docs/runbooks/MDO_Runtime_Guide.md)
 6. ✅ Done — All existing tests remain green, and new tests cover the added operational semantics. (644/644 — 597 baseline + 47 new in PR 3)
 
 ---
@@ -261,7 +261,7 @@ Phase 2 turns the scheduler from “it runs” into “it behaves intelligibly u
     - Added `runtime_config.py`: frozen `RuntimeConfig` dataclass, `validate_runtime_config()` with 7-point validation, `load_runtime_config()`. Defaults match all hardcoded values exactly.
     - Wired `run_scheduler.py` with config validation (fail-fast on bad config), structured startup posture banner, signal-name shutdown logging, clean exit logging.
     - Added `get_scheduler_health()` to `scheduler.py` — read-only snapshot of per-instrument alert state. No side effects, no refactoring needed.
-    - Added `docs/MDO_Runtime_Guide.md` — operator runbook covering startup, shutdown, steady-state logs, alert escalation/recovery, weekends, health-check, config, troubleshooting. Describes implemented behavior only.
+    - Added `docs/runbooks/MDO_Runtime_Guide.md` — operator runbook covering startup, shutdown, steady-state logs, alert escalation/recovery, weekends, health-check, config, troubleshooting. Describes implemented behavior only.
     - 47 new deterministic tests (total 644). Test matrix: config validation (valid/invalid/cross-ref), startup fail-fast, startup posture logging, shutdown signal handling, health-check shape/read-only/state reflection, PR 1 + PR 2 regression safety.
     - `market_hours.py` unchanged. `alert_policy.py` unchanged. Pipeline contract unchanged. `MarketPacketV2` unchanged. No SQLite. No new top-level module. Work confined to `market_data_officer/` and `docs/`.
 - **Next likely phase** — Security/API Hardening — authn/authz, timeout policy, error contract tightening — 🔜 Candidate
@@ -309,7 +309,7 @@ Phase 2 turns the scheduler from “it runs” into “it behaves intelligibly u
 
 Use this prompt for implementation work:
 
-> Implement Operationalise Phase 2 for Market Data Officer using `docs/MDO_Operationalise_Phase2_Spec.md` as the source of truth.
+> Implement Operationalise Phase 2 for Market Data Officer using `docs/specs/MDO_Operationalise_Phase2_Spec.md` as the source of truth.
 > 
 > Rules:
 > - diagnostic-first
