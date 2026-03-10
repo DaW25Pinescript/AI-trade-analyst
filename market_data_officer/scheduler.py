@@ -14,13 +14,48 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from feed.pipeline import run_pipeline
 from market_hours import (
+    FreshnessClassification,
     MarketState,
     classify_freshness,
     get_market_state,
     INSTRUMENT_FAMILY,
 )
+from alert_policy import (
+    AlertDecision,
+    AlertLevel,
+    RefreshOutcome,
+    derive_alert_decision,
+)
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Per-instrument alert state — process-local, resets on scheduler restart.
+# Not persisted. Keys are instrument symbols.
+# ---------------------------------------------------------------------------
+_alert_state: Dict[str, Dict[str, Any]] = {}
+
+
+def _get_alert_state(instrument: str) -> Dict[str, Any]:
+    """Return the mutable alert-state dict for *instrument*, creating if needed."""
+    if instrument not in _alert_state:
+        _alert_state[instrument] = {
+            "consecutive_stale_live": 0,
+            "consecutive_failures": 0,
+            "last_alert_level": AlertLevel.NONE,
+            "last_alert_reason": "",
+            "last_success_ts": None,
+        }
+    return _alert_state[instrument]
+
+
+def _map_outcome(outcome_str: str) -> RefreshOutcome:
+    """Map scheduler outcome string to RefreshOutcome enum."""
+    return {
+        "success": RefreshOutcome.SUCCESS,
+        "skipped": RefreshOutcome.SKIPPED,
+        "failure": RefreshOutcome.FAILED,
+    }.get(outcome_str, RefreshOutcome.NOT_ATTEMPTED)
 
 # ---------------------------------------------------------------------------
 # Cadence config — config-driven, not hardcoded.
@@ -47,6 +82,10 @@ def refresh_instrument(
     pipeline call in a try/except to guarantee job isolation — no exception
     propagates out to crash the scheduler or affect other jobs.
 
+    After each refresh, alert policy is evaluated and edge-triggered
+    structured logs are emitted when warranted.  Alert evaluation failure
+    never crashes the scheduler.
+
     The *_now* parameter exists **only** for deterministic testing — production
     callers must not set it.
 
@@ -68,12 +107,14 @@ def refresh_instrument(
             "%s  SKIPPED  market_state=%s  evaluation_ts=%s",
             instrument, market_state.value, now.isoformat(),
         )
-        return {
+        result = {
             "instrument": instrument,
             "outcome": "skipped",
             "market_state": market_state.value,
             "evaluation_ts": now.isoformat(),
         }
+        _evaluate_alert(instrument, market_state, None, result, now)
+        return result
 
     # ── Execute pipeline (OPEN or UNKNOWN — conservative) ─────────────
     t0 = time.monotonic()
@@ -101,7 +142,7 @@ def refresh_instrument(
             freshness.reason_code.value,
             now.isoformat(),
         )
-        return {
+        result = {
             "instrument": instrument,
             "outcome": "success",
             "duration": round(duration, 1),
@@ -110,6 +151,9 @@ def refresh_instrument(
             "reason_code": freshness.reason_code.value,
             "evaluation_ts": now.isoformat(),
         }
+        _evaluate_alert(instrument, market_state,
+                        freshness.classification, result, now)
+        return result
     except Exception as exc:
         duration = time.monotonic() - t0
 
@@ -129,7 +173,7 @@ def refresh_instrument(
             freshness.reason_code.value,
             now.isoformat(),
         )
-        return {
+        result = {
             "instrument": instrument,
             "outcome": "failure",
             "error": str(exc),
@@ -139,6 +183,140 @@ def refresh_instrument(
             "reason_code": freshness.reason_code.value,
             "evaluation_ts": now.isoformat(),
         }
+        _evaluate_alert(instrument, market_state,
+                        freshness.classification, result, now)
+        return result
+
+
+# ---------------------------------------------------------------------------
+# Alert evaluation — called after every refresh_instrument outcome
+# ---------------------------------------------------------------------------
+
+def _evaluate_alert(
+    instrument: str,
+    market_state: MarketState,
+    freshness_classification: Optional[FreshnessClassification],
+    result: Dict[str, Any],
+    now: datetime,
+) -> None:
+    """Evaluate alert policy and emit edge-triggered structured logs.
+
+    Wrapped in try/except — alert evaluation failure must never crash the
+    scheduler or prevent the next refresh cycle (AC-11).
+    """
+    try:
+        state = _get_alert_state(instrument)
+        outcome = _map_outcome(result["outcome"])
+
+        # ── Update counters per §6.3 ──────────────────────────────────
+        if market_state in (MarketState.CLOSED_EXPECTED,
+                            MarketState.OFF_SESSION_EXPECTED):
+            # Hold rule: freeze counters during expected closure
+            pass
+        elif (outcome == RefreshOutcome.SUCCESS
+              and freshness_classification == FreshnessClassification.FRESH):
+            # Healthy: reset counters
+            state["consecutive_stale_live"] = 0
+            state["consecutive_failures"] = 0
+            state["last_success_ts"] = now
+        elif outcome == RefreshOutcome.FAILED:
+            # Refresh failure during live/unknown: increment failures only
+            state["consecutive_failures"] += 1
+        elif freshness_classification in (FreshnessClassification.STALE_BAD,
+                                          FreshnessClassification.MISSING_BAD):
+            # Stale/missing during live market: increment stale counter only
+            state["consecutive_stale_live"] += 1
+        elif freshness_classification in (FreshnessClassification.STALE_EXPECTED,
+                                          FreshnessClassification.MISSING_EXPECTED):
+            # Expected stale/missing: hold (already covered by market_state check above,
+            # but explicit for UNKNOWN state edge case)
+            pass
+
+        # ── Derive alert decision ─────────────────────────────────────
+        # Use FRESH as default freshness for skipped outcomes where
+        # freshness_classification is None (closed market skip)
+        effective_freshness = (freshness_classification
+                               if freshness_classification is not None
+                               else FreshnessClassification.FRESH)
+
+        decision = derive_alert_decision(
+            instrument=instrument,
+            market_state=market_state,
+            freshness=effective_freshness,
+            refresh_outcome=outcome,
+            eval_ts=now,
+            last_success_ts=state["last_success_ts"],
+            consecutive_stale_live=state["consecutive_stale_live"],
+            consecutive_failures=state["consecutive_failures"],
+            previous_level=state["last_alert_level"],
+            previous_reason_code=state["last_alert_reason"],
+        )
+
+        # ── Emit edge-triggered logs ──────────────────────────────────
+        if decision.should_emit:
+            if decision.level == AlertLevel.NONE:
+                # Recovery log
+                logger.warning(
+                    "%s  ALERT  alert_level=%s  reason_code=%s"
+                    "  recovered_from_level=%s  recovered_from_reason=%s"
+                    "  market_state=%s  freshness=%s  refresh_outcome=%s"
+                    "  consecutive_stale_live=%d  consecutive_failures=%d"
+                    "  last_success_ts=%s  eval_ts=%s",
+                    instrument,
+                    decision.level.value,
+                    decision.reason_code,
+                    state["last_alert_level"].value,
+                    state["last_alert_reason"],
+                    market_state.value,
+                    effective_freshness.value,
+                    outcome.value,
+                    state["consecutive_stale_live"],
+                    state["consecutive_failures"],
+                    state["last_success_ts"].isoformat()
+                    if state["last_success_ts"] else "null",
+                    now.isoformat(),
+                )
+            else:
+                # Alert log (WARN or CRITICAL)
+                logger.warning(
+                    "%s  ALERT  alert_level=%s  reason_code=%s"
+                    "  market_state=%s  freshness=%s  refresh_outcome=%s"
+                    "  consecutive_stale_live=%d  consecutive_failures=%d"
+                    "  last_success_ts=%s  eval_ts=%s",
+                    instrument,
+                    decision.level.value,
+                    decision.reason_code,
+                    market_state.value,
+                    effective_freshness.value,
+                    outcome.value,
+                    state["consecutive_stale_live"],
+                    state["consecutive_failures"],
+                    state["last_success_ts"].isoformat()
+                    if state["last_success_ts"] else "null",
+                    now.isoformat(),
+                )
+
+        # ── Update state from decision ────────────────────────────────
+        if decision.should_reset:
+            state["consecutive_stale_live"] = 0
+            state["consecutive_failures"] = 0
+            state["last_alert_level"] = AlertLevel.NONE
+            state["last_alert_reason"] = ""
+        else:
+            state["last_alert_level"] = decision.level
+            state["last_alert_reason"] = decision.reason_code
+
+        # Attach alert decision to result for testability
+        result["alert_level"] = decision.level.value
+        result["alert_reason"] = decision.reason_code
+        result["alert_emitted"] = decision.should_emit
+
+    except Exception:
+        logger.exception(
+            "%s  ALERT_EVAL_ERROR  Alert evaluation failed — "
+            "scheduler continues normally",
+            instrument,
+        )
 
 
 def build_scheduler(
