@@ -8,9 +8,13 @@ No APScheduler instance is started in any test. Tests exercise:
 - last-known-good preservation (artifacts untouched on failure)
 - no-overlap config (max_instances=1 set on every job)
 - build_scheduler produces correct job configuration
+- market-hours-aware skip/proceed decisions (PR 1)
+- structured log fields include market state + freshness (PR 1)
 """
 
+from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
+import logging
 import pytest
 
 from scheduler import (
@@ -274,3 +278,129 @@ class TestBuildScheduler:
         assert len(jobs) == 1
         assert jobs[0].id == "refresh_TEST_SYM"
         # No shutdown needed — scheduler was never started
+
+
+# ── Market-hours-aware scheduler integration tests (PR 1) ────────────
+
+
+# Deterministic timestamps — no real clock dependency
+_TUESDAY_14 = datetime(2026, 3, 10, 14, 0, tzinfo=timezone.utc)
+_SATURDAY_03 = datetime(2026, 3, 14, 3, 0, tzinfo=timezone.utc)
+_FRIDAY_22 = datetime(2026, 3, 13, 22, 0, tzinfo=timezone.utc)
+_SUNDAY_20 = datetime(2026, 3, 15, 20, 0, tzinfo=timezone.utc)
+
+
+class TestMarketHoursIntegration:
+    """Prove scheduler correctly skips/proceeds based on market state."""
+
+    @patch("scheduler.run_pipeline")
+    def test_open_market_calls_pipeline(self, mock_pipeline):
+        """When market is OPEN, run_pipeline is called."""
+        mock_pipeline.return_value = None
+        result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        assert result["outcome"] == "success"
+        assert mock_pipeline.call_count == 1
+
+    @patch("scheduler.run_pipeline")
+    def test_closed_market_skips_pipeline(self, mock_pipeline):
+        """When market is CLOSED_EXPECTED, run_pipeline is NOT called.
+
+        This is the negative test proving refresh is skipped, not assumed.
+        """
+        result = refresh_instrument("EURUSD", _now=_FRIDAY_22)
+        assert result["outcome"] == "skipped"
+        assert result["market_state"] == "CLOSED_EXPECTED"
+        mock_pipeline.assert_not_called()
+
+    @patch("scheduler.run_pipeline")
+    def test_off_session_skips_pipeline(self, mock_pipeline):
+        """When market is OFF_SESSION_EXPECTED (Saturday), pipeline is skipped."""
+        result = refresh_instrument("EURUSD", _now=_SATURDAY_03)
+        assert result["outcome"] == "skipped"
+        assert result["market_state"] == "OFF_SESSION_EXPECTED"
+        mock_pipeline.assert_not_called()
+
+    @patch("scheduler.run_pipeline")
+    def test_sunday_pre_open_skips(self, mock_pipeline):
+        """Sunday before session open → CLOSED_EXPECTED, pipeline skipped."""
+        result = refresh_instrument("GBPUSD", _now=_SUNDAY_20)
+        assert result["outcome"] == "skipped"
+        assert result["market_state"] == "CLOSED_EXPECTED"
+        mock_pipeline.assert_not_called()
+
+    @patch("scheduler.run_pipeline")
+    def test_skip_preserves_artifacts(self, mock_pipeline):
+        """Skipped refresh never calls pipeline — artifacts untouched."""
+        result = refresh_instrument("XAUUSD", _now=_SATURDAY_03)
+        assert result["outcome"] == "skipped"
+        mock_pipeline.assert_not_called()
+
+    @patch("scheduler.run_pipeline")
+    def test_failure_preserves_artifacts_with_market_state(self, mock_pipeline):
+        """On OPEN failure, artifacts preserved and market state in result."""
+        mock_pipeline.side_effect = RuntimeError("provider down")
+        result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        assert result["outcome"] == "failure"
+        assert result["market_state"] == "OPEN"
+        assert mock_pipeline.call_count == 1
+
+
+class TestStructuredLogFields:
+    """Prove structured log fields include market state and freshness."""
+
+    @patch("scheduler.run_pipeline")
+    def test_success_result_has_structured_fields(self, mock_pipeline):
+        """Success result includes market_state, freshness, reason_code."""
+        mock_pipeline.return_value = None
+        result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        assert "market_state" in result
+        assert "freshness" in result
+        assert "reason_code" in result
+        assert "evaluation_ts" in result
+        assert result["market_state"] == "OPEN"
+        assert result["freshness"] == "FRESH"
+
+    @patch("scheduler.run_pipeline")
+    def test_failure_result_has_structured_fields(self, mock_pipeline):
+        """Failure result includes market_state, freshness, reason_code."""
+        mock_pipeline.side_effect = Exception("boom")
+        result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        assert "market_state" in result
+        assert "freshness" in result
+        assert "reason_code" in result
+        assert result["market_state"] == "OPEN"
+
+    @patch("scheduler.run_pipeline")
+    def test_skip_result_has_market_state(self, mock_pipeline):
+        """Skipped result includes market_state and evaluation_ts."""
+        result = refresh_instrument("EURUSD", _now=_SATURDAY_03)
+        assert result["market_state"] == "OFF_SESSION_EXPECTED"
+        assert "evaluation_ts" in result
+
+    @patch("scheduler.run_pipeline")
+    def test_success_log_includes_market_fields(self, mock_pipeline, caplog):
+        """Success log message contains market_state and freshness."""
+        mock_pipeline.return_value = None
+        with caplog.at_level(logging.INFO, logger="scheduler"):
+            refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        log_text = " ".join(r.message for r in caplog.records)
+        assert "market_state=OPEN" in log_text
+        assert "freshness=FRESH" in log_text
+
+    @patch("scheduler.run_pipeline")
+    def test_skip_log_includes_market_state(self, mock_pipeline, caplog):
+        """Skip log message contains market_state."""
+        with caplog.at_level(logging.INFO, logger="scheduler"):
+            refresh_instrument("EURUSD", _now=_SATURDAY_03)
+        log_text = " ".join(r.message for r in caplog.records)
+        assert "SKIPPED" in log_text
+        assert "market_state=OFF_SESSION_EXPECTED" in log_text
+
+    @patch("scheduler.run_pipeline")
+    def test_failure_log_includes_market_fields(self, mock_pipeline, caplog):
+        """Failure log message contains market_state and freshness."""
+        mock_pipeline.side_effect = Exception("fail")
+        with caplog.at_level(logging.ERROR, logger="scheduler"):
+            refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        log_text = " ".join(r.message for r in caplog.records)
+        assert "market_state=OPEN" in log_text
