@@ -298,3 +298,14 @@ class TestGroupD_ConstraintEnforcement:
             synthesis_notes="", winning_rationale_summary="",
         )
         assert not_actionable.is_actionable() is False
+
+    def test_td_contract_requires_exactly_two_personas(self):
+        """Arbiter must fail loudly if persona_outputs length is not exactly two."""
+        digest = _clean_digest()
+        a = _make_pv("long_bias", "high", "bullish")
+
+        with pytest.raises(
+            ValueError,
+            match=r"Expected exactly 2 persona outputs, got 1",
+        ):
+            arbitrate([a], digest)

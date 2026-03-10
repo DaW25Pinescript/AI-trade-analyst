@@ -190,7 +190,8 @@ def arbitrate(
     Returns:
         ArbiterDecision with all fields populated.
     """
-    assert len(persona_outputs) == 2, f"Expected 2 persona outputs, got {len(persona_outputs)}"
+    if len(persona_outputs) != 2:
+        raise ValueError(f"Expected exactly 2 persona outputs, got {len(persona_outputs)}")
     persona_a, persona_b = persona_outputs
 
     # Step 1: Deterministic consensus computation
