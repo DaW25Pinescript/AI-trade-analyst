@@ -11,15 +11,15 @@ Tracks active specs, current phase, and source of truth for each subsystem.
 | Instrument Promotion | `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` | Phase F — GBPUSD/XAGUSD/XPTUSD trust-level promotion | ✅ Complete |
 | Per-Instrument Provider Routing | `docs/MDO_ProviderRouting_Spec.md` | Per-instrument provider policy | ✅ Complete |
 | Operationalise Phase 1 | `docs/MDO_Operationalise_Spec.md` | APScheduler feed refresh | ✅ Complete |
-| Operationalise Phase 2 | `docs/MDO_Operationalise_Phase2_Spec.md` | Market-hours awareness, alerting, remote deployment | ⏳ Active |
+| Operationalise Phase 2 | `docs/MDO_Operationalise_Phase2_Spec.md` | Market-hours awareness, alerting, remote deployment | ✅ Complete |
 
 ---
 
 ## Current Phase
 
-**Operationalise Phase 2** — market-hours awareness, alerting, remote deployment  
-Spec: `docs/MDO_Operationalise_Phase2_Spec.md`  
-Goal: market-hours gating, alerting on failure, and remote deployment readiness on top of the Phase 1 scheduler base
+**Security/API Hardening** — authn/authz, timeout policy, error contract tightening
+Spec: TBD
+Goal: close known operational risk items on the production-facing API edge before broader live usage
 
 ## Completed Phases
 
@@ -35,6 +35,7 @@ Goal: market-hours gating, alerting on failure, and remote deployment readiness 
 | Instrument Promotion | GBPUSD/XAGUSD/XPTUSD promoted to trusted — 419/419 tests | `docs/MDO_PhaseF_InstrumentPromotion_Spec.md` |
 | Per-Instrument Provider Routing | Explicit per-instrument provider policy — 468/468 tests | `docs/MDO_ProviderRouting_Spec.md` |
 | Operationalise Phase 1 | APScheduler feed refresh — 494/494 tests | `docs/MDO_Operationalise_Spec.md` |
+| Operationalise Phase 2 | Market-hours awareness, alerting, runtime posture — 644/644 tests | `docs/MDO_Operationalise_Phase2_Spec.md` |
 
 ## Pending / Next Candidates
 
