@@ -1,7 +1,7 @@
 # AI Trade Analyst — Security/API Hardening Spec
 
 ## Header block
-- **Status:** ⏳ Spec drafted — implementation pending
+- **Status:** ✅ Complete — 10 March 2026
 - **Date:** 10 March 2026
 - **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 - **Follows:** Operationalise Phase 2 closure + TD-1 arbiter contract fix
@@ -235,23 +235,23 @@ If the phase needs internal enums or reason codes for timeout/retry/auth rejecti
 
 | # | Gate | Acceptance Condition | Status |
 |---|---|---|---|
-| AC-1 | API auth policy | `/analyse` and `/analyse/stream` have an explicit deterministic access policy — rejection proven by test | ⏳ Pending |
-| AC-2 | Request limits | Request/body/file guardrails are explicitly enforced including global body-size cap — rejection proven by test | ⏳ Pending |
-| AC-3 | Server timeout | Analysis execution has an explicit server-side timeout boundary — timeout produces safe error response, proven by test | ⏳ Pending |
-| AC-4 | Error contract | Client-facing errors are sanitised and deterministic — no exception detail, stack trace, or internal path leaks to client, proven by test | ⏳ Pending |
-| AC-5 | Stream error contract | `/analyse/stream` error events use the same safe contract — no raw `str(exc)` emitted, proven by test | ⏳ Pending |
-| AC-6 | `call_llm` timeout | `call_llm()` has an explicit timeout boundary — timeout produces deterministic exception, proven by test | ⏳ Pending |
-| AC-7 | `call_llm` retry | `call_llm()` retries only bounded transient failures — proven by test | ⏳ Pending |
-| AC-8 | Failure mapping | Repeated provider failure becomes a deterministic runtime exception path — proven by test | ⏳ Pending |
-| AC-9 | Resilience tests | Timeout / malformed response / provider-down paths are covered by deterministic tests | ⏳ Pending |
-| AC-10 | Existing hardening preserved | Input sanitisation, upload bounds, magic-byte checks, rate limiting, CORS, security headers, secret masking all remain functional | ⏳ Pending |
-| AC-11 | Production checklist | Security checklist document exists covering TLS, CORS, auth, rate limits, timeouts, body limits, spend limits | ⏳ Pending |
-| AC-12 | Regression safety | Existing analyst, arbiter, and bridge tests remain green — `ai_analyst/tests` at 470+, `tests/*.js` at 235+ | ⏳ Pending |
-| AC-13 | Scope discipline | No DB, no deployment project, no new top-level module, no auth-platform redesign | ⏳ Pending |
-| AC-14 | MDO unchanged | `market_data_officer/` not modified — market-hours, alert policy, runtime config, pipeline all untouched | ⏳ Pending |
-| AC-15 | Deterministic tests | All tests deterministic — no live LLM calls, no real network dependency | ⏳ Pending |
-| AC-16 | TD-2 resolved | Technical Debt Register TD-2 row updated to ✅ Resolved | ⏳ Pending |
-| AC-17 | Docs updated | Spec, specs index, progress plan, and debt register reflect the phase accurately on closure | ⏳ Pending |
+| AC-1 | API auth policy | `/analyse` and `/analyse/stream` have an explicit deterministic access policy — rejection proven by test | ✅ Done |
+| AC-2 | Request limits | Request/body/file guardrails are explicitly enforced including global body-size cap — rejection proven by test | ✅ Done |
+| AC-3 | Server timeout | Analysis execution has an explicit server-side timeout boundary — timeout produces safe error response, proven by test | ✅ Done |
+| AC-4 | Error contract | Client-facing errors are sanitised and deterministic — no exception detail, stack trace, or internal path leaks to client, proven by test | ✅ Done |
+| AC-5 | Stream error contract | `/analyse/stream` error events use the same safe contract — no raw `str(exc)` emitted, proven by test | ✅ Done |
+| AC-6 | `call_llm` timeout | `call_llm()` has an explicit timeout boundary — timeout produces deterministic exception, proven by test | ✅ Done |
+| AC-7 | `call_llm` retry | `call_llm()` retries only bounded transient failures — proven by test | ✅ Done |
+| AC-8 | Failure mapping | Repeated provider failure becomes a deterministic runtime exception path — proven by test | ✅ Done |
+| AC-9 | Resilience tests | Timeout / malformed response / provider-down paths are covered by deterministic tests | ✅ Done |
+| AC-10 | Existing hardening preserved | Input sanitisation, upload bounds, magic-byte checks, rate limiting, CORS, security headers, secret masking all remain functional | ✅ Done |
+| AC-11 | Production checklist | Security checklist document exists covering TLS, CORS, auth, rate limits, timeouts, body limits, spend limits | ✅ Done |
+| AC-12 | Regression safety | Existing analyst, arbiter, and bridge tests remain green — `ai_analyst/tests` at 485, `tests/*.js` at 235+ | ✅ Done |
+| AC-13 | Scope discipline | No DB, no deployment project, no new top-level module, no auth-platform redesign | ✅ Done |
+| AC-14 | MDO unchanged | `market_data_officer/` not modified — market-hours, alert policy, runtime config, pipeline all untouched | ✅ Done |
+| AC-15 | Deterministic tests | All tests deterministic — no live LLM calls, no real network dependency | ✅ Done |
+| AC-16 | TD-2 resolved | Technical Debt Register TD-2 row updated to ✅ Resolved | ✅ Done |
+| AC-17 | Docs updated | Spec, specs index, progress plan, and debt register reflect the phase accurately on closure | ✅ Done |
 
 ## 8. Pre-Code Diagnostic Protocol
 
@@ -387,13 +387,47 @@ Security/API Hardening is done when `/analyse` and `/analyse/stream` have an exp
 | Operationalise Phase 1 | APScheduler feed refresh | ✅ Done — 494 tests |
 | Operationalise Phase 2 | Market-hours + alerting + runtime posture | ✅ Done — 644 tests |
 | TD-1 | Arbiter assert fix | ✅ Done — micro-PR |
-| **Security/API Hardening** | **`/analyse` edge + `call_llm()` safeguards** | **⏳ Spec drafted — implementation pending** |
+| **Security/API Hardening** | **`/analyse` edge + `call_llm()` safeguards** | **✅ Done — 515 tests** |
 | CI Seam Hardening | Gate missing Python integration seams in CI | 🔜 Next candidate |
 | Cleanup | Async marker tidy, enum centralisation (TD-5), unused vars (TD-9) | 🔜 Micro-PRs |
 
 ## 13. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 8).*
+### Auth pattern chosen
+`X-API-Key` header checked against `AI_ANALYST_API_KEY` env var. Reuses the `services/claude_code_api` pattern exactly. If env var is unset or empty, all `/analyse` and `/analyse/stream` requests are rejected 401. No open-by-default bypass.
+
+### Timeout values confirmed
+| Parameter | Value | Call site |
+|---|---|---|
+| Graph execution timeout | 120s (`GRAPH_TIMEOUT_SECONDS`) | `main.py` — `asyncio.wait_for(graph.ainvoke(...))` on both `/analyse` and `/analyse/stream` |
+| LLM call timeout (`call_llm`) | 60s (`LLM_CALL_TIMEOUT_S`) | `analyst/analyst.py` — passed to `litellm.completion(timeout=)` and `openai.OpenAI(timeout=)` |
+| LLM call timeout (graph pipeline) | 45s (hardcoded) | `ai_analyst/core/llm_client.py` — already hardened, not modified |
+
+### Error leakage paths closed
+| ID | Path | Fix |
+|---|---|---|
+| E1 | `/analyse` RuntimeError → `_mask_secrets(str(e))` leaked to client | Now returns generic `"Analysis failed. Check server logs."` |
+| E4 | `/analyse/stream` RuntimeError → raw `str(exc)` in SSE event | Now returns generic `"Analysis failed. Check server logs."` |
+| E2, E3 | Smoke-mode debug paths | Left as-is per diagnostic recommendation — LOW severity, not production-facing |
+| E5–E9 | Validation/parse error detail | Left as-is — LOW severity, expose only standard user-input validation messages |
+
+### Body-limit value
+10 MB (`MAX_REQUEST_BODY_MB` env var). Enforced via `BodySizeLimitMiddleware` checking `Content-Length` header. Returns 413 with safe error shape.
+
+### Retry behavior
+`call_llm()` retries up to 2 times (`LLM_CALL_MAX_RETRIES`) with exponential backoff (1s, 2s, capped at 8s). Only transient/transport errors are retried (timeout, rate limit, 5xx). Non-retriable errors (auth, bad request, validation) fail immediately. All failures map to `RuntimeError` with type name only — no raw provider message in the exception.
+
+### Two-LLM-path discovery
+The diagnostic discovered two separate LLM call paths:
+1. **`analyst/analyst.py:call_llm()`** — synchronous, standalone module. Was unhardened (TD-2 target). Now has timeout + retry + failure mapping.
+2. **`ai_analyst/core/llm_client.py:acompletion_with_retry()`** — async, graph pipeline path. Already hardened with 45s timeout, 2 retries, non-retriable filtering, fallback model routing. Not modified.
+
+### Test count delta
+| Suite | Before | After | Delta |
+|---|---|---|---|
+| `ai_analyst/tests/` | 470 | 485 | +15 (security hardening tests) |
+| `tests/` Python | 13 | 30 | +17 (call_llm resilience tests) |
+| **Total new tests** | — | — | **+32** |
 
 ## 14. Appendix — Recommended Agent Prompt
 

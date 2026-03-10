@@ -74,10 +74,11 @@ def test_analyse_includes_run_usage_summary(monkeypatch):
         }
 
     monkeypatch.setattr(api_main, "summarize_usage", _fake_summarize)
+    monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
 
     with TestClient(api_main.app) as client:
         data, files = _multipart_payload()
-        resp = client.post("/analyse", data=data, files=files)
+        resp = client.post("/analyse", data=data, files=files, headers={"X-API-Key": "test-key"})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -98,10 +99,11 @@ def test_analyse_usage_summary_fail_safe(monkeypatch):
         raise RuntimeError("meter read failed")
 
     monkeypatch.setattr(api_main, "summarize_usage", _raise)
+    monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
 
     with TestClient(api_main.app) as client:
         data, files = _multipart_payload()
-        resp = client.post("/analyse", data=data, files=files)
+        resp = client.post("/analyse", data=data, files=files, headers={"X-API-Key": "test-key"})
 
     assert resp.status_code == 200
     body = resp.json()
