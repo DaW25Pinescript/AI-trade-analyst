@@ -252,7 +252,11 @@ Phase 2 turns the scheduler from “it runs” into “it behaves intelligibly u
     - 55 new deterministic tests (total 549). Full test matrix: market state, freshness classification, reason codes, UNKNOWN conservative path, scheduler skip/proceed integration, structured log fields, artifact preservation.
     - Known simplification: Metals session hours use FX window (Sun 22:00–Fri 22:00 UTC) as starting estimate. Refine if instrument-specific session data becomes available.
     - Pipeline contract unchanged. `MarketPacketV2` unchanged. No SQLite. No external calendar. Work confined to `market_data_officer/`.
-  - **PR 2 — Alerting Hooks** — ⏳ Not started
+  - **PR 2 — Alerting Hooks** — ✅ Complete (10 Mar 2026)
+    - Added `alert_policy.py`: `RefreshOutcome` enum (`SUCCESS`, `SKIPPED`, `FAILED`, `NOT_ATTEMPTED`), `AlertLevel` enum (`NONE`, `WARN`, `CRITICAL`), frozen `AlertDecision` dataclass (`level`, `reason_code`, `should_emit`, `should_reset`), threshold constants (`WARN_STALE_LIVE_THRESHOLD=2`, `CRITICAL_STALE_LIVE_THRESHOLD=4`, `CRITICAL_FAILURE_THRESHOLD=2`), `derive_alert_decision()` — pure stateless function, deterministic, no logging, no I/O.
+    - Wired `scheduler.py:refresh_instrument()` with per-instrument alert state dict (`_alert_state`), outcome-to-enum mapping (`_map_outcome`), counter update logic per §6.3 (hold during closure, reset on recovery, increment on live stale/failure), `_evaluate_alert()` with edge-triggered structured log emission and try/except isolation (AC-11).
+    - 48 new deterministic tests (total 597). Full test matrix: closed suppression, stale-live WARN/CRITICAL escalation, failure escalation, recovery with structured fields, edge-trigger suppression, reason-change re-emit, counter hold through closure, per-instrument isolation, alert eval crash isolation, PR 1 behavior intact.
+    - `market_hours.py` unchanged. Pipeline contract unchanged. `MarketPacketV2` unchanged. No SQLite. No notifier transport. No new top-level module. Work confined to `market_data_officer/`.
   - **PR 3 — Remote Deployment/Runtime Guidance** — ⏳ Not started
 - **Next likely phase** — Security/API Hardening — authn/authz, timeout policy, error contract tightening — 🔜 Candidate
 

@@ -17,6 +17,7 @@ from unittest.mock import patch, MagicMock
 import logging
 import pytest
 
+from market_hours import MarketState
 from scheduler import (
     SCHEDULE_CONFIG,
     build_scheduler,
@@ -404,3 +405,346 @@ class TestStructuredLogFields:
             refresh_instrument("EURUSD", _now=_TUESDAY_14)
         log_text = " ".join(r.message for r in caplog.records)
         assert "market_state=OPEN" in log_text
+
+
+# ── PR 2: Alert wiring integration tests ─────────────────────────────
+
+from scheduler import _alert_state, _get_alert_state
+from alert_policy import AlertLevel, RefreshOutcome
+
+
+@pytest.fixture(autouse=False)
+def clear_alert_state():
+    """Clear module-level alert state before and after each test."""
+    _alert_state.clear()
+    yield
+    _alert_state.clear()
+
+
+class TestAlertWiringStaleEscalation:
+    """Live + stale-live sequence emits WARN then CRITICAL at thresholds."""
+
+    @patch("scheduler.run_pipeline")
+    def test_warn_at_threshold(self, mock_pipeline, caplog, clear_alert_state):
+        """Repeated stale-live emits WARN at threshold."""
+        # Simulate stale results — pipeline succeeds but freshness is STALE_BAD
+        # by mocking classify_freshness to return STALE_BAD
+        mock_pipeline.return_value = None
+
+        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+        stale_result = FreshnessResult(
+            classification=FreshnessClassification.STALE_BAD,
+            reason_code=ReasonCode.OPEN_AND_OVERDUE,
+            market_state=MarketState.OPEN,
+            instrument="EURUSD",
+            age_minutes=120.0,
+            threshold_minutes=90.0,
+            evaluation_ts=_TUESDAY_14,
+        )
+
+        with patch("scheduler.classify_freshness", return_value=stale_result):
+            with caplog.at_level(logging.WARNING, logger="scheduler"):
+                # Run 1: consecutive_stale_live goes to 1 (below threshold)
+                r1 = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+                # Run 2: consecutive_stale_live goes to 2 (at WARN threshold)
+                r2 = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        assert r2.get("alert_level") == "warn"
+        assert r2.get("alert_emitted") is True
+        alert_logs = [r for r in caplog.records if "ALERT" in r.message
+                      and "ALERT_EVAL_ERROR" not in r.message]
+        assert len(alert_logs) >= 1
+
+    @patch("scheduler.run_pipeline")
+    def test_critical_at_threshold(self, mock_pipeline, caplog, clear_alert_state):
+        """Repeated stale-live emits CRITICAL at higher threshold."""
+        mock_pipeline.return_value = None
+
+        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+        stale_result = FreshnessResult(
+            classification=FreshnessClassification.STALE_BAD,
+            reason_code=ReasonCode.OPEN_AND_OVERDUE,
+            market_state=MarketState.OPEN,
+            instrument="EURUSD",
+            age_minutes=120.0,
+            threshold_minutes=90.0,
+            evaluation_ts=_TUESDAY_14,
+        )
+
+        with patch("scheduler.classify_freshness", return_value=stale_result):
+            with caplog.at_level(logging.WARNING, logger="scheduler"):
+                for _ in range(4):
+                    result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        assert result.get("alert_level") == "critical"
+        assert result.get("alert_emitted") is True
+
+
+class TestAlertWiringFailureEscalation:
+    """Live + repeated refresh failures emit CRITICAL."""
+
+    @patch("scheduler.run_pipeline")
+    def test_repeated_failures_escalate(self, mock_pipeline, caplog, clear_alert_state):
+        mock_pipeline.side_effect = RuntimeError("provider down")
+
+        with caplog.at_level(logging.WARNING, logger="scheduler"):
+            for _ in range(2):
+                result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        assert result.get("alert_level") == "critical"
+        assert "failure" in result.get("alert_reason", "")
+
+
+class TestAlertWiringClosedSuppression:
+    """Closed/off-session path emits no alert even after many evaluations."""
+
+    @patch("scheduler.run_pipeline")
+    def test_no_alerts_during_closure(self, mock_pipeline, caplog, clear_alert_state):
+        with caplog.at_level(logging.WARNING, logger="scheduler"):
+            for _ in range(10):
+                result = refresh_instrument("EURUSD", _now=_SATURDAY_03)
+
+        assert result.get("alert_level") == "none"
+        alert_logs = [r for r in caplog.records if "ALERT" in r.message
+                      and "ALERT_EVAL_ERROR" not in r.message]
+        assert len(alert_logs) == 0
+
+
+class TestAlertWiringRecovery:
+    """Recovery emits one structured recovery log."""
+
+    @patch("scheduler.run_pipeline")
+    def test_recovery_log_emitted(self, mock_pipeline, caplog, clear_alert_state):
+        """After escalation, a successful refresh emits recovery."""
+        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+
+        stale_result = FreshnessResult(
+            classification=FreshnessClassification.STALE_BAD,
+            reason_code=ReasonCode.OPEN_AND_OVERDUE,
+            market_state=MarketState.OPEN,
+            instrument="EURUSD",
+            age_minutes=120.0,
+            threshold_minutes=90.0,
+            evaluation_ts=_TUESDAY_14,
+        )
+
+        fresh_result = FreshnessResult(
+            classification=FreshnessClassification.FRESH,
+            reason_code=ReasonCode.OPEN_AND_FRESH,
+            market_state=MarketState.OPEN,
+            instrument="EURUSD",
+            age_minutes=30.0,
+            threshold_minutes=90.0,
+            evaluation_ts=_TUESDAY_14,
+        )
+
+        mock_pipeline.return_value = None
+
+        # Escalate to WARN
+        with patch("scheduler.classify_freshness", return_value=stale_result):
+            for _ in range(2):
+                refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        # Recovery
+        with patch("scheduler.classify_freshness", return_value=fresh_result):
+            with caplog.at_level(logging.WARNING, logger="scheduler"):
+                caplog.clear()
+                result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        assert result.get("alert_level") == "none"
+        assert result.get("alert_emitted") is True
+        # Check recovery log has recovered_from fields
+        alert_logs = [r for r in caplog.records if "ALERT" in r.message
+                      and "ALERT_EVAL_ERROR" not in r.message]
+        assert len(alert_logs) == 1
+        assert "recovered_from_level" in alert_logs[0].message
+        assert "recovered_from_reason" in alert_logs[0].message
+
+
+class TestAlertWiringStructuredFields:
+    """Alert logs include all required context fields from §6.8."""
+
+    @patch("scheduler.run_pipeline")
+    def test_alert_log_has_required_fields(self, mock_pipeline, caplog, clear_alert_state):
+        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+
+        stale_result = FreshnessResult(
+            classification=FreshnessClassification.STALE_BAD,
+            reason_code=ReasonCode.OPEN_AND_OVERDUE,
+            market_state=MarketState.OPEN,
+            instrument="EURUSD",
+            age_minutes=120.0,
+            threshold_minutes=90.0,
+            evaluation_ts=_TUESDAY_14,
+        )
+
+        mock_pipeline.return_value = None
+
+        with patch("scheduler.classify_freshness", return_value=stale_result):
+            with caplog.at_level(logging.WARNING, logger="scheduler"):
+                for _ in range(2):
+                    refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        alert_logs = [r for r in caplog.records if "ALERT" in r.message
+                      and "ALERT_EVAL_ERROR" not in r.message]
+        assert len(alert_logs) >= 1
+        log_msg = alert_logs[-1].message
+        for field in [
+            "alert_level=", "reason_code=", "market_state=",
+            "freshness=", "refresh_outcome=", "consecutive_stale_live=",
+            "consecutive_failures=", "last_success_ts=", "eval_ts=",
+        ]:
+            assert field in log_msg, f"Missing field: {field}"
+
+
+class TestAlertWiringStateReset:
+    """Scheduler state resets correctly after success."""
+
+    @patch("scheduler.run_pipeline")
+    def test_state_resets_after_recovery(self, mock_pipeline, caplog, clear_alert_state):
+        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+
+        stale_result = FreshnessResult(
+            classification=FreshnessClassification.STALE_BAD,
+            reason_code=ReasonCode.OPEN_AND_OVERDUE,
+            market_state=MarketState.OPEN,
+            instrument="EURUSD",
+            age_minutes=120.0,
+            threshold_minutes=90.0,
+            evaluation_ts=_TUESDAY_14,
+        )
+
+        mock_pipeline.return_value = None
+
+        # Escalate
+        with patch("scheduler.classify_freshness", return_value=stale_result):
+            for _ in range(2):
+                refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        # Verify escalated state
+        state = _get_alert_state("EURUSD")
+        assert state["last_alert_level"] == AlertLevel.WARN
+
+        # Recover (default classify_freshness will return FRESH for just-refreshed)
+        refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        # State should be reset
+        state = _get_alert_state("EURUSD")
+        assert state["last_alert_level"] == AlertLevel.NONE
+        assert state["consecutive_stale_live"] == 0
+        assert state["consecutive_failures"] == 0
+
+
+class TestAlertIsolation:
+    """Alert evaluation failure does not crash the scheduler."""
+
+    @patch("scheduler.run_pipeline")
+    def test_alert_eval_exception_does_not_crash(self, mock_pipeline, caplog, clear_alert_state):
+        """If derive_alert_decision raises, scheduler still returns result."""
+        mock_pipeline.return_value = None
+
+        with patch("scheduler.derive_alert_decision", side_effect=RuntimeError("policy bug")):
+            with caplog.at_level(logging.ERROR, logger="scheduler"):
+                result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        # Refresh succeeded — result still returned
+        assert result["outcome"] == "success"
+        assert result["instrument"] == "EURUSD"
+        # Alert error was logged
+        alert_error_logs = [r for r in caplog.records if "ALERT_EVAL_ERROR" in r.message]
+        assert len(alert_error_logs) >= 1
+
+
+class TestAlertPerInstrumentIsolation:
+    """Instrument A's failures do not affect instrument B's counters."""
+
+    @patch("scheduler.run_pipeline")
+    def test_counters_per_instrument(self, mock_pipeline, caplog, clear_alert_state):
+        mock_pipeline.side_effect = RuntimeError("down")
+
+        refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        state_eur = _get_alert_state("EURUSD")
+        state_gbp = _get_alert_state("GBPUSD")
+
+        assert state_eur["consecutive_failures"] == 2
+        assert state_gbp["consecutive_failures"] == 0
+
+
+class TestHoldThroughClosure:
+    """Counter at 2 before weekend, resumes at 3 on Monday STALE_BAD."""
+
+    @patch("scheduler.run_pipeline")
+    def test_counter_hold_and_resume(self, mock_pipeline, caplog, clear_alert_state):
+        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+
+        stale_result = FreshnessResult(
+            classification=FreshnessClassification.STALE_BAD,
+            reason_code=ReasonCode.OPEN_AND_OVERDUE,
+            market_state=MarketState.OPEN,
+            instrument="EURUSD",
+            age_minutes=120.0,
+            threshold_minutes=90.0,
+            evaluation_ts=_TUESDAY_14,
+        )
+
+        mock_pipeline.return_value = None
+
+        # Tuesday: 2 stale evals → counter at 2 (WARN threshold)
+        with patch("scheduler.classify_freshness", return_value=stale_result):
+            for _ in range(2):
+                refresh_instrument("EURUSD", _now=_TUESDAY_14)
+
+        state = _get_alert_state("EURUSD")
+        assert state["consecutive_stale_live"] == 2
+
+        # Saturday: many closed evals — counter should hold at 2
+        for _ in range(5):
+            refresh_instrument("EURUSD", _now=_SATURDAY_03)
+
+        state = _get_alert_state("EURUSD")
+        assert state["consecutive_stale_live"] == 2  # held, not reset
+
+        # Monday: one more stale eval → counter resumes at 3
+        _MONDAY_10 = datetime(2026, 3, 16, 10, 0, tzinfo=timezone.utc)
+        stale_result_monday = FreshnessResult(
+            classification=FreshnessClassification.STALE_BAD,
+            reason_code=ReasonCode.OPEN_AND_OVERDUE,
+            market_state=MarketState.OPEN,
+            instrument="EURUSD",
+            age_minutes=120.0,
+            threshold_minutes=90.0,
+            evaluation_ts=_MONDAY_10,
+        )
+        with patch("scheduler.classify_freshness", return_value=stale_result_monday):
+            refresh_instrument("EURUSD", _now=_MONDAY_10)
+
+        state = _get_alert_state("EURUSD")
+        assert state["consecutive_stale_live"] == 3  # resumed, not 1
+
+
+class TestExistingPR1BehaviorIntact:
+    """Existing PR 1 runtime behavior remains intact after alert wiring."""
+
+    @patch("scheduler.run_pipeline")
+    def test_success_still_returns_expected_shape(self, mock_pipeline, clear_alert_state):
+        mock_pipeline.return_value = None
+        result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        assert result["outcome"] == "success"
+        assert result["instrument"] == "EURUSD"
+        assert "market_state" in result
+        assert "freshness" in result
+
+    @patch("scheduler.run_pipeline")
+    def test_failure_still_returns_expected_shape(self, mock_pipeline, clear_alert_state):
+        mock_pipeline.side_effect = RuntimeError("boom")
+        result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
+        assert result["outcome"] == "failure"
+        assert "error" in result
+
+    @patch("scheduler.run_pipeline")
+    def test_skip_still_returns_expected_shape(self, mock_pipeline, clear_alert_state):
+        result = refresh_instrument("EURUSD", _now=_SATURDAY_03)
+        assert result["outcome"] == "skipped"
+        assert result["market_state"] == "OFF_SESSION_EXPECTED"
