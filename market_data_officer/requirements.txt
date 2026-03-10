@@ -1,0 +1,7 @@
+# Market Data Officer — runtime dependencies
+# Install: pip install -r market_data_officer/requirements.txt
+
+pandas>=2.0
+numpy>=1.24
+requests>=2.28
+apscheduler>=3.10
