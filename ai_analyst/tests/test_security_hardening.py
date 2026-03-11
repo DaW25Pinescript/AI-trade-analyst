@@ -318,13 +318,63 @@ class TestStreamErrorContract:
 # ── JSON form validation detail tests ───────────────────────────────────────
 
 class TestJsonFormValidationDetail:
-    """JSON-backed multipart fields should include field-level parse detail."""
+    """String-array multipart fields accept JSON arrays and Swagger-style CSV."""
 
-    def test_analyse_parse_error_includes_field_and_raw_value(self, monkeypatch):
+    def test_analyse_accepts_timeframes_json_array(self, monkeypatch):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _StubGraph())
+        monkeypatch.setattr(api_main, "build_ticket_draft", lambda _v, _g: {"id": "t1"})
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["timeframes"] = '["H4","M15","M5"]'
+            resp = client.post("/analyse", data=data, files=files, headers={"X-API-Key": "test-key"})
+        assert resp.status_code == 200
+
+    def test_analyse_accepts_timeframes_csv(self, monkeypatch):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _StubGraph())
+        monkeypatch.setattr(api_main, "build_ticket_draft", lambda _v, _g: {"id": "t1"})
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["timeframes"] = "H4,M15,M5"
+            resp = client.post("/analyse", data=data, files=files, headers={"X-API-Key": "test-key"})
+        assert resp.status_code == 200
+
+    def test_analyse_accepts_no_trade_windows_json_array(self, monkeypatch):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _StubGraph())
+        monkeypatch.setattr(api_main, "build_ticket_draft", lambda _v, _g: {"id": "t1"})
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["no_trade_windows"] = '["FOMC","NFP"]'
+            resp = client.post("/analyse", data=data, files=files, headers={"X-API-Key": "test-key"})
+        assert resp.status_code == 200
+
+    def test_analyse_accepts_no_trade_windows_csv(self, monkeypatch):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _StubGraph())
+        monkeypatch.setattr(api_main, "build_ticket_draft", lambda _v, _g: {"id": "t1"})
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["no_trade_windows"] = "FOMC,NFP"
+            resp = client.post("/analyse", data=data, files=files, headers={"X-API-Key": "test-key"})
+        assert resp.status_code == 200
+
+    def test_analyse_accepts_csv_with_whitespace_trimming(self, monkeypatch):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _StubGraph())
+        monkeypatch.setattr(api_main, "build_ticket_draft", lambda _v, _g: {"id": "t1"})
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["timeframes"] = " H4 , M15 , M5 "
+            resp = client.post("/analyse", data=data, files=files, headers={"X-API-Key": "test-key"})
+        assert resp.status_code == 200
+
+    def test_malformed_json_array_still_returns_structured_422(self, monkeypatch):
         monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
         with TestClient(api_main.app) as client:
             data, files = _multipart_payload()
-            data["timeframes"] = "not-json"
+            data["timeframes"] = '["H4",'
             resp = client.post(
                 "/analyse", data=data, files=files,
                 headers={"X-API-Key": "test-key"},
@@ -333,53 +383,31 @@ class TestJsonFormValidationDetail:
         detail = resp.json()["detail"]
         assert detail["field"] == "timeframes"
         assert "form field 'timeframes'" in detail["message"]
-        assert detail["raw_value"] == "'not-json'"
+        assert detail["raw_value"] == '\'["H4",\''
         assert detail["request_id"] is not None
 
-    def test_analyse_known_array_field_reports_contract_message(self, monkeypatch):
+    def test_optional_empty_open_positions_remains_accepted(self, monkeypatch):
         monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setattr(api_main, "build_analysis_graph", lambda: _StubGraph())
+        monkeypatch.setattr(api_main, "build_ticket_draft", lambda _v, _g: {"id": "t1"})
         with TestClient(api_main.app) as client:
             data, files = _multipart_payload()
-            data["no_trade_windows"] = "\"NFP\""
-            resp = client.post(
-                "/analyse", data=data, files=files,
-                headers={"X-API-Key": "test-key"},
-            )
-        assert resp.status_code == 422
-        detail = resp.json()["detail"]
-        assert detail["field"] == "no_trade_windows"
-        assert "must be a JSON array" in detail["message"]
-        assert detail["expected_shape"] == 'JSON array like ["NFP"]'
-        assert detail["raw_value"] == '\'"NFP"\''
+            data["open_positions"] = ""
+            resp = client.post("/analyse", data=data, files=files, headers={"X-API-Key": "test-key"})
+        assert resp.status_code == 200
 
-    def test_analyse_stream_array_field_reports_received_value(self, monkeypatch):
-        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
-        with TestClient(api_main.app) as client:
-            data, files = _multipart_payload()
-            data["open_positions"] = "1"
-            resp = client.post(
-                "/analyse/stream", data=data, files=files,
-                headers={"X-API-Key": "test-key"},
-            )
-        assert resp.status_code == 422
-        detail = resp.json()["detail"]
-        assert detail["field"] == "open_positions"
-        assert "must be a JSON array" in detail["message"]
-        assert detail["raw_value"] == "'1'"
-
-
-    def test_dev_parse_logging_includes_raw_field(self, monkeypatch, caplog):
+    def test_dev_parse_logging_includes_raw_field_and_mode(self, monkeypatch, caplog):
         monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
         monkeypatch.setenv("AI_ANALYST_DEV_DIAGNOSTICS", "true")
         caplog.set_level("INFO")
         with TestClient(api_main.app) as client:
             data, files = _multipart_payload()
-            data["timeframes"] = "H4"
+            data["timeframes"] = "H4,M15"
             client.post(
                 "/analyse", data=data, files=files,
                 headers={"X-API-Key": "test-key", "X-Request-ID": "req-parse-log"},
             )
-        assert "[dev-parse] request_id=req-parse-log field=timeframes raw='H4'" in caplog.text
+        assert "[dev-parse] request_id=req-parse-log field=timeframes raw='H4,M15' mode=csv_fallback" in caplog.text
 
 
 class TestDevDiagnosticsPersistence:
@@ -389,7 +417,7 @@ class TestDevDiagnosticsPersistence:
         monkeypatch.setattr(api_main, "_DEV_DIAGNOSTICS_FALLBACK_PATH", tmp_path / "diag.jsonl")
         with TestClient(api_main.app) as client:
             data, files = _multipart_payload()
-            data["timeframes"] = "H4"
+            data["timeframes"] = '["H4",'
             client.post(
                 "/analyse", data=data, files=files,
                 headers={"X-API-Key": "test-key", "X-Request-ID": "req-diag-1"},

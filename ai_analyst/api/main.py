@@ -294,6 +294,111 @@ def _parse_json_form_field(
     return parsed
 
 
+def _parse_string_array_form_field(
+    field_name: str,
+    raw_value: str,
+    *,
+    array_example: Optional[str] = None,
+    request_id: Optional[str] = None,
+    allow_empty: bool = True,
+) -> list[str]:
+    """Parse string-array form fields from JSON array syntax or CSV fallback."""
+    trimmed = raw_value.strip()
+    mode = "json_array" if trimmed.startswith("[") else "csv_fallback"
+
+    if _dev_diagnostics_enabled():
+        logger.info(
+            "[dev-parse] request_id=%s field=%s raw=%s mode=%s",
+            request_id or "n/a",
+            field_name,
+            repr(raw_value),
+            mode,
+        )
+
+    if mode == "json_array":
+        try:
+            parsed = json.loads(raw_value)
+        except json.JSONDecodeError as exc:
+            expected_shape = f"JSON array like {array_example}" if array_example else "JSON array"
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": (
+                        f"JSON parse error in form field '{field_name}': expected {expected_shape}; "
+                        f"received {_format_form_value(raw_value)}"
+                    ),
+                    "field": field_name,
+                    "raw_value": _format_form_value(raw_value),
+                    "expected_shape": expected_shape,
+                    "parse_error": str(exc),
+                    "request_id": request_id,
+                },
+            )
+        if not isinstance(parsed, list):
+            expected_shape = f"JSON array like {array_example}" if array_example else "JSON array"
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": f"Field '{field_name}' must be a JSON array; received {_format_form_value(raw_value)}",
+                    "field": field_name,
+                    "raw_value": _format_form_value(raw_value),
+                    "expected_shape": expected_shape,
+                    "parse_error": None,
+                    "request_id": request_id,
+                },
+            )
+        values = parsed
+    else:
+        values = [item.strip() for item in raw_value.split(",") if item.strip()]
+
+    if not all(isinstance(item, str) and item.strip() for item in values):
+        expected_shape = "array of non-empty strings"
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": (
+                    f"Field '{field_name}' must be {expected_shape}; "
+                    f"received {_format_form_value(raw_value)}"
+                ),
+                "field": field_name,
+                "raw_value": _format_form_value(raw_value),
+                "expected_shape": expected_shape,
+                "parse_error": f"invalid item types from mode {mode}",
+                "request_id": request_id,
+            },
+        )
+
+    normalized = [item.strip() for item in values]
+    if not allow_empty and not normalized:
+        expected_shape = "non-empty array of strings"
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": (
+                    f"Field '{field_name}' must be {expected_shape}; "
+                    f"received {_format_form_value(raw_value)}"
+                ),
+                "field": field_name,
+                "raw_value": _format_form_value(raw_value),
+                "expected_shape": expected_shape,
+                "parse_error": f"empty array from mode {mode}",
+                "request_id": request_id,
+            },
+        )
+
+    if _dev_diagnostics_enabled() and mode == "csv_fallback":
+        logger.info(
+            "[dev-parse] request_id=%s field=%s raw=%s mode=%s parsed=%s",
+            request_id or "n/a",
+            field_name,
+            repr(raw_value),
+            mode,
+            normalized,
+        )
+
+    return normalized
+
+
 # ── Budget guards ────────────────────────────────────────────────────────────
 # MAX_IMAGE_SIZE_MB: per-image upload ceiling (default 5 MB).
 # MAX_COST_PER_RUN_USD: optional per-run cost ceiling (default disabled).
@@ -726,15 +831,15 @@ async def analyse(
     if dev_trace:
         dev_trace.stage("request_parsing_start")
     try:
-        tf_list: list[str] = _parse_json_form_field(
-            "timeframes", timeframes, expect_array=True, array_example='["H4","M15","M5"]', request_id=request_id
+        tf_list: list[str] = _parse_string_array_form_field(
+            "timeframes", timeframes, array_example='["H4","M15","M5"]', request_id=request_id
         )
-        no_trade_list: list[str] = _parse_json_form_field(
-            "no_trade_windows", no_trade_windows, expect_array=True, array_example='["NFP"]', request_id=request_id
+        no_trade_list: list[str] = _parse_string_array_form_field(
+            "no_trade_windows", no_trade_windows, array_example='["NFP"]', request_id=request_id
         )
-        open_pos_list: list = _parse_json_form_field("open_positions", open_positions, expect_array=True, request_id=request_id)
-        overlay_claims_list: list[str] = _parse_json_form_field(
-            "overlay_indicator_claims", overlay_indicator_claims, expect_array=True, request_id=request_id
+        open_pos_list: list[str] = _parse_string_array_form_field("open_positions", open_positions, request_id=request_id)
+        overlay_claims_list: list[str] = _parse_string_array_form_field(
+            "overlay_indicator_claims", overlay_indicator_claims, request_id=request_id
         )
         if dev_trace:
             dev_trace.stage("request_parsing_success")
@@ -1079,15 +1184,15 @@ async def analyse_stream(
     # ── Parse JSON fields ────────────────────────────────────────────────────
     if dev_trace:
         dev_trace.stage("request_parsing_start")
-    tf_list: list[str] = _parse_json_form_field(
-        "timeframes", timeframes, expect_array=True, array_example='["H4","M15","M5"]', request_id=request_id
+    tf_list: list[str] = _parse_string_array_form_field(
+        "timeframes", timeframes, array_example='["H4","M15","M5"]', request_id=request_id
     )
-    no_trade_list: list[str] = _parse_json_form_field(
-        "no_trade_windows", no_trade_windows, expect_array=True, array_example='["NFP"]', request_id=request_id
+    no_trade_list: list[str] = _parse_string_array_form_field(
+        "no_trade_windows", no_trade_windows, array_example='["NFP"]', request_id=request_id
     )
-    open_pos_list: list = _parse_json_form_field("open_positions", open_positions, expect_array=True, request_id=request_id)
-    overlay_claims_list: list[str] = _parse_json_form_field(
-        "overlay_indicator_claims", overlay_indicator_claims, expect_array=True, request_id=request_id
+    open_pos_list: list[str] = _parse_string_array_form_field("open_positions", open_positions, request_id=request_id)
+    overlay_claims_list: list[str] = _parse_string_array_form_field(
+        "overlay_indicator_claims", overlay_indicator_claims, request_id=request_id
     )
     if dev_trace:
         dev_trace.stage("request_parsing_success")
