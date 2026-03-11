@@ -34,7 +34,11 @@ def extract_usage_tokens(resp: Any) -> tuple[int | None, int | None, int | None]
         return None, None, None
 
     if isinstance(usage, dict):
-        return usage.get("prompt_tokens"), usage.get("completion_tokens"), usage.get("total_tokens")
+        return (
+            usage.get("prompt_tokens"),
+            usage.get("completion_tokens"),
+            usage.get("total_tokens"),
+        )
 
     return (
         getattr(usage, "prompt_tokens", None),
@@ -69,10 +73,14 @@ async def acompletion_metered(
     messages: list[dict],
     **kwargs,
 ):
-    # Backend selection: litellm (default, production) or claude_code_api (experimental).
-    # claude_code_api shells out to `claude -p` via services/claude_code_api/ — it only
-    # supports text-only messages (no images) and provides no token usage data.
-    # Prefer litellm + local Claude proxy for production use.
+    """
+    Metered async completion wrapper.
+
+    Default backend is LiteLLM. When using the local Claude proxy (which exposes
+    an OpenAI-compatible /v1 endpoint), we must force LiteLLM to use the
+    OpenAI provider path even for claude-* model names, otherwise LiteLLM may
+    infer Anthropic and hit the wrong API route.
+    """
     backend_pref = os.getenv("AI_ANALYST_LLM_BACKEND", "litellm").strip().lower()
     use_claude_wrapper = backend_pref == "claude_code_api" and is_text_only(messages)
 
@@ -89,32 +97,32 @@ async def acompletion_metered(
     started = perf_counter()
     ts_utc = datetime.now(timezone.utc).isoformat()
 
+    # Copy kwargs so we can safely inject provider/base settings.
+    call_kwargs = dict(kwargs)
+
+    # Force LiteLLM to use the OpenAI-compatible path for the local Claude proxy.
+    # This is critical for claude-* model names when api_base points at the local proxy.
+    if backend == "litellm":
+        call_kwargs.setdefault("custom_llm_provider", "openai")
+
     try:
         if acompletion_func is None:
             from litellm import acompletion
+
             acompletion_func = acompletion
 
-        # For local_claude_proxy / OpenAI-compatible proxy usage, force LiteLLM
-        # to use the OpenAI provider path even when the model name starts with
-        # "claude-". Otherwise LiteLLM may infer Anthropic and hit the wrong API.
-        call_kwargs = dict(kwargs)
-
-	if backend == "litellm":
-    	    call_kwargs.setdefault("custom_llm_provider", "openai")
-    	    call_kwargs.setdefault("api_base", "http://127.0.0.1:8317/v1")
-
         logger.info(
-            "[llm-call] run_id=%s stage=%s node=%s model=%s provider=%s",
+            "[llm-call] run_id=%s stage=%s node=%s model=%s provider=%s api_base=%s",
             run_id,
             stage,
             node,
             model,
             call_kwargs.get("custom_llm_provider", "auto"),
+            call_kwargs.get("api_base"),
         )
 
         # Unified fallback: acompletion_with_retry handles retries here.
-        # Task-level fallback (primary → fallback model) is handled upstream
-        # by router.call_with_fallback() — a single fallback authority.
+        # Task-level fallback (primary → fallback model) is handled upstream.
         response, attempts = await acompletion_with_retry(
             acompletion_func,
             model=model,
@@ -147,6 +155,7 @@ async def acompletion_metered(
             ),
         )
         return response
+
     except Exception as exc:
         latency_ms = int((perf_counter() - started) * 1000)
         append_usage(
@@ -158,9 +167,9 @@ async def acompletion_metered(
                 node=node,
                 backend=backend,
                 model=model,
-                provider=(kwargs.get("custom_llm_provider") if isinstance(kwargs, dict) else None) or "openai",
+                provider=call_kwargs.get("custom_llm_provider"),
                 success=False,
-                attempts=max(1, int(kwargs.get("max_retries", 2)) + 1),
+                attempts=max(1, int(call_kwargs.get("max_retries", 2)) + 1),
                 latency_ms=latency_ms,
                 prompt_tokens=None,
                 completion_tokens=None,
