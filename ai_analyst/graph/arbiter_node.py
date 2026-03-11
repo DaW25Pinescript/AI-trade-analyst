@@ -25,6 +25,14 @@ from .state import GraphState
 logger = logging.getLogger(__name__)
 
 
+def _dev_diagnostics_enabled() -> bool:
+    import os
+    return (
+        os.getenv("AI_ANALYST_DEV_DIAGNOSTICS", "").lower() == "true"
+        or os.getenv("DEBUG", "").lower() == "true"
+    )
+
+
 def _safe_excerpt(raw: str, max_chars: int = 256) -> str:
     excerpt = (raw or "").replace("\n", " ").strip()
     return excerpt[:max_chars]
@@ -115,6 +123,8 @@ async def arbiter_node(state: GraphState) -> GraphState:
     # v2.1b — deliberation outputs (None when deliberation was not enabled)
     deliberation_outputs = state.get("deliberation_outputs") or []
 
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-stage] request_id=%s stage=arbiter_start payload=%s", ground_truth.run_id, {"analyst_count": len(analyst_outputs)})
     prompt = build_arbiter_prompt(
         analyst_outputs=analyst_outputs,
         risk_constraints=ground_truth.risk_constraints,
@@ -127,7 +137,8 @@ async def arbiter_node(state: GraphState) -> GraphState:
 
     route = router.resolve(ARBITER_DECISION)
 
-    response = await acompletion_metered(
+    try:
+        response = await acompletion_metered(
         run_dir=get_run_dir(ground_truth.run_id),
         run_id=ground_truth.run_id,
         stage="arbiter",
@@ -141,7 +152,12 @@ async def arbiter_node(state: GraphState) -> GraphState:
         api_key=route["api_key"],
     )
 
-    raw: str = response.choices[0].message.content
+        raw: str = response.choices[0].message.content
+    except Exception as exc:
+        if _dev_diagnostics_enabled():
+            logger.warning("[dev-stage] request_id=%s stage=arbiter_fail payload=%s", ground_truth.run_id, {"error": str(exc)[:300]})
+        raise
+
     n_analysts = len(analyst_outputs)
     try:
         cleaned = _extract_json(raw)
@@ -207,5 +223,7 @@ async def arbiter_node(state: GraphState) -> GraphState:
         updated_log = verdict.audit_log.model_copy(update=audit_update)
         verdict = verdict.model_copy(update={"audit_log": updated_log})
 
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-stage] request_id=%s stage=arbiter_success payload=%s", ground_truth.run_id, {"decision": verdict.decision})
     state["final_verdict"] = verdict
     return state

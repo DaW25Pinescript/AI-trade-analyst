@@ -44,6 +44,7 @@ Rules for AI agents:
 High-value roots:
 
 - `ai_analyst/` — active FastAPI + LangGraph analysis runtime and API surface (`/analyse`, stream, triage/journey routes).
+- Dev diagnostics are intentionally env-gated (`AI_ANALYST_DEV_DIAGNOSTICS` or `DEBUG`) and should remain local-first, production-conservative.
 - `market_data_officer/` — deterministic market-data feed/scheduler/canonical packet lane.
 - `macro_risk_officer/` — macro context ingestion/reasoning lane and supporting metrics/history.
 - `app/` — browser workflow surfaces (dashboard/journey/journal/review) and adapter boundary.

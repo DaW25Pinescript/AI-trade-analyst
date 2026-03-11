@@ -26,6 +26,14 @@ from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
+
+def _dev_diagnostics_enabled() -> bool:
+    import os
+    return (
+        os.getenv("AI_ANALYST_DEV_DIAGNOSTICS", "").lower() == "true"
+        or os.getenv("DEBUG", "").lower() == "true"
+    )
+
 _TRIAGE_SMOKE_MODE = os.getenv("TRIAGE_SMOKE_MODE", "").lower() == "true"
 
 from ..models.persona import PersonaType
@@ -76,23 +84,33 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
             config["persona"].value,
         )
 
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-stage] request_id=%s stage=per_analyst_start payload=%s", run_id, {"persona": config["persona"].value, "phase": "phase1"})
     messages = build_messages(prompt)
-    response = await acompletion_metered(
-        run_dir=get_run_dir(run_id),
-        run_id=run_id,
-        stage="phase1_analyst",
-        node=config["persona"].value,
-        model=resolve_profile(config["profile"]).model,
-        messages=messages,
-        response_format={"type": "json_object"},
-        temperature=0.1,   # low temperature for determinism
-        max_tokens=1500,
-        api_base=route["base_url"],
-        api_key=route["api_key"],
-    )
-    raw: str = response.choices[0].message.content
-    raw = extract_json(raw)
-    result = AnalystOutput.model_validate_json(raw)
+    try:
+        response = await acompletion_metered(
+            run_dir=get_run_dir(run_id),
+            run_id=run_id,
+            stage="phase1_analyst",
+            node=config["persona"].value,
+            model=resolve_profile(config["profile"]).model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,   # low temperature for determinism
+            max_tokens=1500,
+            api_base=route["base_url"],
+            api_key=route["api_key"],
+        )
+        raw: str = response.choices[0].message.content
+        raw = extract_json(raw)
+        result = AnalystOutput.model_validate_json(raw)
+    except Exception as exc:
+        if _dev_diagnostics_enabled():
+            logger.warning("[dev-stage] request_id=%s stage=per_analyst_fail payload=%s", run_id, {"persona": config["persona"].value, "phase": "phase1", "error": str(exc)[:300]})
+        raise
+
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-stage] request_id=%s stage=per_analyst_success payload=%s", run_id, {"persona": config["persona"].value, "phase": "phase1", "action": result.recommended_action})
 
     # v2.2 — push progress event so SSE/CLI consumers can display live progress
     await progress_store.push_event(run_id, {
@@ -118,21 +136,31 @@ async def run_overlay_delta(
     Pushes a progress event to the run's queue (if registered) on completion.
     Raises on model error or schema validation failure.
     """
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-stage] request_id=%s stage=per_analyst_start payload=%s", run_id, {"persona": config["persona"].value, "phase": "phase2_overlay"})
     messages = build_messages(prompt)
-    response = await acompletion_metered(
-        run_dir=get_run_dir(run_id),
-        run_id=run_id,
-        stage="phase2_overlay",
-        node=config["persona"].value,
-        model=resolve_profile(config["profile"]).model,
-        messages=messages,
-        response_format={"type": "json_object"},
-        temperature=0.1,
-        max_tokens=1000,
-    )
-    raw: str = response.choices[0].message.content
-    raw = extract_json(raw)
-    result = OverlayDeltaReport.model_validate_json(raw)
+    try:
+        response = await acompletion_metered(
+            run_dir=get_run_dir(run_id),
+            run_id=run_id,
+            stage="phase2_overlay",
+            node=config["persona"].value,
+            model=resolve_profile(config["profile"]).model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=1000,
+        )
+        raw: str = response.choices[0].message.content
+        raw = extract_json(raw)
+        result = OverlayDeltaReport.model_validate_json(raw)
+    except Exception as exc:
+        if _dev_diagnostics_enabled():
+            logger.warning("[dev-stage] request_id=%s stage=per_analyst_fail payload=%s", run_id, {"persona": config["persona"].value, "phase": "phase2_overlay", "error": str(exc)[:300]})
+        raise
+
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-stage] request_id=%s stage=per_analyst_success payload=%s", run_id, {"persona": config["persona"].value, "phase": "phase2_overlay"})
 
     # v2.2 — push progress event
     await progress_store.push_event(run_id, {
@@ -158,26 +186,36 @@ async def run_deliberation_round(
     Pushes a progress event to the run's queue (if registered) on completion.
     Raises on model error or schema validation failure.
     """
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-stage] request_id=%s stage=per_analyst_start payload=%s", run_id, {"persona": config["persona"].value, "phase": "deliberation"})
     prompt = build_deliberation_prompt(
         own_round1_output=own_output,
         peer_round1_outputs=peer_outputs,
         persona=config["persona"],
     )
     messages = build_messages(prompt)
-    response = await acompletion_metered(
-        run_dir=get_run_dir(run_id),
-        run_id=run_id,
-        stage="phase3_deliberation",
-        node=config["persona"].value,
-        model=resolve_profile(config["profile"]).model,
-        messages=messages,
-        response_format={"type": "json_object"},
-        temperature=0.1,
-        max_tokens=1500,
-    )
-    raw: str = response.choices[0].message.content
-    raw = extract_json(raw)
-    result = AnalystOutput.model_validate_json(raw)
+    try:
+        response = await acompletion_metered(
+            run_dir=get_run_dir(run_id),
+            run_id=run_id,
+            stage="phase3_deliberation",
+            node=config["persona"].value,
+            model=resolve_profile(config["profile"]).model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=1500,
+        )
+        raw: str = response.choices[0].message.content
+        raw = extract_json(raw)
+        result = AnalystOutput.model_validate_json(raw)
+    except Exception as exc:
+        if _dev_diagnostics_enabled():
+            logger.warning("[dev-stage] request_id=%s stage=per_analyst_fail payload=%s", run_id, {"persona": config["persona"].value, "phase": "deliberation", "error": str(exc)[:300]})
+        raise
+
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-stage] request_id=%s stage=per_analyst_success payload=%s", run_id, {"persona": config["persona"].value, "phase": "deliberation", "action": result.recommended_action})
 
     # v2.2 — push progress event
     await progress_store.push_event(run_id, {
