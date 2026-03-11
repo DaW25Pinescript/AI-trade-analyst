@@ -999,6 +999,10 @@ async def analyse(
         "_node_timings": None,
         # Debug — temporary analyst output persistence investigation
         "_debug_after_parallel": None,
+        # Observability Phase 1 — run visibility accumulators
+        "_stage_trace": [],
+        "_analyst_results": [],
+        "_arbiter_meta": None,
     }
 
     # Phase 3: set correlation context for structured logging
@@ -1318,6 +1322,10 @@ async def analyse_stream(
         "_node_timings": None,
         # Debug — temporary analyst output persistence investigation
         "_debug_after_parallel": None,
+        # Observability Phase 1 — run visibility accumulators
+        "_stage_trace": [],
+        "_analyst_results": [],
+        "_arbiter_meta": None,
     }
 
     # Phase 3: set correlation context for structured logging

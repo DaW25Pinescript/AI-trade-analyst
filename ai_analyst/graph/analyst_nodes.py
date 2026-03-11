@@ -269,9 +269,12 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
 
     valid_outputs: list[AnalystOutput] = []
     configs_used: list[dict] = []
+    analyst_results: list[dict] = []
     for i, result in enumerate(results):
         config = configs_to_run[i]
-        model = resolve_profile_route(config["profile"]).model
+        route = resolve_profile_route(config["profile"])
+        model = route.model
+        persona = config["persona"].value
         # DEBUG: log the type and keys/attrs of each gather result
         logger.info(
             "[DEBUG] parallel_analyst_node result[%d]: type=%s isinstance_AnalystOutput=%s isinstance_ValidationError=%s",
@@ -284,10 +287,33 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
             )
             valid_outputs.append(result)
             configs_used.append(config)
+            analyst_results.append({
+                "persona": persona, "status": "success",
+                "model": model, "provider": route.api_base or "default",
+            })
         elif isinstance(result, ValidationError):
             logger.warning("Analyst '%s' Phase 1 returned schema-invalid output: %s", model, result)
+            analyst_results.append({
+                "persona": persona, "status": "failed",
+                "model": model, "provider": route.api_base or "default",
+                "reason": f"schema_validation: {str(result)[:200]}",
+            })
         else:
             logger.warning("Analyst '%s' Phase 1 failed with error: %s", model, result)
+            analyst_results.append({
+                "persona": persona, "status": "failed",
+                "model": model, "provider": route.api_base or "default",
+                "reason": f"{type(result).__name__}: {str(result)[:200]}",
+            })
+
+    # Record analysts skipped due to smoke_mode roster slicing
+    if effective_smoke and len(ANALYST_CONFIGS) > 1:
+        for skipped_cfg in ANALYST_CONFIGS[1:]:
+            analyst_results.append({
+                "persona": skipped_cfg["persona"].value,
+                "status": "skipped",
+                "reason": "smoke_mode — roster sliced to 1",
+            })
 
     if effective_smoke:
         logger.info("[smoke] quorum bypass active — skipping quorum enforcement")
@@ -307,6 +333,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
             state["_smoke_error"] = smoke_error
             state["analyst_outputs"] = []
             state["analyst_configs_used"] = []
+            state["_analyst_results"] = analyst_results
             return state
         # Smoke mode: log first result and skip quorum check
         logger.info("[smoke] first analyst result before aggregation: action=%s confidence=%s",
@@ -319,6 +346,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
 
     state["analyst_outputs"] = valid_outputs
     state["analyst_configs_used"] = configs_used
+    state["_analyst_results"] = analyst_results
     logger.info(
         "[DEBUG] parallel_analyst_node DONE: len(valid_outputs)=%d len(state['analyst_outputs'])=%d",
         len(valid_outputs), len(state["analyst_outputs"]),

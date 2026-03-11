@@ -13,6 +13,7 @@ analyst outputs and applies deliberation weighting rules (Round 2 weighted at 1.
 import json
 import logging
 import re
+import time
 
 from ..models.arbiter_output import FinalVerdict
 from ..core.arbiter_prompt_builder import build_arbiter_prompt
@@ -137,6 +138,7 @@ async def arbiter_node(state: GraphState) -> GraphState:
     )
 
     route = resolve_task_route(ARBITER_DECISION)
+    _arbiter_t0 = time.perf_counter()
 
     try:
         response = await acompletion_metered(
@@ -226,4 +228,10 @@ async def arbiter_node(state: GraphState) -> GraphState:
     if _dev_diagnostics_enabled():
         logger.info("[dev-stage] request_id=%s stage=arbiter_success payload=%s", ground_truth.run_id, {"decision": verdict.decision})
     state["final_verdict"] = verdict
+    # Observability Phase 1 — arbiter metadata for run record assembly
+    state["_arbiter_meta"] = {
+        "model": route.model,
+        "provider": route.api_base or "default",
+        "duration_ms": round((time.perf_counter() - _arbiter_t0) * 1000),
+    }
     return state
