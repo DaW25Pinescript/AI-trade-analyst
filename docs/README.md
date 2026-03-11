@@ -23,3 +23,16 @@
 - **How do I run/operate this safely?** → [docs/runbooks/](runbooks/README.md)
 - **What design history/working notes exist?** → [docs/design-notes/](design-notes/README.md)
 - **Where did old plans/audits go?** → [docs/archive/](archive/README.md)
+
+## Contributor Documentation Workflow
+
+When shipping changes, update docs by intent (single-source doctrine still applies):
+
+- **Current project/phase status, next actions, readiness gates** → `docs/AI_TradeAnalyst_Progress.md`
+- **New implementation phase/spec and acceptance details** → `docs/specs/`
+- **Enduring architecture/contracts/repo structure** → `docs/architecture/`
+- **Operational/setup/runtime procedures** → `docs/runbooks/`
+- **Design rationale and decision history** → `docs/design-notes/`
+- **Superseded/historical snapshots** → `docs/archive/`
+
+If a document could be interpreted as “current status”, link it back to `AI_TradeAnalyst_Progress.md` and avoid duplicating phase ownership.

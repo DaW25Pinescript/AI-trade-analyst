@@ -17,6 +17,13 @@
 
 ---
 
+## Phase Index (at-a-glance)
+
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening.
+- **Current phase:** **Cleanup & Observability** (async marker tidy + observability/seam confidence improvements).
+- **Next actions:** execute async-marker tidy, pick TD-5 or TD-9 micro-PR, and progress observability workstream planning.
+- **Active decision gate:** production-readiness gate is satisfied after CI Seam Hardening closure; focus is now cleanup quality and operational confidence.
+
 ## 1) Executive Snapshot
 
 The repository is in a **strong implementation state**:
@@ -87,7 +94,7 @@ This means Market Data Officer progress is strategically important, but it shoul
   - graph execution timeout
   - `call_llm()` timeout/retry/failure mapping
   - safer API error contracts and request-boundary enforcement
-- The technical debt register is now live in this file and should be treated as a maintained section, not a one-off audit dump.
+- The technical debt register summary in this file remains canonical for execution context; the enduring debt ledger is tracked in `docs/architecture/technical_debt.md`.
 - Test suites run cleanly in the current merged state.
 
 ### Test count progression
