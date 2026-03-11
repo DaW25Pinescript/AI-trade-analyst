@@ -13,6 +13,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class ModelProfile:
     name: str
+    provider: str
     model: str
     tier: str
 
@@ -20,11 +21,13 @@ class ModelProfile:
 MODEL_PROFILES: dict[str, ModelProfile] = {
     "claude_sonnet": ModelProfile(
         name="claude_sonnet",
+        provider="openai",
         model="claude-sonnet-4-6",
         tier="worker",
     ),
     "claude_opus": ModelProfile(
         name="claude_opus",
+        provider="openai",
         model="claude-opus-4-6",
         tier="heavy",
     ),

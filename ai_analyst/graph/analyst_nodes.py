@@ -49,7 +49,7 @@ from ..core.usage_meter import acompletion_metered
 from ..core import progress_store
 from ..core.json_extractor import extract_json
 from ..llm_router import router
-from ..llm_router.model_profiles import resolve_profile
+from ..llm_router.router import resolve_profile_route
 from ..llm_router.task_types import ANALYST_REASONING
 from .state import GraphState
 
@@ -68,17 +68,17 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
     Raises on model error or schema validation failure — caller handles exceptions.
     """
     import os as _os
-    route = router.resolve(ANALYST_REASONING)
+    route = resolve_profile_route(config["profile"])
 
     # Smoke-path instrumentation — log LLM call details (never the key value)
     _triage_debug = _os.getenv("TRIAGE_DEBUG", "").lower() == "true"
     if _triage_debug:
         _api_key_env = "OPENAI_API_KEY"  # default; actual source depends on config
-        _key_val = route.get("api_key") or ""
+        _key_val = route.api_key or ""
         logger.info(
             "[run_analyst] LLM call — model=%s base_url=%s api_key_env=%s key_present=%s persona=%s",
-            resolve_profile(config["profile"]).model,
-            route.get("base_url"),
+            route.model,
+            route.api_base,
             _api_key_env,
             bool(_key_val and len(str(_key_val)) > 0),
             config["persona"].value,
@@ -93,13 +93,12 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
             run_id=run_id,
             stage="phase1_analyst",
             node=config["persona"].value,
-            model=resolve_profile(config["profile"]).model,
+            model=route.model,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0.1,   # low temperature for determinism
             max_tokens=1500,
-            api_base=route["base_url"],
-            api_key=route["api_key"],
+            **route.to_call_kwargs(),
         )
         raw: str = response.choices[0].message.content
         raw = extract_json(raw)
@@ -117,7 +116,7 @@ async def run_analyst(config: dict, prompt: dict, run_id: str) -> AnalystOutput:
         "type": "analyst_done",
         "stage": "phase1",
         "persona": config["persona"].value,
-        "model": resolve_profile(config["profile"]).model,
+        "model": route.model,
         "action": result.recommended_action,
         "confidence": result.confidence,
     })
@@ -136,6 +135,7 @@ async def run_overlay_delta(
     Pushes a progress event to the run's queue (if registered) on completion.
     Raises on model error or schema validation failure.
     """
+    route = resolve_profile_route(config["profile"])
     if _dev_diagnostics_enabled():
         logger.info("[dev-stage] request_id=%s stage=per_analyst_start payload=%s", run_id, {"persona": config["persona"].value, "phase": "phase2_overlay"})
     messages = build_messages(prompt)
@@ -145,11 +145,12 @@ async def run_overlay_delta(
             run_id=run_id,
             stage="phase2_overlay",
             node=config["persona"].value,
-            model=resolve_profile(config["profile"]).model,
+            model=route.model,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0.1,
             max_tokens=1000,
+            **route.to_call_kwargs(),
         )
         raw: str = response.choices[0].message.content
         raw = extract_json(raw)
@@ -167,7 +168,7 @@ async def run_overlay_delta(
         "type": "analyst_done",
         "stage": "phase2_overlay",
         "persona": config["persona"].value,
-        "model": resolve_profile(config["profile"]).model,
+        "model": route.model,
         "contradictions": len(result.contradicts),
     })
     return result
@@ -186,6 +187,7 @@ async def run_deliberation_round(
     Pushes a progress event to the run's queue (if registered) on completion.
     Raises on model error or schema validation failure.
     """
+    route = resolve_profile_route(config["profile"])
     if _dev_diagnostics_enabled():
         logger.info("[dev-stage] request_id=%s stage=per_analyst_start payload=%s", run_id, {"persona": config["persona"].value, "phase": "deliberation"})
     prompt = build_deliberation_prompt(
@@ -200,11 +202,12 @@ async def run_deliberation_round(
             run_id=run_id,
             stage="phase3_deliberation",
             node=config["persona"].value,
-            model=resolve_profile(config["profile"]).model,
+            model=route.model,
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0.1,
             max_tokens=1500,
+            **route.to_call_kwargs(),
         )
         raw: str = response.choices[0].message.content
         raw = extract_json(raw)
@@ -222,7 +225,7 @@ async def run_deliberation_round(
         "type": "analyst_done",
         "stage": "deliberation",
         "persona": config["persona"].value,
-        "model": resolve_profile(config["profile"]).model,
+        "model": route.model,
         "action": result.recommended_action,
         "confidence": result.confidence,
     })
@@ -250,7 +253,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     configs_to_run = ANALYST_CONFIGS
     if effective_smoke:
         configs_to_run = ANALYST_CONFIGS[:1]
-        logger.info("[smoke] smoke mode active — running only first analyst: %s", resolve_profile(configs_to_run[0]["profile"]).model)
+        logger.info("[smoke] smoke mode active — running only first analyst: %s", resolve_profile_route(configs_to_run[0]["profile"]).model)
     logger.info("[analyst_fan_out] effective analyst_count=%d", len(configs_to_run))
 
     tasks = [
@@ -268,7 +271,7 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
     configs_used: list[dict] = []
     for i, result in enumerate(results):
         config = configs_to_run[i]
-        model = resolve_profile(config["profile"]).model
+        model = resolve_profile_route(config["profile"]).model
         # DEBUG: log the type and keys/attrs of each gather result
         logger.info(
             "[DEBUG] parallel_analyst_node result[%d]: type=%s isinstance_AnalystOutput=%s isinstance_ValidationError=%s",
@@ -292,12 +295,12 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
             # In smoke mode, capture the error instead of raising
             err = results[0] if results else Exception("no results")
             logger.info("[smoke] first analyst result/error before aggregation: %s", err)
-            route = router.resolve(ANALYST_REASONING)
+            smoke_route = resolve_profile_route(configs_to_run[0]["profile"])
             smoke_error = {
                 "error_type": type(err).__name__,
                 "status_code": getattr(err, "status_code", None),
-                "model_attempted": resolve_profile(configs_to_run[0]["profile"]).model,
-                "base_url_attempted": route.get("base_url"),
+                "model_attempted": smoke_route.model,
+                "base_url_attempted": smoke_route.api_base,
                 "message": str(err)[:500],
             }
             logger.error("[smoke] LLM error captured: %s", smoke_error)
@@ -363,7 +366,7 @@ async def overlay_delta_node(state: GraphState) -> GraphState:
 
     delta_reports: list[OverlayDeltaReport] = []
     for i, result in enumerate(results):
-        model = resolve_profile(configs_used[i]["profile"]).model
+        model = resolve_profile_route(configs_used[i]["profile"]).model
         if isinstance(result, OverlayDeltaReport):
             delta_reports.append(result)
         elif isinstance(result, ValidationError):
@@ -418,7 +421,7 @@ async def deliberation_node(state: GraphState) -> GraphState:
 
     delib_outputs: list[AnalystOutput] = []
     for i, result in enumerate(results):
-        model = resolve_profile(configs_used[i]["profile"]).model
+        model = resolve_profile_route(configs_used[i]["profile"]).model
         if isinstance(result, AnalystOutput):
             delib_outputs.append(result)
         elif isinstance(result, ValidationError):
