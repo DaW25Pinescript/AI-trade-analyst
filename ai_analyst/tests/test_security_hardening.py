@@ -315,6 +315,56 @@ class TestStreamErrorContract:
         assert "database" not in error_events[-1]["detail"].lower()
 
 
+# ── JSON form validation detail tests ───────────────────────────────────────
+
+class TestJsonFormValidationDetail:
+    """JSON-backed multipart fields should include field-level parse detail."""
+
+    def test_analyse_parse_error_includes_field_and_raw_value(self, monkeypatch):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["timeframes"] = "not-json"
+            resp = client.post(
+                "/analyse", data=data, files=files,
+                headers={"X-API-Key": "test-key"},
+            )
+        assert resp.status_code == 422
+        detail = resp.json()["detail"]
+        assert "form field 'timeframes'" in detail
+        assert "Received: 'not-json'" in detail
+
+    def test_analyse_known_array_field_reports_contract_message(self, monkeypatch):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["no_trade_windows"] = "\"NFP\""
+            resp = client.post(
+                "/analyse", data=data, files=files,
+                headers={"X-API-Key": "test-key"},
+            )
+        assert resp.status_code == 422
+        detail = resp.json()["detail"]
+        assert "Field 'no_trade_windows' must be a JSON array." in detail
+        assert 'Example: ["NFP"]' in detail
+        assert 'Received: "NFP"' not in detail  # repr should include single-quoted raw JSON text
+        assert "Received: '\"NFP\"'" in detail
+
+    def test_analyse_stream_array_field_reports_received_value(self, monkeypatch):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["open_positions"] = "1"
+            resp = client.post(
+                "/analyse/stream", data=data, files=files,
+                headers={"X-API-Key": "test-key"},
+            )
+        assert resp.status_code == 422
+        detail = resp.json()["detail"]
+        assert "Field 'open_positions' must be a JSON array." in detail
+        assert "Received: '1'" in detail
+
+
 # ── Stub graph for happy-path tests ──────────────────────────────────────────
 
 from pathlib import Path

@@ -187,6 +187,44 @@ def _load_usage_summary(run_id: str) -> dict:
         return _empty_usage_summary()
 
 
+def _format_form_value(raw_value: str, max_chars: int = 200) -> str:
+    """Return a bounded repr for client-facing validation errors."""
+    preview = raw_value if len(raw_value) <= max_chars else f"{raw_value[:max_chars]}..."
+    return repr(preview)
+
+
+def _parse_json_form_field(
+    field_name: str,
+    raw_value: str,
+    *,
+    expect_array: bool = False,
+    array_example: Optional[str] = None,
+):
+    """Parse a JSON-backed form field and surface field-specific 422 details."""
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"JSON parse error in form field '{field_name}': {exc}. "
+                f"Received: {_format_form_value(raw_value)}"
+            ),
+        )
+
+    if expect_array and not isinstance(parsed, list):
+        example_suffix = f" Example: {array_example}." if array_example else ""
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Field '{field_name}' must be a JSON array.{example_suffix} "
+                f"Received: {_format_form_value(raw_value)}"
+            ),
+        )
+
+    return parsed
+
+
 # ── Budget guards ────────────────────────────────────────────────────────────
 # MAX_IMAGE_SIZE_MB: per-image upload ceiling (default 5 MB).
 # MAX_COST_PER_RUN_USD: optional per-run cost ceiling (default disabled).
@@ -610,13 +648,16 @@ async def analyse(
     _check_rate_limit(client_ip)
 
     # ── Parse JSON fields ────────────────────────────────────────────────────
-    try:
-        tf_list: list[str] = json.loads(timeframes)
-        no_trade_list: list[str] = json.loads(no_trade_windows)
-        open_pos_list: list = json.loads(open_positions)
-        overlay_claims_list: list[str] = json.loads(overlay_indicator_claims)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=422, detail=f"JSON parse error in form field: {e}")
+    tf_list: list[str] = _parse_json_form_field(
+        "timeframes", timeframes, expect_array=True, array_example='["H4","M15","M5"]'
+    )
+    no_trade_list: list[str] = _parse_json_form_field(
+        "no_trade_windows", no_trade_windows, expect_array=True, array_example='["NFP"]'
+    )
+    open_pos_list: list = _parse_json_form_field("open_positions", open_positions, expect_array=True)
+    overlay_claims_list: list[str] = _parse_json_form_field(
+        "overlay_indicator_claims", overlay_indicator_claims, expect_array=True
+    )
 
     # ── Sanitise user inputs before they reach LLM prompts (audit #2) ─────
     try:
@@ -917,13 +958,16 @@ async def analyse_stream(
     _check_rate_limit(client_ip)
 
     # ── Parse JSON fields ────────────────────────────────────────────────────
-    try:
-        tf_list: list[str] = json.loads(timeframes)
-        no_trade_list: list[str] = json.loads(no_trade_windows)
-        open_pos_list: list = json.loads(open_positions)
-        overlay_claims_list: list[str] = json.loads(overlay_indicator_claims)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=422, detail=f"JSON parse error in form field: {e}")
+    tf_list: list[str] = _parse_json_form_field(
+        "timeframes", timeframes, expect_array=True, array_example='["H4","M15","M5"]'
+    )
+    no_trade_list: list[str] = _parse_json_form_field(
+        "no_trade_windows", no_trade_windows, expect_array=True, array_example='["NFP"]'
+    )
+    open_pos_list: list = _parse_json_form_field("open_positions", open_positions, expect_array=True)
+    overlay_claims_list: list[str] = _parse_json_form_field(
+        "overlay_indicator_claims", overlay_indicator_claims, expect_array=True
+    )
 
     # ── Sanitise user inputs before they reach LLM prompts (audit #2) ─────
     try:
