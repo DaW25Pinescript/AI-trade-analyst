@@ -100,8 +100,10 @@ async def acompletion_metered(
     # Copy kwargs so we can safely inject provider/base settings.
     call_kwargs = dict(kwargs)
 
-    # Force LiteLLM to use the OpenAI-compatible path for the local Claude proxy.
-    # This is critical for claude-* model names when api_base points at the local proxy.
+    # Safety fallback: ensure LiteLLM uses the OpenAI-compatible path for the
+    # local Claude proxy.  Since LLM Routing Centralisation, all call sites pass
+    # custom_llm_provider via ResolvedRoute.to_call_kwargs(), so this setdefault
+    # is confirmatory — it only activates if a caller omits the provider.
     if backend == "litellm":
         call_kwargs.setdefault("custom_llm_provider", "openai")
 

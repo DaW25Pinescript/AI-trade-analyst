@@ -19,6 +19,7 @@ from ..core.arbiter_prompt_builder import build_arbiter_prompt
 from ..core.run_paths import get_run_dir
 from ..core.usage_meter import acompletion_metered
 from ..llm_router import router
+from ..llm_router.router import resolve_task_route
 from ..llm_router.task_types import ARBITER_DECISION
 from .state import GraphState
 
@@ -135,7 +136,7 @@ async def arbiter_node(state: GraphState) -> GraphState:
         deliberation_outputs=deliberation_outputs if deliberation_outputs else None,
     )
 
-    route = router.resolve(ARBITER_DECISION)
+    route = resolve_task_route(ARBITER_DECISION)
 
     try:
         response = await acompletion_metered(
@@ -143,13 +144,12 @@ async def arbiter_node(state: GraphState) -> GraphState:
         run_id=ground_truth.run_id,
         stage="arbiter",
         node="arbiter_node",
-        model=route["model"],
+        model=route.model,
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.1,
         max_tokens=2000,
-        api_base=route["base_url"],
-        api_key=route["api_key"],
+        **route.to_call_kwargs(),
     )
 
         raw: str = response.choices[0].message.content

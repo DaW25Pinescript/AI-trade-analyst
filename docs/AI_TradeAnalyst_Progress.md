@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 11 March 2026  
-**Review date:** 10 March 2026  
-**Current phase:** Cleanup & Observability — Async marker tidy, dev diagnostics for /analyse
+**Last updated:** 11 March 2026
+**Review date:** 10 March 2026
+**Current phase:** Post–LLM Routing Centralisation — Observability Phase 1 next
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -19,9 +19,9 @@
 
 ## Phase Index (at-a-glance)
 
-- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening.
-- **Current phase:** **Cleanup & Observability** (async marker tidy + observability/seam confidence improvements).
-- **Next actions:** execute async-marker tidy, expand dev diagnostics from AI Analyst lane to adjacent API seams, and pick TD-5 or TD-9 micro-PR.
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation.
+- **Current phase:** Post–LLM Routing Centralisation. Routing authority is now single-source via `ResolvedRoute` contract.
+- **Next actions:** Smoke re-test `/analyse` with live proxy; Observability Phase 1; pick TD-5 or TD-9 micro-PR.
 - **Active decision gate:** production-readiness gate is satisfied after CI Seam Hardening closure; focus is now cleanup quality and operational confidence.
 
 ## 1) Executive Snapshot
@@ -68,6 +68,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. Y
 | TD-1 Micro-PR | Arbiter assert fix — explicit persona contract enforcement — 645 tests | ✅ Complete |
 | Security/API Hardening | Auth gate, graph + LLM timeouts, error contracts, body limits, TD-2 closure — 677 tests | ✅ Complete |
 | CI Seam Hardening | CI-gate MDO + root Python seams, stream event semantics — 1743 tests across 5 CI jobs | ✅ Complete |
+| LLM Routing Centralisation | Single-source routing via ResolvedRoute contract, 13 bypass removals, 27 new tests — 643 tests | ✅ Complete |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
 
@@ -125,6 +126,7 @@ Phase-closure counts should be read as **phase-gate numbers**, not as a single a
 | TD-1 | 645 | Arbiter assert fix |
 | Security/API Hardening | 677 | Auth gate, graph + LLM timeouts, error contracts, body limits, TD-2 closure |
 | CI Seam Hardening | 1743 | MDO + root Python seams CI-gated, stream event semantics, 5 CI jobs |
+| LLM Routing Centralisation | 643 | Single-source routing via ResolvedRoute; 13 bypass removals; 27 new deterministic route/bypass tests |
 
 ### Known gaps and debt themes
 
@@ -253,11 +255,12 @@ Reduce the architectural split between runtime lanes and address the packaging/i
 ## 6) Immediate Next Actions (Concrete)
 
 1. ~~CI Seam Hardening~~ — ✅ Complete (10 March 2026).
-2. Execute **async-marker tidy** (4 files) if prioritised.
-3. Pick up **TD-5** (enum centralisation) or **TD-9** (unused vars) as micro-PRs.
-4. Plan **observability and seam confidence** improvements (Priority B).
-5. Update `docs/specs/README.md` after each milestone so the specs inventory remains aligned to this progress hub.
-6. Keep the technical debt register current as micro-PRs and named cleanup items close.
+2. ~~LLM Routing Centralisation~~ — ✅ Complete (11 March 2026). Smoke re-test with live proxy is the immediate next validation step.
+3. Execute **async-marker tidy** (4 files) if prioritised.
+4. Pick up **TD-5** (enum centralisation) or **TD-9** (unused vars) as micro-PRs.
+5. Plan **Observability Phase 1** (analyst pipeline run visibility).
+6. Update `docs/specs/README.md` after each milestone so the specs inventory remains aligned to this progress hub.
+7. Keep the technical debt register current as micro-PRs and named cleanup items close.
 
 ---
 

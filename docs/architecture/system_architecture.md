@@ -11,7 +11,7 @@ AI Trade Analyst is a multi-lane trading analysis system with a FastAPI + LangGr
   - `macro_risk_officer/` macro context ingestion/reasoning lane
   - `ai_analyst/` FastAPI + LangGraph multi-analyst runtime lane
   - `app/` API-first UI workflow lane
-- **Active/current phase:** cleanup & observability hardening after CI seam hardening closure.
+- **Active/current phase:** post–LLM Routing Centralisation; Observability Phase 1 next.
 - **Planned / emerging:** direct, unified runtime coupling between the active `ai_analyst` graph path and the MDO packet lane remains an emerging convergence area; concrete MDO coupling exists in legacy analyst paths and selected integrations.
 
 Source of truth for phase/status remains `docs/AI_TradeAnalyst_Progress.md`.
@@ -34,7 +34,7 @@ Source of truth for phase/status remains `docs/AI_TradeAnalyst_Progress.md`.
 - FastAPI entry and orchestration surface: `ai_analyst/api/main.py` (`/analyse`, `/analyse/stream`, triage/journey endpoints).
 - Core analysis graph: `ai_analyst/graph/pipeline.py` (validate → macro context + chart setup fan-out → lenses → optional deliberation/overlay → arbiter).
 - Dev-mode diagnostics layer (local-only): request-id anchored parse/lifecycle tracing and per-run diagnostics records for `/analyse` failure triage (gated by `AI_ANALYST_DEV_DIAGNOSTICS`/`DEBUG`).
-- Prompting/model routing/config surfaces: `ai_analyst/prompt_library/*`, `ai_analyst/llm_router/*`, `config/llm_routing.yaml`.
+- Prompting/model routing/config surfaces: `ai_analyst/prompt_library/*`, `ai_analyst/llm_router/*` (centralised via `ResolvedRoute` contract — single-source routing authority), `config/llm_routing.yaml`.
 
 ### 5) Arbiter / verdict / governance
 - Current graph arbiter path runs in `ai_analyst/graph/arbiter_node.py` with verdict contracts under `ai_analyst/models/arbiter_output.py`.
