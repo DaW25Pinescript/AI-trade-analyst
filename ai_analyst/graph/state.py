@@ -29,3 +29,7 @@ class GraphState(TypedDict):
     _node_timings: Optional[dict]                   # node_name → elapsed_ms
     # Debug — temporary counters for analyst output persistence investigation
     _debug_after_parallel: Optional[int]            # len(analyst_outputs) after parallel_analyst_node
+    # Observability Phase 1 — run visibility
+    _stage_trace: Optional[list]                    # ordered list of stage trace dicts
+    _analyst_results: Optional[list]                # per-analyst result/skip/fail records
+    _arbiter_meta: Optional[dict]                   # arbiter model/provider/duration_ms
