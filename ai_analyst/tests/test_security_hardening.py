@@ -20,6 +20,16 @@ from ai_analyst.api import main as api_main
 
 _PNG_HEADER = b"\x89PNG\r\n\x1a\n"
 
+
+def _detail_to_text(detail) -> str:
+    """Normalize API/SSE error detail into assertion-friendly text."""
+    if isinstance(detail, str):
+        return detail
+    try:
+        return json.dumps(detail, sort_keys=True)
+    except TypeError:
+        return str(detail)
+
 def _multipart_payload():
     data = {
         "instrument": "XAUUSD",
@@ -39,6 +49,12 @@ def _multipart_payload():
         "chart_h4": ("chart.png", _PNG_HEADER + b"\x00" * 64, "image/png"),
     }
     return data, files
+
+
+@pytest.fixture(autouse=True)
+def _disable_rate_limit(monkeypatch):
+    """Security hardening tests are not validating throttling behavior."""
+    monkeypatch.setattr(api_main, "_check_rate_limit", lambda _ip: None)
 
 
 # ── AC-1: Auth policy tests ─────────────────────────────────────────────────
@@ -133,7 +149,7 @@ class TestBodySizeLimit:
                 content=b"x=1",
             )
         assert resp.status_code == 413
-        assert "too large" in resp.json()["detail"].lower()
+        assert "too large" in _detail_to_text(resp.json()["detail"]).lower()
 
     def test_accepts_normal_size_request(self, monkeypatch):
         monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
@@ -172,10 +188,11 @@ class TestGraphTimeout:
             )
         assert resp.status_code == 504
         body = resp.json()
-        assert "timed out" in body["detail"].lower()
+        assert "timed out" in _detail_to_text(body["detail"]).lower()
         # AC-4: Must not leak internal details
-        assert "asyncio" not in body["detail"].lower()
-        assert "Traceback" not in body["detail"]
+        detail_text = _detail_to_text(body["detail"])
+        assert "asyncio" not in detail_text.lower()
+        assert "Traceback" not in detail_text
 
     def test_analyse_stream_emits_timeout_error_event(self, monkeypatch):
         monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
@@ -202,7 +219,7 @@ class TestGraphTimeout:
         ]
         error_events = [json.loads(e) for e in events if '"error"' in e]
         assert len(error_events) >= 1
-        assert "timed out" in error_events[-1]["detail"].lower()
+        assert "timed out" in _detail_to_text(error_events[-1]["detail"]).lower()
 
 
 # ── AC-4: Error contract tests ──────────────────────────────────────────────
@@ -229,10 +246,10 @@ class TestErrorContract:
         detail = resp.json()["detail"]
         # Must not contain the secret or provider error detail
         assert "sk-abc" not in detail
-        assert "internal server error" not in detail.lower()
+        assert "internal server error" not in _detail_to_text(detail).lower()
         assert "/v1/chat" not in detail
         # Should be the generic safe message
-        assert "check server logs" in detail.lower()
+        assert "check server logs" in _detail_to_text(detail).lower()
 
     def test_analyse_generic_error_no_detail_leak(self, monkeypatch):
         monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
@@ -252,7 +269,7 @@ class TestErrorContract:
         assert resp.status_code == 500
         detail = resp.json()["detail"]
         assert "line 42" not in detail
-        assert "check server logs" in detail.lower()
+        assert "check server logs" in _detail_to_text(detail).lower()
 
 
 # ── AC-5: Stream error contract tests ────────────────────────────────────────
@@ -312,7 +329,7 @@ class TestStreamErrorContract:
         ]
         error_events = [json.loads(e) for e in events if '"error"' in e]
         assert len(error_events) >= 1
-        assert "database" not in error_events[-1]["detail"].lower()
+        assert "database" not in _detail_to_text(error_events[-1]["detail"]).lower()
 
 
 # ── JSON form validation detail tests ───────────────────────────────────────
@@ -488,10 +505,6 @@ def _parse_sse_events(response_text: str) -> list[dict]:
 
 class TestStreamEventSemantics:
     """Stream happy-path event semantics: heartbeat, analyst_done shape, verdict."""
-
-    @pytest.fixture(autouse=True)
-    def _bypass_rate_limit(self, monkeypatch):
-        monkeypatch.setattr(api_main, "_check_rate_limit", lambda _ip: None)
 
     def test_stream_emits_verdict_event_with_expected_shape(self, monkeypatch):
         """Verdict event is emitted at stream completion with FinalVerdict payload."""
