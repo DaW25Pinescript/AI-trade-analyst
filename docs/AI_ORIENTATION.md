@@ -28,6 +28,12 @@ The documents below are listed in priority order. Request what you need based on
 - Respect casing contracts: snake_case backend/disk, camelCase JS store/components, adapters as translation boundary.
 - If docs conflict or are ambiguous, state the ambiguity and defer to the Progress hub.
 
+## Session start rule
+
+1. Read this file (`AI_ORIENTATION.md`)
+2. If implementing a phase → read `docs/specs/*` for the active spec
+3. If debugging → read `docs/architecture/repo_map.md` + `docs/architecture/system_architecture.md`
+
 ## After reading this file
 
 Tell me what you're here to do. I'll request the documents I need from the list above and confirm my understanding before starting work.
