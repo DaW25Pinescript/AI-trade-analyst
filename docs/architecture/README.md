@@ -10,6 +10,7 @@ Enduring architecture references, constraints, and contracts.
 - [senate_arbiter_schema.json](senate_arbiter_schema.json)
 - [UI_STYLE_GUIDE.md](UI_STYLE_GUIDE.md)
 - [repo_map.md](repo_map.md)
+- [system_architecture.md](system_architecture.md)
 - [technical_debt.md](technical_debt.md)
 
 ## See also

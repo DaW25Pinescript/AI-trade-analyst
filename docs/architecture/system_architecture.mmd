@@ -1,0 +1,50 @@
+flowchart LR
+    subgraph Sources[Market & Context Sources]
+        PR[Price providers / feed inputs]
+        ME[Macro & event providers]
+    end
+
+    subgraph MDO[Market Data Officer lane]
+        FP[feed.pipeline\nfetch→validate→resample→export]
+        SCH[scheduler + market_hours + alert_policy]
+        PKT[officer/service.py\nbuild_market_packet (canonical packet)]
+    end
+
+    subgraph MRO[Macro Risk Officer lane]
+        MING[ingestion + feeder ingest]
+        MCTX[reasoning engine\nMacroContext]
+    end
+
+    subgraph AI[AI Analyst lane (FastAPI + LangGraph)]
+        API[api/main.py\n/analyse /stream /triage /journey]
+        GRAPH[graph/pipeline.py\nchart+macro fan-out, lenses, deliberation]
+        ARB[arbiter node\nfinal verdict + ticket draft]
+    end
+
+    subgraph UI[Workflow & Review Surfaces]
+        APP[app/ pages + components + store]
+        ADP[app/lib/services.js + adapters.js\nAPI boundary + casing translation]
+        JDATA[app/data/journeys/*\ndrafts/decisions/results]
+    end
+
+    subgraph Contracts[Contracts & Schemas]
+        C1[docs/architecture/CONTRACTS.md]
+        C2[openapi.json + senate_arbiter_schema.json]
+        C3[docs/specs/schemas/* + scoring refs]
+    end
+
+    PR --> FP --> SCH --> PKT
+    ME --> MING --> MCTX
+
+    PKT -. canonical market context (implemented, partial runtime coupling) .-> API
+    MCTX --> GRAPH
+    API --> GRAPH --> ARB
+
+    ARB --> ADP --> APP
+    API --> ADP
+    API <--> JDATA
+
+    C1 -. governs .-> API
+    C1 -. governs .-> ADP
+    C2 -. governs .-> ARB
+    C3 -. shared artifacts .-> GRAPH
