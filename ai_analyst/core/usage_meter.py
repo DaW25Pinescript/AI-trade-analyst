@@ -92,8 +92,25 @@ async def acompletion_metered(
     try:
         if acompletion_func is None:
             from litellm import acompletion
-
             acompletion_func = acompletion
+
+        # For local_claude_proxy / OpenAI-compatible proxy usage, force LiteLLM
+        # to use the OpenAI provider path even when the model name starts with
+        # "claude-". Otherwise LiteLLM may infer Anthropic and hit the wrong API.
+        call_kwargs = dict(kwargs)
+
+	if backend == "litellm":
+    	    call_kwargs.setdefault("custom_llm_provider", "openai")
+    	    call_kwargs.setdefault("api_base", "http://127.0.0.1:8317/v1")
+
+        logger.info(
+            "[llm-call] run_id=%s stage=%s node=%s model=%s provider=%s",
+            run_id,
+            stage,
+            node,
+            model,
+            call_kwargs.get("custom_llm_provider", "auto"),
+        )
 
         # Unified fallback: acompletion_with_retry handles retries here.
         # Task-level fallback (primary → fallback model) is handled upstream
@@ -102,7 +119,7 @@ async def acompletion_metered(
             acompletion_func,
             model=model,
             messages=messages,
-            **kwargs,
+            **call_kwargs,
         )
         actual_model = model
 
@@ -118,7 +135,7 @@ async def acompletion_metered(
                 node=node,
                 backend=backend,
                 model=actual_model,
-                provider=_extract_provider(response),
+                provider=_extract_provider(response) or call_kwargs.get("custom_llm_provider"),
                 success=True,
                 attempts=attempts,
                 latency_ms=latency_ms,
@@ -141,7 +158,7 @@ async def acompletion_metered(
                 node=node,
                 backend=backend,
                 model=model,
-                provider=None,
+                provider=(kwargs.get("custom_llm_provider") if isinstance(kwargs, dict) else None) or "openai",
                 success=False,
                 attempts=max(1, int(kwargs.get("max_retries", 2)) + 1),
                 latency_ms=latency_ms,
