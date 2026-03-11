@@ -3,7 +3,7 @@
 **Status:** ⏳ Task card drafted — implementation pending  
 **Branch:** `feat/mdo-operationalise-phase2-alerting`  
 **Base:** `main` (after PR 1 merge)  
-**Spec source of truth:** `docs/MDO_Operationalise_Phase2_Spec.md` — Sections 4.3, 5.3, 5.4, 6, 8  
+**Spec source of truth:** `docs/specs/MDO_Operationalise_Phase2_Spec.md` — Sections 4.3, 5.3, 5.4, 6, 8  
 **Regression gate:** 549+ (`market_data_officer/tests`)  
 **Package scope:** `market_data_officer/` only  
 **Depends on:** PR 1 — Market-Hours Awareness (complete, 549/549)
@@ -37,7 +37,7 @@ This PR should answer:
 - Edge-triggered structured logging for alert and recovery events
 - Deterministic unit tests for alert policy
 - Deterministic scheduler/integration tests for escalation, suppression, and reset behavior
-- Progress annotation in `docs/MDO_Operationalise_Phase2_Spec.md`
+- Progress annotation in `docs/specs/MDO_Operationalise_Phase2_Spec.md`
 
 ### Out of scope
 - Email / Slack / Discord / PagerDuty / webhook delivery
@@ -81,7 +81,7 @@ Can deterministic alerting be added as a pure policy layer plus minimal schedule
 
 | Role | Path | Notes |
 |------|------|-------|
-| Read-only spec | `docs/MDO_Operationalise_Phase2_Spec.md` | Controlling phase spec |
+| Read-only spec | `docs/specs/MDO_Operationalise_Phase2_Spec.md` | Controlling phase spec |
 | Scheduler/runtime | `market_data_officer/scheduler.py` | Expected change surface |
 | Market-hours policy | `market_data_officer/market_hours.py` | Consumed, not modified |
 | New alert policy module | `market_data_officer/alert_policy.py` | Smallest focused addition |
@@ -364,7 +364,7 @@ Expected change surface:
 - `market_data_officer/scheduler.py` — wire alert evaluation after refresh
 - `market_data_officer/tests/test_alert_policy.py` — new test suite
 - `market_data_officer/tests/test_scheduler.py` — additional integration tests
-- `docs/MDO_Operationalise_Phase2_Spec.md` — progress annotation only
+- `docs/specs/MDO_Operationalise_Phase2_Spec.md` — progress annotation only
 
 No changes expected to:
 - `market_data_officer/market_hours.py` — consumed, not modified
@@ -468,13 +468,13 @@ This PR is mergeable when:
 6. No pipeline contract changes.
 7. No new external dependencies added.
 8. `README_specs.md` remains unchanged — phase status still active.
-9. `docs/MDO_Operationalise_Phase2_Spec.md` has a progress annotation for PR 2 completion.
+9. `docs/specs/MDO_Operationalise_Phase2_Spec.md` has a progress annotation for PR 2 completion.
 
 ---
 
 ## 14. Appendix — Recommended Agent Prompt
 
-Read `docs/MDO_Operationalise_Phase2_Spec.md` in full before starting.  
+Read `docs/specs/MDO_Operationalise_Phase2_Spec.md` in full before starting.  
 Treat it as the controlling spec for this pass.
 
 First task only — run the diagnostic protocol in this task card (D1–D7) and report findings before changing any code.
@@ -503,7 +503,7 @@ Hard constraints:
 Do not change any code until the diagnostic report is reviewed and the patch set is approved.
 
 On completion:
-1. Update `docs/MDO_Operationalise_Phase2_Spec.md` — add PR 2 progress annotation noting alerting hooks implemented and tested. Do **not** mark the overall phase as complete (PR 3 remains).
-2. Do **not** advance `docs/README_specs.md` — Operationalise Phase 2 remains active.
+1. Update `docs/specs/MDO_Operationalise_Phase2_Spec.md` — add PR 2 progress annotation noting alerting hooks implemented and tested. Do **not** mark the overall phase as complete (PR 3 remains).
+2. Do **not** advance `docs/specs/README.md` — Operationalise Phase 2 remains active.
 3. Do **not** change `AI_TradeAnalyst_Progress.md` unless implementation reveals a material scope correction.
 4. Commit all doc changes on the same branch as the implementation.

@@ -103,8 +103,8 @@ The repo is no longer blocked by runtime posture or API edge hardening. The rema
 | API edge / stream path | `ai_analyst/api/main.py` |
 | Security/API hardening tests | `ai_analyst/tests/test_security_hardening.py` |
 | Progress plan | `docs/AI_TradeAnalyst_Progress.md` |
-| Specs index | `docs/README_specs.md` |
-| This phase spec | `docs/CI_Seam_Hardening_Spec.md` |
+| Specs index | `docs/specs/README.md` |
+| This phase spec | `docs/specs/CI_Seam_Hardening_Spec.md` |
 
 **Read-only references expected:**
 - Security/API Hardening spec
@@ -266,8 +266,8 @@ Expected change surface:
 - `market_data_officer/tests/*` (if needed — add missing seam tests only)
 - `tests/*` (if needed — add missing seam tests only)
 - `ai_analyst/tests/*` (only if stream/orchestration seam coverage is missing)
-- `docs/CI_Seam_Hardening_Spec.md` — phase closure
-- `docs/README_specs.md` — phase closure
+- `docs/specs/CI_Seam_Hardening_Spec.md` — phase closure
+- `docs/specs/README.md` — phase closure
 - `docs/AI_TradeAnalyst_Progress.md` — phase closure
 
 No changes expected to:
@@ -396,7 +396,7 @@ Resolved by creating `market_data_officer/requirements.txt` with runtime deps (p
 
 ## 14. Appendix — Recommended Agent Prompt
 
-Read `docs/CI_Seam_Hardening_Spec.md` in full before starting.  
+Read `docs/specs/CI_Seam_Hardening_Spec.md` in full before starting.  
 Treat it as the controlling spec for this pass.
 
 First task only — run the diagnostic protocol in Section 8 and report findings before changing any code:
@@ -422,8 +422,8 @@ Hard constraints:
 Do not change any code or configuration until the diagnostic report is reviewed and the patch set is approved.
 
 On completion, close the spec and update docs:
-1. `docs/CI_Seam_Hardening_Spec.md` — mark ✅ Complete, flip ACs, populate §13 findings with: CI configuration changes, suites gated, integration test shape, stream coverage added, CI execution evidence, test count delta
-2. `docs/README_specs.md` — move CI Seam Hardening to Completed, update Current Phase
+1. `docs/specs/CI_Seam_Hardening_Spec.md` — mark ✅ Complete, flip ACs, populate §13 findings with: CI configuration changes, suites gated, integration test shape, stream coverage added, CI execution evidence, test count delta
+2. `docs/specs/README.md` — move CI Seam Hardening to Completed, update Current Phase
 3. `docs/AI_TradeAnalyst_Progress.md` — record CI Seam Hardening completion and next phase. Mark production-readiness gate items as satisfied if evidence supports it.
 4. If any Technical Debt Register items (§8 of progress plan) were resolved or partially addressed by this work, update their status in the register.
 

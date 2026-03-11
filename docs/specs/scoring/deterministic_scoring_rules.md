@@ -111,7 +111,7 @@ To keep imports/exports and tests stable:
 2. If gate logic order changes, update tests and this precedence list in the same PR.
 3. If defaults/fallbacks change, update snapshot fixtures that assert exported JSON.
 4. If any enum is added/removed/renamed, update:
-   - `docs/schema/*.schema.json`
+   - `docs/specs/schemas/*.schema.json`
    - runtime validators
    - UI label-to-value mappings
    - import/export fixtures.

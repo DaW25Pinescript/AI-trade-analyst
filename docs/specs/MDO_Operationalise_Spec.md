@@ -6,7 +6,7 @@ This phase establishes the first runtime scheduling layer for Market Data Office
 
 **Status:** ✅ Complete — 494/494 tests green  
 **Current repo phase:** Operationalise Phase 2  
-**Next phase spec:** `docs/MDO_Operationalise_Phase2_Spec.md`  
+**Next phase spec:** `docs/specs/MDO_Operationalise_Phase2_Spec.md`  
 **Date closed:** 9 March 2026
 
 ---
@@ -207,7 +207,7 @@ Without Phase 1, the repo had a feed pipeline but no clean runtime loop to opera
 ## 12. Phase Roadmap
 
 - **Operationalise Phase 1** — APScheduler feed refresh base — ✅ Complete
-- **Operationalise Phase 2** — market-hours awareness, alerting, remote deployment — ⏳ Active (`docs/MDO_Operationalise_Phase2_Spec.md`)
+- **Operationalise Phase 2** — market-hours awareness, alerting, remote deployment — ⏳ Active (`docs/specs/MDO_Operationalise_Phase2_Spec.md`)
 - **Next likely phase** — Security/API Hardening — authn/authz, timeout policy, error contract tightening — 🔜 Candidate
 
 ---
@@ -232,5 +232,5 @@ The scheduler exists, but intelligent closed-market handling, alerting, and remo
 
 Use this document only for historical context or scheduler-base audits. For active implementation work, use:
 
-- `docs/MDO_Operationalise_Phase2_Spec.md` for current operationalisation work
+- `docs/specs/MDO_Operationalise_Phase2_Spec.md` for current operationalisation work
 - the canonical progress document for repo-wide sequencing

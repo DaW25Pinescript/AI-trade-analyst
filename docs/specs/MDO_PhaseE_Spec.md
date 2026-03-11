@@ -134,7 +134,7 @@ market_data_officer/officer/service.py
 market_data_officer/officer/loader.py
 market_data_officer/tests/conftest.py
 market_data_officer/tests/
-docs/README_specs.md
+docs/specs/README.md
 docs/AI_TradeAnalyst_Progress.md
 ```
 

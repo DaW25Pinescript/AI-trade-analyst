@@ -4,7 +4,7 @@ Use this template to generate a post-trade After Action Review from the AAR sche
 
 ## Inputs
 - Ticket object
-- AAR object (`docs/schema/aar.schema.json`)
+- AAR object (`docs/specs/schemas/aar.schema.json`)
 - Optional chart observations
 
 ## Prompt skeleton

@@ -106,7 +106,7 @@ market_data_officer/feed/export.py
 market_data_officer/tests/conftest.py
 market_data_officer/tests/
 macro_risk_officer/ingestion/clients/price_client.py   (read-only reference unless diagnostics justify reuse)
-docs/README_specs.md
+docs/specs/README.md
 docs/AI_TradeAnalyst_Progress.md
 ```
 

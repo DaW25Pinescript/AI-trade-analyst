@@ -295,7 +295,7 @@ Expected patch size: ~30–50 lines across 3 files (vs ~100–130 lines for Phas
 ## Appendix — Implementation Prompt
 
 ```
-Read `docs/MDO_Phase1B_Spec.md` and treat it as the controlling spec for this pass.
+Read `docs/specs/MDO_Phase1B_Spec.md` and treat it as the controlling spec for this pass.
 
 Diagnostic report is complete (see Section 11). Approved patch set:
 

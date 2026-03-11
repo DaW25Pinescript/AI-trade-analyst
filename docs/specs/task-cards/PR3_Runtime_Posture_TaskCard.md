@@ -3,7 +3,7 @@
 **Status:** ⏳ Task card drafted — implementation pending  
 **Branch:** `feat/mdo-operationalise-phase2-runtime-posture`  
 **Base:** `main` (after PR 2 merge)  
-**Spec source of truth:** `docs/MDO_Operationalise_Phase2_Spec.md` — Section 7, Section 8 (phase-level ACs), Section 11  
+**Spec source of truth:** `docs/specs/MDO_Operationalise_Phase2_Spec.md` — Section 7, Section 8 (phase-level ACs), Section 11  
 **Regression gate:** 597+ (`market_data_officer/tests`)  
 **Package scope:** `market_data_officer/` + narrow runtime docs only  
 **Depends on:** PR 1 (549/549), PR 2 (597/597)  
@@ -85,13 +85,13 @@ Can we make the scheduler safe and predictable for remote/non-local operation wi
 
 | Role | Path | Notes |
 |------|------|-------|
-| Controlling spec | `docs/MDO_Operationalise_Phase2_Spec.md` | Read-only until completion note |
+| Controlling spec | `docs/specs/MDO_Operationalise_Phase2_Spec.md` | Read-only until completion note |
 | Scheduler runtime | `market_data_officer/scheduler.py` | Expected primary change surface |
 | Scheduler entrypoint | `market_data_officer/run_scheduler.py` | Startup/shutdown surface |
 | Market-hours policy | `market_data_officer/market_hours.py` | Consumed, not modified |
 | Alert policy | `market_data_officer/alert_policy.py` | Consumed, not modified |
 | Runtime config/settings | Existing config surface or small new module under `market_data_officer/` | Smallest safe option |
-| Runtime docs | Narrow doc/update in existing MDO docs or new `docs/MDO_Runtime_Guide.md` | Keep minimal |
+| Runtime docs | Narrow doc/update in existing MDO docs or new `docs/runbooks/MDO_Runtime_Guide.md` | Keep minimal |
 | Tests | `market_data_officer/tests/` | Deterministic lifecycle/config tests |
 
 ---
@@ -300,9 +300,9 @@ Expected change surface:
 - `market_data_officer/scheduler.py` — health-check function if feasible, shutdown logging if gaps
 - Small existing/new runtime config helper under `market_data_officer/` — only if diagnostic justifies it
 - `market_data_officer/tests/test_scheduler.py` — startup validation + lifecycle + health-check tests
-- `docs/MDO_Runtime_Guide.md` (or equivalent) — operator runbook
-- `docs/MDO_Operationalise_Phase2_Spec.md` — phase closure (Workflow E)
-- `docs/README_specs.md` — phase closure
+- `docs/runbooks/MDO_Runtime_Guide.md` (or equivalent) — operator runbook
+- `docs/specs/MDO_Operationalise_Phase2_Spec.md` — phase closure (Workflow E)
+- `docs/specs/README.md` — phase closure
 - `docs/AI_TradeAnalyst_Progress.md` — phase closure
 
 No changes expected to:
@@ -401,7 +401,7 @@ This PR is mergeable when:
 
 ## 14. Appendix — Recommended Agent Prompt
 
-Read `docs/MDO_Operationalise_Phase2_Spec.md` in full before starting.  
+Read `docs/specs/MDO_Operationalise_Phase2_Spec.md` in full before starting.  
 Treat it as the controlling spec for this pass.
 
 First task only — run the diagnostic protocol in this task card (D1–D7) and report findings before changing any code.
@@ -431,7 +431,7 @@ Hard constraints:
 Do not change any code until the diagnostic report is reviewed and the patch set is approved.
 
 On completion — this PR closes Operationalise Phase 2. Perform full Workflow E closure:
-1. `docs/MDO_Operationalise_Phase2_Spec.md` — mark ✅ Complete, flip all phase-level ACs to ✅ Done, populate §Diagnostic Findings with: PR 1/PR 2/PR 3 summary, final test count, naming/scope decisions, and any change surface surprises.
-2. `docs/README_specs.md` — move Operationalise Phase 2 to Completed table with test count. Update Current Phase to next candidate (Security/API Hardening).
+1. `docs/specs/MDO_Operationalise_Phase2_Spec.md` — mark ✅ Complete, flip all phase-level ACs to ✅ Done, populate §Diagnostic Findings with: PR 1/PR 2/PR 3 summary, final test count, naming/scope decisions, and any change surface surprises.
+2. `docs/specs/README.md` — move Operationalise Phase 2 to Completed table with test count. Update Current Phase to next candidate (Security/API Hardening).
 3. `docs/AI_TradeAnalyst_Progress.md` — mark Operationalise Phase 2 complete with final test count. Update current phase.
 4. Commit all doc changes on the same branch as the implementation.

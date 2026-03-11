@@ -85,7 +85,7 @@ G1 → G2 → G3 → G4 (A1+A4) → G5 → G6 → G7 → G8 → G9 → G10 → G
 - Dark-theme multi-step form with design token system
 - Steps: Setup → Charts → Context → Checklist → Prompt → Review
 - IndexedDB persistence via `storage_indexeddb.js`
-- Ticket schema v1.0.0 (`docs/schema/ticket.schema.json`)
+- Ticket schema v1.0.0 (`docs/specs/schemas/ticket.schema.json`)
 - Modular script loading in `app/index.html`
 
 ### G2 — Test/Prediction Mode Card (COMPLETE)
@@ -172,7 +172,7 @@ canonical data contract between Track A and Track B.
 - [x] Bridge transport hardening: `/analyse` now enforces request timeout + bounded retry on transient failures
 - [x] Contract regression tests for bridge reliability: transient 5xx retry path and timeout error path
 - [x] Docker Compose (`docker-compose.yml`): one-command local start for app + API together (C2)
-- [x] OpenAPI spec committed (`docs/openapi.json`); `ticket_draft` in API response envelope
+- [x] OpenAPI spec committed (`docs/architecture/openapi.json`); `ticket_draft` in API response envelope
 - [x] **"Run AI Analysis" button** — `app/` POSTs `GroundTruthPacket`-equivalent payload to
       the FastAPI `/analyse` endpoint.
 - [x] **AI Multi-Model Verdict card** — response (`verdict` + `ticket_draft`) populates a
@@ -284,7 +284,7 @@ v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v2.0 → v2.1 → v2.x
 Tasks:
 - [x] Integration test: `run` CLI with 4 real chart PNGs in manual mode → verify prompt pack structure
 - [x] Integration test: `arbiter` CLI with pre-filled stub responses → verify FinalVerdict structure
-- [x] API key setup guide (`docs/api_key_setup.md`)
+- [x] API key setup guide (`docs/runbooks/api_key_setup.md`)
 - [x] Test that `replay` command re-runs Arbiter correctly on saved outputs
 - [x] Add `pytest-asyncio` integration test fixtures for LangGraph pipeline
 - [x] Verify `json_extractor.py` handles known AI response wrapper patterns
@@ -310,7 +310,7 @@ Tasks:
 - [x] `POST /analyse` response includes a `ticket_draft` block ready to import into `app/`
 - [x] `GroundTruthPacket` accepts a `source_ticket_id` for traceability
 - [x] `AnalysisResponse` envelope model (`verdict + ticket_draft + run_id + source_ticket_id`)
-- [x] OpenAPI spec generated from FastAPI and committed to `docs/openapi.json`
+- [x] OpenAPI spec generated from FastAPI and committed to `docs/architecture/openapi.json`
 - [x] `app/scripts/main.js` unpacks `response.verdict` from the v2.0 envelope
 - [x] 48 new contract tests for ticket_draft mapping (225/225 pytest passing)
 - [ ] Webhook/callback support for async pipeline completion (deferred to v2.1+)
@@ -564,7 +564,7 @@ Tasks:
       — `SchedulerMetrics` (in-process), `FetchLog` (SQLite-backed), `KpiReport` formatter
       — `stale_threshold_seconds` added to `thresholds.yaml`
       — `python -m macro_risk_officer kpi` CLI command
-- [x] Add runbook for degraded macro mode (`docs/MRO_RUNBOOK.md`)
+- [x] Add runbook for degraded macro mode (`docs/runbooks/MRO_RUNBOOK.md`)
 
 ---
 
@@ -573,7 +573,7 @@ Tasks:
 This track begins at G6/v2.0 when both schema and API are stable.
 
 ### C1 — Shared Schema Contract (COMPLETE)
-- [x] `docs/openapi.json` committed (FastAPI-generated); `ticket_draft` contract stable
+- [x] `docs/architecture/openapi.json` committed (FastAPI-generated); `ticket_draft` contract stable
 - [x] `ai_analyst` output validated against schema before any `app/` import
 
 ### C2 — Local Server Setup (COMPLETE)
@@ -687,7 +687,7 @@ This track begins at G6/v2.0 when both schema and API are stable.
 | Model strings duplicated across `analyst_nodes.py`, `api_key_manager.py`, `execution_router.py` | Adding a model requires 3+ consistent edits | S — centralize in `MODEL_REGISTRY` |
 | MRO scheduler as module-level singleton — not injectable, not per-worker-safe | Limits testability and multi-worker deployment | M — move to `app.state` + FastAPI `lifespan` startup (pattern now established by HIGH-8) |
 | `storage_indexeddb.js` is a stub — localStorage growth ceiling | Long-term journal retention at risk | L — implement real IndexedDB adapter |
-| No shared `analyst_output.schema.json` canonical spec | JS and Python output shapes drift silently | M — define in `docs/schema/`, validate both sides |
+| No shared `analyst_output.schema.json` canonical spec | JS and Python output shapes drift silently | M — define in `docs/specs/schemas/`, validate both sides |
 
 ---
 
@@ -820,7 +820,7 @@ base with `main` (predates current repo structure) and can be safely deleted.
    - Dockerfile: added non-root `appuser` with `USER appuser` directive.
    - `docker-compose.prod.yml`: `security_opt: no-new-privileges:true`, `read_only: true`, `tmpfs: /tmp:size=100M`, `PYTHONDONTWRITEBYTECODE=1`.
 20. [x] Secrets manager integration
-   - Added `docs/secrets_manager.md` with detailed setup for AWS Secrets Manager (ECS task definition + entrypoint injection), GCP Secret Manager (Cloud Run + GKE), and HashiCorp Vault (Agent sidecar + entrypoint injection).
+   - Added `docs/runbooks/secrets_manager.md` with detailed setup for AWS Secrets Manager (ECS task definition + entrypoint injection), GCP Secret Manager (Cloud Run + GKE), and HashiCorp Vault (Agent sidecar + entrypoint injection).
    - Added key rotation guide and injection verification steps.
    - Updated `.env.example` header with quick-reference injection commands for all three platforms.
 
@@ -868,8 +868,8 @@ base with `main` (predates current repo structure) and can be safely deleted.
 
 ## Stage 1 — Audit Program (COMPLETE — 2026-03-05)
 
-> All 5 audits executed. Full report: `docs/audit_programme_2026-03-05.md`.
-> Deliverables: `docs/audit_0_orientation_risk_map.md` (Audit 0 architecture + risk map).
+> All 5 audits executed. Full report: `docs/archive/audit_programme_2026-03-05.md`.
+> Deliverables: `docs/archive/audit_0_orientation_risk_map.md` (Audit 0 architecture + risk map).
 > New tests: 45 total (19 + 16 JS, 10 Python). All pass.
 
 ### Audit execution order (completed)
@@ -880,7 +880,7 @@ base with `main` (predates current repo structure) and can be safely deleted.
 5. [x] **Audit 4 — Security + Secrets + Supply Chain** — 16 findings (3 CRIT, 5 HIGH, 5 MED, 3 LOW); threat model delivered
 
 ### Audit 0 — Repo Orientation + Risk Map
-- [x] Read/summary targets: `README.md`, `app/`, `ai_analyst/`, `macro_risk_officer/`, `docs/schema/`, `tests/`, `.github/workflows/`.
+- [x] Read/summary targets: `README.md`, `app/`, `ai_analyst/`, `macro_risk_officer/`, `docs/specs/schemas/`, `tests/`, `.github/workflows/`.
 - [x] Deliverable: 1-page architecture sketch (`app ↔ bridge ↔ ai_analyst ↔ MRO`).
 - [x] Deliverable: top-12 risk map grouped by Correctness / Security / DX / Maintainability / Release.
 - [x] Deliverable: concrete audit sequence for Audits 1–4 with file-level rationale.
@@ -897,7 +897,7 @@ base with `main` (predates current repo structure) and can be safely deleted.
 - [x] Acceptance: `node --test tests/*.js` passes (218/218); no manual/hybrid regression.
 
 ### Audit 1 — Schema + Contract Governance
-- [x] Scope: `docs/schema/*.schema.json`, `app/scripts/schema/`, `app/scripts/state/`, `app/scripts/exports/`, `ai_analyst/models/`.
+- [x] Scope: `docs/specs/schemas/*.schema.json`, `app/scripts/schema/`, `app/scripts/state/`, `app/scripts/exports/`, `ai_analyst/models/`.
 - [x] Verify end-to-end contract enforcement for ticket + AAR:
   - [x] export validates before download
   - [x] import validates before migration/application

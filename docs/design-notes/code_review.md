@@ -160,7 +160,7 @@ The test file reimplements gate logic as a standalone pure function and tests th
 
 ### 10. Enum definitions duplicated between schema JSON and validation JS
 
-**Files:** `docs/schema/ticket.schema.json`, `docs/schema/aar.schema.json`, `app/scripts/schema/backup_validation.js`
+**Files:** `docs/specs/schemas/ticket.schema.json`, `docs/specs/schemas/aar.schema.json`, `app/scripts/schema/backup_validation.js`
 
 Enum arrays are written twice: once in the JSON schemas and once in the validation module. They can drift silently. The `test_enums.js` suite tests the JS-side enums but does not cross-check them against the JSON schemas.
 
