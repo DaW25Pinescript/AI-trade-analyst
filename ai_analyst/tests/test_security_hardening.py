@@ -331,8 +331,10 @@ class TestJsonFormValidationDetail:
             )
         assert resp.status_code == 422
         detail = resp.json()["detail"]
-        assert "form field 'timeframes'" in detail
-        assert "Received: 'not-json'" in detail
+        assert detail["field"] == "timeframes"
+        assert "form field 'timeframes'" in detail["message"]
+        assert detail["raw_value"] == "'not-json'"
+        assert detail["request_id"] is not None
 
     def test_analyse_known_array_field_reports_contract_message(self, monkeypatch):
         monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
@@ -345,10 +347,10 @@ class TestJsonFormValidationDetail:
             )
         assert resp.status_code == 422
         detail = resp.json()["detail"]
-        assert "Field 'no_trade_windows' must be a JSON array." in detail
-        assert 'Example: ["NFP"]' in detail
-        assert 'Received: "NFP"' not in detail  # repr should include single-quoted raw JSON text
-        assert "Received: '\"NFP\"'" in detail
+        assert detail["field"] == "no_trade_windows"
+        assert "must be a JSON array" in detail["message"]
+        assert detail["expected_shape"] == 'JSON array like ["NFP"]'
+        assert detail["raw_value"] == '\'"NFP"\''
 
     def test_analyse_stream_array_field_reports_received_value(self, monkeypatch):
         monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
@@ -361,8 +363,41 @@ class TestJsonFormValidationDetail:
             )
         assert resp.status_code == 422
         detail = resp.json()["detail"]
-        assert "Field 'open_positions' must be a JSON array." in detail
-        assert "Received: '1'" in detail
+        assert detail["field"] == "open_positions"
+        assert "must be a JSON array" in detail["message"]
+        assert detail["raw_value"] == "'1'"
+
+
+    def test_dev_parse_logging_includes_raw_field(self, monkeypatch, caplog):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setenv("AI_ANALYST_DEV_DIAGNOSTICS", "true")
+        caplog.set_level("INFO")
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["timeframes"] = "H4"
+            client.post(
+                "/analyse", data=data, files=files,
+                headers={"X-API-Key": "test-key", "X-Request-ID": "req-parse-log"},
+            )
+        assert "[dev-parse] request_id=req-parse-log field=timeframes raw='H4'" in caplog.text
+
+
+class TestDevDiagnosticsPersistence:
+    def test_parse_failure_writes_fallback_diagnostics_jsonl(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("AI_ANALYST_API_KEY", "test-key")
+        monkeypatch.setenv("AI_ANALYST_DEV_DIAGNOSTICS", "true")
+        monkeypatch.setattr(api_main, "_DEV_DIAGNOSTICS_FALLBACK_PATH", tmp_path / "diag.jsonl")
+        with TestClient(api_main.app) as client:
+            data, files = _multipart_payload()
+            data["timeframes"] = "H4"
+            client.post(
+                "/analyse", data=data, files=files,
+                headers={"X-API-Key": "test-key", "X-Request-ID": "req-diag-1"},
+            )
+
+        content = (tmp_path / "diag.jsonl").read_text(encoding="utf-8")
+        assert "\"request_id\": \"req-diag-1\"" in content
+        assert "\"final_status\": \"failed\"" in content
 
 
 # ── Stub graph for happy-path tests ──────────────────────────────────────────

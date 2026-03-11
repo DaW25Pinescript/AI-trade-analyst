@@ -33,6 +33,7 @@ Source of truth for phase/status remains `docs/AI_TradeAnalyst_Progress.md`.
 ### 4) AI analysis engine / multi-analyst pipeline
 - FastAPI entry and orchestration surface: `ai_analyst/api/main.py` (`/analyse`, `/analyse/stream`, triage/journey endpoints).
 - Core analysis graph: `ai_analyst/graph/pipeline.py` (validate → macro context + chart setup fan-out → lenses → optional deliberation/overlay → arbiter).
+- Dev-mode diagnostics layer (local-only): request-id anchored parse/lifecycle tracing and per-run diagnostics records for `/analyse` failure triage (gated by `AI_ANALYST_DEV_DIAGNOSTICS`/`DEBUG`).
 - Prompting/model routing/config surfaces: `ai_analyst/prompt_library/*`, `ai_analyst/llm_router/*`, `config/llm_routing.yaml`.
 
 ### 5) Arbiter / verdict / governance

@@ -27,6 +27,7 @@ import logging
 import os
 import time
 import threading
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +44,58 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+def _dev_diagnostics_enabled() -> bool:
+    return (
+        os.getenv("AI_ANALYST_DEV_DIAGNOSTICS", "").lower() == "true"
+        or os.getenv("DEBUG", "").lower() == "true"
+    )
+
+
+_DEV_DIAGNOSTICS_FALLBACK_PATH = Path(__file__).resolve().parent.parent / "output" / "runs" / "_dev_diagnostics.jsonl"
+
+
+class DevDiagnosticsTrace:
+    """Collect dev-only request lifecycle events and persist structured diagnostics."""
+
+    def __init__(self, request_id: str, path: str, method: str):
+        self.request_id = request_id
+        self.path = path
+        self.method = method
+        self.started_at = datetime.now(timezone.utc).isoformat()
+        self.events: list[dict] = []
+
+    def stage(self, stage_name: str, **payload) -> None:
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "request_id": self.request_id,
+            "stage": stage_name,
+            "payload": payload,
+        }
+        self.events.append(entry)
+        logger.info("[dev-stage] request_id=%s stage=%s payload=%s", self.request_id, stage_name, payload)
+
+    def persist(self, *, run_id: Optional[str], final_status: str, error_detail: Optional[str] = None) -> None:
+        record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "request_id": self.request_id,
+            "run_id": run_id,
+            "request": {"path": self.path, "method": self.method},
+            "started_at": self.started_at,
+            "final_status": final_status,
+            "error_detail": error_detail,
+            "events": self.events,
+        }
+        if run_id:
+            out_path = get_run_dir(run_id) / "dev_diagnostics.json"
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(json.dumps(record, indent=2, default=str), encoding="utf-8")
+            return
+
+        _DEV_DIAGNOSTICS_FALLBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _DEV_DIAGNOSTICS_FALLBACK_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, default=str) + "\n")
 
 # ── Secret masking for log messages (audit #3 — CWE-209) ─────────────────
 import re as _re
@@ -199,27 +252,43 @@ def _parse_json_form_field(
     *,
     expect_array: bool = False,
     array_example: Optional[str] = None,
+    request_id: Optional[str] = None,
 ):
     """Parse a JSON-backed form field and surface field-specific 422 details."""
+    if _dev_diagnostics_enabled():
+        logger.info("[dev-parse] request_id=%s field=%s raw=%s", request_id or "n/a", field_name, repr(raw_value))
+
     try:
         parsed = json.loads(raw_value)
     except json.JSONDecodeError as exc:
+        expected_shape = f"JSON array like {array_example}" if expect_array and array_example else "valid JSON"
         raise HTTPException(
             status_code=422,
-            detail=(
-                f"JSON parse error in form field '{field_name}': {exc}. "
-                f"Received: {_format_form_value(raw_value)}"
-            ),
+            detail={
+                "message": (
+                    f"JSON parse error in form field '{field_name}': expected {expected_shape}; "
+                    f"received {_format_form_value(raw_value)}"
+                ),
+                "field": field_name,
+                "raw_value": _format_form_value(raw_value),
+                "expected_shape": expected_shape,
+                "parse_error": str(exc),
+                "request_id": request_id,
+            },
         )
 
     if expect_array and not isinstance(parsed, list):
-        example_suffix = f" Example: {array_example}." if array_example else ""
+        expected_shape = f"JSON array like {array_example}" if array_example else "JSON array"
         raise HTTPException(
             status_code=422,
-            detail=(
-                f"Field '{field_name}' must be a JSON array.{example_suffix} "
-                f"Received: {_format_form_value(raw_value)}"
-            ),
+            detail={
+                "message": f"Field '{field_name}' must be a JSON array; received {_format_form_value(raw_value)}",
+                "field": field_name,
+                "raw_value": _format_form_value(raw_value),
+                "expected_shape": expected_shape,
+                "parse_error": None,
+                "request_id": request_id,
+            },
         )
 
     return parsed
@@ -639,25 +708,41 @@ async def analyse(
         ),
     ),
 ):
+    request_id = request.headers.get("X-Request-ID") or request.headers.get("X-Run-ID") or str(uuid.uuid4())
+    dev_trace = DevDiagnosticsTrace(request_id=request_id, path=request.url.path, method=request.method) if _dev_diagnostics_enabled() else None
+
     # ── Triage-path entry log ──────────────────────────────────────────────
-    logger.info("[analyse] POST /analyse received — instrument=%s triage_mode=%s smoke_mode=%s ts=%s",
-                instrument, triage_mode, smoke_mode, datetime.now(timezone.utc).isoformat())
+    logger.info("[analyse] request_id=%s POST /analyse received — instrument=%s triage_mode=%s smoke_mode=%s ts=%s",
+                request_id, instrument, triage_mode, smoke_mode, datetime.now(timezone.utc).isoformat())
+    if dev_trace:
+        dev_trace.stage("request_received", instrument=instrument, triage_mode=triage_mode, smoke_mode=smoke_mode)
+        dev_trace.stage("auth_passed", endpoint="/analyse")
 
     # ── Rate limit check (HIGH-7) ────────────────────────────────────────────
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
 
     # ── Parse JSON fields ────────────────────────────────────────────────────
-    tf_list: list[str] = _parse_json_form_field(
-        "timeframes", timeframes, expect_array=True, array_example='["H4","M15","M5"]'
-    )
-    no_trade_list: list[str] = _parse_json_form_field(
-        "no_trade_windows", no_trade_windows, expect_array=True, array_example='["NFP"]'
-    )
-    open_pos_list: list = _parse_json_form_field("open_positions", open_positions, expect_array=True)
-    overlay_claims_list: list[str] = _parse_json_form_field(
-        "overlay_indicator_claims", overlay_indicator_claims, expect_array=True
-    )
+    if dev_trace:
+        dev_trace.stage("request_parsing_start")
+    try:
+        tf_list: list[str] = _parse_json_form_field(
+            "timeframes", timeframes, expect_array=True, array_example='["H4","M15","M5"]', request_id=request_id
+        )
+        no_trade_list: list[str] = _parse_json_form_field(
+            "no_trade_windows", no_trade_windows, expect_array=True, array_example='["NFP"]', request_id=request_id
+        )
+        open_pos_list: list = _parse_json_form_field("open_positions", open_positions, expect_array=True, request_id=request_id)
+        overlay_claims_list: list[str] = _parse_json_form_field(
+            "overlay_indicator_claims", overlay_indicator_claims, expect_array=True, request_id=request_id
+        )
+        if dev_trace:
+            dev_trace.stage("request_parsing_success")
+    except HTTPException as exc:
+        if dev_trace:
+            dev_trace.stage("request_parsing_failure", error=exc.detail)
+            dev_trace.persist(run_id=None, final_status="failed", error_detail=str(exc.detail))
+        raise
 
     # ── Sanitise user inputs before they reach LLM prompts (audit #2) ─────
     try:
@@ -764,7 +849,14 @@ async def analyse(
             triage_mode=triage_mode,
         )
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Ground Truth Packet validation failed: {e}")
+        if dev_trace:
+            dev_trace.stage("request_parsing_failure", error=str(e))
+            dev_trace.persist(run_id=None, final_status="failed", error_detail=f"Ground Truth Packet validation failed: {e}")
+        raise HTTPException(status_code=422, detail={"message": f"Ground Truth Packet validation failed: {e}", "request_id": request_id})
+
+    if dev_trace:
+        dev_trace.stage("request_id_assigned", run_id=ground_truth.run_id)
+        dev_trace.stage("graph_build_start")
 
     lens_config = LensConfig(
         ICT_ICC=lens_ict_icc,
@@ -807,14 +899,23 @@ async def analyse(
     # Phase 3: set correlation context for structured logging
     ctx_token = correlation_ctx.set(ground_truth.run_id)
     try:
+        if dev_trace:
+            dev_trace.stage("graph_build_success")
+            dev_trace.stage("analyst_fanout_start")
         final_state = await asyncio.wait_for(
             request.app.state.graph.ainvoke(initial_state),
             timeout=GRAPH_TIMEOUT_SECONDS,
         )
+        if dev_trace:
+            dev_trace.stage("analyst_fanout_complete", analyst_count=len(final_state.get("analyst_outputs", [])))
+            dev_trace.stage("arbiter_success", has_verdict=bool(final_state.get("final_verdict")))
     except asyncio.TimeoutError:
         logger.error("Graph execution timed out after %.0fs for run_id=%s",
                       GRAPH_TIMEOUT_SECONDS, ground_truth.run_id)
-        raise HTTPException(status_code=504, detail="Analysis timed out. Please try again later.")
+        if dev_trace:
+            dev_trace.stage("graph_build_failure", error="timeout")
+            dev_trace.persist(run_id=ground_truth.run_id, final_status="failed", error_detail="Analysis timed out")
+        raise HTTPException(status_code=504, detail={"message": "Analysis timed out. Please try again later.", "request_id": request_id, "run_id": ground_truth.run_id})
     except RuntimeError as e:
         if _smoke_mode:
             return JSONResponse(content={
@@ -829,7 +930,10 @@ async def analyse(
             })
         # Propagate pipeline failures (e.g. insufficient analysts) as 503
         logger.error("Pipeline RuntimeError: %s", _mask_secrets(str(e)))
-        raise HTTPException(status_code=503, detail="Analysis failed. Check server logs.")
+        if dev_trace:
+            dev_trace.stage("graph_build_failure", error=_mask_secrets(str(e)))
+            dev_trace.persist(run_id=ground_truth.run_id, final_status="failed", error_detail=_mask_secrets(str(e)))
+        raise HTTPException(status_code=503, detail={"message": "Analysis failed. Check server logs.", "request_id": request_id, "run_id": ground_truth.run_id})
     except Exception as exc:
         if _smoke_mode:
             return JSONResponse(content={
@@ -843,7 +947,10 @@ async def analyse(
                 },
             })
         logger.error("Pipeline error: %s: %s", type(exc).__name__, _mask_secrets(str(exc)))
-        raise HTTPException(status_code=500, detail="Internal pipeline error. Check server logs.")
+        if dev_trace:
+            dev_trace.stage("graph_build_failure", error=f"{type(exc).__name__}: {_mask_secrets(str(exc))}")
+            dev_trace.persist(run_id=ground_truth.run_id, final_status="failed", error_detail=f"{type(exc).__name__}: {_mask_secrets(str(exc))}")
+        raise HTTPException(status_code=500, detail={"message": "Internal pipeline error. Check server logs.", "request_id": request_id, "run_id": ground_truth.run_id})
     finally:
         correlation_ctx.reset(ctx_token)
 
@@ -863,6 +970,8 @@ async def analyse(
         })
 
     verdict: FinalVerdict = final_state["final_verdict"]
+    if dev_trace:
+        dev_trace.stage("artifact_write_start", run_id=ground_truth.run_id)
     ticket_draft = build_ticket_draft(verdict, ground_truth)
     usage_summary = _load_usage_summary(ground_truth.run_id)
 
@@ -881,6 +990,10 @@ async def analyse(
     # Smoke mode: inject debug_analyst_counts into successful response too
     if _smoke_mode:
         resp_data["debug_analyst_counts"] = _debug_counts
+    if dev_trace:
+        dev_trace.stage("artifact_write_success", run_id=ground_truth.run_id)
+        dev_trace.stage("request_complete", status="success")
+        dev_trace.persist(run_id=ground_truth.run_id, final_status="success")
     return JSONResponse(content=resp_data)
 
 
@@ -953,21 +1066,31 @@ async def analyse_stream(
       {"type": "verdict", "verdict": { ... FinalVerdict ... }}
       {"type": "error", "detail": "..."}
     """
+    request_id = request.headers.get("X-Request-ID") or request.headers.get("X-Run-ID") or str(uuid.uuid4())
+    dev_trace = DevDiagnosticsTrace(request_id=request_id, path=request.url.path, method=request.method) if _dev_diagnostics_enabled() else None
+    if dev_trace:
+        dev_trace.stage("request_received", stream=True, instrument=instrument)
+        dev_trace.stage("auth_passed", endpoint="/analyse/stream")
+
     # ── Rate limit check ─────────────────────────────────────────────────────
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
 
     # ── Parse JSON fields ────────────────────────────────────────────────────
+    if dev_trace:
+        dev_trace.stage("request_parsing_start")
     tf_list: list[str] = _parse_json_form_field(
-        "timeframes", timeframes, expect_array=True, array_example='["H4","M15","M5"]'
+        "timeframes", timeframes, expect_array=True, array_example='["H4","M15","M5"]', request_id=request_id
     )
     no_trade_list: list[str] = _parse_json_form_field(
-        "no_trade_windows", no_trade_windows, expect_array=True, array_example='["NFP"]'
+        "no_trade_windows", no_trade_windows, expect_array=True, array_example='["NFP"]', request_id=request_id
     )
-    open_pos_list: list = _parse_json_form_field("open_positions", open_positions, expect_array=True)
+    open_pos_list: list = _parse_json_form_field("open_positions", open_positions, expect_array=True, request_id=request_id)
     overlay_claims_list: list[str] = _parse_json_form_field(
-        "overlay_indicator_claims", overlay_indicator_claims, expect_array=True
+        "overlay_indicator_claims", overlay_indicator_claims, expect_array=True, request_id=request_id
     )
+    if dev_trace:
+        dev_trace.stage("request_parsing_success")
 
     # ── Sanitise user inputs before they reach LLM prompts (audit #2) ─────
     try:
@@ -1055,7 +1178,10 @@ async def analyse_stream(
             ),
         )
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Ground Truth Packet validation failed: {e}")
+        if dev_trace:
+            dev_trace.stage("request_parsing_failure", error=str(e))
+            dev_trace.persist(run_id=None, final_status="failed", error_detail=f"Ground Truth Packet validation failed: {e}")
+        raise HTTPException(status_code=422, detail={"message": f"Ground Truth Packet validation failed: {e}", "request_id": request_id})
 
     lens_config = LensConfig(
         ICT_ICC=lens_ict_icc,
@@ -1091,6 +1217,9 @@ async def analyse_stream(
 
     # Phase 3: set correlation context for structured logging
     correlation_ctx.set(ground_truth.run_id)
+    if dev_trace:
+        dev_trace.stage("request_id_assigned", run_id=ground_truth.run_id)
+        dev_trace.stage("graph_build_start")
 
     # ── Register progress queue and stream ───────────────────────────────────
     run_id = ground_truth.run_id
@@ -1120,6 +1249,10 @@ async def analyse_stream(
             # Pipeline complete — emit final verdict
             final_state = await pipeline_task
             verdict: FinalVerdict = final_state["final_verdict"]
+            if dev_trace:
+                dev_trace.stage("graph_build_success")
+                dev_trace.stage("request_complete", status="success")
+                dev_trace.persist(run_id=run_id, final_status="success")
             yield f"data: {json.dumps({'type': 'verdict', 'verdict': verdict.model_dump()})}\n\n"
 
             # Budget guard (non-blocking warning only)
@@ -1129,10 +1262,16 @@ async def analyse_stream(
         except asyncio.TimeoutError:
             logger.error("Stream graph execution timed out after %.0fs for run_id=%s",
                           GRAPH_TIMEOUT_SECONDS, run_id)
-            yield f"data: {json.dumps({'type': 'error', 'detail': 'Analysis timed out. Please try again later.'})}\n\n"
+            if dev_trace:
+                dev_trace.stage("graph_build_failure", error="timeout")
+                dev_trace.persist(run_id=run_id, final_status="failed", error_detail="Analysis timed out")
+            yield f"data: {json.dumps({'type': 'error', 'detail': 'Analysis timed out. Please try again later.', 'request_id': request_id, 'run_id': run_id})}\n\n"
         except RuntimeError as exc:
             logger.error("Stream pipeline RuntimeError: %s", _mask_secrets(str(exc)))
-            yield f"data: {json.dumps({'type': 'error', 'detail': 'Analysis failed. Check server logs.'})}\n\n"
+            if dev_trace:
+                dev_trace.stage("graph_build_failure", error=_mask_secrets(str(exc)))
+                dev_trace.persist(run_id=run_id, final_status="failed", error_detail=_mask_secrets(str(exc)))
+            yield f"data: {json.dumps({'type': 'error', 'detail': 'Analysis failed. Check server logs.', 'request_id': request_id, 'run_id': run_id})}\n\n"
         except Exception as exc:
             logger.error("Stream pipeline error: %s: %s", type(exc).__name__, _mask_secrets(str(exc)))
             yield "data: {\"type\":\"error\",\"detail\":\"Internal pipeline error\"}\n\n"

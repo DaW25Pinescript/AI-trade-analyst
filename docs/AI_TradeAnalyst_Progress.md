@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 10 March 2026  
+**Last updated:** 11 March 2026  
 **Review date:** 10 March 2026  
-**Current phase:** Cleanup & Observability — Async marker tidy, observability improvements
+**Current phase:** Cleanup & Observability — Async marker tidy, dev diagnostics for /analyse
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -21,7 +21,7 @@
 
 - **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening.
 - **Current phase:** **Cleanup & Observability** (async marker tidy + observability/seam confidence improvements).
-- **Next actions:** execute async-marker tidy, pick TD-5 or TD-9 micro-PR, and progress observability workstream planning.
+- **Next actions:** execute async-marker tidy, expand dev diagnostics from AI Analyst lane to adjacent API seams, and pick TD-5 or TD-9 micro-PR.
 - **Active decision gate:** production-readiness gate is satisfied after CI Seam Hardening closure; focus is now cleanup quality and operational confidence.
 
 ## 1) Executive Snapshot
@@ -36,6 +36,14 @@ The repository is in a **strong implementation state**:
   - **TD-2** — `call_llm()` without timeout/retry safeguards
 - **TD-10** (LLM failure modes under-tested) was also closed as a side-effect of the TD-2 resilience test work.
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
+
+
+### Latest increment — AI Analyst dev diagnostics (11 Mar 2026)
+
+- Added dev-gated diagnostics for `/analyse` and `/analyse/stream` to improve local failure triage without external observability tooling.
+- JSON-backed multipart fields now emit raw-value parse logs in dev mode and return structured 422 details (`field`, `raw_value`, `expected_shape`, parse error, `request_id`).
+- Request lifecycle stage tracing now records high-signal checkpoints (request/auth/parse/graph/fan-out/arbiter/artifact/complete) and persists local diagnostics records per request.
+- Added `AI_ANALYST_DEV_DIAGNOSTICS=true` / `DEBUG=true` gating so production behavior remains conservative by default.
 
 ### Current position (plain language)
 
