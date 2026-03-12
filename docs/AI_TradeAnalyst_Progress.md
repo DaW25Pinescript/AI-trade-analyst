@@ -40,6 +40,16 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
+### Latest increment — Observability Phase 2 diagnostic pass (12 Mar 2026)
+
+- Executed the full Section 10 diagnostic protocol for cross-lane runtime visibility.
+- Audited logging infrastructure across 8 runtime lanes: analyst, analyst API, MDO scheduler, MDO feed pipeline, MDO officer, MRO/feeder ingest, triage, graph orchestration.
+- Key findings: analyst pipeline (P1) has rich structured observability; MDO scheduler logs structured data as unstructured text; MDO feed pipeline uses only `print()`; feeder_ingest.py has zero logging; triage has no partial-failure classification; APScheduler has no event listeners.
+- Audited /metrics, /dashboard, /e2e endpoints — all are analyst-pipeline-only with no MDO/feeder/scheduler data.
+- Baseline test suite: 1218 passed (435 ai_analyst + 139 tests + 644 MDO), 70 pre-existing failures, 4 collection errors.
+- Published spec: `docs/specs/observability_phase_2.md` with logging inventory, failure taxonomy (15 classes), 6-file patch set (~275 lines), lane prioritization (scheduler → triage → feeder → graph).
+- No code changes — diagnostic only. Implementation awaits approval.
+
 ### Latest increment — UI Phase 3A workspace blueprint + visual design (12 Mar 2026)
 
 - Completed the full workspace blueprint and visual design layer for Phase 3A core product workspaces.
@@ -100,7 +110,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | UI Phase 3A | Workspace Blueprint + Visual Design — wireframes, component system, design notes, visual appendix | ✅ Complete |
 | UI Phase 3A Impl | First UI implementation slice — Triage Board + Journey Studio build | ⏸️ Parked |
 | UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
-| Observability Phase 2 | Cross-lane runtime visibility and failure surface clarification | ▶️ Next |
+| Observability Phase 2 | Cross-lane runtime visibility and failure surface clarification — diagnostic pass complete | ▶️ In Progress (diagnostic done, implementation pending approval) |
 | TD-3 | Packaging/import-path stability (`sys.path.insert` cleanup) | ⏳ Pending (after Obs P2) |
 | Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ⏳ Pending (after TD-3) |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending (included in cleanup tranche) |
@@ -164,6 +174,7 @@ Phase-closure counts should be read as **phase-gate numbers**, not as a single a
 | CI Seam Hardening | 1743 | MDO + root Python seams CI-gated, stream event semantics, 5 CI jobs |
 | LLM Routing Centralisation | 643 | Single-source routing via ResolvedRoute; 13 bypass removals; 27 new deterministic route/bypass tests |
 | Observability Phase 1 | 668 | Run record + stdout summary; per-analyst result/skip/fail visibility; 25 new deterministic tests |
+| Observability Phase 2 (diagnostic) | 1218 passed, 70 failed (pre-existing), 4 collection errors | Cross-lane diagnostic baseline: ai_analyst 435, tests 139, MDO 644. Failures are code-vs-test drift, not new regressions. |
 
 ### Known gaps and debt themes
 
@@ -333,7 +344,7 @@ Reduce the architectural split between runtime lanes and address broader converg
 4. ~~UI Phase 1 — Backend Capability Audit~~ — ✅ Complete (12 March 2026). `docs/ui/UI_BACKEND_AUDIT.md`.
 5. ~~UI Phase 2 — UI Contract~~ — ✅ Complete (12 March 2026). `docs/ui/UI_CONTRACT.md` promoted to **Active**.
 6. ~~UI Phase 3A — Workspace Blueprint + Visual Design~~ — ✅ Complete (12 March 2026). `UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`, wireframes, and component design system all locked.
-7. Draft and execute **Observability Phase 2** — cross-lane runtime visibility and failure surface clarification. This is the highest-value non-UI work remaining.
+7. **Observability Phase 2** — diagnostic pass complete (12 March 2026). Spec at `docs/specs/observability_phase_2.md` with full diagnostic: logging inventory, per-lane audit, failure taxonomy, patch set proposal (~275 lines across 6 files). Awaiting approval before implementation.
 8. After Obs P2 closes, execute **TD-3** — packaging/import-path stability (`sys.path.insert` → proper packaging).
 9. After TD-3, execute **cleanup tranche** — async markers, TD-5 (enum centralisation), TD-9 (unused vars), doc index reconciliation.
 10. **UI Phase 3A implementation** remains parked and ready for pickup after the runtime-hardening sequence.
