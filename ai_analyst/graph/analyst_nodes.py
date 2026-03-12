@@ -289,20 +289,20 @@ async def parallel_analyst_node(state: GraphState) -> GraphState:
             configs_used.append(config)
             analyst_results.append({
                 "persona": persona, "status": "success",
-                "model": model, "provider": route.api_base or "default",
+                "model": model, "provider": route.provider,
             })
         elif isinstance(result, ValidationError):
             logger.warning("Analyst '%s' Phase 1 returned schema-invalid output: %s", model, result)
             analyst_results.append({
                 "persona": persona, "status": "failed",
-                "model": model, "provider": route.api_base or "default",
+                "model": model, "provider": route.provider,
                 "reason": f"schema_validation: {str(result)[:200]}",
             })
         else:
             logger.warning("Analyst '%s' Phase 1 failed with error: %s", model, result)
             analyst_results.append({
                 "persona": persona, "status": "failed",
-                "model": model, "provider": route.api_base or "default",
+                "model": model, "provider": route.provider,
                 "reason": f"{type(result).__name__}: {str(result)[:200]}",
             })
 

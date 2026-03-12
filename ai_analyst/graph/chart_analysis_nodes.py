@@ -77,6 +77,9 @@ async def chart_lenses_node(state: GraphState) -> dict:
         "analyst_outputs": result_state["analyst_outputs"],
         "analyst_configs_used": result_state.get("analyst_configs_used", []),
     }
+    # Observability: propagate per-analyst result/skip/fail records
+    if "_analyst_results" in result_state:
+        update["_analyst_results"] = result_state["_analyst_results"]
     # Smoke mode: propagate captured error if the analyst LLM failed
     if "_smoke_error" in result_state:
         update["_smoke_error"] = result_state["_smoke_error"]

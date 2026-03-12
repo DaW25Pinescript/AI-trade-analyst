@@ -231,7 +231,7 @@ async def arbiter_node(state: GraphState) -> GraphState:
     # Observability Phase 1 — arbiter metadata for run record assembly
     state["_arbiter_meta"] = {
         "model": route.model,
-        "provider": route.api_base or "default",
+        "provider": route.provider,
         "duration_ms": round((time.perf_counter() - _arbiter_t0) * 1000),
     }
     return state
