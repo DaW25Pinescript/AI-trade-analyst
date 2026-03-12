@@ -388,7 +388,6 @@ class TestFallbackModelRouting:
         fallbacks = get_fallback_models("gpt-4o")
         assert "gpt-4o-mini" in fallbacks  # should use defaults
 
-    @pytest.mark.asyncio
     async def test_fallback_succeeds_after_primary_fails(self):
         """When primary model fails, fallback model is tried and succeeds."""
         from ai_analyst.core.llm_client import acompletion_with_fallback
@@ -416,7 +415,6 @@ class TestFallbackModelRouting:
         assert model_used != "gpt-4o"
         assert model_used in ("gpt-4o-mini", "claude-haiku-4-5-20251001")
 
-    @pytest.mark.asyncio
     async def test_primary_succeeds_no_fallback_needed(self):
         """When primary model succeeds, no fallback is attempted."""
         from ai_analyst.core.llm_client import acompletion_with_fallback
@@ -437,7 +435,6 @@ class TestFallbackModelRouting:
         assert model_used == "gpt-4o"
         assert len(models_called) == 1
 
-    @pytest.mark.asyncio
     async def test_all_models_fail_raises(self):
         """When all models (primary + fallbacks) fail, RuntimeError is raised."""
         from ai_analyst.core.llm_client import acompletion_with_fallback
@@ -454,7 +451,6 @@ class TestFallbackModelRouting:
                 max_retries=0,
             )
 
-    @pytest.mark.asyncio
     async def test_no_fallbacks_defined_raises_original(self):
         """When no fallbacks are defined for a model, the original error propagates."""
         from ai_analyst.core.llm_client import acompletion_with_fallback

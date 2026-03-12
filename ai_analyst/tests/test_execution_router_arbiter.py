@@ -19,8 +19,6 @@ import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from macro_risk_officer.core.models import AssetPressure, MacroContext
 from ai_analyst.core.execution_router import ExecutionRouter
 from ai_analyst.models.analyst_output import AnalystOutput
@@ -118,7 +116,6 @@ def _stub_verdict_json() -> str:
 # ── Tests ──────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_injected_macro_context_reaches_arbiter_prompt(
     sample_ground_truth, sample_lens_config, tmp_path, monkeypatch
 ):
@@ -163,7 +160,6 @@ async def test_injected_macro_context_reaches_arbiter_prompt(
     )
 
 
-@pytest.mark.asyncio
 async def test_mro_failure_produces_unavailability_notice_not_exception(
     sample_ground_truth, sample_lens_config, tmp_path, monkeypatch
 ):
@@ -207,7 +203,6 @@ async def test_mro_failure_produces_unavailability_notice_not_exception(
     assert "macro_context_available: false" in captured[0]
 
 
-@pytest.mark.asyncio
 async def test_overlay_was_provided_true_when_m15_overlay_in_packet(
     sample_ground_truth_with_overlay, sample_lens_config, tmp_path, monkeypatch
 ):
@@ -249,7 +244,6 @@ async def test_overlay_was_provided_true_when_m15_overlay_in_packet(
     assert "overlay_was_provided: true" in captured[0]
 
 
-@pytest.mark.asyncio
 async def test_overlay_was_provided_false_when_no_m15_overlay(
     sample_ground_truth, sample_lens_config, tmp_path, monkeypatch
 ):

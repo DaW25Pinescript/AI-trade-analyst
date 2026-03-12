@@ -1,14 +1,11 @@
 import json
 from types import SimpleNamespace
 
-import pytest
-
 from ai_analyst.core.is_text_only import is_text_only
 from ai_analyst.core.run_paths import get_run_dir
 from ai_analyst.core.usage_meter import acompletion_metered
 
 
-@pytest.mark.asyncio
 async def test_text_only_routes_to_wrapper(monkeypatch, tmp_path):
     monkeypatch.setenv("AI_ANALYST_LLM_BACKEND", "claude_code_api")
 
@@ -37,7 +34,6 @@ async def test_text_only_routes_to_wrapper(monkeypatch, tmp_path):
     assert row["backend"] == "claude_code_api"
 
 
-@pytest.mark.asyncio
 async def test_multimodal_does_not_route_to_wrapper(monkeypatch, tmp_path):
     monkeypatch.setenv("AI_ANALYST_LLM_BACKEND", "claude_code_api")
 

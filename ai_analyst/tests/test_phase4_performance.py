@@ -7,7 +7,6 @@ Covers:
   - MacroScheduler._refresh() uses ThreadPoolExecutor (parallel source fetches)
   - Pipeline parallel fan-out: both nodes run before chart_lenses
 """
-import pytest
 from unittest.mock import patch, MagicMock
 
 
@@ -16,7 +15,6 @@ from unittest.mock import patch, MagicMock
 
 # ── chart_setup_node: partial state dict ─────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_chart_setup_node_returns_only_chart_analysis_runtime(
     sample_ground_truth, sample_lens_config
 ):
@@ -33,7 +31,6 @@ async def test_chart_setup_node_returns_only_chart_analysis_runtime(
     )
 
 
-@pytest.mark.asyncio
 async def test_chart_setup_node_has_required_runtime_fields(
     sample_ground_truth, sample_lens_config
 ):
@@ -46,7 +43,6 @@ async def test_chart_setup_node_has_required_runtime_fields(
     assert "selected_lenses" in rt
 
 
-@pytest.mark.asyncio
 async def test_chart_setup_node_does_not_touch_macro_context(
     sample_ground_truth, sample_lens_config
 ):
@@ -59,7 +55,6 @@ async def test_chart_setup_node_does_not_touch_macro_context(
 
 # ── macro_context_node: partial state dict ───────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_macro_context_node_returns_only_macro_context_key(
     sample_ground_truth, sample_lens_config
 ):
@@ -74,7 +69,6 @@ async def test_macro_context_node_returns_only_macro_context_key(
     )
 
 
-@pytest.mark.asyncio
 async def test_macro_context_node_does_not_touch_chart_analysis_runtime(
     sample_ground_truth, sample_lens_config
 ):
@@ -147,7 +141,6 @@ def test_pipeline_has_chart_setup_node_not_chart_base():
     assert "chart_auto_detect" not in graph.nodes, "chart_auto_detect merged into chart_setup"
 
 
-@pytest.mark.asyncio
 async def test_parallel_branches_both_complete_before_chart_lenses(
     monkeypatch, sample_ground_truth, sample_lens_config
 ):

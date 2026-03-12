@@ -7,8 +7,6 @@ Tests that lock the pipeline sequencing and mode behavior:
 3. Mode routing determinism: same inputs → same node sequence
 4. Parallel branch invariants: macro_context and chart_setup both precede lenses
 """
-import pytest
-
 from ai_analyst.graph.pipeline import (
     build_analysis_graph,
     _route_after_phase1,
@@ -142,7 +140,6 @@ def test_route_after_deliberation_without_overlay(sample_ground_truth):
 # ── 2. Execution truth table: mode ↔ node sequence ──────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_mode_no_delib_no_overlay_sequence(
     monkeypatch, sample_ground_truth, sample_lens_config
 ):
@@ -166,7 +163,6 @@ async def test_mode_no_delib_no_overlay_sequence(
     assert calls[lenses_idx:] == ["lenses", "arbiter", "pinekraft", "logging"]
 
 
-@pytest.mark.asyncio
 async def test_mode_delib_enabled_no_overlay_sequence(
     monkeypatch, sample_ground_truth, sample_lens_config
 ):
@@ -187,7 +183,6 @@ async def test_mode_delib_enabled_no_overlay_sequence(
     ]
 
 
-@pytest.mark.asyncio
 async def test_mode_overlay_without_delib_sequence(
     monkeypatch, sample_ground_truth_with_overlay, sample_lens_config
 ):
@@ -208,7 +203,6 @@ async def test_mode_overlay_without_delib_sequence(
     ]
 
 
-@pytest.mark.asyncio
 async def test_mode_delib_plus_overlay_sequence(
     monkeypatch, sample_ground_truth_with_overlay, sample_lens_config
 ):
@@ -234,7 +228,6 @@ async def test_mode_delib_plus_overlay_sequence(
 # ── 3. Determinism: same input → same route ─────────────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_determinism_same_input_same_sequence(
     monkeypatch, sample_ground_truth, sample_lens_config
 ):

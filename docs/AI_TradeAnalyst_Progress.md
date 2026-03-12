@@ -121,7 +121,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | Observability Phase 2 | Cross-lane runtime visibility — structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories | ✅ Complete |
 | TD-3 | Packaging/import-path stability — 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added — 1603 tests | ✅ Complete |
 | Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ⏳ Pending (after TD-3) |
-| Tidy | Async marker cleanup (4 files) | ⏳ Pending (included in cleanup tranche) |
+| Tidy | Async marker cleanup (8 files) | ✅ Complete — all 30 redundant `@pytest.mark.asyncio` markers removed; `asyncio_mode = "auto"` handles detection |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
 
 ---

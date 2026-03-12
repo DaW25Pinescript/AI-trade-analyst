@@ -5,7 +5,6 @@ import pytest
 from ai_analyst.core.llm_client import acompletion_with_retry
 
 
-@pytest.mark.asyncio
 async def test_acompletion_with_retry_succeeds_after_transient_failure():
     calls = {"count": 0}
 
@@ -28,7 +27,6 @@ async def test_acompletion_with_retry_succeeds_after_transient_failure():
     assert attempts == 2
 
 
-@pytest.mark.asyncio
 async def test_acompletion_with_retry_raises_after_exhausting_retries():
     async def always_fail(**_kwargs):
         raise ValueError("permanent")
