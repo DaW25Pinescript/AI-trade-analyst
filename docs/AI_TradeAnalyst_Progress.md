@@ -1,7 +1,7 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 11 March 2026
+**Last updated:** 12 March 2026
 **Review date:** 10 March 2026
 **Current phase:** Post–Observability Phase 1 — run visibility shipped
 **Planning horizon:** Next 6–8 weeks
@@ -37,6 +37,12 @@ The repository is in a **strong implementation state**:
 - **TD-10** (LLM failure modes under-tested) was also closed as a side-effect of the TD-2 resilience test work.
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
+
+### Latest increment — UI Phase 1 backend capability audit (12 Mar 2026)
+
+- Completed a repo-grounded backend-to-UI capability audit and published `docs/ui/UI_BACKEND_AUDIT.md`.
+- Inventory includes live FastAPI routes, request/response model shapes, runtime execution modes (sync vs SSE), artifact surfaces, and current `/app` usage coverage.
+- Audit explicitly maps active-used vs active-unused capabilities to guide follow-on `UI_CONTRACT` and `UI_WORKSPACES` documentation phases.
 
 ### Latest increment — AI Analyst dev diagnostics (11 Mar 2026)
 
