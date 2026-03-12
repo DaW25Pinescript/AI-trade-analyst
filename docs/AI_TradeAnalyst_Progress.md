@@ -3,7 +3,7 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 12 March 2026
 **Review date:** 10 March 2026
-**Current phase:** Post-UI Phase 3A — core product workspaces designed; implementation-ready
+**Current phase:** Observability Phase 2 — cross-lane runtime visibility (UI implementation intentionally parked)
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -21,9 +21,9 @@
 ## Phase Index (at-a-glance)
 
 - **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A.
-- **Current phase:** Post-UI Phase 3A. The full UI documentation lane is complete: backend audit, canonical contract, workspace blueprint, wireframes for all core workspaces, component design system, and visual appendix. The next execution gate is choosing the first UI implementation slice.
-- **Next actions:** Begin Phase 3A UI implementation (Triage Board and Journey Studio are highest priority); commit remaining design artifacts; decide `/analyse/stream` adoption timing; keep Chart Evidence and Run Artifact Inspector fenced as post-foundation extensions.
-- **Active decision gate:** the production-readiness gate remains satisfied; the current execution gate is frontend implementation — building the designed workspaces as component assembly against the locked contract.
+- **Current phase:** Observability Phase 2 — cross-lane runtime visibility and failure surface clarification. UI Phase 3A design is complete and banked; UI implementation is intentionally parked while the repo shifts into a runtime-hardening lane.
+- **Next actions:** Draft and execute Observability Phase 2 spec; then TD-3 packaging/import stability; then cleanup tranche (async markers, TD-5, TD-9, doc consolidation). UI implementation resumes after the backend-quality sequence is complete.
+- **Active decision gate:** the production-readiness gate remains satisfied; the current execution gate is runtime hardening — strengthening observability, packaging stability, and seam confidence before resuming UI buildout or broader convergence work.
 
 ## 1) Executive Snapshot
 
@@ -73,7 +73,7 @@ The repository is in a **strong implementation state**:
 
 ### Current position (plain language)
 
-You are no longer proving feasibility or building first-pass runtime behavior. You are at the **design-to-implementation transition**: the full UI documentation lane (audit → contract → workspace blueprint → wireframes → component system) is complete, and implementation can now proceed as component assembly against locked contracts. The runtime seams are stable, security hardening is shipped, and the visual design layer is grounded in real backend surfaces with no invented endpoints.
+You are no longer proving feasibility or building first-pass runtime behavior. The full UI documentation lane (audit → contract → workspace blueprint → wireframes → component system) is complete and banked. UI implementation is intentionally parked while the repo shifts into a **runtime-hardening lane**: the moving lanes (analyst, graph, MDO, legacy surfaces, feeder context) need stronger observability, packaging stability, and seam confidence before wider buildout. The sequence is Observability Phase 2, then TD-3 packaging, then a targeted cleanup tranche.
 
 ### Phase Status Overview
 
@@ -98,9 +98,12 @@ You are no longer proving feasibility or building first-pass runtime behavior. Y
 | UI Phase 1 | Backend Capability Audit — `docs/ui/UI_BACKEND_AUDIT.md` | ✅ Complete |
 | UI Phase 2 | UI Contract — canonical frontend handoff / run-state + error semantics | ✅ Complete |
 | UI Phase 3A | Workspace Blueprint + Visual Design — wireframes, component system, design notes, visual appendix | ✅ Complete |
-| UI Phase 3A Impl | First UI implementation slice — Triage Board + Journey Studio build | ▶️ Next |
-| UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏳ Pending |
-| Tidy | Async marker cleanup (4 files) | ⏳ Pending |
+| UI Phase 3A Impl | First UI implementation slice — Triage Board + Journey Studio build | ⏸️ Parked |
+| UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
+| Observability Phase 2 | Cross-lane runtime visibility and failure surface clarification | ▶️ Next |
+| TD-3 | Packaging/import-path stability (`sys.path.insert` cleanup) | ⏳ Pending (after Obs P2) |
+| Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ⏳ Pending (after TD-3) |
+| Tidy | Async marker cleanup (4 files) | ⏳ Pending (included in cleanup tranche) |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
 
 ---
@@ -166,118 +169,122 @@ Phase-closure counts should be read as **phase-gate numbers**, not as a single a
 
 From repo docs and current structure, the meaningful remaining work is concentrated in:
 
-1. **UI implementation**
-   - ✅ UI Phase 1, UI Phase 2, and UI Phase 3A (design) are complete.
-   - The next step is implementation of Phase 3A core workspaces: Triage Board, Journey Studio, Journal & Review, Analysis Run cleanup.
-   - Phase 3B (Feeder, Ops, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) are planned but fenced.
-2. **Observability and seam visibility**
+1. **Observability and seam visibility** (highest non-UI priority)
    - Important runtime paths still benefit from clearer pass/fail evidence, especially across orchestration boundaries.
+   - Observability Phase 1 shipped run records and stdout summaries; Phase 2 should standardize structured event logging across all lanes and tighten failure surfaces.
+2. **Packaging and import stability** (next after observability)
+   - `sys.path.insert` wiring (TD-3) remains an environment-sensitive deployment footgun.
+   - Prerequisite for stronger multi-environment stability and contributor onboarding.
 3. **Cleanup and consistency**
    - Pending async-marker tidy and doc consolidation remain open.
-4. **Developer/operator UX**
-   - Easier bootstrap and less manual wiring for local/prod parity still matter.
+   - TD-5 (enum centralisation) and TD-9 (unused vars) are ready as micro-PRs.
+4. **UI implementation** (parked, fully designed)
+   - ✅ UI Phase 1, UI Phase 2, and UI Phase 3A (design) are complete and banked.
+   - Implementation resumes after the runtime-hardening sequence.
+   - Phase 3B (Feeder, Ops, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
 5. **Future runtime-lane convergence**
    - The split between analyst, graph, MDO, and legacy lanes still shapes long-term architecture cleanup.
+   - Revisit only after observability, packaging, and cleanup are stronger.
 
 ---
+
 
 ## 3) Where We Should Go Next
 
-The production-readiness gate is **already satisfied**. The current value lane is to formalize the frontend against the real backend surface, then choose implementation slices from that grounded blueprint.
+The production-readiness gate is **already satisfied**. The UI documentation lane is complete and banked. The current value lane is runtime hardening: strengthening observability, packaging stability, and seam confidence before resuming UI buildout or broader convergence.
 
-### Priority A — UI Phase 3A Implementation (highest priority)
-
-#### Objective
-Build the Phase 3A core product workspaces using the locked design artifacts as the implementation spec.
-
-#### Status
-The design phase is **complete**. All workspace blueprints, wireframes, component system, and design decisions are locked and documented. Implementation can proceed as component assembly.
-
-#### Deliverables
-- ✅ `docs/ui/UI_WORKSPACES.md` — workspace blueprint with Runtime/Review/Operator lanes, phased exposure plan, and visual design layer.
-- ✅ `docs/ui/DESIGN_NOTES.md` — all visual and interaction decisions written down for implementers.
-- ✅ `docs/ui/VISUAL_APPENDIX.md` — consolidated wireframe and component system reference sheet.
-- ✅ Wireframes: Triage Board, Journey Studio, Analysis Run (4-state lifecycle), all final-locked.
-- ✅ Component Design System with Composition Patterns (trust strip, execution stack, conditional rail, post-action lock).
-- Build Triage Board workspace against `UI_CONTRACT.md` §10.2 and `UI_WORKSPACES.md` §5.
-- Build Journey Studio workspace against `UI_CONTRACT.md` §10.3 and `UI_WORKSPACES.md` §6.
-- Build Journal & Review workspace against `UI_CONTRACT.md` §10.3 and `UI_WORKSPACES.md` §8.
-- Refine Analysis Run workspace against `UI_CONTRACT.md` §10.1 and `UI_WORKSPACES.md` §7.
-
-#### Done criteria
-- The four Phase 3A workspaces are functional in `/app/` and use the shared component system.
-- The Triage → Journey → Freeze → Journal flow works end-to-end.
-- State handling (`data_state`, run lifecycle, empty-but-valid, error boundaries) matches the contract.
-
----
-
-### Priority B — Contract adoption and UI source-of-truth discipline (high priority)
+### Priority A — Observability Phase 2: Cross-Lane Runtime Visibility (highest priority)
 
 #### Objective
-Keep the UI documentation lane operational as implementation proceeds.
+Standardize structured event logging across all runtime lanes and make it easy to answer "what failed, where, and why?" without manually tracing code paths.
 
-#### Status
-The documentation lane is **complete and operational**. Five artifacts exist under `docs/ui/` and the governance rule in `UI_CONTRACT.md` §3.1 establishes contract-first discipline.
-
-#### Deliverables
-- ✅ `docs/ui/UI_CONTRACT.md` promoted to **Active** status.
-- ✅ `docs/ui/UI_BACKEND_AUDIT.md`, `UI_WORKSPACES.md`, `DESIGN_NOTES.md`, and `VISUAL_APPENDIX.md` all committed.
-- Keep contract and workspace docs aligned with real backend changes as implementation proceeds.
-- Ensure frontend work treats the contract as the canonical handoff instead of inferring shapes ad hoc from backend code.
-- Update progress/docs indexes so contributors can find the UI lane quickly.
-
-#### Done criteria
-- Frontend contributors have one authoritative contract and one authoritative workspace plan.
-- Backend/UI drift risk is reduced by process, not just by memory.
-
----
-
-### Priority C — Observability and seam confidence (high priority)
-
-#### Objective
-Keep improving the visibility of real runtime behavior while UI definition work proceeds.
+#### Context
+The repo has multiple moving lanes (analyst pipeline, graph orchestration, MDO feed refresh, feeder context, legacy surfaces). Observability Phase 1 shipped run records and stdout summaries for the analyst pipeline. Phase 2 should extend visibility across orchestration boundaries and tighten failure surfaces for operators and contributors.
 
 #### Deliverables
 - Standardize structured event logging for feed runs and analysis requests where still inconsistent.
 - Tighten status surfaces around scheduler/runtime health and analysis-path failures.
 - Clarify what success/failure/recovery looks like across MDO and analyst runtime lanes.
+- Make cross-lane failures visible without requiring manual code-path tracing.
 
 #### Done criteria
-- Operators and contributors can answer “what failed, where, and why?” without tracing multiple code paths manually.
-- Seam behavior is visible, not inferred.
+- Operators and contributors can answer "what failed, where, and why?" from logs and status surfaces alone.
+- Seam behavior across orchestration boundaries is visible, not inferred.
+- Structured logging is consistent enough that future monitoring/alerting can be built on top of it.
 
 ---
 
-### Priority D — Cleanup and source-of-truth simplification (medium)
+### Priority B — TD-3: Packaging and Import-Path Stability (high priority, after Obs P2)
 
 #### Objective
-Reduce drift between progress/audit docs and remove stale planning artifacts.
+Remove the `sys.path.insert` wiring footgun and establish proper packaging discipline.
+
+#### Context
+The technical debt register flags TD-3 as the main prerequisite for multi-environment stability and contributor onboarding. This is the structural wiring fix that makes everything downstream safer.
 
 #### Deliverables
-- Keep one canonical progress plan (this file) and treat others as supporting or historical snapshots.
-- Resolve pending async-marker cleanup items.
+- Replace `sys.path.insert` usage with proper packaging (`pyproject.toml` / editable install).
+- Add import-path stability tests (TD-11 resolves as a follow-on).
+- Validate that the repo works cleanly in fresh environments without manual path manipulation.
+
+#### Done criteria
+- The repo is less environment-sensitive.
+- New contributors can set up and run without discovering import-path quirks.
+- TD-11 (import-path stability tests) can be closed as a follow-on.
+
+---
+
+### Priority C — Cleanup Tranche (medium, after TD-3)
+
+#### Objective
+Close small friction items that reduce drift and improve contributor experience, without expanding into architecture surgery.
+
+#### Deliverables
+- Resolve pending async-marker cleanup (4 files).
+- Execute TD-5 (enum centralisation) and TD-9 (unused vars) as micro-PRs.
 - Reconcile duplicate phase summaries across docs.
-- Keep the technical debt register current as debt items are closed.
+- Update `docs/specs/README.md` and docs indexes.
+- Keep the technical debt register current.
 
 #### Done criteria
 - New contributors can identify current phase and next implementation target in under 5 minutes.
 - There is no ambiguity about which progress document is authoritative.
+- TD-5 and TD-9 are closed.
 
 ---
 
-### Priority E — Future runtime-lane convergence and packaging stability (medium / later)
+### Priority D — UI Phase 3A Implementation (parked — resume after runtime hardening)
 
 #### Objective
-Reduce the architectural split between runtime lanes and address the packaging/import fragility that still sits behind TD-3.
+Build the Phase 3A core product workspaces using the locked design artifacts.
+
+#### Status
+The design phase is **complete and banked**. All workspace blueprints, wireframes, component system, and design decisions are locked and documented. Implementation can proceed as component assembly when this lane resumes.
+
+#### Banked deliverables (ready for pickup)
+- ✅ `docs/ui/UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`
+- ✅ Wireframes: Triage Board, Journey Studio, Analysis Run (4-state lifecycle)
+- ✅ Component Design System with Composition Patterns
+- ✅ `UI_CONTRACT.md` governance rule (§3.1) prevents ad hoc contract drift while parked.
+
+#### Implementation targets (when resumed)
+- Build Triage Board, Journey Studio, Journal & Review, Analysis Run cleanup.
+- The Triage → Journey → Freeze → Journal flow end-to-end.
+- Phase 3B (Feeder, Ops, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
+
+---
+
+### Priority E — Future Runtime-Lane Convergence and Extensions (later)
+
+#### Objective
+Reduce the architectural split between runtime lanes and address broader convergence only after observability, packaging, and cleanup are stronger.
 
 #### Deliverables
-- Address `sys.path.insert` usage with proper packaging/install discipline.
-- Add import-path stability tests once packaging is fixed.
-- Revisit duplicated orchestration and mixed data-shape handling when seam confidence is stronger.
-- Treat Chart Evidence and Run Artifact Inspector as **Phase 3C post-foundation UI extensions** after the core Phase 3A implementation and Phase 3B capability exposure are stable.
+- Revisit duplicated orchestration (TD-4) and mixed data-shape handling (TD-8) when seam confidence is stronger.
+- Treat Chart Evidence and Run Artifact Inspector as Phase 3C post-foundation UI extensions.
+- Address runtime-lane convergence (analyst, graph, MDO, legacy) as a deliberate architecture phase, not a side-effect of other work.
 
 #### Done criteria
-- The repo is less environment-sensitive.
 - Future cleanup and UI extension work can happen against stronger contracts and better CI coverage.
 
 ---
@@ -285,38 +292,36 @@ Reduce the architectural split between runtime lanes and address the packaging/i
 ## 4) Proposed 6–8 Week Plan
 
 ### Weeks 1–2
-- Begin Phase 3A UI implementation: Triage Board and Journey Studio as first build targets.
-- Use the component design system and composition patterns as the implementation spec.
-- Validate the Triage → Journey handoff and `data_state` rendering against real backend responses.
+- Draft and begin executing **Observability Phase 2** spec: cross-lane runtime visibility and failure surface clarification.
+- Audit current structured logging coverage across analyst, MDO, feeder, and scheduler lanes.
+- Identify the highest-value seam visibility gaps and standardize event formats.
 
 ### Weeks 3–4
-- Complete Journal & Review workspace (structurally simpler — two list views with empty-state handling).
-- Refine Analysis Run workspace: cleanup legacy workflow compatibility, validate run lifecycle state rendering.
-- Validate the full Triage → Journey → Freeze → Journal flow end-to-end.
-- Tighten any contract ambiguities discovered during implementation.
+- Complete Observability Phase 2 execution and close with test/coverage evidence.
+- Begin **TD-3 packaging/import-path stability**: replace `sys.path.insert` with proper packaging.
+- Validate clean-environment setup without manual path manipulation.
 
 ### Weeks 5–6
-- Begin Phase 3B capability exposure: Feeder & Macro Context widget, Ops/Diagnostics linkout, Analytics/Export surface.
-- Decide whether `/analyse/stream` live mode enters the Analysis Run workspace.
-- Complete async-marker tidy.
-- Consolidate planning/docs indexes and keep the technical debt register synchronized.
+- Complete TD-3 and close TD-11 (import-path stability tests) as follow-on.
+- Execute **cleanup tranche**: async-marker tidy, TD-5 enum centralisation, TD-9 unused vars, doc index reconciliation.
 
 ### Stretch (Weeks 7–8)
-- Draft the post-foundation Chart Evidence design/contract pair if Phase 3A implementation is stable.
-- Revisit TD-5 / TD-9 micro-PRs or TD-3 packaging prep, depending on which unlocks the next phase with least risk.
-- Evaluate whether Journal and Review should separate into distinct workspaces based on implementation experience.
+- Revisit broader runtime-lane convergence readiness based on observability and packaging improvements.
+- Evaluate whether to resume UI Phase 3A implementation or continue with TD-4/TD-8 architecture cleanup.
+- Keep Chart Evidence and Run Artifact Inspector fenced as Phase 3C.
 
 ---
 
 ## 5) Risks to Manage
 
-- **Contract drift risk:** frontend implementation bypasses `UI_CONTRACT.md` and rediscovers backend behavior ad hoc. Mitigated by Section 3.1 governance rule in the contract.
-- **Design-implementation drift risk:** implementation diverges from locked wireframes and component system. Mitigated by `DESIGN_NOTES.md` and `VISUAL_APPENDIX.md` as written references.
+- **Observability gap risk:** cross-lane failures remain invisible without structured logging; operators cannot diagnose issues without manual code tracing.
+- **Packaging fragility risk:** `sys.path.insert`-style wiring remains a deployment and reproducibility footgun until TD-3 is addressed.
+- **Contract drift risk:** frontend implementation (when resumed) bypasses `UI_CONTRACT.md` and rediscovers backend behavior ad hoc. Mitigated by Section 3.1 governance rule in the contract.
+- **Design-implementation drift risk:** UI implementation (when resumed) diverges from locked wireframes and component system. Mitigated by `DESIGN_NOTES.md` and `VISUAL_APPENDIX.md` as written references.
 - **UI split risk:** Journey and legacy workflow surfaces diverge further if compatibility boundaries are not documented clearly.
 - **Seam blind-spot risk:** broad unit coverage may still miss cross-module orchestration and integration regressions.
-- **Packaging fragility risk:** `sys.path.insert`-style wiring remains a deployment and reproducibility footgun until TD-3 is addressed.
 - **Cleanup drift risk:** low-level debt can expand into architecture work if not kept tightly scoped.
-- **Scope-creep risk:** future extensions such as Chart Evidence or Run Artifact Inspector could jump ahead of the core Phase 3A implementation.
+- **Scope-creep risk:** future extensions such as Chart Evidence or Run Artifact Inspector could jump ahead of the runtime-hardening sequence.
 
 ---
 
@@ -328,15 +333,15 @@ Reduce the architectural split between runtime lanes and address the packaging/i
 4. ~~UI Phase 1 — Backend Capability Audit~~ — ✅ Complete (12 March 2026). `docs/ui/UI_BACKEND_AUDIT.md`.
 5. ~~UI Phase 2 — UI Contract~~ — ✅ Complete (12 March 2026). `docs/ui/UI_CONTRACT.md` promoted to **Active**.
 6. ~~UI Phase 3A — Workspace Blueprint + Visual Design~~ — ✅ Complete (12 March 2026). `UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`, wireframes, and component design system all locked.
-7. Begin **UI Phase 3A Implementation** — Triage Board and Journey Studio as first build targets, using the component design system and composition patterns.
-8. Commit wireframe images to `docs/ui/images/` and update `docs/specs/README.md` and any UI docs index.
-9. After core workspaces are functional, begin **Phase 3B capability exposure** (Feeder, Ops, Analytics, optional streaming).
-10. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
-11. Execute **async-marker tidy** (4 files) or pick up **TD-5** / **TD-9** as opportunistic micro-PRs.
+7. Draft and execute **Observability Phase 2** — cross-lane runtime visibility and failure surface clarification. This is the highest-value non-UI work remaining.
+8. After Obs P2 closes, execute **TD-3** — packaging/import-path stability (`sys.path.insert` → proper packaging).
+9. After TD-3, execute **cleanup tranche** — async markers, TD-5 (enum centralisation), TD-9 (unused vars), doc index reconciliation.
+10. **UI Phase 3A implementation** remains parked and ready for pickup after the runtime-hardening sequence.
+11. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
 
 ---
 
-## 7) Decision Gate Before “Production-Ready” Claim
+## 7) Decision Gate Before "Production-Ready" Claim
 
 Most of the earlier production-readiness gate has now been satisfied.
 
@@ -353,7 +358,7 @@ Most of the earlier production-readiness gate has now been satisfied.
 
 **The production-readiness gate is now satisfied.**
 
-The current execution gate is no longer production-readiness; it is UI implementation — building the designed Phase 3A workspaces as component assembly against the locked contract, wireframes, and component design system.
+The current execution gate is no longer production-readiness; it is runtime hardening — strengthening observability across orchestration seams, packaging stability, and developer/operator confidence before resuming UI buildout.
 
 ---
 
@@ -367,18 +372,18 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 |---|------|----------|------|-------------------|
 | TD-1 | `assert` used for runtime contract enforcement | `analyst/arbiter.py` | Silent contract violation under `-O` flag; invalid state reaches downstream decision logic | **✅ Resolved — 10 March 2026** |
 | TD-2 | `call_llm()` lacks timeout, retry, circuit-breaker | `analyst/analyst.py`, LLM call path | Stalled upstream call blocks processing; unstable tail latency; failure amplification | **✅ Resolved — 10 March 2026** — timeout (60s), retry (2 max, exponential backoff), failure mapping to `RuntimeError`. |
-| TD-3 | `sys.path.insert` used as dependency wiring | Multiple core modules | Environment-dependent import resolution; deployment instability; shadowing risk | **Named micro-PR / later phase** — prerequisite for multi-environment config profiles; requires proper packaging (`pyproject.toml` / editable install) |
+| TD-3 | `sys.path.insert` used as dependency wiring | Multiple core modules | Environment-dependent import resolution; deployment instability; shadowing risk | **Priority B — scheduled after Observability Phase 2** — requires proper packaging (`pyproject.toml` / editable install) |
 
 ### Maintenance — resolve opportunistically or as named cleanup
 
 | # | Item | Location | Risk | Resolution timing |
 |---|------|----------|------|-------------------|
 | TD-4 | Orchestration duplication (single vs multi-analyst) | `analyst/service.py`, `analyst/multi_analyst_service.py` | Parallel pipelines with drift risk; lifecycle changes must be made in two places | **Named cleanup** — extract shared orchestration steps into common helper; pick up after seam confidence improves |
-| TD-5 | Magic-string enum duplication | `analyst/analyst.py`, `analyst/personas.py`, `analyst/arbiter.py` | Verdict/confidence/alignment enums hand-maintained in multiple modules; drift and inconsistent validation | **Micro-PR** — centralise into shared contracts module; low risk, high leverage |
+| TD-5 | Magic-string enum duplication | `analyst/analyst.py`, `analyst/personas.py`, `analyst/arbiter.py` | Verdict/confidence/alignment enums hand-maintained in multiple modules; drift and inconsistent validation | **Cleanup tranche** — centralise into shared contracts module; low risk, high leverage |
 | TD-6 | `build_market_packet()` God-function | `market_data_officer/officer/service.py` | Trust policy, quality, feature extraction, serialization, and logging in one function; hard to test in isolation | **Future cleanup** — decompose when packet assembly needs to evolve; not blocking current work |
 | TD-7 | `build_market_packet()` eager loading + `iterrows()` | `market_data_officer/officer/service.py` | O(total_rows) Python loop per request; CPU/memory pressure scales with instrument count | **Future optimisation** — current scale (5 instruments, 4–6 TFs) is within tolerance; revisit when concurrency or instrument count grows |
 | TD-8 | Mixed data-shape handling in `classify_fvg_context` | `analyst/pre_filter.py` | `hasattr`/`get` branches for object vs dict payloads; weak upstream contracts | **Resolves with runtime lane convergence** — architectural, not a standalone cleanup |
-| TD-9 | Unused variables in `build_market_packet()` | `market_data_officer/officer/service.py` | `is_provisional`, `quality_label`, `quality_flags`, `struct_kwargs` assigned but unused; misleading intent | **Micro-PR** — remove or document intent; very small |
+| TD-9 | Unused variables in `build_market_packet()` | `market_data_officer/officer/service.py` | `is_provisional`, `quality_label`, `quality_flags`, `struct_kwargs` assigned but unused; misleading intent | **Cleanup tranche** — remove or document intent; very small |
 
 ### Documentation / testing gaps — address as part of related phases
 
@@ -392,7 +397,8 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 
 1. **Resolved:** TD-1, TD-2, and TD-10 are closed.
 2. **Completed:** CI Seam Hardening (10 March 2026) — production-readiness gate satisfied.
-3. **Next significant debt item:** TD-3 (packaging/import stability).
-4. **Opportunistic micro-PRs:** TD-5 (enum centralisation) and TD-9 (unused vars).
-5. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
-6. **Dependent follow-on:** TD-11 resolves when TD-3 is completed.
+3. **Next:** Observability Phase 2 (cross-lane runtime visibility).
+4. **Then:** TD-3 (packaging/import stability).
+5. **Then:** Cleanup tranche — TD-5 (enum centralisation), TD-9 (unused vars), async markers.
+6. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
+7. **Dependent follow-on:** TD-11 resolves when TD-3 is completed.
