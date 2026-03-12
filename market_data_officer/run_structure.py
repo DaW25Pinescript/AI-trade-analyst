@@ -7,14 +7,10 @@ Usage:
 """
 
 import argparse
-import sys
 from pathlib import Path
 
-# Ensure the parent directory is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.config import StructureConfig
-from structure.engine import run_engine
+from market_data_officer.structure.config import StructureConfig
+from market_data_officer.structure.engine import run_engine
 
 
 def main() -> None:

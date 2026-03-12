@@ -17,8 +17,8 @@ from unittest.mock import patch, MagicMock
 import logging
 import pytest
 
-from market_hours import MarketState
-from scheduler import (
+from market_data_officer.market_hours import MarketState
+from market_data_officer.scheduler import (
     SCHEDULE_CONFIG,
     build_scheduler,
     refresh_instrument,
@@ -80,7 +80,7 @@ class TestScheduleConfig:
 class TestJobIsolation:
     """Prove that refresh_instrument catches all exceptions."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_success_returns_success_outcome(self, mock_pipeline):
         """A successful pipeline run returns outcome='success'."""
         mock_pipeline.return_value = None
@@ -89,7 +89,7 @@ class TestJobIsolation:
         assert result["instrument"] == "EURUSD"
         assert "duration" in result
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_pipeline_called_with_correct_symbol(self, mock_pipeline):
         """The pipeline is called with the correct instrument symbol."""
         mock_pipeline.return_value = None
@@ -97,7 +97,7 @@ class TestJobIsolation:
         call_args = mock_pipeline.call_args
         assert call_args.kwargs["symbol"] == "GBPUSD"
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_pipeline_called_with_date_range(self, mock_pipeline):
         """The pipeline is called with start_date and end_date."""
         mock_pipeline.return_value = None
@@ -108,7 +108,7 @@ class TestJobIsolation:
         # end_date should be after start_date
         assert call_args.kwargs["end_date"] > call_args.kwargs["start_date"]
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_window_hours_from_config(self, mock_pipeline):
         """The date window matches the config window_hours."""
         from datetime import timedelta
@@ -120,7 +120,7 @@ class TestJobIsolation:
         # Allow small timing tolerance (< 1 second)
         assert abs(delta.total_seconds() - 12 * 3600) < 1.0
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_value_error_caught(self, mock_pipeline):
         """ValueError (unknown instrument) is caught at the job boundary."""
         mock_pipeline.side_effect = ValueError("Unknown instrument: FAKE")
@@ -128,7 +128,7 @@ class TestJobIsolation:
         assert result["outcome"] == "failure"
         assert "Unknown instrument" in result["error"]
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_runtime_error_caught(self, mock_pipeline):
         """RuntimeError is caught at the job boundary."""
         mock_pipeline.side_effect = RuntimeError("decode failed")
@@ -136,7 +136,7 @@ class TestJobIsolation:
         assert result["outcome"] == "failure"
         assert "decode failed" in result["error"]
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_connection_error_caught(self, mock_pipeline):
         """ConnectionError (network failure) is caught at the job boundary."""
         mock_pipeline.side_effect = ConnectionError("timeout")
@@ -144,7 +144,7 @@ class TestJobIsolation:
         assert result["outcome"] == "failure"
         assert "timeout" in result["error"]
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_generic_exception_caught(self, mock_pipeline):
         """Any Exception subclass is caught at the job boundary."""
         mock_pipeline.side_effect = Exception("unexpected")
@@ -152,7 +152,7 @@ class TestJobIsolation:
         assert result["outcome"] == "failure"
         assert "unexpected" in result["error"]
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_failure_does_not_raise(self, mock_pipeline):
         """A failed job must not raise — it returns a failure dict."""
         mock_pipeline.side_effect = Exception("boom")
@@ -167,30 +167,30 @@ class TestJobIsolation:
 class TestScheduleLogging:
     """Prove structured log entries are emitted."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_success_log_emitted(self, mock_pipeline, caplog):
         """A successful run emits an INFO log with instrument and SUCCESS."""
         mock_pipeline.return_value = None
         import logging
-        with caplog.at_level(logging.INFO, logger="scheduler"):
+        with caplog.at_level(logging.INFO, logger="market_data_officer.scheduler"):
             refresh_instrument("EURUSD")
         assert any("EURUSD" in r.message and "SUCCESS" in r.message for r in caplog.records)
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_failure_log_emitted(self, mock_pipeline, caplog):
         """A failed run emits an ERROR log with instrument and FAILURE."""
         mock_pipeline.side_effect = RuntimeError("test error")
         import logging
-        with caplog.at_level(logging.ERROR, logger="scheduler"):
+        with caplog.at_level(logging.ERROR, logger="market_data_officer.scheduler"):
             refresh_instrument("EURUSD")
         assert any("EURUSD" in r.message and "FAILURE" in r.message for r in caplog.records)
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_failure_log_includes_error_message(self, mock_pipeline, caplog):
         """Failure log includes the error string."""
         mock_pipeline.side_effect = ValueError("bad symbol")
         import logging
-        with caplog.at_level(logging.ERROR, logger="scheduler"):
+        with caplog.at_level(logging.ERROR, logger="market_data_officer.scheduler"):
             refresh_instrument("EURUSD")
         assert any("bad symbol" in r.message for r in caplog.records)
 
@@ -201,14 +201,14 @@ class TestScheduleLogging:
 class TestLastKnownGood:
     """Prove artifacts are untouched on failure."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_pipeline_not_called_after_failure(self, mock_pipeline):
         """On failure, run_pipeline is called exactly once (no retry in same job)."""
         mock_pipeline.side_effect = Exception("fail")
         refresh_instrument("EURUSD")
         assert mock_pipeline.call_count == 1
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_no_artifact_deletion_on_failure(self, mock_pipeline):
         """The job function does not delete or overwrite anything on failure.
 
@@ -294,7 +294,7 @@ _SUNDAY_20 = datetime(2026, 3, 15, 20, 0, tzinfo=timezone.utc)
 class TestMarketHoursIntegration:
     """Prove scheduler correctly skips/proceeds based on market state."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_open_market_calls_pipeline(self, mock_pipeline):
         """When market is OPEN, run_pipeline is called."""
         mock_pipeline.return_value = None
@@ -302,7 +302,7 @@ class TestMarketHoursIntegration:
         assert result["outcome"] == "success"
         assert mock_pipeline.call_count == 1
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_closed_market_skips_pipeline(self, mock_pipeline):
         """When market is CLOSED_EXPECTED, run_pipeline is NOT called.
 
@@ -313,7 +313,7 @@ class TestMarketHoursIntegration:
         assert result["market_state"] == "CLOSED_EXPECTED"
         mock_pipeline.assert_not_called()
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_off_session_skips_pipeline(self, mock_pipeline):
         """When market is OFF_SESSION_EXPECTED (Saturday), pipeline is skipped."""
         result = refresh_instrument("EURUSD", _now=_SATURDAY_03)
@@ -321,7 +321,7 @@ class TestMarketHoursIntegration:
         assert result["market_state"] == "OFF_SESSION_EXPECTED"
         mock_pipeline.assert_not_called()
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_sunday_pre_open_skips(self, mock_pipeline):
         """Sunday before session open → CLOSED_EXPECTED, pipeline skipped."""
         result = refresh_instrument("GBPUSD", _now=_SUNDAY_20)
@@ -329,14 +329,14 @@ class TestMarketHoursIntegration:
         assert result["market_state"] == "CLOSED_EXPECTED"
         mock_pipeline.assert_not_called()
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_skip_preserves_artifacts(self, mock_pipeline):
         """Skipped refresh never calls pipeline — artifacts untouched."""
         result = refresh_instrument("XAUUSD", _now=_SATURDAY_03)
         assert result["outcome"] == "skipped"
         mock_pipeline.assert_not_called()
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_failure_preserves_artifacts_with_market_state(self, mock_pipeline):
         """On OPEN failure, artifacts preserved and market state in result."""
         mock_pipeline.side_effect = RuntimeError("provider down")
@@ -349,7 +349,7 @@ class TestMarketHoursIntegration:
 class TestStructuredLogFields:
     """Prove structured log fields include market state and freshness."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_success_result_has_structured_fields(self, mock_pipeline):
         """Success result includes market_state, freshness, reason_code."""
         mock_pipeline.return_value = None
@@ -361,7 +361,7 @@ class TestStructuredLogFields:
         assert result["market_state"] == "OPEN"
         assert result["freshness"] == "FRESH"
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_failure_result_has_structured_fields(self, mock_pipeline):
         """Failure result includes market_state, freshness, reason_code."""
         mock_pipeline.side_effect = Exception("boom")
@@ -371,37 +371,37 @@ class TestStructuredLogFields:
         assert "reason_code" in result
         assert result["market_state"] == "OPEN"
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_skip_result_has_market_state(self, mock_pipeline):
         """Skipped result includes market_state and evaluation_ts."""
         result = refresh_instrument("EURUSD", _now=_SATURDAY_03)
         assert result["market_state"] == "OFF_SESSION_EXPECTED"
         assert "evaluation_ts" in result
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_success_log_includes_market_fields(self, mock_pipeline, caplog):
         """Success log message contains market_state and freshness."""
         mock_pipeline.return_value = None
-        with caplog.at_level(logging.INFO, logger="scheduler"):
+        with caplog.at_level(logging.INFO, logger="market_data_officer.scheduler"):
             refresh_instrument("EURUSD", _now=_TUESDAY_14)
         log_text = " ".join(r.message for r in caplog.records)
         assert "market_state=OPEN" in log_text
         assert "freshness=FRESH" in log_text
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_skip_log_includes_market_state(self, mock_pipeline, caplog):
         """Skip log message contains market_state."""
-        with caplog.at_level(logging.INFO, logger="scheduler"):
+        with caplog.at_level(logging.INFO, logger="market_data_officer.scheduler"):
             refresh_instrument("EURUSD", _now=_SATURDAY_03)
         log_text = " ".join(r.message for r in caplog.records)
         assert "SKIPPED" in log_text
         assert "market_state=OFF_SESSION_EXPECTED" in log_text
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_failure_log_includes_market_fields(self, mock_pipeline, caplog):
         """Failure log message contains market_state and freshness."""
         mock_pipeline.side_effect = Exception("fail")
-        with caplog.at_level(logging.ERROR, logger="scheduler"):
+        with caplog.at_level(logging.ERROR, logger="market_data_officer.scheduler"):
             refresh_instrument("EURUSD", _now=_TUESDAY_14)
         log_text = " ".join(r.message for r in caplog.records)
         assert "market_state=OPEN" in log_text
@@ -409,8 +409,8 @@ class TestStructuredLogFields:
 
 # ── PR 2: Alert wiring integration tests ─────────────────────────────
 
-from scheduler import _alert_state, _get_alert_state
-from alert_policy import AlertLevel, RefreshOutcome
+from market_data_officer.scheduler import _alert_state, _get_alert_state
+from market_data_officer.alert_policy import AlertLevel, RefreshOutcome
 
 
 @pytest.fixture(autouse=False)
@@ -424,14 +424,14 @@ def clear_alert_state():
 class TestAlertWiringStaleEscalation:
     """Live + stale-live sequence emits WARN then CRITICAL at thresholds."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_warn_at_threshold(self, mock_pipeline, caplog, clear_alert_state):
         """Repeated stale-live emits WARN at threshold."""
         # Simulate stale results — pipeline succeeds but freshness is STALE_BAD
         # by mocking classify_freshness to return STALE_BAD
         mock_pipeline.return_value = None
 
-        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+        from market_data_officer.market_hours import FreshnessClassification, FreshnessResult, ReasonCode
         stale_result = FreshnessResult(
             classification=FreshnessClassification.STALE_BAD,
             reason_code=ReasonCode.OPEN_AND_OVERDUE,
@@ -442,8 +442,8 @@ class TestAlertWiringStaleEscalation:
             evaluation_ts=_TUESDAY_14,
         )
 
-        with patch("scheduler.classify_freshness", return_value=stale_result):
-            with caplog.at_level(logging.WARNING, logger="scheduler"):
+        with patch("market_data_officer.scheduler.classify_freshness", return_value=stale_result):
+            with caplog.at_level(logging.WARNING, logger="market_data_officer.scheduler"):
                 # Run 1: consecutive_stale_live goes to 1 (below threshold)
                 r1 = refresh_instrument("EURUSD", _now=_TUESDAY_14)
                 # Run 2: consecutive_stale_live goes to 2 (at WARN threshold)
@@ -455,12 +455,12 @@ class TestAlertWiringStaleEscalation:
                       and "ALERT_EVAL_ERROR" not in r.message]
         assert len(alert_logs) >= 1
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_critical_at_threshold(self, mock_pipeline, caplog, clear_alert_state):
         """Repeated stale-live emits CRITICAL at higher threshold."""
         mock_pipeline.return_value = None
 
-        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+        from market_data_officer.market_hours import FreshnessClassification, FreshnessResult, ReasonCode
         stale_result = FreshnessResult(
             classification=FreshnessClassification.STALE_BAD,
             reason_code=ReasonCode.OPEN_AND_OVERDUE,
@@ -471,8 +471,8 @@ class TestAlertWiringStaleEscalation:
             evaluation_ts=_TUESDAY_14,
         )
 
-        with patch("scheduler.classify_freshness", return_value=stale_result):
-            with caplog.at_level(logging.WARNING, logger="scheduler"):
+        with patch("market_data_officer.scheduler.classify_freshness", return_value=stale_result):
+            with caplog.at_level(logging.WARNING, logger="market_data_officer.scheduler"):
                 for _ in range(4):
                     result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
 
@@ -483,11 +483,11 @@ class TestAlertWiringStaleEscalation:
 class TestAlertWiringFailureEscalation:
     """Live + repeated refresh failures emit CRITICAL."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_repeated_failures_escalate(self, mock_pipeline, caplog, clear_alert_state):
         mock_pipeline.side_effect = RuntimeError("provider down")
 
-        with caplog.at_level(logging.WARNING, logger="scheduler"):
+        with caplog.at_level(logging.WARNING, logger="market_data_officer.scheduler"):
             for _ in range(2):
                 result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
 
@@ -498,9 +498,9 @@ class TestAlertWiringFailureEscalation:
 class TestAlertWiringClosedSuppression:
     """Closed/off-session path emits no alert even after many evaluations."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_no_alerts_during_closure(self, mock_pipeline, caplog, clear_alert_state):
-        with caplog.at_level(logging.WARNING, logger="scheduler"):
+        with caplog.at_level(logging.WARNING, logger="market_data_officer.scheduler"):
             for _ in range(10):
                 result = refresh_instrument("EURUSD", _now=_SATURDAY_03)
 
@@ -513,10 +513,10 @@ class TestAlertWiringClosedSuppression:
 class TestAlertWiringRecovery:
     """Recovery emits one structured recovery log."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_recovery_log_emitted(self, mock_pipeline, caplog, clear_alert_state):
         """After escalation, a successful refresh emits recovery."""
-        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+        from market_data_officer.market_hours import FreshnessClassification, FreshnessResult, ReasonCode
 
         stale_result = FreshnessResult(
             classification=FreshnessClassification.STALE_BAD,
@@ -541,13 +541,13 @@ class TestAlertWiringRecovery:
         mock_pipeline.return_value = None
 
         # Escalate to WARN
-        with patch("scheduler.classify_freshness", return_value=stale_result):
+        with patch("market_data_officer.scheduler.classify_freshness", return_value=stale_result):
             for _ in range(2):
                 refresh_instrument("EURUSD", _now=_TUESDAY_14)
 
         # Recovery
-        with patch("scheduler.classify_freshness", return_value=fresh_result):
-            with caplog.at_level(logging.WARNING, logger="scheduler"):
+        with patch("market_data_officer.scheduler.classify_freshness", return_value=fresh_result):
+            with caplog.at_level(logging.WARNING, logger="market_data_officer.scheduler"):
                 caplog.clear()
                 result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
 
@@ -564,9 +564,9 @@ class TestAlertWiringRecovery:
 class TestAlertWiringStructuredFields:
     """Alert logs include all required context fields from §6.8."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_alert_log_has_required_fields(self, mock_pipeline, caplog, clear_alert_state):
-        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+        from market_data_officer.market_hours import FreshnessClassification, FreshnessResult, ReasonCode
 
         stale_result = FreshnessResult(
             classification=FreshnessClassification.STALE_BAD,
@@ -580,8 +580,8 @@ class TestAlertWiringStructuredFields:
 
         mock_pipeline.return_value = None
 
-        with patch("scheduler.classify_freshness", return_value=stale_result):
-            with caplog.at_level(logging.WARNING, logger="scheduler"):
+        with patch("market_data_officer.scheduler.classify_freshness", return_value=stale_result):
+            with caplog.at_level(logging.WARNING, logger="market_data_officer.scheduler"):
                 for _ in range(2):
                     refresh_instrument("EURUSD", _now=_TUESDAY_14)
 
@@ -600,9 +600,9 @@ class TestAlertWiringStructuredFields:
 class TestAlertWiringStateReset:
     """Scheduler state resets correctly after success."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_state_resets_after_recovery(self, mock_pipeline, caplog, clear_alert_state):
-        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+        from market_data_officer.market_hours import FreshnessClassification, FreshnessResult, ReasonCode
 
         stale_result = FreshnessResult(
             classification=FreshnessClassification.STALE_BAD,
@@ -617,7 +617,7 @@ class TestAlertWiringStateReset:
         mock_pipeline.return_value = None
 
         # Escalate
-        with patch("scheduler.classify_freshness", return_value=stale_result):
+        with patch("market_data_officer.scheduler.classify_freshness", return_value=stale_result):
             for _ in range(2):
                 refresh_instrument("EURUSD", _now=_TUESDAY_14)
 
@@ -638,13 +638,13 @@ class TestAlertWiringStateReset:
 class TestAlertIsolation:
     """Alert evaluation failure does not crash the scheduler."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_alert_eval_exception_does_not_crash(self, mock_pipeline, caplog, clear_alert_state):
         """If derive_alert_decision raises, scheduler still returns result."""
         mock_pipeline.return_value = None
 
-        with patch("scheduler.derive_alert_decision", side_effect=RuntimeError("policy bug")):
-            with caplog.at_level(logging.ERROR, logger="scheduler"):
+        with patch("market_data_officer.scheduler.derive_alert_decision", side_effect=RuntimeError("policy bug")):
+            with caplog.at_level(logging.ERROR, logger="market_data_officer.scheduler"):
                 result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
 
         # Refresh succeeded — result still returned
@@ -658,7 +658,7 @@ class TestAlertIsolation:
 class TestAlertPerInstrumentIsolation:
     """Instrument A's failures do not affect instrument B's counters."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_counters_per_instrument(self, mock_pipeline, caplog, clear_alert_state):
         mock_pipeline.side_effect = RuntimeError("down")
 
@@ -675,9 +675,9 @@ class TestAlertPerInstrumentIsolation:
 class TestHoldThroughClosure:
     """Counter at 2 before weekend, resumes at 3 on Monday STALE_BAD."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_counter_hold_and_resume(self, mock_pipeline, caplog, clear_alert_state):
-        from market_hours import FreshnessClassification, FreshnessResult, ReasonCode
+        from market_data_officer.market_hours import FreshnessClassification, FreshnessResult, ReasonCode
 
         stale_result = FreshnessResult(
             classification=FreshnessClassification.STALE_BAD,
@@ -692,7 +692,7 @@ class TestHoldThroughClosure:
         mock_pipeline.return_value = None
 
         # Tuesday: 2 stale evals → counter at 2 (WARN threshold)
-        with patch("scheduler.classify_freshness", return_value=stale_result):
+        with patch("market_data_officer.scheduler.classify_freshness", return_value=stale_result):
             for _ in range(2):
                 refresh_instrument("EURUSD", _now=_TUESDAY_14)
 
@@ -717,7 +717,7 @@ class TestHoldThroughClosure:
             threshold_minutes=90.0,
             evaluation_ts=_MONDAY_10,
         )
-        with patch("scheduler.classify_freshness", return_value=stale_result_monday):
+        with patch("market_data_officer.scheduler.classify_freshness", return_value=stale_result_monday):
             refresh_instrument("EURUSD", _now=_MONDAY_10)
 
         state = _get_alert_state("EURUSD")
@@ -727,7 +727,7 @@ class TestHoldThroughClosure:
 class TestExistingPR1BehaviorIntact:
     """Existing PR 1 runtime behavior remains intact after alert wiring."""
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_success_still_returns_expected_shape(self, mock_pipeline, clear_alert_state):
         mock_pipeline.return_value = None
         result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
@@ -736,14 +736,14 @@ class TestExistingPR1BehaviorIntact:
         assert "market_state" in result
         assert "freshness" in result
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_failure_still_returns_expected_shape(self, mock_pipeline, clear_alert_state):
         mock_pipeline.side_effect = RuntimeError("boom")
         result = refresh_instrument("EURUSD", _now=_TUESDAY_14)
         assert result["outcome"] == "failure"
         assert "error" in result
 
-    @patch("scheduler.run_pipeline")
+    @patch("market_data_officer.scheduler.run_pipeline")
     def test_skip_still_returns_expected_shape(self, mock_pipeline, clear_alert_state):
         result = refresh_instrument("EURUSD", _now=_SATURDAY_03)
         assert result["outcome"] == "skipped"

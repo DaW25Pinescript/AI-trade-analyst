@@ -7,12 +7,8 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import tempfile
 from pathlib import Path
-
-# Ensure imports resolve
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
 
 from analyst.contracts import AnalystOutput, AnalystVerdict, ReasoningBlock, StructureDigest
 from analyst.pre_filter import compute_digest

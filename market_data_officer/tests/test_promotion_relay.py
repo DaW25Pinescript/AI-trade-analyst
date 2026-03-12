@@ -7,26 +7,19 @@ Mirrors test_phase1a_relay.py (FX pattern) and test_phase1b_relay.py (metals
 pattern) but parametrized across the three promotion candidates.
 """
 
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-# Ensure imports resolve
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from instrument_registry import INSTRUMENT_REGISTRY, get_meta
-from officer.contracts import MarketPacketV2
-from officer.service import refresh_from_latest_exports
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY, get_meta
+from market_data_officer.officer.contracts import MarketPacketV2
+from market_data_officer.officer.service import refresh_from_latest_exports
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 def _analyst_import():
-    """Lazy-import analyst modules (they live outside market_data_officer/)."""
-    analyst_root = Path(__file__).resolve().parent.parent.parent / "analyst"
-    sys.path.insert(0, str(analyst_root.parent))
+    """Import analyst modules (they live outside market_data_officer/)."""
     from analyst.contracts import AnalystOutput, AnalystVerdict, ReasoningBlock
     from analyst.pre_filter import compute_digest
     from analyst.service import run_analyst

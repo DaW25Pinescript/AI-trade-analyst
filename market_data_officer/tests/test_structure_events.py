@@ -4,18 +4,14 @@ Tests BOS close-confirmation, wick-only rejection, MSS directional
 transitions, and event ordering constraints.
 """
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.config import StructureConfig
-from structure.events import detect_events
-from structure.swings import detect_swings
+from market_data_officer.structure.config import StructureConfig
+from market_data_officer.structure.events import detect_events
+from market_data_officer.structure.swings import detect_swings
 
 
 def make_bars_with_wicks(

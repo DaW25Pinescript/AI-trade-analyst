@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-trade-analyst"
@@ -26,6 +26,10 @@ dependencies = [
     "httpx>=0.28.0",
     # YAML config parsing
     "PyYAML>=6.0.1",
+    # Data processing (MDO runtime)
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "requests>=2.28",
 ]
 
 [project.optional-dependencies]
@@ -46,10 +50,10 @@ mdo = [
 ai-analyst = "ai_analyst.cli:app"
 
 [tool.setuptools.packages.find]
-include = ["ai_analyst*"]
+include = ["ai_analyst*", "analyst*", "market_data_officer*", "macro_risk_officer*"]
 
 [tool.pytest.ini_options]
-testpaths = ["ai_analyst/tests"]
+testpaths = ["ai_analyst/tests", "market_data_officer/tests", "macro_risk_officer/tests", "tests"]
 asyncio_mode = "auto"
 
 [tool.coverage.run]

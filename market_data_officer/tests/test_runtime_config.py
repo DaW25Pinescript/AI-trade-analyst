@@ -14,19 +14,19 @@ Tests cover:
 
 import pytest
 
-from alert_policy import (
+from market_data_officer.alert_policy import (
     CRITICAL_FAILURE_THRESHOLD,
     CRITICAL_STALE_LIVE_THRESHOLD,
     WARN_STALE_LIVE_THRESHOLD,
 )
-from market_hours import FAMILY_SESSION_POLICY, INSTRUMENT_FAMILY
-from runtime_config import (
+from market_data_officer.market_hours import FAMILY_SESSION_POLICY, INSTRUMENT_FAMILY
+from market_data_officer.runtime_config import (
     ConfigValidationError,
     RuntimeConfig,
     load_runtime_config,
     validate_runtime_config,
 )
-from scheduler import SCHEDULE_CONFIG
+from market_data_officer.scheduler import SCHEDULE_CONFIG
 
 
 # ── Default value alignment tests ───────────────────────────────────

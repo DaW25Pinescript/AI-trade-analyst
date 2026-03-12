@@ -19,15 +19,15 @@ from apscheduler.events import (
 )
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from feed.pipeline import run_pipeline
-from market_hours import (
+from market_data_officer.feed.pipeline import run_pipeline
+from market_data_officer.market_hours import (
     FreshnessClassification,
     MarketState,
     classify_freshness,
     get_market_state,
     INSTRUMENT_FAMILY,
 )
-from alert_policy import (
+from market_data_officer.alert_policy import (
     AlertDecision,
     AlertLevel,
     RefreshOutcome,

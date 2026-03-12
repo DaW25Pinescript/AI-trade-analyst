@@ -12,13 +12,13 @@ import signal
 import sys
 import threading
 
-from runtime_config import (
+from market_data_officer.runtime_config import (
     ConfigValidationError,
     RuntimeConfig,
     load_runtime_config,
     validate_runtime_config,
 )
-from scheduler import build_scheduler
+from market_data_officer.scheduler import build_scheduler
 
 logging.basicConfig(
     level=logging.INFO,

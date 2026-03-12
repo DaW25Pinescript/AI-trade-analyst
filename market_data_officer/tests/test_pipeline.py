@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from feed.pipeline import _find_resample_boundary
+from market_data_officer.feed.pipeline import _find_resample_boundary
 
 
 class TestFindResampleBoundary:

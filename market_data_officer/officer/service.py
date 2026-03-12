@@ -29,8 +29,8 @@ from .features import compute_core_features
 from .loader import EXPECTED_TIMEFRAMES, PACKAGES_DIR, load_all_timeframes, load_manifest
 from .quality import check_package_quality
 from .summarizer import build_state_summary
-from structure.reader import load_structure_summary, structure_is_available
-from instrument_registry import INSTRUMENT_REGISTRY
+from market_data_officer.structure.reader import load_structure_summary, structure_is_available
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY
 
 # Derive trust sets from the central registry
 TRUSTED_INSTRUMENTS = {

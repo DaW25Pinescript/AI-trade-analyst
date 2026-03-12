@@ -5,24 +5,20 @@ instrument-specific tolerance, reclaim detection, post-sweep
 classification, lifecycle, internal/external tagging, and replay.
 """
 
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.config import StructureConfig
-from structure.liquidity import (
+from market_data_officer.structure.config import StructureConfig
+from market_data_officer.structure.liquidity import (
     classify_liquidity_scope,
     detect_liquidity,
     _detect_reclaim,
 )
-from structure.schemas import LiquidityLevel, SwingPoint
-from structure.swings import detect_swings
+from market_data_officer.structure.schemas import LiquidityLevel, SwingPoint
+from market_data_officer.structure.swings import detect_swings
 
 
 def make_multi_day_bars(
@@ -605,7 +601,7 @@ class TestGroup3B_E_Determinism:
     def test_3b_te1_identical_packets(self):
         """TE.1 — Identical inputs produce identical packets."""
         import hashlib, json
-        from structure.engine import compute_structure_packet
+        from market_data_officer.structure.engine import compute_structure_packet
 
         bars = make_multi_day_bars(days=5)
         config = StructureConfig()
@@ -620,7 +616,7 @@ class TestGroup3B_E_Determinism:
 
     def test_3b_te2_reruns_no_resolved_changes(self):
         """TE.2 — Reruns on unchanged bars produce no changes to resolved objects."""
-        from structure.engine import compute_structure_packet
+        from market_data_officer.structure.engine import compute_structure_packet
 
         bars = make_multi_day_bars(days=5)
         config = StructureConfig()
@@ -634,7 +630,7 @@ class TestGroup3B_E_Determinism:
 
     def test_3b_te3_append_only_resolves_unresolved(self):
         """TE.3 — Appending new bars only resolves unresolved outcomes."""
-        from structure.engine import compute_structure_packet
+        from market_data_officer.structure.engine import compute_structure_packet
 
         bars_short = make_multi_day_bars(days=4)
         bars_long = make_multi_day_bars(days=5)

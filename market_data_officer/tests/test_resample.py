@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from feed.resample import resample_from_1m
+from market_data_officer.feed.resample import resample_from_1m
 
 
 def _make_canonical(n: int = 60) -> pd.DataFrame:

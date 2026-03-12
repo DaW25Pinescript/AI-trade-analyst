@@ -5,13 +5,7 @@ All template functions must be deterministic string formatters — no LLM calls.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
 
 from analyst.contracts import LiquidityRef, StructureDigest
 from analyst.multi_contracts import ArbiterDecision, PersonaVerdict

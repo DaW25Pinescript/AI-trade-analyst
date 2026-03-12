@@ -3,15 +3,11 @@
 Validates AC-1 through AC-10 from docs/MDO_PhaseE_Spec.md.
 """
 
-import sys
 from pathlib import Path
 
 import pytest
 
-# Ensure package root is on sys.path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from instrument_registry import INSTRUMENT_REGISTRY, InstrumentMeta, get_meta
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY, InstrumentMeta, get_meta
 
 
 # ── AC-1: Centralised instrument metadata ────────────────────────────
@@ -115,30 +111,30 @@ class TestConsumerDerivation:
     """Consumers (feed/config, officer/service, structure/config) derive from registry."""
 
     def test_feed_instruments_matches_registry(self):
-        from feed.config import INSTRUMENTS
+        from market_data_officer.feed.config import INSTRUMENTS
         assert set(INSTRUMENTS.keys()) == set(INSTRUMENT_REGISTRY.keys())
 
     def test_feed_price_ranges_matches_registry(self):
-        from feed.config import PRICE_RANGES
+        from market_data_officer.feed.config import PRICE_RANGES
         for sym, meta in INSTRUMENT_REGISTRY.items():
             assert PRICE_RANGES[sym] == meta.price_range
 
     def test_officer_trusted_from_registry(self):
-        from officer.service import TRUSTED_INSTRUMENTS
+        from market_data_officer.officer.service import TRUSTED_INSTRUMENTS
         assert TRUSTED_INSTRUMENTS == {"EURUSD", "XAUUSD", "GBPUSD", "XAGUSD", "XPTUSD"}
 
     def test_officer_provisional_from_registry(self):
-        from officer.service import PROVISIONAL_INSTRUMENTS
+        from market_data_officer.officer.service import PROVISIONAL_INSTRUMENTS
         assert PROVISIONAL_INSTRUMENTS == set()
 
     def test_structure_eqh_eql_from_registry(self):
-        from structure.config import StructureConfig
+        from market_data_officer.structure.config import StructureConfig
         cfg = StructureConfig()
         for sym in ("EURUSD", "XAUUSD"):
             assert cfg.eqh_eql_tolerance[sym] == get_meta(sym).eqh_eql_tolerance
 
     def test_structure_fvg_min_from_registry(self):
-        from structure.config import StructureConfig
+        from market_data_officer.structure.config import StructureConfig
         cfg = StructureConfig()
         assert cfg.fvg_min_size_eurusd == get_meta("EURUSD").fvg_min_size
         assert cfg.fvg_min_size_xauusd == get_meta("XAUUSD").fvg_min_size
@@ -157,13 +153,13 @@ class TestExtensionErgonomics:
 
     def test_new_instrument_auto_propagates_to_feed(self):
         """Any instrument added to INSTRUMENT_REGISTRY appears in INSTRUMENTS."""
-        from feed.config import INSTRUMENTS
+        from market_data_officer.feed.config import INSTRUMENTS
         # All registry entries are in INSTRUMENTS (they're the same dict)
         for sym in INSTRUMENT_REGISTRY:
             assert sym in INSTRUMENTS
 
     def test_new_instrument_auto_propagates_to_price_ranges(self):
-        from feed.config import PRICE_RANGES
+        from market_data_officer.feed.config import PRICE_RANGES
         for sym in INSTRUMENT_REGISTRY:
             assert sym in PRICE_RANGES
 

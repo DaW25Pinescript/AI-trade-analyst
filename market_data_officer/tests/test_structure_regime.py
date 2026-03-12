@@ -4,21 +4,17 @@ Tests that identical inputs produce identical packets, IDs are stable,
 and regime summary is correctly derived.
 """
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.config import StructureConfig
-from structure.events import detect_events
-from structure.liquidity import detect_liquidity
-from structure.regime import compute_regime
-from structure.schemas import StructureEvent
-from structure.swings import detect_swings
+from market_data_officer.structure.config import StructureConfig
+from market_data_officer.structure.events import detect_events
+from market_data_officer.structure.liquidity import detect_liquidity
+from market_data_officer.structure.regime import compute_regime
+from market_data_officer.structure.schemas import StructureEvent
+from market_data_officer.structure.swings import detect_swings
 
 
 def make_fixture_bars(prices: list, start: datetime) -> pd.DataFrame:

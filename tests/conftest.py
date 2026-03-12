@@ -4,16 +4,11 @@ Builds synthetic MarketPacketV2 instances with controlled structure blocks
 for deterministic testing of the pre-filter and analyst pipeline.
 """
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
-
-# Ensure imports resolve
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
 
 
 # Re-export _generate_ohlcv for backward compatibility with tests/test_officer_v2.py

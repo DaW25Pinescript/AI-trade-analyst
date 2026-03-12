@@ -5,10 +5,10 @@ import pandas as pd
 import pytest
 from datetime import datetime, timezone
 
-from officer.contracts import CoreFeatures
-from officer.features import compute_core_features
-from officer.loader import load_all_timeframes
-from officer.summarizer import build_state_summary, derive_trend
+from market_data_officer.officer.contracts import CoreFeatures
+from market_data_officer.officer.features import compute_core_features
+from market_data_officer.officer.loader import load_all_timeframes
+from market_data_officer.officer.summarizer import build_state_summary, derive_trend
 
 
 class TestStateSummary:

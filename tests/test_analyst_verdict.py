@@ -5,13 +5,9 @@ hard constraint enforcement, and reasoning block completeness.
 """
 
 import json
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
 
 from analyst.contracts import AnalystVerdict, ReasoningBlock, StructureDigest
 from analyst.analyst import validate_verdict, parse_llm_response, run_analyst_llm

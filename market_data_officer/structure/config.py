@@ -7,7 +7,7 @@ No configuration sprawl — keep it minimal until logic is proven.
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from instrument_registry import INSTRUMENT_REGISTRY
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY
 
 
 @dataclass

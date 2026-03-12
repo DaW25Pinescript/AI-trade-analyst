@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from feed.diagnostics import (
+from market_data_officer.feed.diagnostics import (
     DiagnosticsCollector,
     FetchRecord,
     DecodeRecord,
@@ -17,9 +17,9 @@ from feed.diagnostics import (
     save_cache_inventory,
     verify_decode_assumptions,
 )
-from feed.decode import DecodeStats, decode_with_diagnostics
-from feed.config import InstrumentMeta
-from feed.fetch import FetchResult, fetch_bi5_detailed
+from market_data_officer.feed.decode import DecodeStats, decode_with_diagnostics
+from market_data_officer.feed.config import InstrumentMeta
+from market_data_officer.feed.fetch import FetchResult, fetch_bi5_detailed
 
 
 # --- FetchRecord / DecodeRecord dataclass tests ---

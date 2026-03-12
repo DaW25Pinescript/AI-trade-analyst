@@ -6,13 +6,9 @@ Verifies output file format, atomic writes, and verdict sensitivity to structure
 
 import json
 import os
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
 
 from analyst.contracts import AnalystOutput
 from analyst.pre_filter import compute_digest

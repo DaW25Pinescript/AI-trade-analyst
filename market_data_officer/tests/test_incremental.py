@@ -19,16 +19,16 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from feed.config import DERIVED_TIMEFRAMES, INSTRUMENTS, TIMEFRAME_LABELS
-from feed.gaps import detect_gaps, generate_gap_report, save_gap_report
-from feed.pipeline import (
+from market_data_officer.feed.config import DERIVED_TIMEFRAMES, INSTRUMENTS, TIMEFRAME_LABELS
+from market_data_officer.feed.gaps import detect_gaps, generate_gap_report, save_gap_report
+from market_data_officer.feed.pipeline import (
     _derive_affected_window,
     _find_resample_boundary,
     _load_existing_derived,
     _save_canonical,
     _save_derived,
 )
-from feed.resample import resample_from_1m
+from market_data_officer.feed.resample import resample_from_1m
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ class TestSelectiveDerivedRegeneration:
         first_half = _make_1m_canonical("2025-01-13 09:00", 60)
         first_derived = resample_from_1m(first_half[["open", "high", "low", "close", "volume"]], "5min")
 
-        with patch("feed.pipeline._load_existing_derived", return_value=first_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=first_derived):
             new_data_start = pd.Timestamp("2025-01-13 10:00", tz="UTC")
             selective = _derive_affected_window(ohlcv, "TEST", "5min", "5m", new_data_start)
 
@@ -98,7 +98,7 @@ class TestSelectiveDerivedRegeneration:
         first_chunk = _make_1m_canonical("2025-01-13 08:00", 120)
         first_derived = resample_from_1m(first_chunk[["open", "high", "low", "close", "volume"]], "1h")
 
-        with patch("feed.pipeline._load_existing_derived", return_value=first_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=first_derived):
             new_data_start = pd.Timestamp("2025-01-13 10:00", tz="UTC")
             selective = _derive_affected_window(ohlcv, "TEST", "1h", "1h", new_data_start)
 
@@ -117,7 +117,7 @@ class TestSelectiveDerivedRegeneration:
         first_chunk = _make_1m_canonical("2025-01-13 00:00", 240)
         first_derived = resample_from_1m(first_chunk[["open", "high", "low", "close", "volume"]], "4h")
 
-        with patch("feed.pipeline._load_existing_derived", return_value=first_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=first_derived):
             new_data_start = pd.Timestamp("2025-01-13 04:00", tz="UTC")
             selective = _derive_affected_window(ohlcv, "TEST", "4h", "4h", new_data_start)
 
@@ -137,7 +137,7 @@ class TestSelectiveDerivedRegeneration:
         first_day = _make_1m_canonical("2025-01-13 00:00", 1440)
         first_derived = resample_from_1m(first_day[["open", "high", "low", "close", "volume"]], "1D")
 
-        with patch("feed.pipeline._load_existing_derived", return_value=first_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=first_derived):
             new_data_start = pd.Timestamp("2025-01-14 00:00", tz="UTC")
             selective = _derive_affected_window(ohlcv, "TEST", "1D", "1d", new_data_start)
 
@@ -153,7 +153,7 @@ class TestSelectiveDerivedRegeneration:
         canonical = _make_1m_canonical("2025-01-13 09:00", 60)
         ohlcv = canonical[["open", "high", "low", "close", "volume"]]
 
-        with patch("feed.pipeline._load_existing_derived", return_value=None):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=None):
             result = _derive_affected_window(ohlcv, "TEST", "5min", "5m",
                                              pd.Timestamp("2025-01-13 09:00", tz="UTC"))
 
@@ -169,7 +169,7 @@ class TestSelectiveDerivedRegeneration:
         ohlcv = canonical[["open", "high", "low", "close", "volume"]]
 
         existing = resample_from_1m(ohlcv, "5min")
-        with patch("feed.pipeline._load_existing_derived", return_value=existing):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=existing):
             result = _derive_affected_window(ohlcv, "TEST", "5min", "5m", new_data_start=None)
 
         assert result is not None
@@ -184,7 +184,7 @@ class TestSelectiveDerivedRegeneration:
         # Build existing derived from full canonical (first pass)
         existing_derived = resample_from_1m(ohlcv.iloc[:60], "1h")
 
-        with patch("feed.pipeline._load_existing_derived", return_value=existing_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=existing_derived):
             new_data_start = pd.Timestamp("2025-01-13 10:00", tz="UTC")
             result = _derive_affected_window(ohlcv, "TEST", "1h", "1h", new_data_start)
 
@@ -204,7 +204,7 @@ class TestSelectiveDerivedRegeneration:
         boundary = _find_resample_boundary(new_data_start, "1h")
         assert boundary == pd.Timestamp("2025-01-13 09:00", tz="UTC")
 
-        with patch("feed.pipeline._load_existing_derived", return_value=existing_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=existing_derived):
             result = _derive_affected_window(ohlcv, "TEST", "1h", "1h", new_data_start)
 
         full = resample_from_1m(ohlcv, "1h")
@@ -233,12 +233,12 @@ class TestZeroRedundantFetches:
         existing["build_method"] = "tick_to_1m"
         existing["quality_flag"] = "ok"
 
-        with patch("feed.pipeline._load_existing_canonical", return_value=existing), \
-             patch("feed.pipeline.fetch_bi5") as mock_fetch, \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=existing), \
+             patch("market_data_officer.feed.pipeline.fetch_bi5") as mock_fetch, \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
 
-            from feed.pipeline import run_pipeline
+            from market_data_officer.feed.pipeline import run_pipeline
 
             run_pipeline(
                 "EURUSD",
@@ -257,12 +257,12 @@ class TestZeroRedundantFetches:
         existing["build_method"] = "tick_to_1m"
         existing["quality_flag"] = "ok"
 
-        with patch("feed.pipeline._load_existing_canonical", return_value=existing), \
-             patch("feed.pipeline.fetch_bi5", return_value=b"") as mock_fetch, \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=existing), \
+             patch("market_data_officer.feed.pipeline.fetch_bi5", return_value=b"") as mock_fetch, \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
 
-            from feed.pipeline import run_pipeline
+            from market_data_officer.feed.pipeline import run_pipeline
 
             run_pipeline(
                 "EURUSD",
@@ -286,12 +286,12 @@ class TestZeroRedundantFetches:
         existing["build_method"] = "tick_to_1m"
         existing["quality_flag"] = "ok"
 
-        with patch("feed.pipeline._load_existing_canonical", return_value=existing), \
-             patch("feed.pipeline.fetch_bi5") as mock_fetch, \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=existing), \
+             patch("market_data_officer.feed.pipeline.fetch_bi5") as mock_fetch, \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
 
-            from feed.pipeline import run_pipeline
+            from market_data_officer.feed.pipeline import run_pipeline
 
             run_pipeline(
                 "EURUSD",
@@ -308,12 +308,12 @@ class TestZeroRedundantFetches:
         existing["build_method"] = "tick_to_1m"
         existing["quality_flag"] = "ok"
 
-        with patch("feed.pipeline._load_existing_canonical", return_value=existing), \
-             patch("feed.pipeline.fetch_bi5") as mock_fetch, \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=existing), \
+             patch("market_data_officer.feed.pipeline.fetch_bi5") as mock_fetch, \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
 
-            from feed.pipeline import run_pipeline
+            from market_data_officer.feed.pipeline import run_pipeline
 
             run_pipeline(
                 "XAUUSD",
@@ -332,12 +332,12 @@ class TestZeroRedundantFetches:
         existing["build_method"] = "tick_to_1m"
         existing["quality_flag"] = "ok"
 
-        with patch("feed.pipeline._load_existing_canonical", return_value=existing), \
-             patch("feed.pipeline.fetch_bi5", return_value=b"") as mock_fetch, \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=existing), \
+             patch("market_data_officer.feed.pipeline.fetch_bi5", return_value=b"") as mock_fetch, \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
 
-            from feed.pipeline import run_pipeline
+            from market_data_officer.feed.pipeline import run_pipeline
 
             run_pipeline(
                 "EURUSD",
@@ -447,7 +447,7 @@ class TestGapDetectionBothInstruments:
 
         report = generate_gap_report("EURUSD", df)
 
-        with patch("feed.gaps.GAP_REPORT_DIR", tmp_path):
+        with patch("market_data_officer.feed.gaps.GAP_REPORT_DIR", tmp_path):
             path = save_gap_report("EURUSD", report)
 
         assert path.exists()
@@ -470,7 +470,7 @@ class TestSelectiveRegenerationXAUUSD:
         first_chunk = _make_xauusd_canonical("2025-01-13 08:00", 120)
         first_derived = resample_from_1m(first_chunk[["open", "high", "low", "close", "volume"]], "1h")
 
-        with patch("feed.pipeline._load_existing_derived", return_value=first_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=first_derived):
             selective = _derive_affected_window(ohlcv, "XAUUSD", "1h", "1h",
                                                 pd.Timestamp("2025-01-13 10:00", tz="UTC"))
 
@@ -487,7 +487,7 @@ class TestSelectiveRegenerationXAUUSD:
         first_chunk = _make_xauusd_canonical("2025-01-13 09:00", 60)
         first_derived = resample_from_1m(first_chunk[["open", "high", "low", "close", "volume"]], "5min")
 
-        with patch("feed.pipeline._load_existing_derived", return_value=first_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=first_derived):
             selective = _derive_affected_window(ohlcv, "XAUUSD", "5min", "5m",
                                                 pd.Timestamp("2025-01-13 10:00", tz="UTC"))
 
@@ -519,7 +519,7 @@ class TestAllTimeframesCovered:
 
         new_start = canonical.index[half]
 
-        with patch("feed.pipeline._load_existing_derived", return_value=first_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=first_derived):
             selective = _derive_affected_window(ohlcv, "EURUSD", rule, tf_label, new_start)
 
         full = resample_from_1m(ohlcv, rule)
@@ -541,7 +541,7 @@ class TestAllTimeframesCovered:
 
         new_start = canonical.index[half]
 
-        with patch("feed.pipeline._load_existing_derived", return_value=first_derived):
+        with patch("market_data_officer.feed.pipeline._load_existing_derived", return_value=first_derived):
             selective = _derive_affected_window(ohlcv, "XAUUSD", rule, tf_label, new_start)
 
         full = resample_from_1m(ohlcv, rule)

@@ -4,18 +4,14 @@ Validates AC-1 through AC-5, AC-8 from docs/MDO_ProviderRouting_Spec.md.
 All tests are deterministic — no live provider dependency.
 """
 
-import sys
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from instrument_registry import INSTRUMENT_REGISTRY, InstrumentMeta, get_meta
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY, InstrumentMeta, get_meta
 
 
 # ── AC-1: Explicit provider policy exists ────────────────────────────
@@ -117,21 +113,21 @@ class TestFallbackTriggerConditions:
         """Return a timezone-aware hour datetime for testing."""
         return datetime(2025, 1, 15, 14, 0, 0, tzinfo=timezone.utc)
 
-    @patch("feed.pipeline.fetch_bi5")
-    @patch("feed.pipeline.fetch_1m_ohlcv_yfinance")
+    @patch("market_data_officer.feed.pipeline.fetch_bi5")
+    @patch("market_data_officer.feed.pipeline.fetch_1m_ohlcv_yfinance")
     def test_fallback_activates_on_empty_payload(self, mock_yf, mock_fetch):
         """Empty Dukascopy payload → fallback called (when enabled)."""
         mock_fetch.return_value = b""  # empty payload
         mock_yf.return_value = pd.DataFrame()  # yfinance also empty (that's fine)
 
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.pipeline import run_pipeline
 
         hour = self._make_hour_dt()
         # We just verify the fallback was attempted — full pipeline needs dirs
         # so we test the logic path via the mock call counts
-        with patch("feed.pipeline._load_existing_canonical", return_value=None), \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=None), \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
             try:
                 run_pipeline("EURUSD", hour, hour, save_raw=False)
             except Exception:
@@ -140,20 +136,20 @@ class TestFallbackTriggerConditions:
         # Fallback should have been attempted because payload was empty
         assert mock_yf.called, "yfinance fallback was not called on empty payload"
 
-    @patch("feed.pipeline.fetch_bi5")
-    @patch("feed.pipeline.fetch_1m_ohlcv_yfinance")
+    @patch("market_data_officer.feed.pipeline.fetch_bi5")
+    @patch("market_data_officer.feed.pipeline.fetch_1m_ohlcv_yfinance")
     def test_fallback_activates_on_transport_exception(self, mock_yf, mock_fetch):
         """Transport exception → fallback called (when enabled)."""
         import requests
         mock_fetch.side_effect = requests.RequestException("SSL error")
         mock_yf.return_value = pd.DataFrame()
 
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.pipeline import run_pipeline
 
         hour = self._make_hour_dt()
-        with patch("feed.pipeline._load_existing_canonical", return_value=None), \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=None), \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
             try:
                 run_pipeline("EURUSD", hour, hour, save_raw=False)
             except Exception:
@@ -161,20 +157,20 @@ class TestFallbackTriggerConditions:
 
         assert mock_yf.called, "yfinance fallback was not called on transport exception"
 
-    @patch("feed.pipeline.fetch_bi5")
-    @patch("feed.pipeline.decode_dukascopy_ticks")
-    @patch("feed.pipeline.fetch_1m_ohlcv_yfinance")
+    @patch("market_data_officer.feed.pipeline.fetch_bi5")
+    @patch("market_data_officer.feed.pipeline.decode_dukascopy_ticks")
+    @patch("market_data_officer.feed.pipeline.fetch_1m_ohlcv_yfinance")
     def test_fallback_does_not_activate_on_successful_fetch(self, mock_yf, mock_decode, mock_fetch):
         """Successful Dukascopy fetch → fallback NOT called."""
         mock_fetch.return_value = b"\x00" * 20  # non-empty payload
         mock_decode.return_value = pd.DataFrame()  # empty ticks (decode issue, not transport)
 
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.pipeline import run_pipeline
 
         hour = self._make_hour_dt()
-        with patch("feed.pipeline._load_existing_canonical", return_value=None), \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=None), \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
             try:
                 run_pipeline("EURUSD", hour, hour, save_raw=False)
             except Exception:
@@ -191,8 +187,8 @@ class TestFallbackDisabled:
     def _make_hour_dt(self):
         return datetime(2025, 1, 15, 14, 0, 0, tzinfo=timezone.utc)
 
-    @patch("feed.pipeline.fetch_bi5")
-    @patch("feed.pipeline.fetch_1m_ohlcv_yfinance")
+    @patch("market_data_officer.feed.pipeline.fetch_bi5")
+    @patch("market_data_officer.feed.pipeline.fetch_1m_ohlcv_yfinance")
     def test_fallback_disabled_no_fallback_on_empty(self, mock_yf, mock_fetch):
         """Empty payload + fallback_enabled=False → fallback NOT called."""
         mock_fetch.return_value = b""  # empty — would normally trigger fallback
@@ -201,14 +197,14 @@ class TestFallbackDisabled:
         original_meta = get_meta("EURUSD")
         disabled_meta = replace(original_meta, fallback_enabled=False)
 
-        from feed.config import INSTRUMENTS
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.config import INSTRUMENTS
+        from market_data_officer.feed.pipeline import run_pipeline
 
         hour = self._make_hour_dt()
         with patch.dict(INSTRUMENTS, {"EURUSD": disabled_meta}), \
-             patch("feed.pipeline._load_existing_canonical", return_value=None), \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+             patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=None), \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
             try:
                 run_pipeline("EURUSD", hour, hour, save_raw=False)
             except Exception:
@@ -218,8 +214,8 @@ class TestFallbackDisabled:
             "yfinance fallback was called despite fallback_enabled=False"
         )
 
-    @patch("feed.pipeline.fetch_bi5")
-    @patch("feed.pipeline.fetch_1m_ohlcv_yfinance")
+    @patch("market_data_officer.feed.pipeline.fetch_bi5")
+    @patch("market_data_officer.feed.pipeline.fetch_1m_ohlcv_yfinance")
     def test_fallback_disabled_no_fallback_on_transport_error(self, mock_yf, mock_fetch):
         """Transport error + fallback_enabled=False → fallback NOT called."""
         import requests
@@ -228,14 +224,14 @@ class TestFallbackDisabled:
         original_meta = get_meta("EURUSD")
         disabled_meta = replace(original_meta, fallback_enabled=False)
 
-        from feed.config import INSTRUMENTS
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.config import INSTRUMENTS
+        from market_data_officer.feed.pipeline import run_pipeline
 
         hour = self._make_hour_dt()
         with patch.dict(INSTRUMENTS, {"EURUSD": disabled_meta}), \
-             patch("feed.pipeline._load_existing_canonical", return_value=None), \
-             patch("feed.pipeline._save_canonical"), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+             patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=None), \
+             patch("market_data_officer.feed.pipeline._save_canonical"), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
             try:
                 run_pipeline("EURUSD", hour, hour, save_raw=False)
             except Exception:
@@ -265,10 +261,10 @@ class TestProviderProvenance:
             "volume": [100.0] * n,
         }, index=idx)
 
-    @patch("feed.pipeline.fetch_bi5")
-    @patch("feed.pipeline.decode_dukascopy_ticks")
-    @patch("feed.pipeline.ticks_to_1m_ohlcv")
-    @patch("feed.pipeline.fetch_1m_ohlcv_yfinance")
+    @patch("market_data_officer.feed.pipeline.fetch_bi5")
+    @patch("market_data_officer.feed.pipeline.decode_dukascopy_ticks")
+    @patch("market_data_officer.feed.pipeline.ticks_to_1m_ohlcv")
+    @patch("market_data_officer.feed.pipeline.fetch_1m_ohlcv_yfinance")
     def test_primary_vendor_stamp(self, mock_yf, mock_agg, mock_decode, mock_fetch):
         """When primary succeeds, vendor stamp = meta.primary_provider."""
         bars = self._make_fake_bars()
@@ -277,7 +273,7 @@ class TestProviderProvenance:
         mock_agg.return_value = bars
         mock_yf.return_value = pd.DataFrame()
 
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.pipeline import run_pipeline
 
         captured_bars = []
         original_save = None
@@ -286,9 +282,9 @@ class TestProviderProvenance:
             captured_bars.append(df.copy())
 
         hour = self._make_hour_dt()
-        with patch("feed.pipeline._load_existing_canonical", return_value=None), \
-             patch("feed.pipeline._save_canonical", side_effect=capture_save), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=None), \
+             patch("market_data_officer.feed.pipeline._save_canonical", side_effect=capture_save), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
             try:
                 run_pipeline("EURUSD", hour, hour, save_raw=False)
             except Exception:
@@ -299,15 +295,15 @@ class TestProviderProvenance:
             vendors = set(captured_bars[0]["vendor"].unique())
             assert meta.primary_provider in vendors
 
-    @patch("feed.pipeline.fetch_bi5")
-    @patch("feed.pipeline.fetch_1m_ohlcv_yfinance")
+    @patch("market_data_officer.feed.pipeline.fetch_bi5")
+    @patch("market_data_officer.feed.pipeline.fetch_1m_ohlcv_yfinance")
     def test_fallback_vendor_stamp(self, mock_yf, mock_fetch):
         """When fallback activates, vendor stamp = meta.fallback_provider."""
         mock_fetch.return_value = b""  # empty → triggers fallback
         fb_bars = self._make_fake_bars(5)
         mock_yf.return_value = fb_bars
 
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.pipeline import run_pipeline
 
         captured_bars = []
 
@@ -315,9 +311,9 @@ class TestProviderProvenance:
             captured_bars.append(df.copy())
 
         hour = self._make_hour_dt()
-        with patch("feed.pipeline._load_existing_canonical", return_value=None), \
-             patch("feed.pipeline._save_canonical", side_effect=capture_save), \
-             patch("feed.pipeline._rebuild_derived_and_export"):
+        with patch("market_data_officer.feed.pipeline._load_existing_canonical", return_value=None), \
+             patch("market_data_officer.feed.pipeline._save_canonical", side_effect=capture_save), \
+             patch("market_data_officer.feed.pipeline._rebuild_derived_and_export"):
             try:
                 run_pipeline("EURUSD", hour, hour, save_raw=False)
             except Exception:
@@ -378,7 +374,7 @@ class TestRoutingGuardRails:
         """The fallback gate in pipeline.py reads meta.fallback_enabled,
         not a hardcoded boolean."""
         import inspect
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.pipeline import run_pipeline
 
         source = inspect.getsource(run_pipeline)
         # The fallback gate should reference meta.fallback_enabled
@@ -389,7 +385,7 @@ class TestRoutingGuardRails:
     def test_no_hardcoded_vendor_stamp_in_pipeline(self):
         """Vendor stamps in pipeline.py use meta.primary_provider / meta.fallback_provider."""
         import inspect
-        from feed.pipeline import run_pipeline
+        from market_data_officer.feed.pipeline import run_pipeline
 
         source = inspect.getsource(run_pipeline)
         assert "meta.primary_provider" in source
