@@ -20,6 +20,8 @@ callers fall back to MacroScheduler as before.
 
 from __future__ import annotations
 
+import json
+import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -27,6 +29,8 @@ from macro_risk_officer.config.loader import load_weights
 from macro_risk_officer.core.models import MacroEvent, MacroContext
 from macro_risk_officer.core.reasoning_engine import ReasoningEngine
 from macro_risk_officer.ingestion.normalizer import normalise_events
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED_CONTRACT_VERSION = "1.0.0"
 
@@ -119,13 +123,55 @@ def events_from_feeder(payload: dict) -> List[MacroEvent]:
             f"Expected '{SUPPORTED_CONTRACT_VERSION}'."
         )
 
+    raw_events = payload.get("events", [])
+    total = len(raw_events)
     raw: List[MacroEvent] = []
-    for ev in payload.get("events", []):
+    skipped_ids: list[str] = []
+    for ev in raw_events:
         try:
             raw.append(_feeder_event_to_macro_event(ev))
-        except (KeyError, ValueError):
-            # Skip malformed individual events without aborting ingestion
+        except (KeyError, ValueError) as exc:
+            eid = ev.get("event_id", "<unknown>") if isinstance(ev, dict) else "<malformed>"
+            skipped_ids.append(eid)
+            logger.warning(
+                json.dumps({
+                    "event": "feeder.event.mapping_failed",
+                    "top_level_category": "request_validation_failure",
+                    "event_code": "feeder_event_mapping_failure",
+                    "event_id": eid,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc)[:300],
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                })
+            )
             continue
+
+    mapped = len(raw)
+    if skipped_ids:
+        logger.info(
+            json.dumps({
+                "event": "feeder.ingest.mapping_summary",
+                "top_level_category": "request_validation_failure",
+                "event_code": "feeder_event_mapping_failure",
+                "total_events": total,
+                "mapped": mapped,
+                "skipped": len(skipped_ids),
+                "skipped_ids": skipped_ids[:20],
+                "ts": datetime.now(timezone.utc).isoformat(),
+            })
+        )
+    else:
+        logger.info(
+            json.dumps({
+                "event": "feeder.ingest.mapping_complete",
+                "top_level_category": "runtime_execution_failure",
+                "event_code": "feeder_ingest_success",
+                "total_events": total,
+                "mapped": mapped,
+                "skipped": 0,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            })
+        )
 
     return normalise_events(raw)
 
@@ -154,10 +200,38 @@ def ingest_feeder_payload(
     Raises:
         ValueError if contract_version is not supported.
     """
+    logger.info(
+        json.dumps({
+            "event": "feeder.ingest.received",
+            "top_level_category": "runtime_execution_failure",
+            "event_code": "feeder_ingest_received",
+            "contract_version": payload.get("contract_version"),
+            "instrument": instrument,
+            "event_count": len(payload.get("events", [])),
+            "ts": datetime.now(timezone.utc).isoformat(),
+        })
+    )
+
     events = events_from_feeder(payload)
 
     raw_exposures: dict = load_weights().get("instrument_exposures", {})
     exposures: dict[str, float] = dict(raw_exposures.get(instrument, {}))
 
     engine = ReasoningEngine()
-    return engine.generate_context(events, exposures)
+    context = engine.generate_context(events, exposures)
+
+    logger.info(
+        json.dumps({
+            "event": "feeder.ingest.complete",
+            "top_level_category": "runtime_execution_failure",
+            "event_code": "feeder_ingest_success",
+            "instrument": instrument,
+            "events_ingested": len(events),
+            "regime": context.regime,
+            "vol_bias": context.vol_bias,
+            "confidence": context.confidence,
+            "ts": datetime.now(timezone.utc).isoformat(),
+        })
+    )
+
+    return context

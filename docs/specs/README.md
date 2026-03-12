@@ -14,6 +14,8 @@
 - [MDO_Operationalise_Phase2_Spec.md](MDO_Operationalise_Phase2_Spec.md)
 - [Security_API_Hardening_Spec.md](Security_API_Hardening_Spec.md)
 - [CI_Seam_Hardening_Spec.md](CI_Seam_Hardening_Spec.md)
+- [Observability_P1_Run_Visibility_Spec.md](Observability_P1_Run_Visibility_Spec.md)
+- [observability_phase_2.md](observability_phase_2.md)
 
 ## Supporting Spec Assets
 

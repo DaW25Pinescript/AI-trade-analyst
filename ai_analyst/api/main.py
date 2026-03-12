@@ -616,7 +616,16 @@ async def feeder_ingest(request: Request):
 
     try:
         validated_payload = FeederIngestPayload.model_validate(payload)
-    except ValidationError:
+    except ValidationError as ve:
+        logger.warning(
+            json.dumps({
+                "event": "feeder.ingest.validation_failed",
+                "top_level_category": "request_validation_failure",
+                "event_code": "feeder_payload_schema_invalid",
+                "error": str(ve)[:500],
+                "ts": datetime.now(timezone.utc).isoformat(),
+            })
+        )
         raise HTTPException(
             status_code=422,
             detail={
@@ -647,6 +656,24 @@ async def feeder_ingest(request: Request):
     except Exception as exc:
         logger.warning("[Feeder] Ingestion failed: %s: %s", type(exc).__name__, _mask_secrets(str(exc)))
         raise HTTPException(status_code=500, detail="Feeder ingestion failed. Check server logs.")
+
+    # Obs P2: detect staleness-to-fresh recovery
+    prev_ingested_at = getattr(request.app.state, "feeder_ingested_at", None)
+    was_stale = False
+    if prev_ingested_at is not None:
+        was_stale = (datetime.now(timezone.utc) - prev_ingested_at).total_seconds() > _FEEDER_STALE_SECONDS
+    elif prev_ingested_at is None:
+        was_stale = True  # first ingest = recovery from "no data"
+    if was_stale:
+        logger.info(
+            json.dumps({
+                "event": "feeder.staleness.recovered",
+                "top_level_category": "recovery_after_prior_failure",
+                "event_code": "feeder_staleness_recovered",
+                "previous_ingested_at": prev_ingested_at.isoformat() if prev_ingested_at else None,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            })
+        )
 
     # Cache in app.state for macro_context_node to pick up
     request.app.state.feeder_context = context
@@ -1397,19 +1424,37 @@ async def analyse_stream(
 # ── Phase 3: Monitoring & Observability endpoints ─────────────────────────────
 
 @app.get("/metrics")
-async def get_metrics():
+async def get_metrics(request: Request):
     """
     Phase 3 — Pipeline metrics endpoint.
 
     Returns aggregated metrics for all recorded pipeline runs including:
     cost, latency, analyst agreement, decision distribution, and recent runs.
+
+    Obs P2: additively includes feeder_status for cross-lane visibility.
     """
     from dataclasses import asdict
     snapshot = metrics_store.snapshot()
+
+    # Obs P2: additive feeder status
+    feeder_ingested_at = getattr(request.app.state, "feeder_ingested_at", None)
+    feeder_meta = getattr(request.app.state, "feeder_payload_meta", None)
+    feeder_status: dict = {"status": "no_data", "age_seconds": None, "stale": True}
+    if feeder_ingested_at is not None:
+        age = (datetime.now(timezone.utc) - feeder_ingested_at).total_seconds()
+        stale = age > _FEEDER_STALE_SECONDS
+        feeder_status = {
+            "status": "stale" if stale else "fresh",
+            "age_seconds": round(age, 1),
+            "stale": stale,
+            "event_count": feeder_meta.get("event_count", 0) if feeder_meta else 0,
+        }
+
     return JSONResponse(content={
         "status": "ok",
         "server_started_at": metrics_store.started_at,
         "metrics": asdict(snapshot),
+        "feeder_status": feeder_status,
     })
 
 
