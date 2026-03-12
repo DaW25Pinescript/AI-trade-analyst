@@ -1,12 +1,9 @@
 import json
 from types import SimpleNamespace
 
-import pytest
-
 from ai_analyst.graph.arbiter_node import arbiter_node
 
 
-@pytest.mark.asyncio
 async def test_malformed_arbiter_json_returns_structured_error_and_no_trade(
     sample_ground_truth, sample_lens_config, monkeypatch
 ):
@@ -43,7 +40,6 @@ async def test_malformed_arbiter_json_returns_structured_error_and_no_trade(
     assert "response_excerpt" in err
 
 
-@pytest.mark.asyncio
 async def test_missing_verdict_decision_defaults_to_no_trade_with_warning(
     sample_ground_truth, sample_lens_config, monkeypatch, caplog
 ):

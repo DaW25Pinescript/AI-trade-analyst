@@ -127,7 +127,6 @@ def test_cost_ceiling_skips_when_cost_data_unavailable(tmp_path):
 # ── HIGH-1 — retry logic ─────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
 async def test_non_retriable_exception_fails_immediately():
     """AuthenticationError must not be retried — fail on first attempt."""
     from ai_analyst.core.llm_client import acompletion_with_retry
@@ -153,7 +152,6 @@ async def test_non_retriable_exception_fails_immediately():
     assert calls["count"] == 1, "Non-retriable exceptions must not be retried"
 
 
-@pytest.mark.asyncio
 async def test_bad_request_error_not_retried():
     """BadRequestError must fail immediately without retrying."""
     from ai_analyst.core.llm_client import acompletion_with_retry
@@ -179,7 +177,6 @@ async def test_bad_request_error_not_retried():
     assert calls["count"] == 1
 
 
-@pytest.mark.asyncio
 async def test_retriable_runtime_error_is_retried():
     """Generic RuntimeError (e.g. connection error) should be retried up to max_retries."""
     from ai_analyst.core.llm_client import acompletion_with_retry
@@ -203,7 +200,6 @@ async def test_retriable_runtime_error_is_retried():
     assert attempts == 3
 
 
-@pytest.mark.asyncio
 async def test_exponential_backoff_with_jitter_applied(monkeypatch):
     """Sleep durations use _backoff_seconds (exponential + jitter), not a fixed linear value."""
     from ai_analyst.core import llm_client
@@ -239,7 +235,6 @@ async def test_exponential_backoff_with_jitter_applied(monkeypatch):
         assert s >= 0
 
 
-@pytest.mark.asyncio
 async def test_legacy_retry_backoff_s_zero_skips_sleep(monkeypatch):
     """Legacy retry_backoff_s=0 from existing tests must not sleep at all."""
     sleep_calls = []
