@@ -29,6 +29,7 @@ data outages never block the pipeline.
 The conditional branch after chart_lenses checks enable_deliberation first, then
 ground_truth.m15_overlay. The branch after deliberation checks only m15_overlay.
 """
+import json
 import logging
 from time import perf_counter
 
@@ -86,6 +87,19 @@ async def validate_input_node(state: GraphState) -> GraphState:
     state["_node_timings"] = {}
     logger.info("[Pipeline] Run started: instrument=%s session=%s run_id=%s",
                 gt.instrument, gt.session, gt.run_id)
+    logger.info(
+        json.dumps({
+            "event": "graph.pipeline.started",
+            "top_level_category": "runtime_execution_failure",
+            "event_code": "graph_pipeline_started",
+            "run_id": gt.run_id,
+            "instrument": gt.instrument,
+            "session": gt.session,
+            "timeframes": gt.timeframes,
+            "triage_mode": getattr(gt, "triage_mode", False),
+            "fan_out_branches": ["macro_context", "chart_setup"],
+        })
+    )
 
     return state
 
@@ -100,10 +114,25 @@ def _route_after_phase1(state: GraphState) -> str:
     3. Else → proceed directly to arbiter.
     """
     if state.get("enable_deliberation"):
-        return "deliberation"
-    if state["ground_truth"].m15_overlay:
-        return "fan_out_overlay_delta"
-    return "run_arbiter"
+        dest = "deliberation"
+    elif state["ground_truth"].m15_overlay:
+        dest = "fan_out_overlay_delta"
+    else:
+        dest = "run_arbiter"
+
+    gt = state["ground_truth"]
+    logger.info(
+        json.dumps({
+            "event": "graph.route.after_phase1",
+            "top_level_category": "runtime_execution_failure",
+            "event_code": "graph_routing_decision",
+            "run_id": gt.run_id,
+            "destination": dest,
+            "deliberation_enabled": bool(state.get("enable_deliberation")),
+            "overlay_provided": bool(gt.m15_overlay),
+        })
+    )
+    return dest
 
 
 def _route_after_deliberation(state: GraphState) -> str:
@@ -111,8 +140,22 @@ def _route_after_deliberation(state: GraphState) -> str:
     Conditional router: after deliberation, route to overlay delta or directly to arbiter.
     """
     if state["ground_truth"].m15_overlay:
-        return "fan_out_overlay_delta"
-    return "run_arbiter"
+        dest = "fan_out_overlay_delta"
+    else:
+        dest = "run_arbiter"
+
+    gt = state["ground_truth"]
+    logger.info(
+        json.dumps({
+            "event": "graph.route.after_deliberation",
+            "top_level_category": "runtime_execution_failure",
+            "event_code": "graph_routing_decision",
+            "run_id": gt.run_id,
+            "destination": dest,
+            "overlay_provided": bool(gt.m15_overlay),
+        })
+    )
+    return dest
 
 
 def build_analysis_graph() -> StateGraph:

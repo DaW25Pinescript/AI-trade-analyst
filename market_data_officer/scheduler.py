@@ -5,11 +5,18 @@ own job with per-family cadence. Job isolation ensures one failure does not
 affect other instruments or crash the scheduler.
 """
 
+import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
+from apscheduler.events import (
+    EVENT_JOB_ERROR,
+    EVENT_JOB_EXECUTED,
+    EVENT_JOB_MAX_INSTANCES,
+    EVENT_JOB_MISSED,
+)
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from feed.pipeline import run_pipeline
@@ -107,6 +114,14 @@ def refresh_instrument(
             "%s  SKIPPED  market_state=%s  evaluation_ts=%s",
             instrument, market_state.value, now.isoformat(),
         )
+        _emit_obs_event(
+            "mdo.refresh.skipped",
+            top_level_category="stale_but_readable",
+            event_code="mdo_refresh_market_closed",
+            instrument=instrument,
+            market_state=market_state.value,
+            ts=now.isoformat(),
+        )
         result = {
             "instrument": instrument,
             "outcome": "skipped",
@@ -142,6 +157,20 @@ def refresh_instrument(
             freshness.reason_code.value,
             now.isoformat(),
         )
+        _emit_obs_event(
+            "mdo.refresh.complete",
+            top_level_category="recovery_after_prior_failure"
+            if _get_alert_state(instrument)["consecutive_failures"] > 0
+            else "runtime_execution_failure",
+            event_code="mdo_refresh_success",
+            instrument=instrument,
+            outcome="success",
+            duration_ms=round(duration * 1000),
+            market_state=market_state.value,
+            freshness=freshness.classification.value,
+            reason_code=freshness.reason_code.value,
+            ts=now.isoformat(),
+        )
         result = {
             "instrument": instrument,
             "outcome": "success",
@@ -172,6 +201,20 @@ def refresh_instrument(
             freshness.classification.value,
             freshness.reason_code.value,
             now.isoformat(),
+        )
+        _emit_obs_event(
+            "mdo.refresh.failed",
+            top_level_category="runtime_execution_failure",
+            event_code="mdo_refresh_pipeline_error",
+            instrument=instrument,
+            outcome="failure",
+            error_type=type(exc).__name__,
+            error=str(exc)[:500],
+            duration_ms=round(duration * 1000),
+            market_state=market_state.value,
+            freshness=freshness.classification.value,
+            reason_code=freshness.reason_code.value,
+            ts=now.isoformat(),
         )
         result = {
             "instrument": instrument,
@@ -369,6 +412,75 @@ def get_scheduler_health(
     }
 
 
+# ---------------------------------------------------------------------------
+# Obs P2 — Structured event emitter
+# ---------------------------------------------------------------------------
+
+def _emit_obs_event(event: str, **fields: Any) -> None:
+    """Emit a structured JSON observability event via the module logger.
+
+    Every event carries ``top_level_category`` and ``event_code`` per the
+    Obs P2 taxonomy nesting rule (6 canonical categories → 15 event codes).
+    """
+    fields["event"] = event
+    if "ts" not in fields:
+        fields["ts"] = datetime.now(timezone.utc).isoformat()
+    try:
+        logger.info(json.dumps(fields, default=str))
+    except Exception:
+        # Observability must never crash the scheduler
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Obs P2 — APScheduler lifecycle listeners
+# ---------------------------------------------------------------------------
+
+def _on_job_executed(event: Any) -> None:
+    """Listener for EVENT_JOB_EXECUTED — job completed without exception."""
+    _emit_obs_event(
+        "scheduler.job.executed",
+        top_level_category="runtime_execution_failure",  # category for lifecycle
+        event_code="scheduler_job_executed",
+        job_id=event.job_id,
+        scheduled_run_time=str(getattr(event, "scheduled_run_time", None)),
+    )
+
+
+def _on_job_error(event: Any) -> None:
+    """Listener for EVENT_JOB_ERROR — job raised an exception."""
+    _emit_obs_event(
+        "scheduler.job.error",
+        top_level_category="runtime_execution_failure",
+        event_code="scheduler_job_error",
+        job_id=event.job_id,
+        exception=str(getattr(event, "exception", "")),
+        scheduled_run_time=str(getattr(event, "scheduled_run_time", None)),
+    )
+
+
+def _on_job_missed(event: Any) -> None:
+    """Listener for EVENT_JOB_MISSED — trigger fired outside misfire_grace_time."""
+    _emit_obs_event(
+        "scheduler.job.missed",
+        top_level_category="dependency_unavailability",
+        event_code="scheduler_job_missed",
+        job_id=event.job_id,
+        scheduled_run_time=str(getattr(event, "scheduled_run_time", None)),
+    )
+
+
+def _on_job_max_instances(event: Any) -> None:
+    """Listener for EVENT_JOB_MAX_INSTANCES — overlap skipped (coalesce)."""
+    _emit_obs_event(
+        "scheduler.job.overlap_skipped",
+        top_level_category="stale_but_readable",
+        event_code="scheduler_job_overlap_skipped",
+        job_id=event.job_id,
+        scheduled_run_time=str(getattr(event, "scheduled_run_time", None)),
+    )
+
+
 def build_scheduler(
     schedule_config: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> BackgroundScheduler:
@@ -377,6 +489,9 @@ def build_scheduler(
     Each job uses max_instances=1 to enforce the no-overlap policy —
     if a run is still active when the next trigger fires, the trigger
     is skipped (coalesced).
+
+    Obs P2: APScheduler lifecycle listeners are registered for job executed,
+    error, missed, and max-instances (overlap skip) events.
     """
     cfg = schedule_config or SCHEDULE_CONFIG
     scheduler = BackgroundScheduler(timezone="UTC")
@@ -393,5 +508,11 @@ def build_scheduler(
             coalesce=True,
             misfire_grace_time=60 * 30,  # 30 min grace
         )
+
+    # Obs P2: register APScheduler lifecycle event listeners
+    scheduler.add_listener(_on_job_executed, EVENT_JOB_EXECUTED)
+    scheduler.add_listener(_on_job_error, EVENT_JOB_ERROR)
+    scheduler.add_listener(_on_job_missed, EVENT_JOB_MISSED)
+    scheduler.add_listener(_on_job_max_instances, EVENT_JOB_MAX_INSTANCES)
 
     return scheduler

@@ -40,15 +40,23 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — Observability Phase 2 diagnostic pass (12 Mar 2026)
+### Latest increment — Observability Phase 2 implementation (12 Mar 2026)
+
+- Implemented structured JSON event emission across 4 under-instrumented lanes (MDO scheduler, feeder ingest, triage, graph orchestration).
+- APScheduler lifecycle listeners registered for job executed/error/missed/max_instances events.
+- Feeder ingest zero-logging gap closed: ingest received/complete, per-event mapping failures, staleness recovery detection.
+- Triage batch summary with partial-failure classification, per-symbol timing, and error categorization (Guardrail B: log-only, no response shape change).
+- Graph routing decisions logged at both conditional branch points; pipeline start event with fan-out info.
+- /metrics endpoint additively extended with feeder_status section.
+- 16 event codes mapped under 6 canonical categories per taxonomy nesting rule (Guardrail A).
+- 18 new deterministic tests in `ai_analyst/tests/test_obs_p2_events.py`.
+- Test suite: 1236 passed (+18), 70 failed (pre-existing), 4 collection errors (pre-existing). Zero new regressions.
+
+### Previous increment — Observability Phase 2 diagnostic pass (12 Mar 2026)
 
 - Executed the full Section 10 diagnostic protocol for cross-lane runtime visibility.
-- Audited logging infrastructure across 8 runtime lanes: analyst, analyst API, MDO scheduler, MDO feed pipeline, MDO officer, MRO/feeder ingest, triage, graph orchestration.
-- Key findings: analyst pipeline (P1) has rich structured observability; MDO scheduler logs structured data as unstructured text; MDO feed pipeline uses only `print()`; feeder_ingest.py has zero logging; triage has no partial-failure classification; APScheduler has no event listeners.
-- Audited /metrics, /dashboard, /e2e endpoints — all are analyst-pipeline-only with no MDO/feeder/scheduler data.
-- Baseline test suite: 1218 passed (435 ai_analyst + 139 tests + 644 MDO), 70 pre-existing failures, 4 collection errors.
-- Published spec: `docs/specs/observability_phase_2.md` with logging inventory, failure taxonomy (15 classes), 6-file patch set (~275 lines), lane prioritization (scheduler → triage → feeder → graph).
-- No code changes — diagnostic only. Implementation awaits approval.
+- Audited logging infrastructure across 8 runtime lanes.
+- Published spec: `docs/specs/observability_phase_2.md` with logging inventory, failure taxonomy, patch set proposal.
 
 ### Latest increment — UI Phase 3A workspace blueprint + visual design (12 Mar 2026)
 
@@ -110,7 +118,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | UI Phase 3A | Workspace Blueprint + Visual Design — wireframes, component system, design notes, visual appendix | ✅ Complete |
 | UI Phase 3A Impl | First UI implementation slice — Triage Board + Journey Studio build | ⏸️ Parked |
 | UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
-| Observability Phase 2 | Cross-lane runtime visibility and failure surface clarification — diagnostic pass complete | ▶️ In Progress (diagnostic done, implementation pending approval) |
+| Observability Phase 2 | Cross-lane runtime visibility — structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories | ✅ Complete |
 | TD-3 | Packaging/import-path stability (`sys.path.insert` cleanup) | ⏳ Pending (after Obs P2) |
 | Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ⏳ Pending (after TD-3) |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending (included in cleanup tranche) |
@@ -175,6 +183,7 @@ Phase-closure counts should be read as **phase-gate numbers**, not as a single a
 | LLM Routing Centralisation | 643 | Single-source routing via ResolvedRoute; 13 bypass removals; 27 new deterministic route/bypass tests |
 | Observability Phase 1 | 668 | Run record + stdout summary; per-analyst result/skip/fail visibility; 25 new deterministic tests |
 | Observability Phase 2 (diagnostic) | 1218 passed, 70 failed (pre-existing), 4 collection errors | Cross-lane diagnostic baseline: ai_analyst 435, tests 139, MDO 644. Failures are code-vs-test drift, not new regressions. |
+| Observability Phase 2 (implementation) | 1236 passed, 70 failed (pre-existing), 4 collection errors | +18 new tests: MDO events (3), APScheduler listeners (5), feeder ingest (3), triage batch (1), graph routing (3), taxonomy completeness (3). Zero new regressions. |
 
 ### Known gaps and debt themes
 
@@ -344,7 +353,7 @@ Reduce the architectural split between runtime lanes and address broader converg
 4. ~~UI Phase 1 — Backend Capability Audit~~ — ✅ Complete (12 March 2026). `docs/ui/UI_BACKEND_AUDIT.md`.
 5. ~~UI Phase 2 — UI Contract~~ — ✅ Complete (12 March 2026). `docs/ui/UI_CONTRACT.md` promoted to **Active**.
 6. ~~UI Phase 3A — Workspace Blueprint + Visual Design~~ — ✅ Complete (12 March 2026). `UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`, wireframes, and component design system all locked.
-7. **Observability Phase 2** — diagnostic pass complete (12 March 2026). Spec at `docs/specs/observability_phase_2.md` with full diagnostic: logging inventory, per-lane audit, failure taxonomy, patch set proposal (~275 lines across 6 files). Awaiting approval before implementation.
+7. ~~Observability Phase 2~~ — ✅ Complete (12 March 2026). Diagnostic + implementation shipped. 16 structured event codes across MDO scheduler, feeder, triage, graph. 18 new tests. Spec: `docs/specs/observability_phase_2.md`.
 8. After Obs P2 closes, execute **TD-3** — packaging/import-path stability (`sys.path.insert` → proper packaging).
 9. After TD-3, execute **cleanup tranche** — async markers, TD-5 (enum centralisation), TD-9 (unused vars), doc index reconciliation.
 10. **UI Phase 3A implementation** remains parked and ready for pickup after the runtime-hardening sequence.

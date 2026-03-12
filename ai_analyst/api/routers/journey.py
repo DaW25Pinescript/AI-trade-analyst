@@ -11,6 +11,7 @@ All writes go to app/data/journeys/{drafts,decisions,results}/.
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,17 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
+
+
+def _emit_obs_event(event: str, **fields: Any) -> None:
+    """Emit a structured JSON observability event (Obs P2)."""
+    fields["event"] = event
+    if "ts" not in fields:
+        fields["ts"] = datetime.now(timezone.utc).isoformat()
+    try:
+        logger.info(json.dumps(fields, default=str))
+    except Exception:
+        pass
 
 router = APIRouter()
 
@@ -393,19 +405,80 @@ async def run_triage(request: Request):
                 symbols, datetime.now(timezone.utc).isoformat())
     written = []
     failed = []
+    symbol_outcomes: list[dict] = []
+    batch_t0 = time.monotonic()
 
     for symbol in symbols:
+        sym_t0 = time.monotonic()
         try:
             result = await run_real_triage_for_symbol(symbol)
+            sym_dur = round((time.monotonic() - sym_t0) * 1000)
             ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             filename = f"multi_analyst_output_{symbol}_{ts}.json"
             path = os.path.join(output_dir, filename)
             with open(path, "w") as f:
                 json.dump(result, f, indent=2)
             written.append(symbol)
-        except Exception as e:
+            symbol_outcomes.append({
+                "symbol": symbol, "outcome": "success", "duration_ms": sym_dur,
+            })
+        except httpx.TimeoutException as e:
+            sym_dur = round((time.monotonic() - sym_t0) * 1000)
             failed.append(symbol)
             logger.error("[triage] %s failed: %s", symbol, e)
+            symbol_outcomes.append({
+                "symbol": symbol, "outcome": "failed",
+                "error_class": "triage_symbol_timeout",
+                "error_type": type(e).__name__, "duration_ms": sym_dur,
+            })
+        except httpx.HTTPStatusError as e:
+            sym_dur = round((time.monotonic() - sym_t0) * 1000)
+            failed.append(symbol)
+            logger.error("[triage] %s failed: %s", symbol, e)
+            symbol_outcomes.append({
+                "symbol": symbol, "outcome": "failed",
+                "error_class": "triage_symbol_http_error",
+                "error_type": type(e).__name__,
+                "status_code": e.response.status_code, "duration_ms": sym_dur,
+            })
+        except Exception as e:
+            sym_dur = round((time.monotonic() - sym_t0) * 1000)
+            failed.append(symbol)
+            logger.error("[triage] %s failed: %s", symbol, e)
+            symbol_outcomes.append({
+                "symbol": symbol, "outcome": "failed",
+                "error_class": "triage_symbol_runtime_error",
+                "error_type": type(e).__name__, "duration_ms": sym_dur,
+            })
+
+    # Obs P2: structured batch summary — Guardrail B: log event only, no response shape change
+    batch_dur = round((time.monotonic() - batch_t0) * 1000)
+    if not written:
+        batch_status = "all_failed"
+        top_cat = "runtime_execution_failure"
+        evt_code = "triage_batch_all_failed"
+    elif failed:
+        batch_status = "partial_failure"
+        top_cat = "runtime_execution_failure"
+        evt_code = "triage_batch_partial_failure"
+    else:
+        batch_status = "success"
+        top_cat = "runtime_execution_failure"
+        evt_code = "triage_batch_success"
+
+    _emit_obs_event(
+        "triage.batch.summary",
+        top_level_category=top_cat,
+        event_code=evt_code,
+        batch_status=batch_status,
+        symbols_attempted=len(symbols),
+        symbols_succeeded=len(written),
+        symbols_failed=len(failed),
+        succeeded=written,
+        failed_symbols=failed,
+        duration_ms=batch_dur,
+        symbol_outcomes=symbol_outcomes,
+    )
 
     if not written:
         from fastapi import HTTPException
