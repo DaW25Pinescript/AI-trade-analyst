@@ -4,17 +4,12 @@ Test A: XAUUSD fixture → officer loader → MarketPacketV2 (4 TFs, gold-range 
 Test B: run_analyst() with injected XAUUSD packet + mocked LLM → structured result
 """
 
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-# Ensure imports resolve
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from officer.contracts import MarketPacketV2
-from officer.service import refresh_from_latest_exports
+from market_data_officer.officer.contracts import MarketPacketV2
+from market_data_officer.officer.service import refresh_from_latest_exports
 
 # The 4 analyst-target timeframes for XAUUSD (spec §2)
 XAUUSD_TARGET_TFS = {"15m", "1h", "4h", "1d"}
@@ -87,9 +82,6 @@ class TestXAUUSDAnalystConsumption:
         packet = refresh_from_latest_exports(
             "XAUUSD", packages_dir=xauusd_hot_packages_dir,
         )
-
-        analyst_root = Path(__file__).resolve().parent.parent.parent / "analyst"
-        sys.path.insert(0, str(analyst_root.parent))
 
         from analyst.contracts import (
             AnalystOutput,

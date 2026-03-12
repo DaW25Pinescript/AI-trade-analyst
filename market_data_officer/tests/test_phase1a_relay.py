@@ -4,18 +4,13 @@ Test A: feed fixture → officer loader → MarketPacketV2 (all 6 TFs)
 Test B: run_analyst() with injected packet + mocked LLM → structured result
 """
 
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-# Ensure imports resolve
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from officer.contracts import MarketPacketV2
-from officer.service import refresh_from_latest_exports
-from officer.loader import EXPECTED_TIMEFRAMES
+from market_data_officer.officer.contracts import MarketPacketV2
+from market_data_officer.officer.service import refresh_from_latest_exports
+from market_data_officer.officer.loader import EXPECTED_TIMEFRAMES
 
 
 # ---------------------------------------------------------------------------
@@ -68,10 +63,6 @@ class TestAnalystConsumption:
     def test_run_analyst_with_injected_packet(self, hot_packages_dir):
         # Build a real packet from fixture artifacts
         packet = refresh_from_latest_exports("EURUSD", packages_dir=hot_packages_dir)
-
-        # Import analyst modules (they live outside market_data_officer/)
-        analyst_root = Path(__file__).resolve().parent.parent.parent / "analyst"
-        sys.path.insert(0, str(analyst_root.parent))
 
         from analyst.contracts import (
             AnalystOutput,

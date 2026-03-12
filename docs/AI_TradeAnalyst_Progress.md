@@ -119,7 +119,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | UI Phase 3A Impl | First UI implementation slice — Triage Board + Journey Studio build | ⏸️ Parked |
 | UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
 | Observability Phase 2 | Cross-lane runtime visibility — structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories | ✅ Complete |
-| TD-3 | Packaging/import-path stability (`sys.path.insert` cleanup) | ⏳ Pending (after Obs P2) |
+| TD-3 | Packaging/import-path stability — 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added — 1603 tests | ✅ Complete |
 | Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ⏳ Pending (after TD-3) |
 | Tidy | Async marker cleanup (4 files) | ⏳ Pending (included in cleanup tranche) |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
@@ -192,9 +192,9 @@ From repo docs and current structure, the meaningful remaining work is concentra
 1. **Observability and seam visibility** (highest non-UI priority)
    - Important runtime paths still benefit from clearer pass/fail evidence, especially across orchestration boundaries.
    - Observability Phase 1 shipped run records and stdout summaries; Phase 2 should standardize structured event logging across all lanes and tighten failure surfaces.
-2. **Packaging and import stability** (next after observability)
-   - `sys.path.insert` wiring (TD-3) remains an environment-sensitive deployment footgun.
-   - Prerequisite for stronger multi-environment stability and contributor onboarding.
+2. **Packaging and import stability** — ✅ **Complete** (TD-3, 12 March 2026)
+   - 27 `sys.path.insert` calls removed; `pyproject.toml` fixed; `pip install -e .` works in clean venv.
+   - 16 import stability tests added (TD-11 resolved).
 3. **Cleanup and consistency**
    - Pending async-marker tidy and doc consolidation remain open.
    - TD-5 (enum centralisation) and TD-9 (unused vars) are ready as micro-PRs.
@@ -335,7 +335,7 @@ Reduce the architectural split between runtime lanes and address broader converg
 ## 5) Risks to Manage
 
 - **Observability gap risk:** cross-lane failures remain invisible without structured logging; operators cannot diagnose issues without manual code tracing.
-- **Packaging fragility risk:** `sys.path.insert`-style wiring remains a deployment and reproducibility footgun until TD-3 is addressed.
+- ~~**Packaging fragility risk:**~~ **Resolved** — TD-3 complete (12 March 2026). All `sys.path.insert` calls removed; `pip install -e .` is the canonical install path.
 - **Contract drift risk:** frontend implementation (when resumed) bypasses `UI_CONTRACT.md` and rediscovers backend behavior ad hoc. Mitigated by Section 3.1 governance rule in the contract.
 - **Design-implementation drift risk:** UI implementation (when resumed) diverges from locked wireframes and component system. Mitigated by `DESIGN_NOTES.md` and `VISUAL_APPENDIX.md` as written references.
 - **UI split risk:** Journey and legacy workflow surfaces diverge further if compatibility boundaries are not documented clearly.
@@ -354,8 +354,8 @@ Reduce the architectural split between runtime lanes and address broader converg
 5. ~~UI Phase 2 — UI Contract~~ — ✅ Complete (12 March 2026). `docs/ui/UI_CONTRACT.md` promoted to **Active**.
 6. ~~UI Phase 3A — Workspace Blueprint + Visual Design~~ — ✅ Complete (12 March 2026). `UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`, wireframes, and component design system all locked.
 7. ~~Observability Phase 2~~ — ✅ Complete (12 March 2026). Diagnostic + implementation shipped. 16 structured event codes across MDO scheduler, feeder, triage, graph. 18 new tests. Spec: `docs/specs/observability_phase_2.md`.
-8. After Obs P2 closes, execute **TD-3** — packaging/import-path stability (`sys.path.insert` → proper packaging).
-9. After TD-3, execute **cleanup tranche** — async markers, TD-5 (enum centralisation), TD-9 (unused vars), doc index reconciliation.
+8. ~~TD-3 — packaging/import-path stability~~ — ✅ Complete (12 March 2026). 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added. Spec: `docs/specs/td3_packaging_import_stability.md`.
+9. Next: execute **cleanup tranche** — async markers, TD-5 (enum centralisation), TD-9 (unused vars), doc index reconciliation.
 10. **UI Phase 3A implementation** remains parked and ready for pickup after the runtime-hardening sequence.
 11. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
 
@@ -392,7 +392,7 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 |---|------|----------|------|-------------------|
 | TD-1 | `assert` used for runtime contract enforcement | `analyst/arbiter.py` | Silent contract violation under `-O` flag; invalid state reaches downstream decision logic | **✅ Resolved — 10 March 2026** |
 | TD-2 | `call_llm()` lacks timeout, retry, circuit-breaker | `analyst/analyst.py`, LLM call path | Stalled upstream call blocks processing; unstable tail latency; failure amplification | **✅ Resolved — 10 March 2026** — timeout (60s), retry (2 max, exponential backoff), failure mapping to `RuntimeError`. |
-| TD-3 | `sys.path.insert` used as dependency wiring | Multiple core modules | Environment-dependent import resolution; deployment instability; shadowing risk | **Priority B — scheduled after Observability Phase 2** — requires proper packaging (`pyproject.toml` / editable install) |
+| TD-3 | `sys.path.insert` used as dependency wiring | Multiple core modules | Environment-dependent import resolution; deployment instability; shadowing risk | **✅ Resolved — 12 March 2026** — 27 path hacks removed, pyproject.toml fixed, all packages installable via `pip install -e .`, 16 import stability tests added |
 
 ### Maintenance — resolve opportunistically or as named cleanup
 
@@ -410,13 +410,14 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 | # | Item | Location | Risk | Resolution timing |
 |---|------|----------|------|-------------------|
 | TD-10 | LLM failure modes under-tested | Test suites for analyst path | Tests previously mocked `call_llm` but did not exercise timeout, malformed response, or retry behavior | **✅ Resolved — 10 March 2026** — resilience coverage landed alongside TD-2 closure |
-| TD-11 | No import-path stability tests | No coverage for `sys.path.insert` patterns | Path mutation normalised in tests; packaging regressions not actively caught | **Follows TD-3** — when packaging is fixed, add environment-matrix tests |
+| TD-11 | No import-path stability tests | No coverage for `sys.path.insert` patterns | Path mutation normalised in tests; packaging regressions not actively caught | **✅ Resolved — 12 March 2026** — 16 import stability tests in `tests/test_import_stability.py` including negative packaging test (AC-12) |
 | TD-12 | Cross-module architecture contracts undocumented | Core service boundaries | Ownership of policy decisions, fallback semantics, scaling expectations embedded in code flow | **Future documentation** — address when runtime lanes converge or during next architecture review |
 
 ### Resolution sequence
 
-1. **Resolved:** TD-1, TD-2, and TD-10 are closed.
+1. **Resolved:** TD-1, TD-2, TD-3, TD-10, and TD-11 are closed.
 2. **Completed:** CI Seam Hardening (10 March 2026) — production-readiness gate satisfied.
+3. **Completed:** TD-3 Packaging/Import Stability (12 March 2026) — 27 sys.path.insert calls removed, pyproject.toml fixed, editable install working, 16 import stability tests.
 3. **Next:** Observability Phase 2 (cross-lane runtime visibility).
 4. **Then:** TD-3 (packaging/import stability).
 5. **Then:** Cleanup tranche — TD-5 (enum centralisation), TD-9 (unused vars), async markers.

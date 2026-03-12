@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import pytest
 
-from feed.gaps import detect_gaps, generate_gap_report, is_fx_trading_hour
+from market_data_officer.feed.gaps import detect_gaps, generate_gap_report, is_fx_trading_hour
 
 
 def _make_1m_ohlcv(

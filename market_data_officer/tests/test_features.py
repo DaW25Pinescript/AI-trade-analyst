@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 from datetime import datetime, timezone
 
-from officer.features import compute_core_features
-from officer.loader import load_timeframe
+from market_data_officer.officer.features import compute_core_features
+from market_data_officer.officer.loader import load_timeframe
 
 
 class TestCoreFeatures:

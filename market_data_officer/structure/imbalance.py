@@ -8,7 +8,7 @@ import pandas as pd
 
 from .config import StructureConfig
 from .schemas import FairValueGap
-from instrument_registry import INSTRUMENT_REGISTRY
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY
 
 
 def _compact_ts(ts) -> str:

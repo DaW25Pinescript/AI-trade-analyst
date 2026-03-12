@@ -16,13 +16,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from alert_policy import AlertLevel
-from runtime_config import (
+from market_data_officer.alert_policy import AlertLevel
+from market_data_officer.runtime_config import (
     ConfigValidationError,
     RuntimeConfig,
     validate_runtime_config,
 )
-from scheduler import (
+from market_data_officer.scheduler import (
     SCHEDULE_CONFIG,
     _alert_state,
     _get_alert_state,
@@ -76,7 +76,7 @@ class TestStartupPostureBanner:
 
     def test_startup_banner_logs_posture_fields(self, caplog):
         """log_startup_posture emits mode, cadence, and threshold info."""
-        from run_scheduler import log_startup_posture
+        from market_data_officer.run_scheduler import log_startup_posture
 
         config = RuntimeConfig()
         with caplog.at_level(logging.INFO):
@@ -94,7 +94,7 @@ class TestStartupPostureBanner:
 
     def test_startup_banner_includes_all_instruments(self, caplog):
         config = RuntimeConfig()
-        from run_scheduler import log_startup_posture
+        from market_data_officer.run_scheduler import log_startup_posture
 
         with caplog.at_level(logging.INFO):
             log_startup_posture(config)
@@ -125,7 +125,7 @@ class TestShutdownBehavior:
 
     def test_shutdown_logs_signal_name(self, caplog):
         """The shutdown handler logs the signal name."""
-        from run_scheduler import main
+        from market_data_officer.run_scheduler import main
 
         scheduler = build_scheduler()
         scheduler.start()
@@ -134,13 +134,13 @@ class TestShutdownBehavior:
         # Simulate the shutdown handler from run_scheduler
         with caplog.at_level(logging.INFO):
             sig_name = signal.Signals(signal.SIGINT).name
-            logging.getLogger("run_scheduler").info(
+            logging.getLogger("market_data_officer.run_scheduler").info(
                 "Shutdown signal received (signal=%s) — stopping scheduler",
                 sig_name,
             )
             scheduler.shutdown(wait=False)
             stop_event.set()
-            logging.getLogger("run_scheduler").info(
+            logging.getLogger("market_data_officer.run_scheduler").info(
                 "Scheduler stopped — clean exit"
             )
 
@@ -153,7 +153,7 @@ class TestShutdownBehavior:
         # Prime some alert state
         _alert_state.clear()
         now = datetime(2026, 3, 10, 14, 0, 0, tzinfo=timezone.utc)
-        with patch("scheduler.run_pipeline", side_effect=Exception("net fail")):
+        with patch("market_data_officer.scheduler.run_pipeline", side_effect=Exception("net fail")):
             refresh_instrument("EURUSD", _now=now)
 
         # Take health snapshot (simulates post-shutdown diagnostic)
@@ -191,7 +191,7 @@ class TestHealthCheck:
 
     def test_health_reflects_state_after_successful_refresh(self):
         now = datetime(2026, 3, 10, 14, 0, 0, tzinfo=timezone.utc)
-        with patch("scheduler.run_pipeline"):
+        with patch("market_data_officer.scheduler.run_pipeline"):
             refresh_instrument("EURUSD", _now=now)
 
         health = get_scheduler_health()
@@ -202,7 +202,7 @@ class TestHealthCheck:
 
     def test_health_reflects_failure_state(self):
         now = datetime(2026, 3, 10, 14, 0, 0, tzinfo=timezone.utc)
-        with patch("scheduler.run_pipeline", side_effect=Exception("timeout")):
+        with patch("market_data_officer.scheduler.run_pipeline", side_effect=Exception("timeout")):
             refresh_instrument("EURUSD", _now=now)
 
         health = get_scheduler_health()
@@ -212,7 +212,7 @@ class TestHealthCheck:
     def test_health_is_read_only(self):
         """Calling get_scheduler_health does not alter _alert_state."""
         now = datetime(2026, 3, 10, 14, 0, 0, tzinfo=timezone.utc)
-        with patch("scheduler.run_pipeline", side_effect=Exception("err")):
+        with patch("market_data_officer.scheduler.run_pipeline", side_effect=Exception("err")):
             refresh_instrument("EURUSD", _now=now)
 
         state_before = dict(_alert_state.get("EURUSD", {}))
@@ -227,12 +227,12 @@ class TestHealthCheck:
         assert get_scheduler_health()["instruments_with_state"] == 0
 
         now = datetime(2026, 3, 10, 14, 0, 0, tzinfo=timezone.utc)
-        with patch("scheduler.run_pipeline"):
+        with patch("market_data_officer.scheduler.run_pipeline"):
             refresh_instrument("EURUSD", _now=now)
 
         assert get_scheduler_health()["instruments_with_state"] == 1
 
-        with patch("scheduler.run_pipeline"):
+        with patch("market_data_officer.scheduler.run_pipeline"):
             refresh_instrument("GBPUSD", _now=now)
 
         assert get_scheduler_health()["instruments_with_state"] == 2
@@ -247,7 +247,7 @@ class TestHealthCheck:
 
     def test_health_check_does_not_trigger_refresh(self):
         """Calling health-check must never invoke the pipeline."""
-        with patch("scheduler.run_pipeline") as mock_pipeline:
+        with patch("market_data_officer.scheduler.run_pipeline") as mock_pipeline:
             get_scheduler_health()
             get_scheduler_health()
             mock_pipeline.assert_not_called()
@@ -269,7 +269,7 @@ class TestRegressionSafety:
         """PR 1 behavior: closed market → skip, no pipeline call."""
         # Saturday 12:00 UTC — all instruments closed
         sat_noon = datetime(2026, 3, 7, 12, 0, 0, tzinfo=timezone.utc)
-        with patch("scheduler.run_pipeline") as mock:
+        with patch("market_data_officer.scheduler.run_pipeline") as mock:
             result = refresh_instrument("EURUSD", _now=sat_noon)
         assert result["outcome"] == "skipped"
         assert result["market_state"] == "OFF_SESSION_EXPECTED"
@@ -278,7 +278,7 @@ class TestRegressionSafety:
     def test_alert_escalation_still_works(self):
         """PR 2 behavior: consecutive failures trigger alert escalation."""
         now = datetime(2026, 3, 10, 14, 0, 0, tzinfo=timezone.utc)
-        with patch("scheduler.run_pipeline", side_effect=Exception("fail")):
+        with patch("market_data_officer.scheduler.run_pipeline", side_effect=Exception("fail")):
             r1 = refresh_instrument("EURUSD", _now=now)
             r2 = refresh_instrument("EURUSD", _now=now)
         # After 2 failures, should be at CRITICAL (threshold=2)
@@ -287,11 +287,11 @@ class TestRegressionSafety:
     def test_recovery_still_resets(self):
         """PR 2 behavior: success after alert resets counters."""
         now = datetime(2026, 3, 10, 14, 0, 0, tzinfo=timezone.utc)
-        with patch("scheduler.run_pipeline", side_effect=Exception("fail")):
+        with patch("market_data_officer.scheduler.run_pipeline", side_effect=Exception("fail")):
             refresh_instrument("EURUSD", _now=now)
             refresh_instrument("EURUSD", _now=now)
 
-        with patch("scheduler.run_pipeline"):
+        with patch("market_data_officer.scheduler.run_pipeline"):
             result = refresh_instrument("EURUSD", _now=now)
         assert result["alert_level"] == "none"
         assert result.get("alert_reason") == "recovery"

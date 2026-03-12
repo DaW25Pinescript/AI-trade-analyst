@@ -4,18 +4,13 @@ Creates synthetic hot package data that mimics the feed's export format.
 """
 
 import json
-import sys
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-# Ensure officer module is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from instrument_registry import INSTRUMENT_REGISTRY, get_meta
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY, get_meta
 
 
 def _generate_ohlcv(

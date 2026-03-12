@@ -2,7 +2,7 @@
 
 import pytest
 
-from officer.loader import load_manifest, load_timeframe, load_all_timeframes
+from market_data_officer.officer.loader import load_manifest, load_timeframe, load_all_timeframes
 
 
 class TestManifest:
@@ -49,7 +49,7 @@ class TestNoRawParquet:
 
     def test_no_read_parquet_in_loader(self):
         import inspect
-        from officer import loader
+        from market_data_officer.officer import loader
 
         source = inspect.getsource(loader)
         assert "read_parquet" not in source

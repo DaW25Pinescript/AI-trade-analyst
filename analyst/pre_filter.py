@@ -6,12 +6,6 @@ Same MarketPacketV2 input produces the same StructureDigest output every time.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-# Ensure imports resolve from repo root
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
-
 from market_data_officer.officer.contracts import (
     MarketPacketV2,
     StructureBlock,

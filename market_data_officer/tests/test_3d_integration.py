@@ -4,17 +4,13 @@ Verifies the full pipeline: structure engine output -> reader -> officer -> v2 p
 """
 
 import json
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from officer.contracts import MarketPacketV2, StructureBlock
-from officer.service import assemble_structure_block, build_market_packet, write_packet
-from structure.reader import load_structure_packet, structure_is_available
+from market_data_officer.officer.contracts import MarketPacketV2, StructureBlock
+from market_data_officer.officer.service import assemble_structure_block, build_market_packet, write_packet
+from market_data_officer.structure.reader import load_structure_packet, structure_is_available
 
 
 def _make_structure_packet(instrument, timeframe, as_of=None, base_price=1.085):

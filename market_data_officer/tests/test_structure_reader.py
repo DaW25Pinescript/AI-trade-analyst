@@ -1,15 +1,12 @@
 """Tests for structure/reader.py — Group A acceptance criteria."""
 
 import json
-import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.reader import (
+from market_data_officer.structure.reader import (
     load_structure_packet,
     load_structure_summary,
     structure_is_available,
@@ -140,7 +137,7 @@ class TestGroupA_Reader:
     def test_ta7_reader_does_not_import_engine(self):
         """TA.7 — Reader does not import structure engine modules."""
         import inspect
-        from structure import reader
+        from market_data_officer.structure import reader
         source = inspect.getsource(reader)
         assert "from structure.engine" not in source
         assert "import engine" not in source

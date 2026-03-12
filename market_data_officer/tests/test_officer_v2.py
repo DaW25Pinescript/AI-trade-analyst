@@ -10,9 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from officer.contracts import (
+from market_data_officer.officer.contracts import (
     ActiveFVGZone,
     LiquidityNearest,
     LiquidityTimeframeSummary,
@@ -21,7 +19,7 @@ from officer.contracts import (
     StructureRecentEvent,
     StructureRegime,
 )
-from officer.service import (
+from market_data_officer.officer.service import (
     assemble_structure_block,
     build_market_packet,
     write_packet,

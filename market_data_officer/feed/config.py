@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from instrument_registry import INSTRUMENT_REGISTRY, InstrumentMeta
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY, InstrumentMeta
 
 # ── Backward-compatible aliases derived from the central registry ────
 #

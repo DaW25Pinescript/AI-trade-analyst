@@ -6,26 +6,22 @@ Groups A through G as defined in ACCEPTANCE_TESTS.md.
 import copy
 import hashlib
 import json
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.config import StructureConfig
-from structure.engine import compute_structure_packet
-from structure.imbalance import (
+from market_data_officer.structure.config import StructureConfig
+from market_data_officer.structure.engine import compute_structure_packet
+from market_data_officer.structure.imbalance import (
     build_active_zone_registry,
     detect_fvg,
     process_imbalance,
     update_fvg_fills,
 )
-from structure.io import get_output_path, write_packet_atomic
-from structure.schemas import FairValueGap
+from market_data_officer.structure.io import get_output_path, write_packet_atomic
+from market_data_officer.structure.schemas import FairValueGap
 
 START = datetime(2026, 1, 5, 21, 0, tzinfo=timezone.utc)
 
@@ -657,7 +653,7 @@ class TestGroupG_OutputBoundaries:
         # This test verifies the constraint by checking that imbalance.py
         # does not import from officer/ or feed/
         import inspect
-        from structure import imbalance
+        from market_data_officer.structure import imbalance
         source = inspect.getsource(imbalance)
         assert "officer" not in source.lower() or "officer" in "market_data_officer"
         assert "feed" not in source

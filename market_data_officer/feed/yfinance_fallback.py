@@ -14,7 +14,7 @@ from typing import Optional
 
 import pandas as pd
 
-from instrument_registry import INSTRUMENT_REGISTRY
+from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY
 
 logger = logging.getLogger(__name__)
 

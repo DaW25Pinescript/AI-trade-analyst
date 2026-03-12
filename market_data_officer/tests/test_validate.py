@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from feed.validate import validate_ohlcv
+from market_data_officer.feed.validate import validate_ohlcv
 
 
 def _make_ohlcv(n: int = 5, start: str = "2025-01-15 09:00") -> pd.DataFrame:

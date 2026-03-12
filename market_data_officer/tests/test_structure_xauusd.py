@@ -4,18 +4,14 @@ Tests full structure suite on XAUUSD across 15m, 1h, 4h,
 including price range guard and instrument-specific tolerance.
 """
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.config import StructureConfig
-from structure.engine import compute_structure_packet
+from market_data_officer.structure.config import StructureConfig
+from market_data_officer.structure.engine import compute_structure_packet
 
 
 def generate_xauusd_bars(

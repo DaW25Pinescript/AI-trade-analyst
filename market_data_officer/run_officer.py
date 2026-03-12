@@ -6,13 +6,9 @@ Usage:
 """
 
 import argparse
-import sys
 from pathlib import Path
 
-# Add parent directory to path for module imports
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from officer.service import build_market_packet, write_packet
+from market_data_officer.officer.service import build_market_packet, write_packet
 
 
 def main() -> None:

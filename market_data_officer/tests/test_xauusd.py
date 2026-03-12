@@ -17,11 +17,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from feed.config import INSTRUMENTS, PRICE_RANGES, InstrumentMeta
-from feed.decode import decode_dukascopy_ticks
-from feed.aggregate import ticks_to_1m_ohlcv
-from feed.fetch import build_bi5_url
-from feed.validate import validate_ohlcv
+from market_data_officer.feed.config import INSTRUMENTS, PRICE_RANGES, InstrumentMeta
+from market_data_officer.feed.decode import decode_dukascopy_ticks
+from market_data_officer.feed.aggregate import ticks_to_1m_ohlcv
+from market_data_officer.feed.fetch import build_bi5_url
+from market_data_officer.feed.validate import validate_ohlcv
 
 
 def _make_bi5_payload(ticks: list[tuple]) -> bytes:
