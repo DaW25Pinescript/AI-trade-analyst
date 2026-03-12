@@ -4,11 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
-from pathlib import Path
-
-# Ensure imports resolve
-sys.path.insert(0, str(Path(__file__).resolve().parent / "market_data_officer"))
 
 from analyst.multi_analyst_service import run_multi_analyst
 

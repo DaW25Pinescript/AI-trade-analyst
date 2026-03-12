@@ -6,19 +6,19 @@ from datetime import datetime, timezone
 
 import pytest
 
-from officer.contracts import (
+from market_data_officer.officer.contracts import (
     CoreFeatures,
     FeatureBlock,
     MarketPacket,
     QualityBlock,
     StateSummary,
 )
-from officer.loader import load_timeframe
-from officer.service import build_market_packet, write_packet
-from officer.structure.bos_detector import detect_bos
-from officer.structure.fvg_detector import detect_fvg
-from officer.structure.compression_detector import detect_compression
-from officer.structure.imbalance_detector import detect_imbalance
+from market_data_officer.officer.loader import load_timeframe
+from market_data_officer.officer.service import build_market_packet, write_packet
+from market_data_officer.officer.structure.bos_detector import detect_bos
+from market_data_officer.officer.structure.fvg_detector import detect_fvg
+from market_data_officer.officer.structure.compression_detector import detect_compression
+from market_data_officer.officer.structure.imbalance_detector import detect_imbalance
 
 
 class TestStubModules:
@@ -51,10 +51,10 @@ class TestStubFilesExist:
     """T4.1 — All stub modules exist as importable files."""
 
     def test_stub_files_importable(self):
-        from officer.structure import bos_detector
-        from officer.structure import fvg_detector
-        from officer.structure import compression_detector
-        from officer.structure import imbalance_detector
+        from market_data_officer.officer.structure import bos_detector
+        from market_data_officer.officer.structure import fvg_detector
+        from market_data_officer.officer.structure import compression_detector
+        from market_data_officer.officer.structure import imbalance_detector
 
         assert hasattr(bos_detector, "detect_bos")
         assert hasattr(fvg_detector, "detect_fvg")

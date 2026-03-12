@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 import pandas as pd
 import pytest
 
-from feed.config import INSTRUMENTS
-from feed.decode import decode_dukascopy_ticks
+from market_data_officer.feed.config import INSTRUMENTS
+from market_data_officer.feed.decode import decode_dukascopy_ticks
 
 
 def _make_bi5_payload(ticks: list[tuple]) -> bytes:

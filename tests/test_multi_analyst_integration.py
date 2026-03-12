@@ -6,13 +6,9 @@ and end-to-end pipeline with mocked LLM calls.
 
 import json
 import os
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
 
 from analyst.contracts import AnalystVerdict, StructureDigest
 from analyst.multi_contracts import ArbiterDecision, MultiAnalystOutput, PersonaVerdict

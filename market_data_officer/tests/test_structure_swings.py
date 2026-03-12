@@ -4,17 +4,13 @@ Tests confirmed swing detection, confirmation timestamps, no lookahead,
 ID stability, and empty-bar handling.
 """
 
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.config import StructureConfig
-from structure.swings import detect_swings
+from market_data_officer.structure.config import StructureConfig
+from market_data_officer.structure.swings import detect_swings
 
 
 def make_fixture_bars(prices: list, start: datetime) -> pd.DataFrame:

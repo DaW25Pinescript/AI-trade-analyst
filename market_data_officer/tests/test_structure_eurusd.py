@@ -6,19 +6,15 @@ synthetic data (hot packages not available in test environment).
 
 import json
 import os
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from structure.config import StructureConfig
-from structure.engine import compute_structure_packet
-from structure.io import get_output_path, write_packet_atomic
+from market_data_officer.structure.config import StructureConfig
+from market_data_officer.structure.engine import compute_structure_packet
+from market_data_officer.structure.io import get_output_path, write_packet_atomic
 
 
 def generate_eurusd_bars(

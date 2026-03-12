@@ -16,8 +16,8 @@ def _seed_fixture(instrument: str) -> None:
     Uses the same manifest/CSV shape as conftest.hot_packages_dir so the
     officer's standard loader path works unchanged.
     """
-    from feed.config import PACKAGES_DIR, HOT_WINDOW_SIZES
-    from instrument_registry import INSTRUMENT_REGISTRY, get_meta
+    from market_data_officer.feed.config import PACKAGES_DIR, HOT_WINDOW_SIZES
+    from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY, get_meta
 
     PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -151,7 +151,7 @@ def main() -> None:
         sys.exit(1)
 
     # Import here to avoid import errors when just running --help
-    from feed.pipeline import run_pipeline
+    from market_data_officer.feed.pipeline import run_pipeline
 
     run_pipeline(
         symbol=args.instrument,

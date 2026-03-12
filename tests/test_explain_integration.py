@@ -14,9 +14,6 @@ from unittest import mock
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
-
 from analyst.contracts import AnalystVerdict, LiquidityRef, ReasoningBlock, StructureDigest
 from analyst.multi_contracts import ArbiterDecision, MultiAnalystOutput, PersonaVerdict
 from analyst.explainability import build_explanation, build_explanation_from_dict, REQUIRED_SIGNALS

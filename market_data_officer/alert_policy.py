@@ -10,7 +10,7 @@ operator-visible alert or recovery log.
 from dataclasses import dataclass
 from enum import Enum
 
-from market_hours import (
+from market_data_officer.market_hours import (
     FreshnessClassification,
     MarketState,
 )

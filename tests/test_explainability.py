@@ -11,13 +11,9 @@ import json
 import os
 import sys
 import tempfile
-from pathlib import Path
 from unittest import mock
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
 
 from analyst.contracts import AnalystVerdict, ReasoningBlock, StructureDigest, LiquidityRef
 from analyst.multi_contracts import ArbiterDecision, MultiAnalystOutput, PersonaVerdict

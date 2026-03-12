@@ -12,12 +12,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
 
-from alert_policy import (
+from market_data_officer.alert_policy import (
     CRITICAL_FAILURE_THRESHOLD,
     CRITICAL_STALE_LIVE_THRESHOLD,
     WARN_STALE_LIVE_THRESHOLD,
 )
-from market_hours import FAMILY_SESSION_POLICY, INSTRUMENT_FAMILY
+from market_data_officer.market_hours import FAMILY_SESSION_POLICY, INSTRUMENT_FAMILY
 
 
 # ---------------------------------------------------------------------------

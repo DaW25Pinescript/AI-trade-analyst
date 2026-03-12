@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from alert_policy import (
+from market_data_officer.alert_policy import (
     AlertDecision,
     AlertLevel,
     CRITICAL_FAILURE_THRESHOLD,
@@ -26,7 +26,7 @@ from alert_policy import (
     WARN_STALE_LIVE_THRESHOLD,
     derive_alert_decision,
 )
-from market_hours import FreshnessClassification, MarketState
+from market_data_officer.market_hours import FreshnessClassification, MarketState
 
 
 # ── Helpers ────────────────────────────────────────────────────────────

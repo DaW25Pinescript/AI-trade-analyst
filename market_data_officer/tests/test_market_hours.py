@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from market_hours import (
+from market_data_officer.market_hours import (
     FAMILY_SESSION_POLICY,
     INSTRUMENT_FAMILY,
     FreshnessClassification,

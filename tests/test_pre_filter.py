@@ -5,12 +5,8 @@ produces correct StructureDigest from various MarketPacketV2 configurations.
 """
 
 import json
-import sys
-from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "market_data_officer"))
 
 from analyst.pre_filter import compute_digest, classify_fvg_context
 from analyst.contracts import StructureDigest

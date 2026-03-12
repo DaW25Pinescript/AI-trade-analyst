@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from officer.quality import check_package_quality
+from market_data_officer.officer.quality import check_package_quality
 
 
 class TestValidPackage:
