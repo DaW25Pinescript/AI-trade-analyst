@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
 // EmptyState — shown when a valid response returns zero items.
-// This is NOT an error — it means no triage items exist yet.
+// This is NOT an error — it means no items exist yet.
 // ---------------------------------------------------------------------------
 
-interface EmptyStateProps {
+export interface EmptyStateProps {
   message?: string;
   description?: string;
 }

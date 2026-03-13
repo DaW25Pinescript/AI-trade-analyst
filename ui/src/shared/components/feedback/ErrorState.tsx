@@ -3,7 +3,7 @@
 // Supports optional retry action.
 // ---------------------------------------------------------------------------
 
-interface ErrorStateProps {
+export interface ErrorStateProps {
   message?: string;
   detail?: string;
   onRetry?: () => void;

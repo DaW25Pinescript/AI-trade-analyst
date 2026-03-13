@@ -2,6 +2,9 @@
 // TanStack Query mutation hook for POST /triage.
 // On success: invalidates the triage query cache so the board re-fetches.
 // On failure: surfaces error for explicit retry — no auto-retry.
+//
+// Ownership (PR-UI-3): Moved from shared/hooks/ to workspaces/triage/hooks/
+// because POST /triage is triage-specific — no other workspace will call it.
 // ---------------------------------------------------------------------------
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +12,7 @@ import {
   triggerTriage,
   type TriggerTriageResponse,
 } from "@shared/api/triage";
-import { TRIAGE_QUERY_KEY } from "./useWatchlistTriage";
+import { WATCHLIST_TRIAGE_KEY } from "@shared/hooks";
 
 export interface TriggerTriageError {
   message: string;
@@ -37,7 +40,7 @@ export function useTriggerTriage() {
       return result.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TRIAGE_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: WATCHLIST_TRIAGE_KEY });
     },
   });
 }

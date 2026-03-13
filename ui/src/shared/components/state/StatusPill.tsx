@@ -3,7 +3,7 @@
 // Used for triage_status, bias, and other categorical labels.
 // ---------------------------------------------------------------------------
 
-interface StatusPillProps {
+export interface StatusPillProps {
   label: string;
   variant?: "default" | "positive" | "negative" | "neutral" | "warning";
 }

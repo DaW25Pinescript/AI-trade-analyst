@@ -3,14 +3,14 @@
 // Communicates that the data source is not available, not that the app failed.
 // ---------------------------------------------------------------------------
 
-interface UnavailableStateProps {
+export interface UnavailableStateProps {
   message?: string;
   description?: string;
 }
 
 export function UnavailableState({
-  message = "Triage data unavailable",
-  description = "The triage data source is currently unavailable. This may resolve on its own.",
+  message = "Data unavailable",
+  description = "The data source is currently unavailable. This may resolve on its own.",
 }: UnavailableStateProps) {
   return (
     <div className="rounded-lg border border-dashed border-amber-800/50 bg-amber-950/20 p-12 text-center">

@@ -1,69 +1,77 @@
 // ---------------------------------------------------------------------------
-// EntityRowCard — triage row with symbol, bias, confidence, why_interesting.
+// EntityRowCard — generic ranked entity row with label, sublabel, metadata,
+// and optional status indicators.
 //
 // Per DESIGN_NOTES §3: medium-density TradingView watchlist style.
 // Entire row clickable with hover affordance.
-// why_interesting gets widest column and breathing room.
-// Per DESIGN_NOTES §1.1: fresh rows show no badge, stale rows show badge.
+//
+// Decision (PR-UI-3): Made generic to remove triage-specific domain coupling.
+// The triage workspace wraps this with TriageRowCard for domain-specific
+// field mapping. See workspaces/triage/components/TriageRowCard.tsx.
 // ---------------------------------------------------------------------------
 
-import type { TriageRowViewModel } from "@workspaces/triage/adapters/triageViewModel";
 import { StatusPill } from "@shared/components/state/StatusPill";
+import type { StatusPillProps } from "@shared/components/state/StatusPill";
 
-interface EntityRowCardProps {
-  row: TriageRowViewModel;
-  onClick: (symbol: string) => void;
+export interface EntityRowCardProps {
+  /** Primary identifier displayed in the first column. */
+  label: string;
+  /** Optional status pill shown after the label. */
+  pill?: StatusPillProps;
+  /** Optional short metadata string shown right-aligned (e.g. "78%"). */
+  meta?: string;
+  /** Main descriptive text — gets the widest column. */
+  description?: string;
+  /** Optional trailing badge text (e.g. "STALE"). */
+  badge?: { text: string; className: string };
+  /** Row click handler. */
+  onClick?: () => void;
 }
 
-function biasVariant(
-  bias: string,
-): "positive" | "negative" | "neutral" | "warning" {
-  const b = bias.toLowerCase();
-  if (b === "bullish" || b === "long") return "positive";
-  if (b === "bearish" || b === "short") return "negative";
-  if (b === "neutral" || b === "flat") return "neutral";
-  return "warning";
-}
-
-function formatConfidence(c: number): string {
-  if (c >= 1 && c <= 100) return `${Math.round(c)}%`;
-  if (c > 0 && c <= 1) return `${Math.round(c * 100)}%`;
-  return `${c}`;
-}
-
-export function EntityRowCard({ row, onClick }: EntityRowCardProps) {
+export function EntityRowCard({
+  label,
+  pill,
+  meta,
+  description,
+  badge,
+  onClick,
+}: EntityRowCardProps) {
   return (
     <button
       type="button"
-      onClick={() => onClick(row.symbol)}
+      onClick={onClick}
       className="group flex w-full items-center gap-4 rounded-lg border border-gray-800 bg-gray-900 px-4 py-3 text-left transition-colors hover:border-gray-600 hover:bg-gray-800/70"
     >
-      {/* Symbol */}
+      {/* Label */}
       <span className="w-20 shrink-0 text-sm font-semibold text-gray-100">
-        {row.symbol}
+        {label}
       </span>
 
-      {/* Bias pill */}
-      <span className="w-20 shrink-0">
-        <StatusPill label={row.bias} variant={biasVariant(row.bias)} />
-      </span>
+      {/* Status pill */}
+      {pill && (
+        <span className="w-20 shrink-0">
+          <StatusPill label={pill.label} variant={pill.variant} />
+        </span>
+      )}
 
-      {/* Confidence */}
-      <span className="w-14 shrink-0 text-right text-xs tabular-nums text-gray-400">
-        {formatConfidence(row.confidence)}
-      </span>
+      {/* Meta */}
+      {meta && (
+        <span className="w-14 shrink-0 text-right text-xs tabular-nums text-gray-400">
+          {meta}
+        </span>
+      )}
 
-      {/* Why interesting — widest column with breathing room */}
+      {/* Description — widest column with breathing room */}
       <span className="min-w-0 flex-1 truncate text-sm text-gray-300">
-        {row.whyInteresting || (
+        {description || (
           <span className="text-gray-600 italic">—</span>
         )}
       </span>
 
-      {/* Per-row stale badge — only shown for stale rows */}
-      {row.freshness === "stale" && (
-        <span className="shrink-0 rounded border border-amber-700/50 bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
-          STALE
+      {/* Optional trailing badge */}
+      {badge && (
+        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${badge.className}`}>
+          {badge.text}
         </span>
       )}
 

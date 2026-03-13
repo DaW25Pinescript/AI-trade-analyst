@@ -2,7 +2,7 @@
 // LoadingSkeleton — placeholder skeleton for loading state.
 // ---------------------------------------------------------------------------
 
-interface LoadingSkeletonProps {
+export interface LoadingSkeletonProps {
   rows?: number;
 }
 

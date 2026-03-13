@@ -2,7 +2,7 @@
 
 ## Header
 
-- **Status:** ▶️ In progress — Phase 2 complete, Phase 3 next
+- **Status:** ▶️ In progress — Phase 3 complete, Phase 4 next
 - **Date:** 13 March 2026
 - **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 - **Spec file:** `docs/specs/ui_reentry_phase_plan.md`
@@ -438,8 +438,8 @@ Total: 12 PRs. 8 frontend-only, 4 with backend changes. The first 4 PRs require 
 | **Phase 0** | **UI Re-Entry Governance** | **✅ Done** |
 | **Phase 1** | **React App Shell + Triage Route** | **✅ Done** |
 | **Phase 2** | **Triage Board MVP (component seed)** | **✅ Done** |
-| **Phase 3** | **Shared Component Extraction** | **▶️ Next** |
-| **Phase 4** | **Agent Ops Contract + Backend MVP** | **⏳ Pending** |
+| **Phase 3** | **Shared Component Extraction** | **✅ Done** |
+| **Phase 4** | **Agent Ops Contract + Backend MVP** | **▶️ Next** |
 | **Phase 5** | **Agent Ops React MVP** | **⏳ Pending** |
 | **Phase 6** | **Journey Studio + Analysis Run + Journal & Review** | **⏳ Pending** |
 | **Phase 7** | **Agent Ops Trace + Detail** | **⏳ Pending** |

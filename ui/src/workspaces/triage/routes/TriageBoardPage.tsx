@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Triage Board — PR-UI-2 implementation.
+// Triage Board — PR-UI-2 implementation, PR-UI-3 barrel imports.
 //
 // Renders real triage data from GET /watchlist/triage with all 7 state
 // conditions handled. Trust strip always visible. Per-row staleness from
@@ -7,22 +7,23 @@
 //
 // Layout per UI_WORKSPACES §5 and DESIGN_NOTES §3:
 // - Top bar: title + TrustStrip + "Run Triage" button
-// - Main board: ranked EntityRowCard list
+// - Main board: ranked TriageRowCard list
 // ---------------------------------------------------------------------------
 
 import { useNavigate } from "react-router-dom";
-import { useWatchlistTriage } from "@shared/hooks/useWatchlistTriage";
-import { useTriggerTriage } from "@shared/hooks/useTriggerTriage";
-import { useFeederHealth } from "@shared/hooks/useFeederHealth";
+import { useWatchlistTriage, useFeederHealth } from "@shared/hooks";
+import { PanelShell } from "@shared/components/layout";
+import { TrustStrip } from "@shared/components/trust";
+import { DataStateBadge } from "@shared/components/state";
+import {
+  LoadingSkeleton,
+  EmptyState,
+  UnavailableState,
+  ErrorState,
+} from "@shared/components/feedback";
 import { buildTriageBoardViewModel } from "../adapters/triageViewModel";
-import { PanelShell } from "@shared/components/layout/PanelShell";
-import { TrustStrip } from "@shared/components/trust/TrustStrip";
-import { DataStateBadge } from "@shared/components/state/DataStateBadge";
-import { EntityRowCard } from "@shared/components/entity/EntityRowCard";
-import { LoadingSkeleton } from "@shared/components/feedback/LoadingSkeleton";
-import { EmptyState } from "@shared/components/feedback/EmptyState";
-import { UnavailableState } from "@shared/components/feedback/UnavailableState";
-import { ErrorState } from "@shared/components/feedback/ErrorState";
+import { useTriggerTriage } from "../hooks/useTriggerTriage";
+import { TriageRowCard } from "../components/TriageRowCard";
 
 export function TriageBoardPage() {
   const navigate = useNavigate();
@@ -129,16 +130,23 @@ export function TriageBoardPage() {
         />
       )}
 
-      {vm.condition === "unavailable" && <UnavailableState />}
+      {vm.condition === "unavailable" && (
+        <UnavailableState message="Triage data unavailable" />
+      )}
 
-      {vm.condition === "empty" && <EmptyState />}
+      {vm.condition === "empty" && (
+        <EmptyState
+          message="No triage items"
+          description="Run triage to generate items for your watchlist."
+        />
+      )}
 
       {(vm.condition === "ready" ||
         vm.condition === "stale" ||
         vm.condition === "demo-fallback") && (
         <div className="space-y-2">
           {vm.items.map((row) => (
-            <EntityRowCard
+            <TriageRowCard
               key={row.symbol}
               row={row}
               onClick={handleRowClick}

@@ -7,7 +7,7 @@ import type { FeederHealth } from "@shared/api/feeder";
 import { DataStateBadge } from "@shared/components/state/DataStateBadge";
 import { FeederHealthChip } from "./FeederHealthChip";
 
-interface TrustStripProps {
+export interface TrustStripProps {
   dataState: string | null;
   generatedAt: string | null;
   feederHealth: FeederHealth | undefined;
