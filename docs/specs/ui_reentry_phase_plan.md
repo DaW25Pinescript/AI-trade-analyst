@@ -439,7 +439,7 @@ Total: 12 PRs. 8 frontend-only, 4 with backend changes. The first 4 PRs require 
 | **Phase 1** | **React App Shell + Triage Route** | **✅ Done** |
 | **Phase 2** | **Triage Board MVP (component seed)** | **✅ Done** |
 | **Phase 3** | **Shared Component Extraction** | **✅ Done** |
-| **Phase 4** | **Agent Ops Contract + Backend MVP** | **▶️ Next** |
+| **Phase 4** | **Agent Ops Contract + Backend MVP** | **🟡 Contract complete (PR-OPS-1), backend next (PR-OPS-2)** |
 | **Phase 5** | **Agent Ops React MVP** | **⏳ Pending** |
 | **Phase 6** | **Journey Studio + Analysis Run + Journal & Review** | **⏳ Pending** |
 | **Phase 7** | **Agent Ops Trace + Detail** | **⏳ Pending** |

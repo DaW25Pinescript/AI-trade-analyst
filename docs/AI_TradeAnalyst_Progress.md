@@ -3,7 +3,7 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 13 March 2026
 **Review date:** 10 March 2026
-**Current phase:** UI Phase 3A Implementation — Shared component extraction complete, Phase 4 next
+**Current phase:** Phase 4 — Agent Ops contract complete, backend MVP (PR-OPS-2) next
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -21,10 +21,10 @@
 ## Phase Index (at-a-glance)
 
 - **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A.
-- **Current phase:** UI Phase 3A Implementation — Shared component extraction complete, Phase 4 next.
+- **Current phase:** Phase 4 — Agent Ops contract complete, backend MVP (PR-OPS-2) next.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations is classified as Phase 3B extension — an operator observability / explainability / trust workspace on new read-only projection endpoints.
-- **Next actions:** PR-OPS-1 (Agent Ops contract spec). Agent Ops backend endpoints are Phase 4.
+- **Next actions:** PR-OPS-2 (Agent Ops backend implementation — roster + health endpoints).
 - **Active decision gate:** the production-readiness gate remains satisfied; the runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. UI implementation is now the active lane.
 
 ## 1) Executive Snapshot
@@ -42,7 +42,11 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — PR-UI-3: Shared Component Extraction (13 Mar 2026)
+### Latest increment — PR-OPS-1: Agent Ops Contract Spec (13 Mar 2026)
+
+Delivered PR-OPS-1 — Agent Operations endpoint contract specification. Created `docs/ui/AGENT_OPS_CONTRACT.md` with implementation-ready contracts for `GET /ops/agent-roster` (static architecture and roster truth) and `GET /ops/agent-health` (current health snapshot). Shared types locked: `DepartmentKey` (4 canonical values), `ResponseMeta`, `OpsErrorEnvelope`. Full response shapes specified: `AgentRosterResponse` (governance_layer, officer_layer, departments, relationships), `AgentHealthSnapshotResponse` (entities with separate run_state and health_state dimensions). Polling model locked (no SSE, no WebSocket). Roster ↔ health join rule explicit. Contract test priorities listed for PR-OPS-2. Reserved future endpoints acknowledged (Phase 7: agent-trace, agent-detail). `UI_CONTRACT.md` updated with §10.6 cross-reference. Zero code files changed.
+
+### Previous increment — PR-UI-3: Shared Component Extraction (13 Mar 2026)
 
 Delivered PR-UI-3 — shared component extraction and hardening. EntityRowCard made generic (Option A: label/pill/meta/description/badge props), triage-specific TriageRowCard wrapper created. useTriggerTriage moved to workspaces/triage/hooks/ (triage-specific mutation). Hook cache key conventions standardised (exported named constants, explicit return types, documented stale times). All shared component props exported. Barrel index files created for all 5 component subdirectories and hooks. TriageBoardPage refactored to barrel imports with zero inline shared components. 36 new isolated component tests. Shared README with component inventory, import examples, hook reference, and contributor guidance. Build passes, typecheck clean, 66 tests green (36 new). No backend modifications.
 
@@ -139,6 +143,8 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | Phase 1 — React App Shell + Triage Route | React app shell + routing + typed fetch — build clean, typecheck clean, 5 smoke tests | ✅ Complete |
 | Phase 2 — Triage Board MVP | Real triage data + shared components + trust strip — build clean, typecheck clean, 30 tests | ✅ Complete |
 | Phase 3 — Shared Component Extraction | Barrel exports, typed props, generic EntityRowCard, hook ownership, 36 component tests, shared README — 66 tests | ✅ Complete |
+| Phase 4 — Agent Ops Contract (PR-OPS-1) | Endpoint contract spec for /ops/agent-roster and /ops/agent-health — zero code changes | ✅ Complete |
+| Phase 4 — Agent Ops Backend (PR-OPS-2) | Backend implementation — roster + health endpoints | ▶️ Next |
 | UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
 | Observability Phase 2 | Cross-lane runtime visibility — structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories | ✅ Complete |
 | TD-3 | Packaging/import-path stability — 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added — 1603 tests | ✅ Complete |
@@ -374,8 +380,8 @@ Reduce the architectural split between runtime lanes and address broader converg
 8. ~~TD-3 — packaging/import-path stability~~ — ✅ Complete (12 March 2026). 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added. Spec: `docs/specs/td3_packaging_import_stability.md`.
 9. ~~Cleanup tranche~~ — ✅ Complete (13 March 2026). Async markers cleaned, TD-5 enum centralisation resolved, TD-9 unused vars resolved, doc consolidation complete.
 10. ~~Runtime-hardening sequence~~ — ✅ Complete. Obs P2, TD-3, and cleanup tranche all closed.
-11. **UI implementation is now the active lane.** PR-UI-1 (React app shell), PR-UI-2 (Triage Board MVP), and PR-UI-3 (Shared Component Extraction) are complete. Next: **PR-OPS-1** (Agent Ops Contract Spec).
-12. Agent Ops backend endpoints are **Phase 4**.
+11. **UI implementation is now the active lane.** PR-UI-1 (React app shell), PR-UI-2 (Triage Board MVP), PR-UI-3 (Shared Component Extraction), and PR-OPS-1 (Agent Ops Contract Spec) are complete. Next: **PR-OPS-2** (Agent Ops Backend — roster + health endpoints).
+12. Agent Ops contract spec is complete. Backend endpoints (PR-OPS-2) are **next**.
 13. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
 
 ---
