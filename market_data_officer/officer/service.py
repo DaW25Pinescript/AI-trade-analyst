@@ -303,15 +303,11 @@ def build_market_packet(
 
     # Determine instrument trust level
     is_trusted = instrument in TRUSTED_INSTRUMENTS
-    is_provisional = instrument in PROVISIONAL_INSTRUMENTS
     instrument_verified = is_trusted
 
     # For unverified/provisional instruments, check if data exists
     # If no data, return a minimal packet with appropriate quality flags
     if not instrument_verified:
-        quality_label = "unverified"
-        quality_flags = ["instrument_not_verified"]
-
         # Try to load data anyway — it may exist even if unverified
         try:
             manifest = load_manifest(instrument, packages_dir)
@@ -410,11 +406,6 @@ def build_market_packet(
     # Log quality issues
     for flag in quality_block.flags:
         print(f"[officer] WARNING: quality flag: {flag}")
-
-    # Assemble structure block
-    struct_kwargs = {}
-    if structure_output_dir is not None:
-        struct_kwargs["structure_output_dir"] = structure_output_dir
 
     # Get current price for proximity sorting
     current_price = 0.0

@@ -403,7 +403,7 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 | TD-6 | `build_market_packet()` God-function | `market_data_officer/officer/service.py` | Trust policy, quality, feature extraction, serialization, and logging in one function; hard to test in isolation | **Future cleanup** — decompose when packet assembly needs to evolve; not blocking current work |
 | TD-7 | `build_market_packet()` eager loading + `iterrows()` | `market_data_officer/officer/service.py` | O(total_rows) Python loop per request; CPU/memory pressure scales with instrument count | **Future optimisation** — current scale (5 instruments, 4–6 TFs) is within tolerance; revisit when concurrency or instrument count grows |
 | TD-8 | Mixed data-shape handling in `classify_fvg_context` | `analyst/pre_filter.py` | `hasattr`/`get` branches for object vs dict payloads; weak upstream contracts | **Resolves with runtime lane convergence** — architectural, not a standalone cleanup |
-| TD-9 | Unused variables in `build_market_packet()` | `market_data_officer/officer/service.py` | `is_provisional`, `quality_label`, `quality_flags`, `struct_kwargs` assigned but unused; misleading intent | **Cleanup tranche** — remove or document intent; very small |
+| TD-9 | ~~Unused variables in `build_market_packet()`~~ | `market_data_officer/officer/service.py` | ~~`is_provisional`, `quality_label`, `quality_flags`, `struct_kwargs` assigned but unused~~ | ✅ **Resolved** (13 March 2026) — all four dead locals removed in PR-3 |
 
 ### Documentation / testing gaps — address as part of related phases
 
@@ -420,6 +420,6 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 3. **Completed:** TD-3 Packaging/Import Stability (12 March 2026) — 27 sys.path.insert calls removed, pyproject.toml fixed, editable install working, 16 import stability tests.
 3. **Next:** Observability Phase 2 (cross-lane runtime visibility).
 4. **Then:** TD-3 (packaging/import stability).
-5. **Then:** Cleanup tranche — TD-9 (unused vars), async markers. (TD-5 enum centralisation resolved 13 March 2026.)
+5. **Then:** Cleanup tranche — async markers, doc consolidation. (TD-5 enum centralisation resolved 13 March 2026. TD-9 unused vars resolved 13 March 2026.)
 6. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
 7. **Dependent follow-on:** TD-11 resolves when TD-3 is completed.
