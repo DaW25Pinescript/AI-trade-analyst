@@ -5,6 +5,7 @@ import {
 } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { TriageBoardPage } from "@workspaces/triage/routes/TriageBoardPage";
+import { AgentOpsRoute } from "@workspaces/ops/routes/AgentOpsRoute";
 import { WorkspacePlaceholder } from "@shared/components/WorkspacePlaceholder";
 import { NotFoundPage } from "@shared/components/NotFoundPage";
 
@@ -31,7 +32,7 @@ const router = createHashRouter([
         path: "review",
         element: <WorkspacePlaceholder name="Review" />,
       },
-      { path: "ops", element: <WorkspacePlaceholder name="Ops" /> },
+      { path: "ops", element: <AgentOpsRoute /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
