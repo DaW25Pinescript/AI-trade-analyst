@@ -1,5 +1,7 @@
 # UI Phase 1 — Backend Capability Audit (Repo-Grounded)
 
+> **Historical baseline audit.** This document is a point-in-time capability snapshot, not a live status tracker. For current repo status, see [../AI_TradeAnalyst_Progress.md](../AI_TradeAnalyst_Progress.md).
+
 ## 1) Summary
 
 This audit maps the **actual** backend capabilities in `ai_analyst/api/` against the current frontend surfaces in `app/`.

@@ -1,11 +1,11 @@
 # UI_WORKSPACES
 
-AI Trade Analyst – Workspace Blueprint  
-File: `docs/ui/UI_WORKSPACES.md`  
-Status: Commit-ready  
-Scope: UI / Workflow Layer  
-Phase: UI Phase 3  
+AI Trade Analyst – Workspace Blueprint
+File: `docs/ui/UI_WORKSPACES.md`
+Scope: UI / Workflow Layer
 Depends on: `docs/ui/UI_BACKEND_AUDIT.md`, `docs/ui/UI_CONTRACT.md`, `docs/ui/DESIGN_NOTES.md`
+
+> For current repo phase and progress, see [../AI_TradeAnalyst_Progress.md](../AI_TradeAnalyst_Progress.md).
 
 ---
 

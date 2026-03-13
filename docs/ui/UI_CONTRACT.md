@@ -1,10 +1,10 @@
 # UI_CONTRACT
 
-AI Trade Analyst – UI Contract  
-File: `docs/ui/UI_CONTRACT.md`  
-Status: Active  
-Scope: Backend → UI Contract  
-Phase: UI Phase 2  
+> **Contract authority for UI behavior**, not a status/phase tracker. For current repo phase and progress, see [../AI_TradeAnalyst_Progress.md](../AI_TradeAnalyst_Progress.md).
+
+AI Trade Analyst – UI Contract
+File: `docs/ui/UI_CONTRACT.md`
+Scope: Backend → UI Contract
 Depends on: `docs/ui/UI_BACKEND_AUDIT.md`
 
 ---
