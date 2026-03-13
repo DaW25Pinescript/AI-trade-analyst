@@ -569,6 +569,11 @@ from .routers.journey import router as journey_router
 
 app.include_router(journey_router)
 
+# ── Agent Operations router (PR-OPS-2) ──────────────────────────────────────
+from .routers.ops import router as ops_router
+
+app.include_router(ops_router)
+
 
 @app.get("/health")
 async def health():
