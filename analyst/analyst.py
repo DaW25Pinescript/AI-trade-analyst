@@ -19,14 +19,11 @@ from analyst.contracts import (
     ReasoningBlock,
     StructureDigest,
 )
+from analyst.enums import VALID_CONFIDENCES, VALID_LTF_ALIGNMENTS, VALID_VERDICTS
 from analyst.prompt_builder import SYSTEM_PROMPT, build_user_prompt
 from market_data_officer.officer.contracts import MarketPacketV2
 
 logger = logging.getLogger(__name__)
-
-VALID_VERDICTS = {"long_bias", "short_bias", "no_trade", "conditional", "no_data"}
-VALID_CONFIDENCES = {"high", "moderate", "low", "none"}
-VALID_LTF_ALIGNMENTS = {"aligned", "mixed", "conflicted", "unknown"}
 
 # ── call_llm transport/runtime settings (TD-2) ────────────────────────────────
 LLM_CALL_TIMEOUT_S: float = float(os.environ.get("LLM_CALL_TIMEOUT_S", "60"))

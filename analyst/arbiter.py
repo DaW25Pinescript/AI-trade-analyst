@@ -12,33 +12,9 @@ import re
 from typing import Any
 
 from analyst.contracts import StructureDigest
+from analyst.enums import VERDICT_TO_BIAS, lower_confidence
 from analyst.multi_contracts import ArbiterDecision, PersonaVerdict
 from analyst.analyst import call_llm
-
-
-# ---------------------------------------------------------------------------
-# Confidence ordering
-# ---------------------------------------------------------------------------
-
-_CONFIDENCE_ORDER = {"high": 3, "moderate": 2, "low": 1, "none": 0}
-
-
-def _lower_confidence(a: str, b: str) -> str:
-    """Return the lower of two confidence levels."""
-    return a if _CONFIDENCE_ORDER[a] <= _CONFIDENCE_ORDER[b] else b
-
-
-# ---------------------------------------------------------------------------
-# Directional bias mapping
-# ---------------------------------------------------------------------------
-
-_VERDICT_TO_BIAS = {
-    "long_bias": "bullish",
-    "short_bias": "bearish",
-    "no_trade": "none",
-    "conditional": "neutral",
-    "no_data": "none",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +44,7 @@ def compute_consensus(
         if a.confidence == b.confidence:
             return "full_alignment", a.verdict, a.confidence
         else:
-            lower = _lower_confidence(a.confidence, b.confidence)
+            lower = lower_confidence(a.confidence, b.confidence)
             return "directional_alignment_confidence_split", a.verdict, lower
 
     # Priority 5 — both directional, opposite directions
@@ -83,7 +59,7 @@ def compute_consensus(
         directional = a if a.is_directional() else b
         other = b if a.is_directional() else a
         if other.directional_bias == directional.directional_bias:
-            lower = _lower_confidence(a.confidence, b.confidence)
+            lower = lower_confidence(a.confidence, b.confidence)
             return "directional_alignment_confidence_split", directional.verdict, lower
 
     return "conditional", "conditional", "low"
@@ -212,7 +188,7 @@ def arbitrate(
         confidence_spread = f"{persona_a.confidence} vs {persona_b.confidence}"
 
     # Step 3: Derive directional bias from final verdict
-    final_directional_bias = _VERDICT_TO_BIAS.get(final_verdict, "none")
+    final_directional_bias = VERDICT_TO_BIAS.get(final_verdict, "none")
 
     # Step 4: Determine no-trade enforcement
     no_trade_enforced = digest.has_hard_no_trade()

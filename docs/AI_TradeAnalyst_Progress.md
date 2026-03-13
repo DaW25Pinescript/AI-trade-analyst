@@ -399,7 +399,7 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 | # | Item | Location | Risk | Resolution timing |
 |---|------|----------|------|-------------------|
 | TD-4 | Orchestration duplication (single vs multi-analyst) | `analyst/service.py`, `analyst/multi_analyst_service.py` | Parallel pipelines with drift risk; lifecycle changes must be made in two places | **Named cleanup** — extract shared orchestration steps into common helper; pick up after seam confidence improves |
-| TD-5 | Magic-string enum duplication | `analyst/analyst.py`, `analyst/personas.py`, `analyst/arbiter.py` | Verdict/confidence/alignment enums hand-maintained in multiple modules; drift and inconsistent validation | **Cleanup tranche** — centralise into shared contracts module; low risk, high leverage |
+| TD-5 | Magic-string enum duplication | `analyst/analyst.py`, `analyst/personas.py`, `analyst/arbiter.py` | Verdict/confidence/alignment enums hand-maintained in multiple modules; drift and inconsistent validation | **✅ Resolved — 13 March 2026** — canonical source `analyst/enums.py`; 5 duplicated definitions removed from 4 modules |
 | TD-6 | `build_market_packet()` God-function | `market_data_officer/officer/service.py` | Trust policy, quality, feature extraction, serialization, and logging in one function; hard to test in isolation | **Future cleanup** — decompose when packet assembly needs to evolve; not blocking current work |
 | TD-7 | `build_market_packet()` eager loading + `iterrows()` | `market_data_officer/officer/service.py` | O(total_rows) Python loop per request; CPU/memory pressure scales with instrument count | **Future optimisation** — current scale (5 instruments, 4–6 TFs) is within tolerance; revisit when concurrency or instrument count grows |
 | TD-8 | Mixed data-shape handling in `classify_fvg_context` | `analyst/pre_filter.py` | `hasattr`/`get` branches for object vs dict payloads; weak upstream contracts | **Resolves with runtime lane convergence** — architectural, not a standalone cleanup |
@@ -415,11 +415,11 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 
 ### Resolution sequence
 
-1. **Resolved:** TD-1, TD-2, TD-3, TD-10, and TD-11 are closed.
+1. **Resolved:** TD-1, TD-2, TD-3, TD-5, TD-10, and TD-11 are closed.
 2. **Completed:** CI Seam Hardening (10 March 2026) — production-readiness gate satisfied.
 3. **Completed:** TD-3 Packaging/Import Stability (12 March 2026) — 27 sys.path.insert calls removed, pyproject.toml fixed, editable install working, 16 import stability tests.
 3. **Next:** Observability Phase 2 (cross-lane runtime visibility).
 4. **Then:** TD-3 (packaging/import stability).
-5. **Then:** Cleanup tranche — TD-5 (enum centralisation), TD-9 (unused vars), async markers.
+5. **Then:** Cleanup tranche — TD-9 (unused vars), async markers. (TD-5 enum centralisation resolved 13 March 2026.)
 6. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
 7. **Dependent follow-on:** TD-11 resolves when TD-3 is completed.
