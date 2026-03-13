@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from analyst.contracts import StructureDigest
+from analyst.enums import CONFIDENCE_ORDER, VERDICT_TO_BIAS, lower_confidence
 from analyst.multi_contracts import ArbiterDecision, MultiAnalystOutput, PersonaVerdict
 from analyst.explain_contracts import (
     CausalChain,
@@ -35,29 +36,6 @@ REQUIRED_SIGNALS = {
     "caution_flags",
 }
 
-# ---------------------------------------------------------------------------
-# Confidence ordering helper
-# ---------------------------------------------------------------------------
-
-_CONFIDENCE_ORDER = {"high": 3, "moderate": 2, "low": 1, "none": 0}
-
-
-def _lower_confidence(a: str, b: str) -> str:
-    return a if _CONFIDENCE_ORDER.get(a, 0) <= _CONFIDENCE_ORDER.get(b, 0) else b
-
-
-# ---------------------------------------------------------------------------
-# Verdict-to-bias mapping
-# ---------------------------------------------------------------------------
-
-_VERDICT_TO_BIAS = {
-    "long_bias": "bullish",
-    "short_bias": "bearish",
-    "no_trade": "none",
-    "conditional": "neutral",
-    "no_data": "none",
-}
-
 
 # ---------------------------------------------------------------------------
 # Signal influence classification — Rule 3: rule-based, not heuristic
@@ -73,7 +51,7 @@ def classify_signal_influence(
 
     Returns one of: "dominant", "supporting", "conflicting", "neutral", "absent".
     """
-    verdict_bias = _VERDICT_TO_BIAS.get(verdict, "none")
+    verdict_bias = VERDICT_TO_BIAS.get(verdict, "none")
 
     if signal_name == "htf_regime":
         return _classify_htf_regime(digest, verdict, verdict_bias)
@@ -437,9 +415,8 @@ def compute_persona_dominance(
         direction_driver = "both"
 
     # Confidence driver
-    conf_order = {"high": 3, "moderate": 2, "low": 1, "none": 0}
-    pa_conf = conf_order.get(pa.confidence, 0)
-    pb_conf = conf_order.get(pb.confidence, 0)
+    pa_conf = CONFIDENCE_ORDER.get(pa.confidence, 0)
+    pb_conf = CONFIDENCE_ORDER.get(pb.confidence, 0)
 
     if pa_conf < pb_conf:
         stricter = "technical_structure"
@@ -452,7 +429,7 @@ def compute_persona_dominance(
         confidence_driver = "arbiter_rule"
 
     # Confidence effect
-    lower = _lower_confidence(pa.confidence, pb.confidence)
+    lower = lower_confidence(pa.confidence, pb.confidence)
     if arbiter.final_confidence != pa.confidence and arbiter.final_confidence != pb.confidence:
         effect = "downgraded"
     elif stricter and arbiter.final_confidence == lower:

@@ -11,17 +11,9 @@ import re
 from typing import Any
 
 from analyst.contracts import ReasoningBlock, StructureDigest
+from analyst.enums import VALID_CONFIDENCES, VALID_DIRECTIONAL_BIASES, VALID_VERDICTS
 from analyst.multi_contracts import PersonaVerdict
 from analyst.analyst import call_llm
-
-
-# ---------------------------------------------------------------------------
-# Valid enum values (mirrors analyst.analyst)
-# ---------------------------------------------------------------------------
-
-VALID_VERDICTS = {"long_bias", "short_bias", "no_trade", "conditional", "no_data"}
-VALID_CONFIDENCES = {"high", "moderate", "low", "none"}
-VALID_DIRECTIONAL_BIASES = {"bullish", "bearish", "neutral", "none"}
 
 # ---------------------------------------------------------------------------
 # Persona names
