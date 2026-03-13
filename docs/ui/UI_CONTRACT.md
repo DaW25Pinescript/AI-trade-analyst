@@ -958,10 +958,10 @@ The Agent Operations endpoint contracts are defined in a dedicated document:
 
 | Method | Route | Purpose | Contract status |
 |--------|-------|---------|----------------|
-| `GET` | `/ops/agent-roster` | Static architecture and roster truth | Contracted — not yet implemented |
-| `GET` | `/ops/agent-health` | Current health snapshot (poll-based) | Contracted — not yet implemented |
+| `GET` | `/ops/agent-roster` | Static architecture and roster truth | Implemented (PR-OPS-2) |
+| `GET` | `/ops/agent-health` | Current health snapshot (poll-based) | Implemented (PR-OPS-2) |
 
-These endpoints do not exist until PR-OPS-2 (backend implementation) merges. Frontend code must not attempt to call these endpoints until PR-OPS-2 is complete and this section is updated to reflect active status.
+These endpoints are implemented and available. Frontend code may call these endpoints. See `AGENT_OPS_CONTRACT.md` for response shapes and behavioral rules.
 
 ### Reserved future endpoints (Phase 7)
 
