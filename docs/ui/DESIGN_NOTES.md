@@ -62,3 +62,47 @@ All decisions map directly to:
 - UI_CONTRACT sections 6, 7, 9–12 (states, lifecycle, error handling, retry rules)
 
 This file is the single source of visual truth when the wireframes are not open.
+
+---
+
+## 5. Agent Operations Governance Decisions (locked — 13 March 2026)
+
+These decisions were locked during UI Re-Entry Governance (PR-UI-0) and must not be re-litigated during implementation.
+
+### 5.1 Agent Operations product framing (locked)
+
+- Agent Operations is an **operator observability, explainability, and trust workspace** for the multi-agent analysis engine.
+- North-star question: **"Why should I trust this system right now?"**
+- It exists to answer five operator questions:
+  1. Who participated?
+  2. What happened in this run?
+  3. Why did the system reach this verdict?
+  4. Where is trust weakened?
+  5. What needs attention?
+
+### 5.2 Agent Operations negative scope (locked)
+
+- Agent Ops MVP is **not** a configuration interface.
+- It is **not** a prompt editor.
+- It is **not** a manual orchestration panel.
+- It is **not** a model-switching console.
+- It is **not** a chat-with-agents surface.
+
+### 5.3 Agent Operations classification
+
+- Phase 3B extension, not Phase 3A.
+- No production contract for `/ops/*` until backend PRs merge and `UI_CONTRACT.md` is updated.
+- Phase 5 = roster-first observability MVP.
+- Phase 7 = run-scoped forensic explainability.
+
+### 5.4 HTML prototype status
+
+- `operations.html` is visual reference only for hierarchy, tone, and interaction intent — not implementation debt.
+
+### 5.5 Frontend migration rule
+
+- React app coexists with existing `app/` during workspace-by-workspace migration — no big-bang legacy replacement.
+
+### 5.6 Agent health polling rule
+
+- `/ops/agent-health` is poll-based snapshot only in MVP — no SSE, no WebSocket, no live-push semantics.
