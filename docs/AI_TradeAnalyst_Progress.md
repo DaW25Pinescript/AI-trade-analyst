@@ -326,6 +326,10 @@ Reduce the architectural split between runtime lanes and address broader converg
 #### Done criteria
 - Future cleanup and UI extension work can happen against stronger contracts and better CI coverage.
 
+#### Future architecture direction (post-foundation)
+
+**Future Design Direction — Reflective Intelligence Layer:** Human-governed review and policy-refinement architecture built on run-record audit trails. Intended to use Agent Ops observability and Journal & Review artifacts to surface recurring weaknesses, generate bounded hypotheses, and propose reversible policy changes for human approval. Becomes viable once the repo has stable run artifacts, Agent Ops observability surfaces, Journal & Review readback, and sufficient historical run volume. Not part of current UI re-entry implementation scope. Design note: `docs/design-notes/reflective_intelligence_layer.md`.
+
 ---
 
 ## 4) Proposed 6–8 Week Plan
