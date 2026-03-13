@@ -3,7 +3,7 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 13 March 2026
 **Review date:** 10 March 2026
-**Current phase:** UI Phase 3A Implementation — Triage Board first (React + TypeScript + Tailwind)
+**Current phase:** UI Phase 3A Implementation — Triage Board MVP complete, component extraction next
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -21,10 +21,10 @@
 ## Phase Index (at-a-glance)
 
 - **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A.
-- **Current phase:** UI Phase 3A Implementation — Triage Board first (React + TypeScript + Tailwind). UI implementation resumes with Triage Board as the first React workspace and component-system seed.
+- **Current phase:** UI Phase 3A Implementation — Triage Board MVP complete, component extraction next.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations is classified as Phase 3B extension — an operator observability / explainability / trust workspace on new read-only projection endpoints.
-- **Next actions:** PR-UI-2 (Triage Board MVP), then PR-UI-3 (component extraction), then PR-OPS-1 (Agent Ops contract spec). Agent Ops backend endpoints are Phase 4 (after Triage Board and component extraction).
+- **Next actions:** PR-UI-3 (component extraction), then PR-OPS-1 (Agent Ops contract spec). Agent Ops backend endpoints are Phase 4 (after component extraction).
 - **Active decision gate:** the production-readiness gate remains satisfied; the runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. UI implementation is now the active lane.
 
 ## 1) Executive Snapshot
@@ -42,7 +42,11 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — PR-UI-1: React App Shell (13 Mar 2026)
+### Latest increment — PR-UI-2: Triage Board MVP (13 Mar 2026)
+
+Delivered PR-UI-2 — the Triage Board MVP with real backend data rendering, shared components, and trust strip. Replaces the Phase 1 placeholder with a working triage board consuming `GET /watchlist/triage` and `POST /triage`. Includes: feeder health API client (`fetchFeederHealth`) matching §9.9, view-model adapter layer, TanStack Query hooks (`useWatchlistTriage`, `useTriggerTriage`, `useFeederHealth`), 10 shared components across 5 subdirectories (state, trust, layout, feedback, entity), all 7 state conditions handled (loading, ready, empty, stale, unavailable, demo-fallback, error), board-level trust strip always visible (data_state badge + feeder health chip + timestamp), per-row staleness derived from `verdict_at` only, Run Triage trigger-and-refresh with partial failure surfacing, row click navigates to `#/journey/{symbol}`. Build passes, typecheck clean, 30 tests green (24 new). No backend modifications.
+
+### Previous increment — PR-UI-1: React App Shell (13 Mar 2026)
 
 Delivered PR-UI-1 — the React + TypeScript + Tailwind app shell in `ui/`. Includes Vite build tooling, hash-based routing for all workspaces, typed API client layer (`apiFetch<T>`) with mixed error-detail preservation per UI_CONTRACT.md §11, typed triage endpoint functions (`fetchWatchlistTriage`, `triggerTriage`) matching §9.5, TanStack Query scaffolding, Vite proxy config for backend API, Tailwind styling, and Vitest smoke tests. All routes render placeholder pages (no blank pages). Default route redirects to `#/triage`. Build passes, typecheck clean, 5 smoke tests green. Repo-shape locked: `ui/src/shared/` for cross-workspace code, `ui/src/workspaces/<name>/` for workspace-specific code. Coexists with legacy `app/` — no backend modifications.
 
@@ -129,6 +133,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | Phase 0 — UI Re-Entry Governance | Governance unlock — progress hub + design note + phase plan | ✅ Complete |
 | UI Phase 3A Impl | First UI implementation slice — Triage Board first (React + TypeScript + Tailwind) | 🟢 Active |
 | Phase 1 — React App Shell + Triage Route | React app shell + routing + typed fetch — build clean, typecheck clean, 5 smoke tests | ✅ Complete |
+| Phase 2 — Triage Board MVP | Real triage data + shared components + trust strip — build clean, typecheck clean, 30 tests | ✅ Complete |
 | UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
 | Observability Phase 2 | Cross-lane runtime visibility — structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories | ✅ Complete |
 | TD-3 | Packaging/import-path stability — 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added — 1603 tests | ✅ Complete |
@@ -360,7 +365,7 @@ Reduce the architectural split between runtime lanes and address broader converg
 8. ~~TD-3 — packaging/import-path stability~~ — ✅ Complete (12 March 2026). 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added. Spec: `docs/specs/td3_packaging_import_stability.md`.
 9. ~~Cleanup tranche~~ — ✅ Complete (13 March 2026). Async markers cleaned, TD-5 enum centralisation resolved, TD-9 unused vars resolved, doc consolidation complete.
 10. ~~Runtime-hardening sequence~~ — ✅ Complete. Obs P2, TD-3, and cleanup tranche all closed.
-11. **UI implementation is now the active lane.** PR-UI-1 (React app shell) is complete. Next: **PR-UI-2** (Triage Board MVP).
+11. **UI implementation is now the active lane.** PR-UI-1 (React app shell) and PR-UI-2 (Triage Board MVP) are complete. Next: **PR-UI-3** (Shared Component Extraction).
 12. Agent Ops backend endpoints are **Phase 4** (after Triage Board and component extraction).
 13. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
 

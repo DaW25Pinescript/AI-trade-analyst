@@ -1,10 +1,21 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { TriageBoardPage } from "../src/workspaces/triage/routes/TriageBoardPage";
 import { WorkspacePlaceholder } from "../src/shared/components/WorkspacePlaceholder";
 import { NotFoundPage } from "../src/shared/components/NotFoundPage";
+
+// Mock API modules so TriageBoardPage doesn't make real requests in smoke tests
+vi.mock("../src/shared/api/triage", () => ({
+  fetchWatchlistTriage: vi.fn(() => new Promise(() => {})),
+  triggerTriage: vi.fn(),
+}));
+
+vi.mock("../src/shared/api/feeder", () => ({
+  fetchFeederHealth: vi.fn(() => new Promise(() => {})),
+}));
+
+import { TriageBoardPage } from "../src/workspaces/triage/routes/TriageBoardPage";
 
 function renderWithProviders(element: React.ReactElement) {
   const queryClient = new QueryClient({
@@ -16,7 +27,7 @@ function renderWithProviders(element: React.ReactElement) {
 }
 
 describe("TriageBoardPage", () => {
-  it("renders the triage placeholder", () => {
+  it("renders the triage board with title and Run Triage button", () => {
     const router = createMemoryRouter(
       [{ path: "/", element: <TriageBoardPage /> }],
       { initialEntries: ["/"] },
@@ -30,9 +41,7 @@ describe("TriageBoardPage", () => {
       </QueryClientProvider>,
     );
     expect(screen.getByText("Triage Board")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Phase 1 foundation shell/),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Run Triage")).toBeInTheDocument();
   });
 });
 
@@ -73,5 +82,10 @@ describe("API types compile", () => {
   it("client types are importable", async () => {
     const mod = await import("../src/shared/api/client");
     expect(typeof mod.apiFetch).toBe("function");
+  });
+
+  it("feeder types are importable", async () => {
+    const mod = await import("../src/shared/api/feeder");
+    expect(typeof mod.fetchFeederHealth).toBe("function");
   });
 });
