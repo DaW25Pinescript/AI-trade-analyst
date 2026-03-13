@@ -1,8 +1,8 @@
 # Agent Operations — Endpoint Contract Specification
 
 **File:** `docs/ui/AGENT_OPS_CONTRACT.md`
-**Status:** Active — contract locked, endpoints not yet implemented
-**Phase:** PR-OPS-1 (contract docs) — PR-OPS-2 (backend implementation) follows
+**Status:** Active — contract locked, endpoints implemented (PR-OPS-2)
+**Phase:** PR-OPS-1 (contract docs) ✓ — PR-OPS-2 (backend implementation) ✓ — PR-OPS-3 (frontend) follows
 **Scope:** Backend → UI contract extension for Agent Operations read-only projection endpoints
 **Depends on:** `UI_CONTRACT.md`, `agent_operations_workspace.schema.refined.md`, `agent_operations_component_adapter_plan.refined.md`, `DESIGN_NOTES.md` §5
 **Classification:** Phase 3B extension — operator observability / explainability / trust workspace
@@ -361,54 +361,54 @@ PR-OPS-2 (backend implementation) must include deterministic tests covering the 
 
 ### 7.1 Response shape tests
 
-- [ ] `/ops/agent-roster` returns a valid `AgentRosterResponse` with all required fields
-- [ ] `/ops/agent-health` returns a valid `AgentHealthSnapshotResponse` with all required fields
-- [ ] All `ResponseMeta` fields are present and correctly typed
-- [ ] `AgentSummary` contains all required fields with correct types
-- [ ] `AgentHealthItem` contains all required fields with correct types
+- [x] `/ops/agent-roster` returns a valid `AgentRosterResponse` with all required fields
+- [x] `/ops/agent-health` returns a valid `AgentHealthSnapshotResponse` with all required fields
+- [x] All `ResponseMeta` fields are present and correctly typed
+- [x] `AgentSummary` contains all required fields with correct types
+- [x] `AgentHealthItem` contains all required fields with correct types
 
 ### 7.2 Department key tests
 
-- [ ] `departments` record contains exactly the four canonical `DepartmentKey` values
-- [ ] No freeform or misspelled department keys are accepted
-- [ ] Each department key maps to a non-empty array of `AgentSummary` objects
+- [x] `departments` record contains exactly the four canonical `DepartmentKey` values
+- [x] No freeform or misspelled department keys are accepted
+- [x] Each department key maps to a non-empty array of `AgentSummary` objects
 
 ### 7.3 Relationship array tests
 
-- [ ] `relationships` array is present in roster response
-- [ ] Every `from` and `to` value references a valid roster entity `id`
-- [ ] Relationship `type` values are within the allowed enum
+- [x] `relationships` array is present in roster response
+- [x] Every `from` and `to` value references a valid roster entity `id`
+- [x] Relationship `type` values are within the allowed enum
 
 ### 7.4 `data_state` tests
 
-- [ ] Roster response includes `data_state` with a valid value
-- [ ] Health response includes `data_state` with a valid value
-- [ ] `data_state: "unavailable"` triggers appropriate error handling
+- [x] Roster response includes `data_state` with a valid value
+- [x] Health response includes `data_state` with a valid value
+- [x] `data_state: "unavailable"` triggers appropriate error handling
 
 ### 7.5 Structured error envelope tests
 
-- [ ] HTTP errors return `OpsErrorEnvelope` shape (not freeform string `detail`)
-- [ ] `OpsError` contains `error` and `message` fields
-- [ ] Error responses use appropriate HTTP status codes
+- [x] HTTP errors return `OpsErrorEnvelope` shape (not freeform string `detail`)
+- [x] `OpsError` contains `error` and `message` fields
+- [x] Error responses use appropriate HTTP status codes
 
 ### 7.6 Separate `run_state` / `health_state` tests
 
-- [ ] `run_state` and `health_state` are separate fields on `AgentHealthItem`
-- [ ] Both fields accept only their respective allowed values
-- [ ] An entity can have independent values for each dimension (e.g. `run_state: "completed"` with `health_state: "degraded"`)
+- [x] `run_state` and `health_state` are separate fields on `AgentHealthItem`
+- [x] Both fields accept only their respective allowed values
+- [x] An entity can have independent values for each dimension (e.g. `run_state: "completed"` with `health_state: "degraded"`)
 
 ### 7.7 Empty and degraded scenario tests
 
-- [ ] Empty roster (zero entities) returns HTTP error, not empty response
-- [ ] Empty health `entities` array is a valid response (returns 200)
-- [ ] Health failure with roster success is a handled degraded scenario
-- [ ] Roster failure is a workspace-level blocking error
+- [x] Empty roster (zero entities) returns HTTP error, not empty response
+- [x] Empty health `entities` array is a valid response (returns 200)
+- [x] Health failure with roster success is a handled degraded scenario
+- [x] Roster failure is a workspace-level blocking error
 
 ### 7.8 Health `entity_id` ↔ roster `id` join tests
 
-- [ ] Every `entity_id` in health response matches a roster `id`
-- [ ] Health items with unknown `entity_id` values are invalid
-- [ ] Missing health for a known roster entity is a valid state
+- [x] Every `entity_id` in health response matches a roster `id`
+- [x] Health items with unknown `entity_id` values are invalid
+- [x] Missing health for a known roster entity is a valid state
 
 ---
 
