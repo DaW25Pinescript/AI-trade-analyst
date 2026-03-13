@@ -38,6 +38,7 @@ export default defineConfig({
       "/backtest": "http://localhost:8000",
       "/e2e": "http://localhost:8000",
       "/plugins": "http://localhost:8000",
+      "/ops": "http://localhost:8000",
     },
   },
 });

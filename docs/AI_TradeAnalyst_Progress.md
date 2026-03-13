@@ -3,7 +3,7 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 13 March 2026
 **Review date:** 10 March 2026
-**Current phase:** Phase 4 — Agent Ops contract complete, backend MVP (PR-OPS-2) next
+**Current phase:** Phase 5 — Agent Ops React workspace MVP complete (PR-OPS-3)
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -21,10 +21,10 @@
 ## Phase Index (at-a-glance)
 
 - **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A.
-- **Current phase:** Phase 4 — Agent Ops contract complete, backend MVP (PR-OPS-2) next.
+- **Current phase:** Phase 5 — Agent Ops React workspace MVP complete (PR-OPS-3).
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations is classified as Phase 3B extension — an operator observability / explainability / trust workspace on new read-only projection endpoints.
-- **Next actions:** PR-OPS-2 (Agent Ops backend implementation — roster + health endpoints).
+- **Next actions:** PR-UI-4 (Journey Studio React workspace).
 - **Active decision gate:** the production-readiness gate remains satisfied; the runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. UI implementation is now the active lane.
 
 ## 1) Executive Snapshot
@@ -42,7 +42,11 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — PR-OPS-1: Agent Ops Contract Spec (13 Mar 2026)
+### Latest increment — PR-OPS-3: Agent Ops React Workspace MVP (13 Mar 2026)
+
+Delivered PR-OPS-3 — Agent Operations React workspace MVP. Replaced the /ops placeholder route with a real operator observability workspace consuming live `GET /ops/agent-roster` and `GET /ops/agent-health` endpoints. New API layer (`fetchAgentRoster`, `fetchAgentHealth`) with typed response shapes from AGENT_OPS_CONTRACT.md. TanStack Query hooks (`useAgentRoster`, `useAgentHealth`) with appropriate stale times. Deterministic view-model adapter (`buildOpsWorkspaceViewModel`) that joins health onto roster by entity_id, preserves hierarchy, ignores unknown health-only entities, and marks missing-health roster entities as unavailable. Full workspace UI: summary/trust bar, governance layer section, officer layer section, department sections with framed boxes, entity cards with health orb indicators, selected-node detail panel. Mode pills (Org/Run/Health) with Run and Health disabled (Phase 7). Degraded banners for health-failed and empty-health states. All required state handling: loading, healthy success, roster success + health failure, roster success + empty health, roster failure, join mismatch safety. Dark control-room aesthetic with teal/amber/red orb system. 23 new tests (adapter unit tests + component integration tests). Build passes, typecheck clean, 89 tests green. No backend modifications. `/ops` proxy added to Vite dev server config.
+
+### Previous increment — PR-OPS-1: Agent Ops Contract Spec (13 Mar 2026)
 
 Delivered PR-OPS-1 — Agent Operations endpoint contract specification. Created `docs/ui/AGENT_OPS_CONTRACT.md` with implementation-ready contracts for `GET /ops/agent-roster` (static architecture and roster truth) and `GET /ops/agent-health` (current health snapshot). Shared types locked: `DepartmentKey` (4 canonical values), `ResponseMeta`, `OpsErrorEnvelope`. Full response shapes specified: `AgentRosterResponse` (governance_layer, officer_layer, departments, relationships), `AgentHealthSnapshotResponse` (entities with separate run_state and health_state dimensions). Polling model locked (no SSE, no WebSocket). Roster ↔ health join rule explicit. Contract test priorities listed for PR-OPS-2. Reserved future endpoints acknowledged (Phase 7: agent-trace, agent-detail). `UI_CONTRACT.md` updated with §10.6 cross-reference. Zero code files changed.
 
