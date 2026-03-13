@@ -17,6 +17,7 @@
 - [Observability_P1_Run_Visibility_Spec.md](Observability_P1_Run_Visibility_Spec.md)
 - [observability_phase_2.md](observability_phase_2.md)
 - [td3_packaging_import_stability.md](td3_packaging_import_stability.md) — ✅ Complete
+- [ui_reentry_phase_plan.md](ui_reentry_phase_plan.md) — ✅ Active — UI re-entry execution plan (React + TypeScript + Tailwind, phased build from Triage Board through Agent Operations)
 
 ## Supporting Spec Assets
 

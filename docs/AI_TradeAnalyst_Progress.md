@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 12 March 2026
+**Last updated:** 13 March 2026
 **Review date:** 10 March 2026
-**Current phase:** Observability Phase 2 — cross-lane runtime visibility (UI implementation intentionally parked)
+**Current phase:** UI Phase 3A Implementation — Triage Board first (React + TypeScript + Tailwind)
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -21,9 +21,11 @@
 ## Phase Index (at-a-glance)
 
 - **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A.
-- **Current phase:** Observability Phase 2 — cross-lane runtime visibility and failure surface clarification. UI Phase 3A design is complete and banked; UI implementation is intentionally parked while the repo shifts into a runtime-hardening lane.
-- **Next actions:** Draft and execute Observability Phase 2 spec; then TD-3 packaging/import stability; then cleanup tranche (async markers, TD-5, TD-9, doc consolidation). UI implementation resumes after the backend-quality sequence is complete.
-- **Active decision gate:** the production-readiness gate remains satisfied; the current execution gate is runtime hardening — strengthening observability, packaging stability, and seam confidence before resuming UI buildout or broader convergence work.
+- **Current phase:** UI Phase 3A Implementation — Triage Board first (React + TypeScript + Tailwind). UI implementation resumes with Triage Board as the first React workspace and component-system seed.
+- **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
+- **Agent Operations classification:** Agent Operations is classified as Phase 3B extension — an operator observability / explainability / trust workspace on new read-only projection endpoints.
+- **Next actions:** PR-UI-1 (React app shell), then PR-UI-2 (Triage Board MVP), then PR-UI-3 (component extraction), then PR-OPS-1 (Agent Ops contract spec). Agent Ops backend endpoints are Phase 4 (after Triage Board and component extraction).
+- **Active decision gate:** the production-readiness gate remains satisfied; the runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. UI implementation is now the active lane.
 
 ## 1) Executive Snapshot
 
@@ -40,7 +42,11 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — Observability Phase 2 implementation (12 Mar 2026)
+### Latest increment — UI Re-Entry Governance (13 Mar 2026)
+
+Reopened UI implementation lane. Locked React + TypeScript + Tailwind as forward stack. Triage Board is the first React workspace and component-system seed. Agent Operations classified as Phase 3B extension: an operator observability, explainability, and trust workspace built on new read-only projection endpoints. Agent Ops north-star question: "Why should I trust this system right now?" Agent Ops MVP is not config, prompt editing, manual orchestration, model-switching, or chat-with-agents. HTML prototype is visual reference only. Execution plan committed as `docs/specs/ui_reentry_phase_plan.md`.
+
+### Previous increment — Observability Phase 2 implementation (12 Mar 2026)
 
 - Implemented structured JSON event emission across 4 under-instrumented lanes (MDO scheduler, feeder ingest, triage, graph orchestration).
 - APScheduler lifecycle listeners registered for job executed/error/missed/max_instances events.
@@ -91,7 +97,7 @@ The repository is in a **strong implementation state**:
 
 ### Current position (plain language)
 
-You are no longer proving feasibility or building first-pass runtime behavior. The full UI documentation lane (audit → contract → workspace blueprint → wireframes → component system) is complete and banked. UI implementation is intentionally parked while the repo shifts into a **runtime-hardening lane**: the moving lanes (analyst, graph, MDO, legacy surfaces, feeder context) need stronger observability, packaging stability, and seam confidence before wider buildout. The sequence is Observability Phase 2, then TD-3 packaging, then a targeted cleanup tranche.
+You are no longer proving feasibility or building first-pass runtime behavior. The full UI documentation lane (audit → contract → workspace blueprint → wireframes → component system) is complete and banked. The runtime-hardening sequence (Observability Phase 2, TD-3 packaging, cleanup tranche) is complete. **UI implementation is now the active lane.** The forward frontend stack is React + TypeScript + Tailwind. The first PR after governance is PR-UI-1 (React app shell). Agent Ops backend endpoints are Phase 4 (after Triage Board and component extraction).
 
 ### Phase Status Overview
 
@@ -116,11 +122,13 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | UI Phase 1 | Backend Capability Audit — `docs/ui/UI_BACKEND_AUDIT.md` | ✅ Complete |
 | UI Phase 2 | UI Contract — canonical frontend handoff / run-state + error semantics | ✅ Complete |
 | UI Phase 3A | Workspace Blueprint + Visual Design — wireframes, component system, design notes, visual appendix | ✅ Complete |
-| UI Phase 3A Impl | First UI implementation slice — Triage Board + Journey Studio build | ⏸️ Parked |
+| Phase 0 — UI Re-Entry Governance | Governance unlock — progress hub + design note + phase plan | ✅ Complete |
+| UI Phase 3A Impl | First UI implementation slice — Triage Board first (React + TypeScript + Tailwind) | 🟢 Active |
+| Phase 1 — React App Shell + Triage Route | React app shell + routing + typed fetch | ⏳ Next |
 | UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
 | Observability Phase 2 | Cross-lane runtime visibility — structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories | ✅ Complete |
 | TD-3 | Packaging/import-path stability — 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added — 1603 tests | ✅ Complete |
-| Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ⏳ In progress |
+| Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ✅ Complete |
 | Doc Consolidation (PR-4) | Consolidate status tracking around canonical progress hub — README de-conflict, architecture de-conflict, UI lane framing, historical placement hygiene | ✅ Complete |
 | Tidy | Async marker cleanup (8 files) | ✅ Complete — all 30 redundant `@pytest.mark.asyncio` markers removed; `asyncio_mode = "auto"` handles detection |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
@@ -199,9 +207,10 @@ From repo docs and current structure, the meaningful remaining work is concentra
 3. **Cleanup and consistency**
    - Pending async-marker tidy and doc consolidation remain open.
    - TD-5 (enum centralisation) and TD-9 (unused vars) are ready as micro-PRs.
-4. **UI implementation** (parked, fully designed)
+4. **UI implementation** (active — runtime hardening complete)
    - ✅ UI Phase 1, UI Phase 2, and UI Phase 3A (design) are complete and banked.
-   - Implementation resumes after the runtime-hardening sequence.
+   - ✅ Runtime-hardening sequence complete. UI implementation is the active lane.
+   - Forward stack: React + TypeScript + Tailwind. First PR: PR-UI-1 (React app shell).
    - Phase 3B (Feeder, Ops, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
 5. **Future runtime-lane convergence**
    - The split between analyst, graph, MDO, and legacy lanes still shapes long-term architecture cleanup.
@@ -212,9 +221,9 @@ From repo docs and current structure, the meaningful remaining work is concentra
 
 ## 3) Where We Should Go Next
 
-The production-readiness gate is **already satisfied**. The UI documentation lane is complete and banked. The current value lane is runtime hardening: strengthening observability, packaging stability, and seam confidence before resuming UI buildout or broader convergence.
+The production-readiness gate is **already satisfied**. The UI documentation lane is complete and banked. The runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. The current value lane is **UI implementation**: building the designed workspaces starting with the Triage Board as the first React workspace and component-system seed.
 
-### Priority A — Observability Phase 2: Cross-Lane Runtime Visibility (highest priority)
+### Priority A — Observability Phase 2: Cross-Lane Runtime Visibility (✅ complete)
 
 #### Objective
 Standardize structured event logging across all runtime lanes and make it easy to answer "what failed, where, and why?" without manually tracing code paths.
@@ -235,7 +244,7 @@ The repo has multiple moving lanes (analyst pipeline, graph orchestration, MDO f
 
 ---
 
-### Priority B — TD-3: Packaging and Import-Path Stability (high priority, after Obs P2)
+### Priority B — TD-3: Packaging and Import-Path Stability (✅ complete)
 
 #### Objective
 Remove the `sys.path.insert` wiring footgun and establish proper packaging discipline.
@@ -255,7 +264,7 @@ The technical debt register flags TD-3 as the main prerequisite for multi-enviro
 
 ---
 
-### Priority C — Cleanup Tranche (medium, after TD-3)
+### Priority C — Cleanup Tranche (✅ complete)
 
 #### Objective
 Close small friction items that reduce drift and improve contributor experience, without expanding into architecture surgery.
@@ -274,13 +283,13 @@ Close small friction items that reduce drift and improve contributor experience,
 
 ---
 
-### Priority D — UI Phase 3A Implementation (parked — resume after runtime hardening)
+### Priority D — UI Phase 3A Implementation (active — runtime hardening complete)
 
 #### Objective
 Build the Phase 3A core product workspaces using the locked design artifacts.
 
 #### Status
-The design phase is **complete and banked**. All workspace blueprints, wireframes, component system, and design decisions are locked and documented. Implementation can proceed as component assembly when this lane resumes.
+The design phase is **complete and banked**. The runtime-hardening sequence is **complete**. UI implementation is now the **active lane**. Forward frontend stack: React + TypeScript + Tailwind. Execution plan: `docs/specs/ui_reentry_phase_plan.md`.
 
 #### Banked deliverables (ready for pickup)
 - ✅ `docs/ui/UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`
@@ -313,23 +322,12 @@ Reduce the architectural split between runtime lanes and address broader converg
 ## 4) Proposed 6–8 Week Plan
 
 ### Weeks 1–2
-- Draft and begin executing **Observability Phase 2** spec: cross-lane runtime visibility and failure surface clarification.
-- Audit current structured logging coverage across analyst, MDO, feeder, and scheduler lanes.
-- Identify the highest-value seam visibility gaps and standardize event formats.
+- **PR-UI-1** (React app shell): React + TypeScript + Tailwind project setup, build tooling, routing framework, typed API client layer, Triage Board route placeholder.
+- **PR-UI-2** (Triage Board MVP): Live data rendering from `/watchlist/triage`, first shared component primitives (DataStateBadge, TrustStrip, StatusPill, EntityRowCard, PanelShell, state shells).
 
 ### Weeks 3–4
-- Complete Observability Phase 2 execution and close with test/coverage evidence.
-- Begin **TD-3 packaging/import-path stability**: replace `sys.path.insert` with proper packaging.
-- Validate clean-environment setup without manual path manipulation.
-
-### Weeks 5–6
-- Complete TD-3 and close TD-11 (import-path stability tests) as follow-on.
-- Execute **cleanup tranche**: async-marker tidy, TD-5 enum centralisation, TD-9 unused vars, doc index reconciliation.
-
-### Stretch (Weeks 7–8)
-- Revisit broader runtime-lane convergence readiness based on observability and packaging improvements.
-- Evaluate whether to resume UI Phase 3A implementation or continue with TD-4/TD-8 architecture cleanup.
-- Keep Chart Evidence and Run Artifact Inspector fenced as Phase 3C.
+- **PR-UI-3** (component extraction): Harden Triage Board components into reusable shared layer.
+- **PR-OPS-1** (Agent Ops contract spec): Document endpoint contracts for `/ops/agent-roster` and `/ops/agent-health` before any backend implementation.
 
 ---
 
@@ -356,9 +354,11 @@ Reduce the architectural split between runtime lanes and address broader converg
 6. ~~UI Phase 3A — Workspace Blueprint + Visual Design~~ — ✅ Complete (12 March 2026). `UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`, wireframes, and component design system all locked.
 7. ~~Observability Phase 2~~ — ✅ Complete (12 March 2026). Diagnostic + implementation shipped. 16 structured event codes across MDO scheduler, feeder, triage, graph. 18 new tests. Spec: `docs/specs/observability_phase_2.md`.
 8. ~~TD-3 — packaging/import-path stability~~ — ✅ Complete (12 March 2026). 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added. Spec: `docs/specs/td3_packaging_import_stability.md`.
-9. Next: execute **cleanup tranche** — async markers, TD-5 (enum centralisation), TD-9 (unused vars), doc index reconciliation.
-10. **UI Phase 3A implementation** remains parked and ready for pickup after the runtime-hardening sequence.
-11. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
+9. ~~Cleanup tranche~~ — ✅ Complete (13 March 2026). Async markers cleaned, TD-5 enum centralisation resolved, TD-9 unused vars resolved, doc consolidation complete.
+10. ~~Runtime-hardening sequence~~ — ✅ Complete. Obs P2, TD-3, and cleanup tranche all closed.
+11. **UI implementation is now the active lane.** First PR after governance: **PR-UI-1** (React app shell).
+12. Agent Ops backend endpoints are **Phase 4** (after Triage Board and component extraction).
+13. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
 
 ---
 
@@ -419,8 +419,8 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 1. **Resolved:** TD-1, TD-2, TD-3, TD-5, TD-10, and TD-11 are closed.
 2. **Completed:** CI Seam Hardening (10 March 2026) — production-readiness gate satisfied.
 3. **Completed:** TD-3 Packaging/Import Stability (12 March 2026) — 27 sys.path.insert calls removed, pyproject.toml fixed, editable install working, 16 import stability tests.
-3. **Next:** Observability Phase 2 (cross-lane runtime visibility).
-4. **Then:** TD-3 (packaging/import stability).
-5. **Then:** Cleanup tranche — async markers, doc consolidation. (TD-5 enum centralisation resolved 13 March 2026. TD-9 unused vars resolved 13 March 2026.)
-6. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
-7. **Dependent follow-on:** TD-11 resolves when TD-3 is completed.
+3. **Completed:** Observability Phase 2 (12 March 2026) — cross-lane runtime visibility.
+4. **Completed:** TD-3 (12 March 2026) — packaging/import stability.
+5. **Completed:** Cleanup tranche (13 March 2026) — async markers, doc consolidation, TD-5, TD-9.
+6. **Active:** UI Phase 3A Implementation — PR-UI-1 (React app shell) is next.
+7. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
