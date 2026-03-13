@@ -1,19 +1,23 @@
 // ---------------------------------------------------------------------------
 // TanStack Query hook for GET /watchlist/triage.
 // Supports manual refetch via the returned refetch handle.
+//
+// Cache key convention (PR-UI-3): exported named constant, explicit return
+// type, stale time documented.
 // ---------------------------------------------------------------------------
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   fetchWatchlistTriage,
   type WatchlistTriageResponse,
 } from "@shared/api/triage";
 
-export const TRIAGE_QUERY_KEY = ["watchlist", "triage"] as const;
+/** Cache key for watchlist triage query. */
+export const WATCHLIST_TRIAGE_KEY = ["watchlist", "triage"] as const;
 
-export function useWatchlistTriage() {
-  return useQuery<WatchlistTriageResponse>({
-    queryKey: TRIAGE_QUERY_KEY,
+export function useWatchlistTriage(): UseQueryResult<WatchlistTriageResponse, Error> {
+  return useQuery<WatchlistTriageResponse, Error>({
+    queryKey: WATCHLIST_TRIAGE_KEY,
     queryFn: async () => {
       const result = await fetchWatchlistTriage();
       if (!result.ok) {
@@ -25,5 +29,6 @@ export function useWatchlistTriage() {
       }
       return result.data;
     },
+    // Uses QueryClient default staleTime (30s) — triage data is not latency-critical
   });
 }

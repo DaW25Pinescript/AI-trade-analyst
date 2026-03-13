@@ -1,6 +1,6 @@
 # AI Trade Analyst — React UI
 
-> **PR-UI-1 foundation shell.** This is the forward React + TypeScript + Tailwind frontend. It coexists with the legacy `app/` during workspace-by-workspace migration.
+> **PR-UI-3 hardened.** This is the forward React + TypeScript + Tailwind frontend. It coexists with the legacy `app/` during workspace-by-workspace migration.
 
 ## Repo-Shape
 
@@ -13,7 +13,7 @@ ui/                          ← React app root (own build pipeline)
 ├── tailwind.config.js
 ├── postcss.config.js
 ├── public/
-├── tests/                   ← Vitest smoke tests
+├── tests/                   ← Vitest tests (smoke + component + integration)
 └── src/
     ├── main.tsx              ← Entry point
     ├── app/
@@ -21,19 +21,27 @@ ui/                          ← React app root (own build pipeline)
     │   ├── AppShell.tsx      ← Top-level layout + nav
     │   └── router.tsx        ← Hash-based routing (react-router-dom)
     ├── shared/
+    │   ├── README.md         ← Component inventory + contributor guide
     │   ├── api/
     │   │   ├── client.ts     ← Generic apiFetch<T> wrapper
-    │   │   └── triage.ts     ← Typed triage endpoint functions
-    │   ├── components/       ← Shared UI components
-    │   ├── hooks/
-    │   ├── lib/
+    │   │   ├── triage.ts     ← Typed triage endpoint functions
+    │   │   └── feeder.ts     ← Feeder health endpoint client
+    │   ├── components/       ← Shared UI components (barrel exports per subdir)
+    │   │   ├── state/        ← DataStateBadge, StatusPill
+    │   │   ├── trust/        ← TrustStrip, FeederHealthChip
+    │   │   ├── layout/       ← PanelShell
+    │   │   ├── feedback/     ← EmptyState, ErrorState, UnavailableState, LoadingSkeleton
+    │   │   └── entity/       ← EntityRowCard (generic)
+    │   ├── hooks/            ← useWatchlistTriage, useFeederHealth (barrel export)
     │   ├── styles/
     │   │   └── index.css     ← Tailwind base
     │   └── types/
     └── workspaces/
         ├── triage/           ← Triage Board workspace
-        │   └── routes/
-        │       └── TriageBoardPage.tsx
+        │   ├── adapters/     ← triageViewModel.ts
+        │   ├── components/   ← TriageRowCard (wraps EntityRowCard)
+        │   ├── hooks/        ← useTriggerTriage (triage-specific mutation)
+        │   └── routes/       ← TriageBoardPage.tsx
         ├── journey/
         ├── analysis/
         ├── journal/

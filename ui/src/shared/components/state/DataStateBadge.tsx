@@ -4,7 +4,7 @@
 // Per DESIGN_NOTES §1.2: read-only — no dropdown, tooltip-expandable only.
 // ---------------------------------------------------------------------------
 
-interface DataStateBadgeProps {
+export interface DataStateBadgeProps {
   dataState: string | null;
 }
 

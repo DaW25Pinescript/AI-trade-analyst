@@ -5,7 +5,7 @@
 
 import type { ReactNode } from "react";
 
-interface PanelShellProps {
+export interface PanelShellProps {
   children: ReactNode;
   className?: string;
 }

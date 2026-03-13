@@ -5,7 +5,7 @@
 
 import type { FeederHealth } from "@shared/api/feeder";
 
-interface FeederHealthChipProps {
+export interface FeederHealthChipProps {
   health: FeederHealth | undefined;
   isLoading: boolean;
   isError: boolean;
