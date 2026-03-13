@@ -1,6 +1,6 @@
 # AI Trade Analyst
 
-![AI Trade Analyst](docs/assets/ai-trade-analyst-banner.svg)
+![AI Trade Analyst](docs/assets/ai-trade-analyst-banner.jpg)
 
 AI Trade Analyst is a data-first AI trading analysis system designed to assist discretionary traders with structured trade planning, multi-model analysis, and post-trade review.
 
