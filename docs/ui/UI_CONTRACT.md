@@ -946,6 +946,34 @@ These endpoints exist and are valid UI-facing surfaces, but are not currently co
 
 ---
 
+## 10.6 Agent Operations Endpoints (Phase 3B)
+
+The Agent Operations endpoint contracts are defined in a dedicated document:
+
+**Contract document:** [`AGENT_OPS_CONTRACT.md`](AGENT_OPS_CONTRACT.md)
+
+**Classification:** Phase 3B — operator observability / explainability / trust workspace. Operator-lane, not runtime-lane.
+
+### Contracted endpoints (PR-OPS-1)
+
+| Method | Route | Purpose | Contract status |
+|--------|-------|---------|----------------|
+| `GET` | `/ops/agent-roster` | Static architecture and roster truth | Contracted — not yet implemented |
+| `GET` | `/ops/agent-health` | Current health snapshot (poll-based) | Contracted — not yet implemented |
+
+These endpoints do not exist until PR-OPS-2 (backend implementation) merges. Frontend code must not attempt to call these endpoints until PR-OPS-2 is complete and this section is updated to reflect active status.
+
+### Reserved future endpoints (Phase 7)
+
+| Method | Route | Purpose | Contract status |
+|--------|-------|---------|----------------|
+| `GET` | `/runs/{run_id}/agent-trace` | Run-specific participation and lineage | Reserved — not yet contracted |
+| `GET` | `/ops/agent-detail/{entity_id}` | Full detail for selected entity | Reserved — not yet contracted |
+
+These endpoints are acknowledged in the roadmap but have no contract specification. They will be contracted in a separate document before Phase 7 implementation begins.
+
+---
+
 ## 11. Error Contract Rules
 
 There is **no single global error envelope** across the backend.
