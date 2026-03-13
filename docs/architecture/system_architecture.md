@@ -11,10 +11,9 @@ AI Trade Analyst is a multi-lane trading analysis system with a FastAPI + LangGr
   - `macro_risk_officer/` macro context ingestion/reasoning lane
   - `ai_analyst/` FastAPI + LangGraph multi-analyst runtime lane
   - `app/` API-first UI workflow lane
-- **Active/current phase:** post–Observability Phase 2 (complete); Phase 1 run visibility (run_record.json + stdout summary) + Phase 2 cross-lane structured events (MDO, feeder, triage, graph) shipped.
-- **Planned / emerging:** direct, unified runtime coupling between the active `ai_analyst` graph path and the MDO packet lane remains an emerging convergence area; concrete MDO coupling exists in legacy analyst paths and selected integrations.
+- **Emerging convergence area:** direct, unified runtime coupling between the `ai_analyst` graph path and the MDO packet lane; concrete MDO coupling exists in legacy analyst paths and selected integrations.
 
-Source of truth for phase/status remains `docs/AI_TradeAnalyst_Progress.md`.
+> **Note:** Current phase, status, and sequencing live in [../AI_TradeAnalyst_Progress.md](../AI_TradeAnalyst_Progress.md). This document describes enduring architecture, not execution progress.
 
 ## Major system lanes
 

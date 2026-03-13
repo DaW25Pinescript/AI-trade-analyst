@@ -1,9 +1,9 @@
 # Architecture Docs
 
-Enduring architecture references, constraints, and contracts.
+Enduring architecture references, constraints, and contracts. These docs describe structural architecture, not current phase or status — for that, see the [canonical progress hub](../AI_TradeAnalyst_Progress.md).
 
-- [OBJECTIVE.md](OBJECTIVE.md)
-- [CONSTRAINTS.md](CONSTRAINTS.md)
+- [OBJECTIVE.md](OBJECTIVE.md) *(stub — full content archived)*
+- [CONSTRAINTS.md](CONSTRAINTS.md) *(stub — full content archived)*
 - [CONTRACTS.md](CONTRACTS.md)
 - [model_routing.md](model_routing.md)
 - [openapi.json](openapi.json)

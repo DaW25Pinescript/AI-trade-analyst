@@ -108,86 +108,31 @@ AI Trade Analyst exists to:
 - Provide repeatable analysis workflows
 - Create auditable trade decision records
 
-## Current Status
+## Capabilities
 
-### Browser App
+### Browser App (`app/`)
 
-The repository ships a runnable static web application under:
-
-```text
-app/
-```
-
-Capabilities:
-
-- Structured ticket workflow
-- Gate evaluation
-- AI analysis integration
-- Verdict display
+- Structured ticket workflow with gate evaluation
+- AI analysis integration and verdict display
 - Export/import backups
 - After-action review (AAR)
 
-### Python AI Analyst
+### Python AI Analyst (`ai_analyst/`)
 
-Location:
-
-```text
-ai_analyst/
-```
-
-Current version: v2.1
-
-Capabilities:
-
-- Multi-model analysis
-- Multi-persona reasoning
-- Arbiter synthesis
+- Multi-model, multi-persona analysis with arbiter synthesis
 - Manual / hybrid / automated execution modes
 - CLI execution and replay
+- Centralized model routing (`llm_router/`)
 
-Model routing is centralized under:
+### Macro Risk Officer (`macro_risk_officer/`)
 
-```text
-llm_router/
-```
-
-### Macro Risk Officer
-
-Location:
-
-```text
-macro_risk_officer/
-```
-
-Status: complete
-
-Features:
-
-- Macro regime classification
-- Volatility bias assessment
+- Macro regime classification and volatility bias assessment
 - Cross-asset pressure context
-- SQLite outcome tracking
-- KPI telemetry
+- SQLite outcome tracking and KPI telemetry
 
-The MRO is advisory only.
+The MRO is advisory only — it provides macro context to the Arbiter but never generates trade signals or overrides price-structure conclusions.
 
-It provides macro context to the Arbiter but never generates trade signals or overrides price-structure conclusions.
-
-## Test Suite Status
-
-As of 2026-03-06:
-
-- 703+ tests passing
-- 0 failing
-
-Breakdown:
-
-| Component | Tests |
-| --- | --- |
-| Browser app | 234 JS |
-| AI analyst | 469 Python |
-| Macro Risk Officer | 153 |
-| Intentional skips | 16 |
+> **Current phase and progress:** see [docs/AI_TradeAnalyst_Progress.md](docs/AI_TradeAnalyst_Progress.md) (canonical status hub).
 
 ## Directory Map
 
