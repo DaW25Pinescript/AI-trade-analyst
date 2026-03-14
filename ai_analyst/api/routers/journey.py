@@ -33,15 +33,18 @@ def _emit_obs_event(event: str, **fields: Any) -> None:
     except Exception:
         pass
 
+
 router = APIRouter()
 
 # ── Triage debug flag ────────────────────────────────────────────────────────
 _TRIAGE_DEBUG = os.getenv("TRIAGE_DEBUG", "").lower() == "true"
 
+
 def _debug(msg: str, *args: object) -> None:
     """Emit a log line only when TRIAGE_DEBUG=true."""
     if _TRIAGE_DEBUG:
         logger.info(msg, *args)
+
 
 # ── Path configuration ────────────────────────────────────────────────────────
 
@@ -75,11 +78,27 @@ def _now_iso() -> str:
 
 
 def _current_session() -> str:
+    """Return the active trading session based on current UTC hour."""
     hour = datetime.now(timezone.utc).hour
-    if 0 <= hour < 7: return "Asia"
-    if 7 <= hour < 12: return "London"
-    if 12 <= hour < 21: return "NY"
+    if 0 <= hour < 7:
+        return "Asia"
+    if 7 <= hour < 12:
+        return "London"
+    if 12 <= hour < 21:
+        return "NY"
     return "Asia"  # off-hours default — Sydney/Tokyo overlap
+
+
+def _get_loopback_analyse_url() -> str:
+    return os.getenv("AI_ANALYST_LOOPBACK_ANALYSE_URL", "http://127.0.0.1:8000/analyse")
+
+
+def _build_loopback_auth_headers() -> dict[str, str]:
+    """Build headers for backend loopback calls mirroring /analyse auth source."""
+    api_key = os.getenv("AI_ANALYST_API_KEY", "").strip()
+    if not api_key:
+        return {}
+    return {"X-API-Key": api_key}
 
 
 def _load_json(path: Path) -> dict | None:
@@ -215,39 +234,49 @@ async def watchlist_triage():
 # ── POST /triage ─────────────────────────────────────────────────────────────
 
 
-def _current_session() -> str:
-    """Return the active trading session based on current UTC hour."""
-    hour = datetime.now(timezone.utc).hour
-    if 0 <= hour < 7:
-        return "Asia"
-    if 7 <= hour < 12:
-        return "London"
-    if 12 <= hour < 21:
-        return "NY"
-    return "Off"
+def _build_triage_analyse_form_fields(
+    symbol: str,
+    session: str,
+    *,
+    smoke_mode: bool = False,
+) -> list[tuple[str, tuple[None, str]]]:
+    """Build deterministic multipart form fields for loopback /analyse calls."""
+    form_fields: list[tuple[str, tuple[None, str]]] = [
+        ("instrument", (None, symbol)),
+        ("session", (None, session)),
+        ("timeframes", (None, json.dumps(["H4", "H1", "M15"]))),
+        ("account_balance", (None, "10000")),
+        ("min_rr", (None, "2.0")),
+        ("max_risk_per_trade", (None, "0.5")),
+        ("max_daily_risk", (None, "1.5")),
+        ("triage_mode", (None, "true")),
+    ]
+    if smoke_mode:
+        form_fields.append(("smoke_mode", (None, "true")))
+    return form_fields
 
 
 async def run_real_triage_for_symbol(symbol: str) -> dict:
     """Call the /analyse endpoint for a single symbol and normalise the result."""
     session = _current_session()
-    files = [
-        ("instrument", (None, symbol)),
-        ("session", (None, session)),
-        ("timeframes", (None, '["H4","H1","M15"]')),
-        ("account_balance", (None, "10000")),
-        ("min_rr", (None, "2.0")),
-        ("max_risk_per_trade", (None, "0.5")),
-        ("triage_mode", (None, "true")),
-    ]
-    loopback_url = "http://127.0.0.1:8000/analyse"
+    files = _build_triage_analyse_form_fields(symbol, session, smoke_mode=False)
+    loopback_url = _get_loopback_analyse_url()
+    headers = _build_loopback_auth_headers()
     payload_fields = [name for name, _ in files]
-    _debug("[triage] PRE-loopback  symbol=%s url=%s payload_fields=%s", symbol, loopback_url, payload_fields)
+    _debug(
+        "[triage] PRE-loopback  symbol=%s url=%s payload_fields=%s auth_header=%s",
+        symbol,
+        loopback_url,
+        payload_fields,
+        "X-API-Key" in headers,
+    )
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 loopback_url,
                 files=files,
+                headers=headers,
             )
             _debug(
                 "[triage] POST-loopback symbol=%s url=%s status=%s body=%.500s",
@@ -299,12 +328,14 @@ async def triage_smoke():
     Not wired to the frontend.
     """
     symbol = "XAUUSD"
-    loopback_url = "http://127.0.0.1:8000/analyse"
+    loopback_url = _get_loopback_analyse_url()
+    headers = _build_loopback_auth_headers()
     ts_start = datetime.now(timezone.utc).isoformat()
     diag: dict[str, Any] = {
         "symbol": symbol,
         "started_at": ts_start,
         "loopback_url": loopback_url,
+        "loopback_auth_configured": "X-API-Key" in headers,
         "loopback_hop_succeeded": False,
         "loopback_status_code": None,
         "loopback_response_truncated": None,
@@ -327,20 +358,11 @@ async def triage_smoke():
         diag["llm_config_error"] = f"{type(e).__name__}: {str(e)[:300]}"
 
     # Perform the loopback call — deterministic payload, no auto-detection
-    files = [
-        ("instrument", (None, symbol)),
-        ("session", (None, "London")),
-        ("timeframes", (None, '["H4","H1","M15"]')),
-        ("account_balance", (None, "10000")),
-        ("min_rr", (None, "2.0")),
-        ("max_risk_per_trade", (None, "0.5")),
-        ("triage_mode", (None, "true")),
-        ("smoke_mode", (None, "true")),
-    ]
+    files = _build_triage_analyse_form_fields(symbol, "London", smoke_mode=True)
 
     try:
         async with httpx.AsyncClient(timeout=90.0) as client:
-            resp = await client.post(loopback_url, files=files)
+            resp = await client.post(loopback_url, files=files, headers=headers)
             diag["loopback_status_code"] = resp.status_code
             diag["loopback_response_truncated"] = resp.text[:500]
             diag["loopback_hop_succeeded"] = 200 <= resp.status_code < 400
@@ -519,207 +541,106 @@ async def journey_bootstrap(asset: str):
     else:
         data_state = "live"
 
-    arbiter = multi_output.get("arbiter_decision") or {}
-    digest = multi_output.get("digest") or {}
-
-    response = {
+    return {
         "data_state": data_state,
         "instrument": asset,
-        "generated_at": generated_at,
-        "structure_digest": digest,
-        "analyst_verdict": {
-            "verdict": arbiter.get("final_verdict", "no_data"),
-            "confidence": arbiter.get("final_confidence", "none"),
-        },
-        "arbiter_decision": arbiter,
-        "explanation": explain_block if explain_block else {},
-        "reasoning_summary": arbiter.get("winning_rationale_summary"),
+        "multi_output": multi_output,
+        "explainability": explain_block,
     }
-
-    return response
-
-
-# ── POST /journey/draft ───────────────────────────────────────────────────────
 
 
 @router.post("/journey/draft")
-async def save_draft(request: Request):
-    """Save a journey draft to disk."""
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "error": "Invalid JSON body"},
-        )
+async def save_journey_draft(payload: dict):
+    """Save journey draft payload to app/data/journeys/drafts/."""
+    journey_id = payload.get("journey_id")
+    if not journey_id:
+        return {"success": False, "error": "Missing journey_id"}
 
-    journey_id = body.get("journey_id") or f"j_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{id(body) % 10000:04d}"
-    filename = f"journey_{journey_id}.json"
-    filepath = _DRAFTS_DIR / filename
+    payload["updated_at"] = _now_iso()
+    if "created_at" not in payload:
+        payload["created_at"] = payload["updated_at"]
 
-    payload = {**body, "journey_id": journey_id, "saved_at": _now_iso()}
-
-    if not _write_json(filepath, payload):
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "error": "Failed to write draft to disk"},
-        )
+    path = _DRAFTS_DIR / f"{journey_id}.json"
+    ok = _write_json(path, payload)
+    if not ok:
+        return {"success": False, "error": "Failed to save draft"}
 
     return {
         "success": True,
         "journey_id": journey_id,
-        "saved_at": payload["saved_at"],
-        "path": str(filepath.relative_to(_PROJECT_ROOT)),
+        "saved_at": payload["updated_at"],
     }
-
-
-# ── POST /journey/decision ───────────────────────────────────────────────────
 
 
 @router.post("/journey/decision")
-async def save_decision(request: Request):
-    """Save a frozen decision snapshot to disk. Immutable — rejects duplicate IDs."""
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "error": "Invalid JSON body"},
-        )
+async def save_journey_decision(payload: dict):
+    """Save final journey decision payload to app/data/journeys/decisions/."""
+    journey_id = payload.get("journey_id")
+    if not journey_id:
+        return {"success": False, "error": "Missing journey_id"}
 
-    snapshot_id = body.get("snapshot_id")
-    if not snapshot_id:
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "error": "Missing snapshot_id"},
-        )
+    payload["decided_at"] = payload.get("decided_at") or _now_iso()
 
-    filename = f"decision_{snapshot_id}.json"
-    filepath = _DECISIONS_DIR / filename
-
-    # Immutability check
-    if filepath.exists():
-        return JSONResponse(
-            status_code=409,
-            content={
-                "success": False,
-                "error": f"Decision snapshot '{snapshot_id}' already exists. Snapshots are immutable.",
-            },
-        )
-
-    payload = {**body, "saved_at": _now_iso()}
-
-    if not _write_json(filepath, payload):
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "error": "Failed to write decision to disk"},
-        )
+    path = _DECISIONS_DIR / f"{journey_id}.json"
+    ok = _write_json(path, payload)
+    if not ok:
+        return {"success": False, "error": "Failed to save decision"}
 
     return {
         "success": True,
-        "snapshot_id": snapshot_id,
-        "saved_at": payload["saved_at"],
-        "path": str(filepath.relative_to(_PROJECT_ROOT)),
+        "journey_id": journey_id,
+        "saved_at": payload["decided_at"],
     }
-
-
-# ── POST /journey/result ─────────────────────────────────────────────────────
 
 
 @router.post("/journey/result")
-async def save_result(request: Request):
-    """Save a result snapshot to disk."""
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "error": "Invalid JSON body"},
-        )
+async def save_journey_result(payload: dict):
+    """Save realised journey result payload to app/data/journeys/results/."""
+    journey_id = payload.get("journey_id")
+    if not journey_id:
+        return {"success": False, "error": "Missing journey_id"}
 
-    snapshot_id = body.get("snapshot_id")
-    if not snapshot_id:
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "error": "Missing snapshot_id"},
-        )
+    payload["logged_at"] = payload.get("logged_at") or _now_iso()
 
-    filename = f"result_{snapshot_id}.json"
-    filepath = _RESULTS_DIR / filename
-
-    payload = {**body, "saved_at": _now_iso()}
-
-    if not _write_json(filepath, payload):
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "error": "Failed to write result to disk"},
-        )
+    path = _RESULTS_DIR / f"{journey_id}.json"
+    ok = _write_json(path, payload)
+    if not ok:
+        return {"success": False, "error": "Failed to save result"}
 
     return {
         "success": True,
-        "snapshot_id": snapshot_id,
-        "saved_at": payload["saved_at"],
-        "path": str(filepath.relative_to(_PROJECT_ROOT)),
+        "journey_id": journey_id,
+        "saved_at": payload["logged_at"],
     }
 
 
-# ── GET /journal/decisions ───────────────────────────────────────────────────
+@router.get("/journey/journal")
+async def list_journal_entries():
+    """List all draft journey entries sorted by updated_at descending."""
+    if not _DRAFTS_DIR.exists():
+        return []
+
+    entries = []
+    for path in _DRAFTS_DIR.glob("*.json"):
+        data = _load_json(path)
+        if data:
+            entries.append(data)
+
+    entries.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+    return entries
 
 
-@router.get("/journal/decisions")
-async def journal_decisions():
-    """List saved decision snapshots (summary only)."""
-    if not _DECISIONS_DIR.exists():
-        return {"records": []}
+@router.get("/journey/review")
+async def list_review_entries():
+    """List all realised journey result entries sorted by logged_at descending."""
+    if not _RESULTS_DIR.exists():
+        return []
 
-    records = []
-    for fpath in sorted(_DECISIONS_DIR.glob("decision_*.json")):
-        raw = _load_json(fpath)
-        if raw is None:
-            continue
-        records.append({
-            "snapshot_id": raw.get("snapshot_id", ""),
-            "instrument": raw.get("instrument", ""),
-            "saved_at": raw.get("saved_at", ""),
-            "journey_status": raw.get("journey_status", ""),
-            "verdict": raw.get("system_verdict", {}).get("verdict", "") if isinstance(raw.get("system_verdict"), dict) else "",
-            "user_decision": raw.get("user_decision", {}).get("action", "") if isinstance(raw.get("user_decision"), dict) else None,
-        })
+    entries = []
+    for path in _RESULTS_DIR.glob("*.json"):
+        data = _load_json(path)
+        if data:
+            entries.append(data)
 
-    return {"records": records}
-
-
-# ── GET /review/records ──────────────────────────────────────────────────────
-
-
-@router.get("/review/records")
-async def review_records():
-    """List saved decision + result records for review surface."""
-    if not _DECISIONS_DIR.exists():
-        return {"records": []}
-
-    # Build set of result snapshot IDs
-    result_ids: set[str] = set()
-    if _RESULTS_DIR.exists():
-        for fpath in _RESULTS_DIR.glob("result_*.json"):
-            raw = _load_json(fpath)
-            if raw and raw.get("snapshot_id"):
-                result_ids.add(raw["snapshot_id"])
-
-    records = []
-    for fpath in sorted(_DECISIONS_DIR.glob("decision_*.json")):
-        raw = _load_json(fpath)
-        if raw is None:
-            continue
-        sid = raw.get("snapshot_id", "")
-        records.append({
-            "snapshot_id": sid,
-            "instrument": raw.get("instrument", ""),
-            "saved_at": raw.get("saved_at", ""),
-            "journey_status": raw.get("journey_status", ""),
-            "verdict": raw.get("system_verdict", {}).get("verdict", "") if isinstance(raw.get("system_verdict"), dict) else "",
-            "user_decision": raw.get("user_decision", {}).get("action", "") if isinstance(raw.get("user_decision"), dict) else None,
-            "has_result": sid in result_ids,
-        })
-
-    return {"records": records}
+    entries.sort(key=lambda x: x.get("logged_at", ""), reverse=True)
+    return entries
