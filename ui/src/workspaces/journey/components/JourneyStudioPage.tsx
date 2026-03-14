@@ -140,6 +140,12 @@ export function JourneyStudioPage() {
     navigate("/triage");
   }, [navigate]);
 
+  const handleEscalateToAnalysis = useCallback(() => {
+    if (asset) {
+      navigate(`/analysis?asset=${encodeURIComponent(asset)}`);
+    }
+  }, [asset, navigate]);
+
   // ---- No asset parameter fallback ----
   if (!asset) {
     return (
@@ -329,6 +335,7 @@ export function JourneyStudioPage() {
         onFreeze={handleFreeze}
         onSaveResult={handleSaveResult}
         onNavigateToTriage={handleNavigateToTriage}
+        onEscalateToAnalysis={handleEscalateToAnalysis}
       />
     </PanelShell>
   );
