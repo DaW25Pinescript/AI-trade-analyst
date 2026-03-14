@@ -2,7 +2,7 @@
 
 ## Header
 
-- **Status:** ▶️ In progress — Phase 5 complete, Phase 6 next
+- **Status:** ▶️ In progress — Phase 6 partially complete (Journey Studio ✅, Analysis Run ✅, Journal & Review next)
 - **Date:** 13 March 2026
 - **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 - **Spec file:** `docs/specs/ui_reentry_phase_plan.md`
@@ -441,7 +441,7 @@ Total: 12 PRs. 8 frontend-only, 4 with backend changes. The first 4 PRs require 
 | **Phase 3** | **Shared Component Extraction** | **✅ Done** |
 | **Phase 4** | **Agent Ops Contract + Backend MVP** | **✅ Done** |
 | **Phase 5** | **Agent Ops React MVP** | **✅ Done (PR-OPS-3)** |
-| **Phase 6** | **Journey Studio + Analysis Run + Journal & Review** | **⏳ Pending** |
+| **Phase 6** | **Journey Studio + Analysis Run + Journal & Review** | **🟢 In progress — Journey ✅ PR-UI-4, Analysis Run ✅ PR-UI-5, Journal & Review ⏳** |
 | **Phase 7** | **Agent Ops Trace + Detail** | **⏳ Pending** |
 | UI Phase 3C | Chart Evidence + Run Artifact Inspector | ⏸️ Fenced |
 

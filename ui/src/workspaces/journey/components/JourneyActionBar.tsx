@@ -24,6 +24,7 @@ export interface JourneyActionBarProps {
   onFreeze: () => void;
   onSaveResult: () => void;
   onNavigateToTriage: () => void;
+  onEscalateToAnalysis?: () => void;
 }
 
 export function JourneyActionBar({
@@ -41,6 +42,7 @@ export function JourneyActionBar({
   onFreeze,
   onSaveResult,
   onNavigateToTriage,
+  onEscalateToAnalysis,
 }: JourneyActionBarProps) {
   return (
     <div className="space-y-2" data-testid="action-bar">
@@ -78,13 +80,25 @@ export function JourneyActionBar({
 
       {/* Action buttons */}
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onNavigateToTriage}
-          className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          Back to Triage
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onNavigateToTriage}
+            className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            Back to Triage
+          </button>
+          {onEscalateToAnalysis && (
+            <button
+              type="button"
+              onClick={onEscalateToAnalysis}
+              className="text-sm text-blue-500 hover:text-blue-300 transition-colors"
+              data-testid="escalate-to-analysis"
+            >
+              Escalate to Analysis
+            </button>
+          )}
+        </div>
 
         <div className="flex items-center gap-3">
           {/* Save Draft — disappears post-freeze */}
