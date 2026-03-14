@@ -246,7 +246,12 @@ export function buildJourneyWorkspaceViewModel(
     isFrozen,
     frozenSnapshotId: frozenSnapshotId ?? null,
     canSaveDraft: isContentReady && !isFrozen,
-    canFreeze: isContentReady && stage === "draft" && !isFrozen,
+    canFreeze:
+      isContentReady &&
+      stage === "draft" &&
+      !isFrozen &&
+      !!(formState?.thesis?.trim()) &&
+      !!(formState?.userDecision),
     canSaveResult: isFrozen && stage === "frozen",
 
     draftJourneyId: draftJourneyId ?? null,
