@@ -6,6 +6,7 @@ import {
 import { AppShell } from "./AppShell";
 import { TriageBoardPage } from "@workspaces/triage/routes/TriageBoardPage";
 import { JourneyStudioRoute } from "@workspaces/journey/routes/JourneyStudioRoute";
+import { AnalysisRunRoute } from "@workspaces/analysis/routes/AnalysisRunRoute";
 import { AgentOpsRoute } from "@workspaces/ops/routes/AgentOpsRoute";
 import { WorkspacePlaceholder } from "@shared/components/WorkspacePlaceholder";
 import { NotFoundPage } from "@shared/components/NotFoundPage";
@@ -23,7 +24,7 @@ const router = createHashRouter([
       },
       {
         path: "analysis",
-        element: <WorkspacePlaceholder name="Analysis" />,
+        element: <AnalysisRunRoute />,
       },
       {
         path: "journal",
