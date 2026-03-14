@@ -3,7 +3,7 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 14 March 2026
 **Review date:** 10 March 2026
-**Current phase:** Phase 6 — Analysis Run React workspace MVP (PR-UI-5)
+**Current phase:** Phase 6 — Complete (Journey Studio ✅, Analysis Run ✅, Journal & Review ✅)
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -21,11 +21,11 @@
 ## Phase Index (at-a-glance)
 
 - **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-3.
-- **Current phase:** Phase 6 — Analysis Run React workspace MVP (PR-UI-5).
+- **Current phase:** Phase 6 — Complete (Journey Studio ✅, Analysis Run ✅, Journal & Review ✅).
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations is classified as Phase 3B extension — an operator observability / explainability / trust workspace on new read-only projection endpoints.
-- **Next actions:** Journal & Review workspace (PR-UI-6).
-- **Active decision gate:** the production-readiness gate remains satisfied; the runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. UI implementation is now the active lane.
+- **Next actions:** Phase 7 — Agent Ops Trace + Detail (PR-OPS-4, PR-OPS-5).
+- **Active decision gate:** the production-readiness gate remains satisfied; the runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. UI implementation is now the active lane. Phase 6 (core product lane) is complete.
 
 ## 1) Executive Snapshot
 
@@ -42,7 +42,11 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — PR-UI-5: Analysis Run React Workspace MVP (14 Mar 2026)
+### Latest increment — PR-UI-6: Journal & Review React Workspace MVP (14 Mar 2026)
+
+Delivered PR-UI-6 — Journal & Review React workspace MVP. Replaced the /journal placeholder route with a real decision readback workspace consuming existing `GET /journal/decisions` and `GET /review/records` endpoints. Single `/journal` route with internal Journal | Review toggle — structurally separable per UI_WORKSPACES §8.6. New workspace-local API layer (`fetchDecisions`, `fetchReviewRecords`) with typed response shapes per UI_CONTRACT §9.7 (DecisionSnapshot) and §9.8 (ReviewRecord extends DecisionSnapshot). Workspace adapter (`journalAdapter.ts`) normalizes backend responses to view models, derives header summaries (decision count for Journal, outcome coverage for Review), derives per-record result indicators (has-result vs needs-follow-up), handles empty records as normal state. TanStack Query hooks (`useJournalDecisions`, `useReviewRecords`) with exported cache keys. Journal view shows frozen decisions list with metadata and lateral navigation to Journey Studio. Review view shows decisions plus result linkage (`has_result`) with visual distinction between "has result" and "needs follow-up". Both views handle empty records gracefully as welcoming state, not error. Row interaction navigates laterally to `#/journey/{instrument}` — required primary behavior per spec. No fake detail screen (DESIGN_NOTES §1.9). Shared components reused: PanelShell, LoadingSkeleton, EmptyState, ErrorState, EntityRowCard, StatusPill. Read-only workspace — no mutations, no result submission, no outcome logging. 42 new tests (adapter unit tests + component integration tests + view toggle tests + empty state tests + navigation tests + header summary tests + outcome coverage tests). Build passes, 243 tests green (42 new). No backend modifications. Phase 6 is now complete — all core product workspaces shipped (Journey Studio, Analysis Run, Journal & Review).
+
+### Previous increment — PR-UI-5: Analysis Run React Workspace MVP (14 Mar 2026)
 
 Delivered PR-UI-5 — Analysis Run React workspace MVP. Replaced the /analysis placeholder route with a real expert execution surface consuming existing `POST /analyse` (multipart/form-data) and `GET /runs/{run_id}/usage` (JSON) endpoints. New workspace-local API layer (`submitAnalysis`, `fetchRunUsage`) with multipart transport for /analyse — deliberately separated from the shared JSON `apiFetch` to avoid Content-Type contamination. Workspace adapter (`analysisAdapter.ts`) normalizes backend responses to UI view models, handles mixed error detail shapes (string or structured object per UI_CONTRACT §11.1), derives tab enablement and submission read-only state, tolerates empty-but-valid usage summaries. Standalone run lifecycle state machine (`runLifecycle.ts`) implementing UI_CONTRACT §7 canonical states (idle → validating → submitting → running → completed | failed) with `partial` reserved in type for future streaming. State machine enforces valid transitions only, preserves run_id/request_id across all states including failure. Three-panel tabbed layout with tab persistence (Submission | Execution | Verdict) — all tabs remain navigable post-run. Submission locks to read-only post-submit for "what did I submit?" verification. Execution panel shows spinner with elapsed time counter during running state — no fake progress indicators. Verdict panel renders full FinalVerdict at expert density (final_bias, decision, approved_setups, no_trade_conditions, overall_confidence, analyst_agreement_pct, arbiter_notes). Verdict tab shows "No verdict — run failed" on failure state. Usage accordion inline below verdict, closed by default, tolerates artifact-missing gracefully. Journey → Analysis escalation via ?asset=SYMBOL query parameter with provenance breadcrumb and "Return to Journey" link. Multipart field names discovered from backend FastAPI route: instrument, session, timeframes, account_balance, min_rr, max_risk_per_trade, max_daily_risk, chart_h4/h1/m15/m5, lens_* flags, enable_deliberation, smoke_mode, source_ticket_id. 69 new tests (state machine unit tests + adapter unit tests + component tests + integration tests + escalation tests + E2E submission→verdict test). Build passes, typecheck clean, 201 tests green. No backend modifications.
 
@@ -158,6 +162,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | Phase 4 — Agent Ops Contract (PR-OPS-1) | Endpoint contract spec for /ops/agent-roster and /ops/agent-health — zero code changes | ✅ Complete |
 | Phase 5 — Journey Studio MVP (PR-UI-4) | Journey Studio workspace — staged flow, freeze lifecycle, bootstrap context, 43 tests — 132 tests | ✅ Complete |
 | Phase 6a — Analysis Run MVP (PR-UI-5) | Analysis Run workspace — multipart /analyse, run lifecycle state machine, tab persistence, 69 tests — 201 tests | ✅ Complete |
+| Phase 6b — Journal & Review MVP (PR-UI-6) | Journal & Review workspace — decision readback, review toggle, outcome coverage, 42 tests — 243 tests | ✅ Complete |
 | Phase 4 — Agent Ops Backend (PR-OPS-2) | Backend implementation — roster + health endpoints | ▶️ Next |
 | UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
 | Observability Phase 2 | Cross-lane runtime visibility — structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories | ✅ Complete |
@@ -394,8 +399,8 @@ Reduce the architectural split between runtime lanes and address broader converg
 8. ~~TD-3 — packaging/import-path stability~~ — ✅ Complete (12 March 2026). 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added. Spec: `docs/specs/td3_packaging_import_stability.md`.
 9. ~~Cleanup tranche~~ — ✅ Complete (13 March 2026). Async markers cleaned, TD-5 enum centralisation resolved, TD-9 unused vars resolved, doc consolidation complete.
 10. ~~Runtime-hardening sequence~~ — ✅ Complete. Obs P2, TD-3, and cleanup tranche all closed.
-11. **UI implementation is now the active lane.** PR-UI-1 (React app shell), PR-UI-2 (Triage Board MVP), PR-UI-3 (Shared Component Extraction), PR-OPS-1 (Agent Ops Contract Spec), PR-OPS-3 (Agent Ops Workspace MVP), PR-UI-4 (Journey Studio MVP), and PR-UI-5 (Analysis Run MVP) are complete. Next: **Journal & Review workspace** (PR-UI-6).
-12. Journey Studio MVP is complete. The core product workflow lane (Triage → Journey) is now functional end-to-end.
+11. **UI implementation is now the active lane.** PR-UI-1 (React app shell), PR-UI-2 (Triage Board MVP), PR-UI-3 (Shared Component Extraction), PR-OPS-1 (Agent Ops Contract Spec), PR-OPS-3 (Agent Ops Workspace MVP), PR-UI-4 (Journey Studio MVP), PR-UI-5 (Analysis Run MVP), and PR-UI-6 (Journal & Review MVP) are complete. **Phase 6 is complete.** Next: **Phase 7 — Agent Ops Trace + Detail** (PR-OPS-4, PR-OPS-5).
+12. Core product workflow lane is now complete end-to-end: Triage Board → Journey Studio → Analysis Run → Journal & Review.
 13. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
 
 ---

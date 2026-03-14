@@ -4,7 +4,6 @@ const NAV_ITEMS = [
   { to: "/triage", label: "Triage" },
   { to: "/analysis", label: "Analysis" },
   { to: "/journal", label: "Journal" },
-  { to: "/review", label: "Review" },
   { to: "/ops", label: "Ops" },
 ] as const;
 

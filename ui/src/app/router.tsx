@@ -8,7 +8,7 @@ import { TriageBoardPage } from "@workspaces/triage/routes/TriageBoardPage";
 import { JourneyStudioRoute } from "@workspaces/journey/routes/JourneyStudioRoute";
 import { AnalysisRunRoute } from "@workspaces/analysis/routes/AnalysisRunRoute";
 import { AgentOpsRoute } from "@workspaces/ops/routes/AgentOpsRoute";
-import { WorkspacePlaceholder } from "@shared/components/WorkspacePlaceholder";
+import { JournalReviewRoute } from "@workspaces/journal/routes/JournalReviewRoute";
 import { NotFoundPage } from "@shared/components/NotFoundPage";
 
 const router = createHashRouter([
@@ -28,11 +28,7 @@ const router = createHashRouter([
       },
       {
         path: "journal",
-        element: <WorkspacePlaceholder name="Journal" />,
-      },
-      {
-        path: "review",
-        element: <WorkspacePlaceholder name="Review" />,
+        element: <JournalReviewRoute />,
       },
       { path: "ops", element: <AgentOpsRoute /> },
       { path: "*", element: <NotFoundPage /> },
