@@ -1,113 +1,129 @@
-# dashboard_server.py
-# ============================================================
-#  AI Trade Analyst — Fancy Live Dashboard Server
-#  • Finds your real "docs" folder no matter where the .bat is
-#  • Finds generate_dashboard.py the same way
-#  • On every page load: regenerates dashboard.html from ALL Progress/SPEC files
-#  • Recursive + completely skips "archive" folder
-#  • Opens the beautiful interactive dashboard (not the old simple list)
-# ============================================================
+#!/usr/bin/env python3
+"""Serve a live-regenerated dashboard from a repo/docs folder."""
+
+from __future__ import annotations
 
 import argparse
-import os
 import http.server
+import os
 import socketserver
 import subprocess
 import sys
+from pathlib import Path
+from urllib.parse import urlparse
 
-def locate_docs_folder():
-    """Walk UP until we find the real 'docs' folder."""
-    current = os.path.abspath(os.getcwd())
-    for _ in range(10):
-        candidate = os.path.join(current, "docs")
-        if os.path.isdir(candidate):
-            return candidate
-        parent = os.path.dirname(current)
-        if parent == current:
-            break
-        current = parent
+
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+
+def locate_docs_folder(start: Path) -> Path | None:
+    """Search current dir, script dir, and parents for a docs folder."""
+    checked: list[Path] = []
+    for base in [start, Path(__file__).resolve().parent]:
+        current = base.resolve()
+        for _ in range(12):
+            if current in checked:
+                break
+            checked.append(current)
+            candidate = current / "docs"
+            if candidate.is_dir():
+                return candidate
+            if current.parent == current:
+                break
+            current = current.parent
     return None
 
-def locate_generator_script():
-    """Walk UP until we find generate_dashboard.py."""
-    current = os.path.abspath(os.getcwd())
-    for _ in range(10):
-        candidate = os.path.join(current, "generate_dashboard.py")
-        if os.path.isfile(candidate):
-            return candidate
-        parent = os.path.dirname(current)
-        if parent == current:
-            break
-        current = parent
-    return None
+
+def locate_generator_script(start: Path) -> Path | None:
+    for base in [start, Path(__file__).resolve().parent]:
+        current = base.resolve()
+        for _ in range(12):
+            candidate = current / "generate_dashboard.py"
+            if candidate.is_file():
+                return candidate
+            if current.parent == current:
+                break
+            current = current.parent
+    local = Path(__file__).resolve().parent / "generate_dashboard.py"
+    return local if local.is_file() else None
 
 
-# ====================== SERVER ======================
-if __name__ == "__main__":
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AI Trade Analyst Fancy Dashboard")
     parser.add_argument("--port", type=int, default=9090)
-    args = parser.parse_args()
+    parser.add_argument("--folder", type=str, default="", help="Optional docs folder override")
+    return parser.parse_args()
 
-    # Auto-find everything
-    docs_root = locate_docs_folder()
-    generator_path = locate_generator_script()
+
+def main() -> int:
+    args = parse_args()
+    cwd = Path.cwd()
+    docs_root = Path(args.folder).resolve() if args.folder else locate_docs_folder(cwd)
+    generator_path = locate_generator_script(cwd)
 
     if docs_root is None:
-        print("❌ ERROR: Could not find a 'docs' folder anywhere above here.")
-        exit(1)
+        print("[ERROR] Could not find a 'docs' folder. Pass --folder explicitly or run from inside the repo.")
+        return 1
+    if not docs_root.is_dir():
+        print(f"[ERROR] docs folder is not valid: {docs_root}")
+        return 1
     if generator_path is None:
-        print("❌ ERROR: Could not find generate_dashboard.py anywhere above here.")
-        exit(1)
+        print("[ERROR] Could not find generate_dashboard.py.")
+        return 1
 
-    print(f"🔍 Found docs folder: {docs_root}")
-    print(f"🔍 Found generator: {generator_path}")
-
-    # Serve from the docs folder (so /dashboard.html works)
     os.chdir(docs_root)
+    print(f"[INFO] Serving docs folder: {docs_root}")
+    print(f"[INFO] Using generator:   {generator_path}")
 
     class DashboardHandler(http.server.SimpleHTTPRequestHandler):
-        root_dir = docs_root
-        generator_path = generator_path
-
-        def do_GET(self):
-            if self.path in ("/", "/index.html", "/dashboard.html"):
-                # LIVE REGENERATE every time you open/refresh the page
-                output_html = os.path.join(self.root_dir, "dashboard.html")
-                print("🔄 Regenerating fancy dashboard from latest MD files...")
-
+        def do_GET(self) -> None:  # noqa: N802
+            request_path = urlparse(self.path).path
+            if request_path in ("/", "/index.html", "/dashboard.html"):
+                output_html = docs_root / "dashboard.html"
+                print("[INFO] Regenerating dashboard from latest markdown files...")
                 try:
-                    subprocess.run(
-                        [sys.executable, self.generator_path,
-                         "--folder", self.root_dir,
-                         "--output", output_html],
-                        cwd=os.path.dirname(self.generator_path),
+                    result = subprocess.run(
+                        [sys.executable, str(generator_path), "--folder", str(docs_root), "--output", str(output_html)],
+                        cwd=str(generator_path.parent),
                         check=True,
                         capture_output=True,
-                        text=True
+                        text=True,
                     )
-                    print("✅ Dashboard regenerated successfully")
-                except subprocess.CalledProcessError as e:
-                    print(f"⚠️ Generator failed: {e.stderr.strip()}")
-                    self.send_response(200)
-                    self.send_header("Content-type", "text/html")
+                    if result.stdout.strip():
+                        print(result.stdout.strip())
+                    print("[OK] Dashboard regenerated successfully")
+                except subprocess.CalledProcessError as exc:
+                    stderr = exc.stderr.strip() or exc.stdout.strip() or str(exc)
+                    print(f"[WARN] Generator failed: {stderr}")
+                    if output_html.exists():
+                        print("[WARN] Serving existing dashboard.html fallback")
+                        self.path = "/dashboard.html"
+                        return super().do_GET()
+                    self.send_response(500)
+                    self.send_header("Content-type", "text/html; charset=utf-8")
                     self.end_headers()
-                    self.wfile.write(b"<h1 style='color:red;text-align:center;margin-top:50px;'>No Progress.md file found (or parse error)</h1>")
+                    message = (
+                        "<h1 style='color:#f87171;text-align:center;margin-top:50px;'>"
+                        "Dashboard generation failed</h1>"
+                        f"<pre style='max-width:900px;margin:20px auto;padding:16px;background:#111827;color:#e5e7eb;white-space:pre-wrap;'>{stderr}</pre>"
+                    )
+                    self.wfile.write(message.encode("utf-8"))
                     return
-
-                # Serve the freshly generated fancy dashboard
                 self.path = "/dashboard.html"
+            return super().do_GET()
 
-            # Serve any other file (e.g. if you ever add images)
-            super().do_GET()
-
-    with socketserver.TCPServer(("", args.port), DashboardHandler) as httpd:
-        print(f"✅ FANCY DASHBOARD LIVE at http://localhost:{args.port}")
-        print("   • Opens automatically")
-        print("   • Refresh = instant update from your MD files")
-        print("   • Archive folder is skipped")
+    with ReusableTCPServer(("", args.port), DashboardHandler) as httpd:
+        print(f"[OK] FANCY DASHBOARD LIVE at http://localhost:{args.port}")
+        print("   - Refresh = instant update from your MD files")
+        print("   - Archive folder is skipped by the generator")
         print("   Press Ctrl+C to stop.\n")
-
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
             print("\n👋 Server stopped.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
