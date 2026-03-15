@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Agent Operations workspace tests — PR-OPS-3 + PR-OPS-5a.
+// Agent Operations workspace tests — PR-OPS-3 + PR-OPS-5a + PR-OPS-5b.
 //
 // Explicit assertions (no snapshots) covering:
 //   - healthy render
@@ -11,6 +11,10 @@
 //   - route render
 //   - PR-OPS-5a: Health mode activation, data_state banners,
 //     OpsErrorEnvelope parsing, typed adapters, mode switching
+//   - PR-OPS-5b: Run mode (trace, stages, participants, edges, arbiter,
+//     partial run, null arbiter, 404, stale), Detail sidebar (all 4
+//     entity_type variants, 404, stale, unavailable health, dependencies,
+//     recent participation, run navigation)
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -22,6 +26,8 @@ import type {
   AgentRosterResponse,
   AgentHealthSnapshotResponse,
   AgentHealthItem,
+  AgentDetailResponse,
+  AgentTraceResponse,
 } from "../src/shared/api/ops";
 import { parseOpsErrorEnvelope } from "../src/shared/api/ops";
 import {
@@ -34,6 +40,8 @@ import {
 
 const mockFetchRoster = vi.fn();
 const mockFetchHealth = vi.fn();
+const mockFetchDetail = vi.fn();
+const mockFetchTrace = vi.fn();
 
 vi.mock("../src/shared/api/ops", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/shared/api/ops")>();
@@ -41,6 +49,8 @@ vi.mock("../src/shared/api/ops", async (importOriginal) => {
     ...actual,
     fetchAgentRoster: (...args: unknown[]) => mockFetchRoster(...args),
     fetchAgentHealth: (...args: unknown[]) => mockFetchHealth(...args),
+    fetchAgentDetail: (...args: unknown[]) => mockFetchDetail(...args),
+    fetchAgentTrace: (...args: unknown[]) => mockFetchTrace(...args),
   };
 });
 
@@ -210,6 +220,116 @@ function makeHealth(
   };
 }
 
+function makeDetail(
+  entityId: string,
+  entityType: "persona" | "officer" | "arbiter" | "subsystem" = "arbiter",
+  overrides?: Partial<AgentDetailResponse>,
+): AgentDetailResponse {
+  const base: AgentDetailResponse = {
+    version: "2026.03",
+    generated_at: "2026-03-15T10:00:00Z",
+    data_state: "live",
+    entity_id: entityId,
+    entity_type: entityType,
+    display_name: entityId.toUpperCase(),
+    department: null,
+    identity: {
+      purpose: "Test purpose",
+      role: "Test role",
+      visual_family: "governance",
+      capabilities: ["CAP1"],
+      responsibilities: ["RESP1"],
+      initials: "XX",
+    },
+    status: {
+      run_state: "completed",
+      health_state: "live",
+      last_active_at: "2026-03-15T09:00:00Z",
+      last_run_id: "run-001",
+      health_summary: "All good",
+    },
+    dependencies: [],
+    recent_participation: [],
+    recent_warnings: [],
+    type_specific: entityType === "persona"
+      ? { variant: "persona" as const, analysis_focus: ["focus1"], verdict_style: "directional", department_role: "analyst", typical_outputs: ["output1"] }
+      : entityType === "officer"
+        ? { variant: "officer" as const, officer_domain: "market_data", data_sources: ["src1"], monitored_surfaces: ["surf1"], update_cadence: "1m" }
+        : entityType === "arbiter"
+          ? { variant: "arbiter" as const, synthesis_method: "weighted", veto_gates: ["gate1"], quorum_rule: "majority", override_capable: true, policy_summary: "Policy text" }
+          : { variant: "subsystem" as const, subsystem_type: "monitor", monitored_resources: ["res1"], health_check_method: "ping", runtime_role: "monitor" },
+  };
+  return { ...base, ...overrides } as AgentDetailResponse;
+}
+
+function makeTrace(overrides?: Partial<AgentTraceResponse>): AgentTraceResponse {
+  return {
+    version: "2026.03",
+    generated_at: "2026-03-15T10:00:00Z",
+    data_state: "live",
+    run_id: "run-001",
+    summary: {
+      instrument: "EURUSD",
+      session: "session-001",
+      timeframes: ["1H", "4H"],
+      duration_ms: 5432,
+      completed_at: "2026-03-15T09:55:00Z",
+      final_verdict: "bullish",
+      final_confidence: 0.82,
+    },
+    stages: [
+      { stage: "validate_input", status: "completed", order: 0, duration_ms: 100 },
+      { stage: "macro_context", status: "completed", order: 1, duration_ms: 800 },
+      { stage: "analyst_execution", status: "completed", order: 2, duration_ms: 3000 },
+      { stage: "arbiter", status: "completed", order: 3, duration_ms: 500 },
+      { stage: "logging", status: "completed", order: 4, duration_ms: 32 },
+    ],
+    participants: [
+      {
+        entity_id: "default-analyst",
+        display_name: "DEFAULT ANALYST",
+        role: "Senior Analyst",
+        participation_status: "active",
+        contribution: {
+          summary: "Bullish bias detected",
+          stance: "bullish",
+          confidence: 0.85,
+          was_overridden: false,
+          override_reason: null,
+        },
+      },
+      {
+        entity_id: "risk-challenger",
+        display_name: "RISK CHALLENGER",
+        role: "Risk Challenger",
+        participation_status: "active",
+        contribution: {
+          summary: "Challenged bias",
+          stance: "bearish",
+          confidence: 0.6,
+          was_overridden: true,
+          override_reason: "Arbiter override",
+        },
+      },
+    ],
+    edges: [
+      { from: "default-analyst", to: "arbiter", type: "supports", summary: "Supports verdict" },
+      { from: "risk-challenger", to: "arbiter", type: "challenges", summary: null },
+    ],
+    arbiter_summary: {
+      verdict: "bullish",
+      confidence: 0.82,
+      method: "weighted_synthesis",
+      override_applied: true,
+      dissent_summary: "Risk challenger dissented with bearish view",
+    },
+    artifacts: [
+      { name: "run_record.json", path: "runs/run-001/run_record.json", type: "record" },
+    ],
+    ...overrides,
+  };
+}
+
 function renderWithRouter(element: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -343,6 +463,14 @@ describe("opsViewModel adapter", () => {
 describe("AgentOpsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default detail mock — returns a valid detail for any entity
+    mockFetchDetail.mockImplementation((entityId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: makeDetail(entityId),
+        status: 200,
+      }),
+    );
   });
 
   it("renders healthy state with roster and health data", async () => {
@@ -448,7 +576,7 @@ describe("AgentOpsPage", () => {
     await userEvent.click(arbiterCard);
 
     // Detail panel should appear
-    const panels = screen.getAllByTestId("selected-detail-panel");
+    const panels = screen.getAllByTestId("agent-detail-sidebar");
     expect(panels.length).toBeGreaterThan(0);
 
     // Check detail content in any panel
@@ -456,7 +584,7 @@ describe("AgentOpsPage", () => {
     expect(within(panel).getByText("ARBITER")).toBeInTheDocument();
     // "arbiter" appears in both ID and Type rows — use getAllByText
     expect(within(panel).getAllByText("arbiter").length).toBeGreaterThanOrEqual(1);
-    expect(within(panel).getByText("Final Decision Maker")).toBeInTheDocument();
+    expect(within(panel).getByText("Test role")).toBeInTheDocument();
   });
 
   it("closes detail panel on close click", async () => {
@@ -472,14 +600,14 @@ describe("AgentOpsPage", () => {
     await userEvent.click(arbiterCard);
 
     // Panel should exist
-    expect(screen.getAllByTestId("selected-detail-panel").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("agent-detail-sidebar").length).toBeGreaterThan(0);
 
     // Close it
     const closeButtons = screen.getAllByLabelText("Close detail panel");
     await userEvent.click(closeButtons[0]);
 
     // Panel should be gone
-    expect(screen.queryByTestId("selected-detail-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-detail-sidebar")).not.toBeInTheDocument();
   });
 
   it("toggles selection when clicking the same entity twice", async () => {
@@ -492,14 +620,14 @@ describe("AgentOpsPage", () => {
 
     const arbiterCard = await screen.findByTestId("entity-card-arbiter");
     await userEvent.click(arbiterCard);
-    expect(screen.getAllByTestId("selected-detail-panel").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("agent-detail-sidebar").length).toBeGreaterThan(0);
 
     // Click again to deselect
     await userEvent.click(arbiterCard);
-    expect(screen.queryByTestId("selected-detail-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-detail-sidebar")).not.toBeInTheDocument();
   });
 
-  it("disables Run mode pill, enables Health mode pill", async () => {
+  it("enables Run and Health mode pills", async () => {
     mockFetchRoster.mockReturnValue(new Promise(() => {}));
     mockFetchHealth.mockReturnValue(new Promise(() => {}));
 
@@ -508,8 +636,7 @@ describe("AgentOpsPage", () => {
     const runButton = screen.getByRole("button", { name: "Run" });
     const healthButton = screen.getByRole("button", { name: "Health" });
 
-    expect(runButton).toBeDisabled();
-    expect(runButton).toHaveAttribute("title", "Requires run trace wiring (PR-OPS-5b)");
+    expect(runButton).not.toBeDisabled();
     expect(healthButton).not.toBeDisabled();
   });
 });
@@ -519,6 +646,14 @@ describe("AgentOpsPage", () => {
 describe("AgentOpsRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default detail mock — returns a valid detail for any entity
+    mockFetchDetail.mockImplementation((entityId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: makeDetail(entityId),
+        status: 200,
+      }),
+    );
   });
 
   it("renders the ops workspace at /ops route", async () => {
@@ -600,6 +735,14 @@ describe("parseOpsErrorEnvelope", () => {
 describe("AgentOpsPage — Health mode (PR-OPS-5a)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default detail mock — returns a valid detail for any entity
+    mockFetchDetail.mockImplementation((entityId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: makeDetail(entityId),
+        status: 200,
+      }),
+    );
   });
 
   it("activates Health mode and shows health mode header", async () => {
@@ -633,15 +776,15 @@ describe("AgentOpsPage — Health mode (PR-OPS-5a)", () => {
     // Select entity in Org mode
     const arbiterCard = await screen.findByTestId("entity-card-arbiter");
     await userEvent.click(arbiterCard);
-    expect(screen.getAllByTestId("selected-detail-panel").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("agent-detail-sidebar").length).toBeGreaterThan(0);
 
     // Switch to Health mode — use getByRole to target button specifically
     const healthPill = screen.getByRole("button", { name: "Health" });
     await userEvent.click(healthPill);
 
     // Selection should be preserved
-    expect(screen.getAllByTestId("selected-detail-panel").length).toBeGreaterThan(0);
-    const panel = screen.getAllByTestId("selected-detail-panel")[0];
+    expect(screen.getAllByTestId("agent-detail-sidebar").length).toBeGreaterThan(0);
+    const panel = screen.getAllByTestId("agent-detail-sidebar")[0];
     expect(within(panel).getByText("ARBITER")).toBeInTheDocument();
   });
 
@@ -772,5 +915,489 @@ describe("PR-OPS-5a contract compliance", () => {
       to: "senate",
       type: "synthesizes",
     });
+  });
+});
+
+// ---- PR-OPS-5b: Run mode ----
+
+describe("AgentOpsPage — Run mode (PR-OPS-5b)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetchDetail.mockImplementation((entityId: string) =>
+      Promise.resolve({ ok: true, data: makeDetail(entityId), status: 200 }),
+    );
+  });
+
+  function setupReady() {
+    const roster = makeRoster();
+    const health = makeHealth();
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+  }
+
+  it("shows run selector and empty state when switching to Run mode", async () => {
+    setupReady();
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    expect(screen.getByTestId("run-selector")).toBeInTheDocument();
+    expect(screen.getByTestId("run-mode-empty")).toBeInTheDocument();
+    expect(screen.getByText("Enter a run ID to view the agent trace")).toBeInTheDocument();
+  });
+
+  it("loads and displays trace after entering run ID", async () => {
+    setupReady();
+    const trace = makeTrace();
+    mockFetchTrace.mockResolvedValue({ ok: true, data: trace, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    const input = screen.getByTestId("run-id-input");
+    await userEvent.type(input, "run-001");
+
+    const loadButton = screen.getByRole("button", { name: /load/i });
+    await userEvent.click(loadButton);
+
+    const tracePanel = await screen.findByTestId("run-trace-panel");
+    expect(tracePanel).toBeInTheDocument();
+  });
+
+  it("renders trace summary fields (instrument, verdict, confidence)", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({ ok: true, data: makeTrace(), status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    const input = screen.getByTestId("run-id-input");
+    await userEvent.type(input, "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    const header = await screen.findByTestId("run-header");
+    expect(within(header).getByText("EURUSD")).toBeInTheDocument();
+    expect(within(header).getByText("bullish")).toBeInTheDocument();
+    expect(within(header).getByText("82%")).toBeInTheDocument();
+  });
+
+  it("renders stage timeline with all stages", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({ ok: true, data: makeTrace(), status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    const timeline = await screen.findByTestId("trace-stage-timeline");
+    expect(timeline).toBeInTheDocument();
+    expect(screen.getByTestId("trace-stage-validate_input")).toBeInTheDocument();
+    expect(screen.getByTestId("trace-stage-macro_context")).toBeInTheDocument();
+    expect(screen.getByTestId("trace-stage-analyst_execution")).toBeInTheDocument();
+    expect(screen.getByTestId("trace-stage-arbiter")).toBeInTheDocument();
+    expect(screen.getByTestId("trace-stage-logging")).toBeInTheDocument();
+  });
+
+  it("renders participants with override indicator", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({ ok: true, data: makeTrace(), status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    const participants = await screen.findByTestId("trace-participant-list");
+    expect(participants).toBeInTheDocument();
+
+    expect(screen.getByTestId("participant-default-analyst")).toBeInTheDocument();
+    expect(screen.getByTestId("participant-risk-challenger")).toBeInTheDocument();
+
+    // Risk challenger was overridden
+    expect(screen.getByTestId("override-risk-challenger")).toBeInTheDocument();
+  });
+
+  it("renders trace edges", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({ ok: true, data: makeTrace(), status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    const edgeList = await screen.findByTestId("trace-edge-list");
+    expect(edgeList).toBeInTheDocument();
+    expect(screen.getByTestId("trace-edge-default-analyst-arbiter")).toBeInTheDocument();
+    expect(screen.getByTestId("trace-edge-risk-challenger-arbiter")).toBeInTheDocument();
+  });
+
+  it("renders arbiter summary card with override applied", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({ ok: true, data: makeTrace(), status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    const arbiterCard = await screen.findByTestId("arbiter-summary-card");
+    expect(arbiterCard).toBeInTheDocument();
+    expect(screen.getByTestId("arbiter-override-applied")).toBeInTheDocument();
+    expect(within(arbiterCard).getByText("weighted_synthesis")).toBeInTheDocument();
+  });
+
+  it("hides arbiter summary when null", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({
+      ok: true,
+      data: makeTrace({ arbiter_summary: null }),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await screen.findByTestId("run-trace-panel");
+    expect(screen.queryByTestId("arbiter-summary-card")).not.toBeInTheDocument();
+  });
+
+  it("shows partial run indicator when stages are pending/running", async () => {
+    setupReady();
+    const trace = makeTrace({
+      stages: [
+        { stage: "validate_input", status: "completed", order: 0, duration_ms: 100 },
+        { stage: "macro_context", status: "running", order: 1, duration_ms: null },
+        { stage: "analyst_execution", status: "pending", order: 2, duration_ms: null },
+      ],
+    });
+    mockFetchTrace.mockResolvedValue({ ok: true, data: trace, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await screen.findByTestId("run-trace-panel");
+    expect(screen.getByTestId("partial-run-indicator")).toBeInTheDocument();
+  });
+
+  it("shows 404 error for unknown run ID", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({
+      ok: false,
+      status: 404,
+      detail: { error: "RUN_NOT_FOUND", message: "Run not found" },
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "bad-run");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    const errorEl = await screen.findByTestId("run-trace-error");
+    expect(errorEl).toBeInTheDocument();
+    expect(within(errorEl).getAllByText("Run not found").length).toBeGreaterThan(0);
+  });
+
+  it("shows stale banner when trace data_state is stale", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({
+      ok: true,
+      data: makeTrace({ data_state: "stale" }),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await screen.findByTestId("run-trace-panel");
+    expect(screen.getByTestId("data-state-banner-health")).toBeInTheDocument();
+  });
+
+  it("hides Org/Health banners in Run mode", async () => {
+    const roster = makeRoster({ data_state: "stale" });
+    const health = makeHealth(undefined, { data_state: "stale" });
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+
+    // Stale banners visible in Org mode
+    expect(screen.getByTestId("data-state-banner-roster")).toBeInTheDocument();
+    expect(screen.getByTestId("data-state-banner-health")).toBeInTheDocument();
+
+    // Switch to Run mode — banners should hide
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(screen.queryByTestId("data-state-banner-roster")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("data-state-banner-health")).not.toBeInTheDocument();
+  });
+
+  it("renders artifacts section", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({ ok: true, data: makeTrace(), status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await userEvent.type(screen.getByTestId("run-id-input"), "run-001");
+    await userEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    const artifacts = await screen.findByTestId("trace-artifacts");
+    expect(artifacts).toBeInTheDocument();
+    expect(screen.getByText("run_record.json")).toBeInTheDocument();
+  });
+});
+
+// ---- PR-OPS-5b: Detail sidebar ----
+
+describe("AgentOpsPage — Detail sidebar (PR-OPS-5b)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetchDetail.mockImplementation((entityId: string) =>
+      Promise.resolve({ ok: true, data: makeDetail(entityId), status: 200 }),
+    );
+  });
+
+  function setupReady() {
+    const roster = makeRoster();
+    const health = makeHealth();
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+  }
+
+  it("renders arbiter type-specific section via entity_type switch", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      data: makeDetail("arbiter", "arbiter"),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    expect(within(sidebar).getByTestId("detail-arbiter-section")).toBeInTheDocument();
+    expect(within(sidebar).getByText("weighted")).toBeInTheDocument();
+    expect(within(sidebar).getByText("majority")).toBeInTheDocument();
+  });
+
+  it("renders persona type-specific section", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      data: makeDetail("default-analyst", "persona"),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-default-analyst");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    expect(within(sidebar).getByTestId("detail-persona-section")).toBeInTheDocument();
+    expect(within(sidebar).getByText("directional")).toBeInTheDocument();
+    expect(within(sidebar).getByText("analyst")).toBeInTheDocument();
+  });
+
+  it("renders officer type-specific section", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      data: makeDetail("mdo", "officer"),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-mdo");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    expect(within(sidebar).getByTestId("detail-officer-section")).toBeInTheDocument();
+    expect(within(sidebar).getByText("market_data")).toBeInTheDocument();
+  });
+
+  it("renders subsystem type-specific section", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      data: makeDetail("infra-monitor", "subsystem"),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-infra-monitor");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    const subsystemSection = within(sidebar).getByTestId("detail-subsystem-section");
+    expect(subsystemSection).toBeInTheDocument();
+    // subsystem_type and runtime_role both "monitor" — verify section renders them
+    expect(within(subsystemSection).getAllByText("monitor").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows 404 error when entity not found", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: false,
+      status: 404,
+      detail: { error: "ENTITY_NOT_FOUND", message: "Entity not found" },
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    const error = await within(sidebar).findByTestId("detail-error");
+    expect(error).toBeInTheDocument();
+    expect(within(error).getAllByText("Entity not found").length).toBeGreaterThan(0);
+  });
+
+  it("shows stale indicator when detail data_state is stale", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      data: makeDetail("arbiter", "arbiter", { data_state: "stale" }),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    expect(within(sidebar).getByTestId("detail-stale-indicator")).toBeInTheDocument();
+  });
+
+  it("shows unavailable health state indicator", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      data: makeDetail("arbiter", "arbiter", {
+        status: {
+          run_state: "idle",
+          health_state: "unavailable",
+          last_active_at: null,
+          last_run_id: null,
+          health_summary: null,
+        },
+      }),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    expect(within(sidebar).getByTestId("detail-health-unavailable")).toBeInTheDocument();
+  });
+
+  it("renders dependencies list", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      data: makeDetail("arbiter", "arbiter", {
+        dependencies: [
+          { entity_id: "senate", display_name: "SENATE", direction: "upstream", relationship_type: "synthesizes" },
+          { entity_id: "mdo", display_name: "MDO", direction: "downstream", relationship_type: "feeds" },
+        ],
+      }),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    expect(within(sidebar).getByText("SENATE")).toBeInTheDocument();
+    expect(within(sidebar).getByText("MDO")).toBeInTheDocument();
+  });
+
+  it("renders recent participation with override indicator", async () => {
+    setupReady();
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      data: makeDetail("arbiter", "arbiter", {
+        recent_participation: [
+          { run_id: "run-001", run_completed_at: "2026-03-15T09:55:00Z", verdict_direction: "bullish", was_overridden: true, contribution_summary: "Bullish call" },
+          { run_id: "run-002", run_completed_at: "2026-03-15T09:50:00Z", verdict_direction: "bearish", was_overridden: false, contribution_summary: "Bearish call" },
+        ],
+      }),
+      status: 200,
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(card);
+
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    const participation = within(sidebar).getByTestId("detail-recent-participation");
+    expect(participation).toBeInTheDocument();
+    expect(within(participation).getByText("Overridden")).toBeInTheDocument();
+  });
+
+  it("hides detail sidebar in Run mode", async () => {
+    setupReady();
+    renderWithRouter(<AgentOpsPage />);
+
+    const card = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(card);
+    expect(screen.getAllByTestId("agent-detail-sidebar").length).toBeGreaterThan(0);
+
+    // Switch to Run mode — sidebar hides
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(screen.queryByTestId("agent-detail-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("navigates to Run mode from detail sidebar last-run link", async () => {
+    setupReady();
+    mockFetchTrace.mockResolvedValue({ ok: true, data: makeTrace(), status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    const card = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(card);
+
+    // Find and click the last run link in the detail sidebar
+    const sidebar = screen.getAllByTestId("agent-detail-sidebar")[0];
+    const content = await within(sidebar).findByTestId("detail-content");
+
+    // The detail mock has last_run_id: "run-001" — should render as clickable link
+    const runLink = within(content).getByText("run-001");
+    await userEvent.click(runLink);
+
+    // Should switch to Run mode and show trace
+    expect(screen.getByTestId("run-mode-view")).toBeInTheDocument();
   });
 });

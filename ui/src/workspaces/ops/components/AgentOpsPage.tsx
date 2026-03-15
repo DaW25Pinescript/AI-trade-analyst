@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // AgentOpsPage — Agent Operations workspace main page.
 //
-// Modes: Org (structural view), Health (operator attention view).
-// Run mode is disabled pending PR-OPS-5b.
+// Modes: Org (structural view), Health (operator attention view),
+//        Run (trace-driven view for a selected run).
 //
 // State handling per AGENT_OPS_CONTRACT.md:
 //   - loading
@@ -21,9 +21,11 @@ import type { OpsEntityViewModel } from "../adapters/opsViewModel";
 import { OpsSummaryBar } from "./OpsSummaryBar";
 import { OpsLayerSection } from "./OpsLayerSection";
 import { OpsDepartmentSection } from "./OpsDepartmentSection";
-import { OpsSelectedDetailPanel } from "./OpsSelectedDetailPanel";
 import { OpsDegradedBanner } from "./OpsDegradedBanner";
 import { OpsDataStateBanner } from "./OpsDataStateBanner";
+import { RunSelector } from "./RunSelector";
+import { RunTracePanel } from "./RunTracePanel";
+import { AgentDetailSidebar } from "./AgentDetailSidebar";
 
 type OpsMode = "org" | "run" | "health";
 
@@ -48,6 +50,7 @@ export function AgentOpsPage() {
   const healthQuery = useAgentHealth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<OpsMode>("org");
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const vm = useMemo(
     () =>
@@ -95,17 +98,6 @@ export function AgentOpsPage() {
     [mode, vm.departments],
   );
 
-  // Find selected entity across all layers
-  const selectedEntity = useMemo((): OpsEntityViewModel | null => {
-    if (!selectedId) return null;
-    const all = [
-      ...vm.governanceLayer,
-      ...vm.officerLayer,
-      ...vm.departments.flatMap((d) => d.entities),
-    ];
-    return all.find((e) => e.id === selectedId) ?? null;
-  }, [selectedId, vm]);
-
   const handleSelect = useCallback((id: string) => {
     setSelectedId((prev) => (prev === id ? null : id));
   }, []);
@@ -118,6 +110,20 @@ export function AgentOpsPage() {
     setMode(newMode);
     // Selection preserved across mode switch per §7.4
   }, []);
+
+  const handleSelectRun = useCallback((runId: string | null) => {
+    setSelectedRunId(runId);
+  }, []);
+
+  // Navigate to Run mode from detail sidebar's "last run" link
+  const handleNavigateToRun = useCallback((runId: string) => {
+    setSelectedRunId(runId);
+    setMode("run");
+  }, []);
+
+  // Determine whether to show the backend-backed detail sidebar
+  // In Org/Health modes with a selected entity, show the full detail sidebar
+  const showDetailSidebar = selectedId !== null && mode !== "run";
 
   return (
     <PanelShell>
@@ -142,9 +148,12 @@ export function AgentOpsPage() {
           </button>
           <button
             type="button"
-            disabled
-            title="Requires run trace wiring (PR-OPS-5b)"
-            className="rounded px-3 py-1 text-xs font-medium text-gray-600 cursor-not-allowed"
+            onClick={() => handleModeChange("run")}
+            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+              mode === "run"
+                ? "bg-cyan-900/40 text-cyan-300"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
           >
             Run
           </button>
@@ -186,19 +195,19 @@ export function AgentOpsPage() {
         vm.condition === "degraded" ||
         vm.condition === "empty-health") && (
         <>
-          {/* Degraded banners */}
-          {vm.condition === "degraded" && (
+          {/* Degraded banners (Org/Health modes) */}
+          {mode !== "run" && vm.condition === "degraded" && (
             <OpsDegradedBanner variant="health-failed" />
           )}
-          {vm.condition === "empty-health" && (
+          {mode !== "run" && vm.condition === "empty-health" && (
             <OpsDegradedBanner variant="empty-health" />
           )}
 
-          {/* data_state banners per §5.6 */}
-          {vm.rosterDataState === "stale" && (
+          {/* data_state banners per §5.6 (Org/Health modes) */}
+          {mode !== "run" && vm.rosterDataState === "stale" && (
             <OpsDataStateBanner source="Roster" state="stale" />
           )}
-          {vm.healthDataState === "stale" && (
+          {mode !== "run" && vm.healthDataState === "stale" && (
             <OpsDataStateBanner source="Health" state="stale" />
           )}
 
@@ -217,59 +226,91 @@ export function AgentOpsPage() {
             </div>
           )}
 
-          {/* Summary / trust region */}
-          <OpsSummaryBar vm={vm} />
-
-          {/* Main content + optional detail panel */}
-          <div className="flex gap-4">
-            {/* Left: hierarchy */}
-            <div className="min-w-0 flex-1 space-y-6">
-              {/* Governance layer */}
-              <OpsLayerSection
-                title="Governance Layer"
-                entities={displayGovernance}
-                selectedId={selectedId}
-                onSelect={handleSelect}
+          {/* Run mode */}
+          {mode === "run" && (
+            <div className="space-y-4" data-testid="run-mode-view">
+              <RunSelector
+                currentRunId={selectedRunId}
+                onSelectRun={handleSelectRun}
               />
-
-              {/* Officer layer */}
-              <OpsLayerSection
-                title="Officer Layer"
-                entities={displayOfficers}
-                selectedId={selectedId}
-                onSelect={handleSelect}
-              />
-
-              {/* Department sections */}
-              {displayDepartments.map((dept) => (
-                <OpsDepartmentSection
-                  key={dept.key}
-                  department={dept}
-                  selectedId={selectedId}
-                  onSelect={handleSelect}
-                />
-              ))}
+              {selectedRunId ? (
+                <RunTracePanel runId={selectedRunId} />
+              ) : (
+                <div
+                  className="rounded-lg border border-gray-700/40 bg-gray-900/40 px-6 py-8 text-center"
+                  data-testid="run-mode-empty"
+                >
+                  <p className="text-sm text-gray-400">
+                    Enter a run ID to view the agent trace
+                  </p>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Paste a run ID from Journey Studio or Analysis workspace
+                  </p>
+                </div>
+              )}
             </div>
+          )}
 
-            {/* Right: selected detail panel */}
-            {selectedEntity && (
-              <div className="hidden w-80 shrink-0 lg:block">
-                <OpsSelectedDetailPanel
-                  entity={selectedEntity}
-                  onClose={handleCloseDetail}
-                />
+          {/* Org/Health mode content */}
+          {mode !== "run" && (
+            <>
+              {/* Summary / trust region */}
+              <OpsSummaryBar vm={vm} />
+
+              {/* Main content + optional detail panel */}
+              <div className="flex gap-4">
+                {/* Left: hierarchy */}
+                <div className="min-w-0 flex-1 space-y-6">
+                  {/* Governance layer */}
+                  <OpsLayerSection
+                    title="Governance Layer"
+                    entities={displayGovernance}
+                    selectedId={selectedId}
+                    onSelect={handleSelect}
+                  />
+
+                  {/* Officer layer */}
+                  <OpsLayerSection
+                    title="Officer Layer"
+                    entities={displayOfficers}
+                    selectedId={selectedId}
+                    onSelect={handleSelect}
+                  />
+
+                  {/* Department sections */}
+                  {displayDepartments.map((dept) => (
+                    <OpsDepartmentSection
+                      key={dept.key}
+                      department={dept}
+                      selectedId={selectedId}
+                      onSelect={handleSelect}
+                    />
+                  ))}
+                </div>
+
+                {/* Right: backend-backed detail sidebar */}
+                {showDetailSidebar && (
+                  <div className="hidden w-80 shrink-0 lg:block">
+                    <AgentDetailSidebar
+                      entityId={selectedId!}
+                      onClose={handleCloseDetail}
+                      onSelectRun={handleNavigateToRun}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Detail panel for small screens — below content */}
-          {selectedEntity && (
-            <div className="lg:hidden">
-              <OpsSelectedDetailPanel
-                entity={selectedEntity}
-                onClose={handleCloseDetail}
-              />
-            </div>
+              {/* Detail sidebar for small screens — below content */}
+              {showDetailSidebar && (
+                <div className="lg:hidden">
+                  <AgentDetailSidebar
+                    entityId={selectedId!}
+                    onClose={handleCloseDetail}
+                    onSelectRun={handleNavigateToRun}
+                  />
+                </div>
+              )}
+            </>
           )}
         </>
       )}

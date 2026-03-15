@@ -3,7 +3,7 @@
 **Phase:** 7 (continued)
 **Lane:** Operator / Observability
 **Type:** Frontend-only
-**Status:** 🔶 5a complete — 5b pending
+**Status:** ✅ Complete (5a + 5b)
 **Date:** 2026-03-15
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Extends:** PR-OPS-3 (workspace shell), `docs/ui/AGENT_OPS_CONTRACT.md` (all four endpoints now contracted)
@@ -321,27 +321,27 @@ All TBC from diagnostic — workspace shell, adapter pattern, hook pattern, type
 | AC-5 | Roster blocking | Roster failure → workspace-level blocking error | ✅ Done (5a) |
 | AC-6 | Health mode active | Health mode enabled, elevates degraded/stale entities | ✅ Done (5a) |
 | AC-7 | Relationship rendering | Org/Health modes render roster relationship lines | ✅ Done (5a) |
-| AC-8 | Trace wiring | Run mode renders ordered stage timeline | ⏳ Pending (5b) |
-| AC-9 | Participant cards | Participants render status and available contribution fields (stance/confidence/contribution/override when present) | ⏳ Pending (5b) |
-| AC-10 | Trace edges | Trace edges with correct types | ⏳ Pending (5b) |
-| AC-11 | Arbiter summary | Arbiter panel with override details | ⏳ Pending (5b) |
-| AC-12 | Arbiter null | Null arbiter → panel hidden, no fabrication | ⏳ Pending (5b) |
-| AC-13 | Trace not found | Invalid run_id → "run not found" | ⏳ Pending (5b) |
-| AC-14 | Partial run | Partial → available stages + incomplete indicator | ⏳ Pending (5b) |
-| AC-15 | Run selector | Mechanism to select run_id — not hardcoded | ⏳ Pending (5b) |
-| AC-16 | Detail persona | Persona click → PersonaDetail fields | ⏳ Pending (5b) |
-| AC-17 | Detail officer | Officer click → OfficerDetail fields | ⏳ Pending (5b) |
-| AC-18 | Detail arbiter | Arbiter click → ArbiterDetail fields | ⏳ Pending (5b) |
-| AC-19 | Detail subsystem | Subsystem click → SubsystemDetail fields | ⏳ Pending (5b) |
-| AC-20 | Detail not found | Unknown entity_id → "entity not found" | ⏳ Pending (5b) |
-| AC-21 | Detail degradation | Health unavailable → degraded status, rest normal | ⏳ Pending (5b) |
+| AC-8 | Trace wiring | Run mode renders ordered stage timeline | ✅ Done (5b) |
+| AC-9 | Participant cards | Participants render status and available contribution fields (stance/confidence/contribution/override when present) | ✅ Done (5b) |
+| AC-10 | Trace edges | Trace edges with correct types | ✅ Done (5b) |
+| AC-11 | Arbiter summary | Arbiter panel with override details | ✅ Done (5b) |
+| AC-12 | Arbiter null | Null arbiter → panel hidden, no fabrication | ✅ Done (5b) |
+| AC-13 | Trace not found | Invalid run_id → "run not found" | ✅ Done (5b) |
+| AC-14 | Partial run | Partial → available stages + incomplete indicator | ✅ Done (5b) |
+| AC-15 | Run selector | Mechanism to select run_id — not hardcoded | ✅ Done (5b) |
+| AC-16 | Detail persona | Persona click → PersonaDetail fields | ✅ Done (5b) |
+| AC-17 | Detail officer | Officer click → OfficerDetail fields | ✅ Done (5b) |
+| AC-18 | Detail arbiter | Arbiter click → ArbiterDetail fields | ✅ Done (5b) |
+| AC-19 | Detail subsystem | Subsystem click → SubsystemDetail fields | ✅ Done (5b) |
+| AC-20 | Detail not found | Unknown entity_id → "entity not found" | ✅ Done (5b) |
+| AC-21 | Detail degradation | Health unavailable → degraded status, rest normal | ✅ Done (5b) |
 | AC-22 | data_state banners | Stale/unavailable renders appropriate banner | ✅ Done (5a) |
 | AC-23 | Error envelope | OpsErrorEnvelope parsed, not generic error | ✅ Done (5a) |
 | AC-24 | Typed adapters | Four adapters matching contract shapes | ✅ Done (5a) |
-| AC-25 | No backend changes | Zero backend modifications | ✅ Done (5a) |
-| AC-26 | Existing UI preserved | Phase 6 + PR-OPS-3 Org mode — zero regressions | ✅ Done (5a) |
-| AC-27 | Mode switching | Selection preserved unless invalid in new context | ✅ Done (5a) |
-| AC-28 | Build + typecheck | Build and typecheck pass | ✅ Done (5a) |
+| AC-25 | No backend changes | Zero backend modifications | ✅ Done (5a+5b) |
+| AC-26 | Existing UI preserved | Phase 6 + PR-OPS-3 Org mode — zero regressions | ✅ Done (5a+5b) |
+| AC-27 | Mode switching | Selection preserved unless invalid in new context | ✅ Done (5a+5b) |
+| AC-28 | Build + typecheck | Build and typecheck pass | ✅ Done (5a+5b) |
 
 ---
 

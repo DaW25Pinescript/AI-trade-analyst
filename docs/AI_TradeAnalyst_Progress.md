@@ -24,7 +24,7 @@
 - **Current phase:** Phase 6 — Complete (Journey Studio ✅, Analysis Run ✅, Journal & Review ✅).
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations is classified as Phase 3B extension — an operator observability / explainability / trust workspace on new read-only projection endpoints.
-- **Next actions:** Phase 7 — PR-OPS-5 (frontend Agent Ops wiring with trace + detail endpoints).
+- **Next actions:** PR-OPS-5 complete (5a + 5b). Agent Ops read-side stack fully wired. 63 tests passing.
 - **Active decision gate:** the production-readiness gate remains satisfied; the runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. UI implementation is now the active lane. Phase 6 (core product lane) is complete.
 
 ## 1) Executive Snapshot
@@ -42,7 +42,15 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — PR-OPS-4b: Agent Detail Endpoint (15 Mar 2026)
+### Latest increment — PR-OPS-5b: Agent Ops Frontend Wiring Complete (15 Mar 2026)
+
+Delivered PR-OPS-5b — Run mode + Detail sidebar wiring for the Agent Ops workspace (Phase 7). New components: `RunSelector` (paste-field run ID input), `TraceStageTimeline` (ordered stages with status-aware dots and partial run indicator), `TraceParticipantList` (participants with stance/confidence/override indicators), `TraceEdgeList` (conservative from→to edge rendering with type labels), `ArbiterSummaryCard` (verdict/confidence/method/override/dissent), `RunTracePanel` (orchestrates full Run mode view with trace summary, stages, participants, edges, arbiter, artifacts), `AgentDetailSidebar` (backend-backed detail panel with discriminated union rendering — switches on `entity_type` NOT `type_specific.variant`). Four type-specific sections: `PersonaSection`, `OfficerSection`, `ArbiterSection`, `SubsystemSection`. `AgentOpsPage` updated: Run pill activated, run selector + trace panel wired, detail sidebar replaces old roster-based panel, degraded/stale banners scoped to Org/Health modes. Null arbiter → hidden (no fabrication). 404 error handling for both trace and detail. data_state stale indicators at both workspace and entity level. 63 frontend tests passing (39 baseline + 24 new). All 28 spec ACs (AC-1 through AC-28) verified ✅. PR-OPS-5 spec marked complete. Zero backend modifications. Agent Ops read-side stack fully wired.
+
+### Previous increment — PR-OPS-5a: Agent Ops Frontend Wiring — Types + Health Mode (15 Mar 2026)
+
+Delivered PR-OPS-5a — types, adapters, hooks, Org preservation, and Health mode activation for the Agent Ops workspace (Phase 7). Created contract-exact TypeScript types for all four endpoints (roster, health, trace, detail), API fetch functions with `OpsErrorEnvelope` parsing, TanStack Query hooks (`useAgentRoster`, `useAgentHealth`, `useAgentTrace`, `useAgentDetail`), view-model adapter (`buildOpsWorkspaceViewModel`) with roster-health join per §5.10 rules (unknown IDs discarded, missing health valid, roster as structural truth). Health mode activated with `elevateDegraded` sort. data_state stale/unavailable banners. 39 tests covering AC-1 through AC-7 + shared gates. Run mode and Detail sidebar deferred to 5b.
+
+### Previous increment — PR-OPS-4b: Agent Detail Endpoint (15 Mar 2026)
 
 Delivered PR-OPS-4b — agent-detail endpoint for the Agent Ops workspace (Phase 7). Added `GET /ops/agent-detail/{entity_id}` read-only composite projection endpoint that derives entity-level detail from roster (identity, department, visual_family), static profile registry (purpose, responsibilities, type-specific variant), health snapshot (graceful degradation when unavailable), and bounded recent-run scan (max 20 dirs or 7 days, capped at 5 entries). New Pydantic models (`AgentDetailResponse`, `EntityIdentity`, `EntityStatus`, `EntityDependency`, `RecentParticipation`, `PersonaDetail`, `OfficerDetail`, `ArbiterDetail`, `SubsystemDetail`) following flat `ResponseMeta` inheritance per PR-OPS-2 pattern. Discriminated union via `entity_type` + `type_specific.variant` tag. Static profile registry (`ops_profile_registry.py`) with hardcoded profiles for all 13 roster entities. Detail projection service builds dependency graph from roster relationships, maps upstream/downstream directions. Thin route handler with `OpsErrorEnvelope` for 404/422/500. 72 new deterministic tests covering AC-10 through AC-17, AC-18–AC-25 (all 25 spec ACs now passing). Test suite: 197 passed (55 baseline + 70 trace + 72 detail), zero regressions. `AGENT_OPS_CONTRACT.md` §6 promoted from "reserved" to full contract with both trace and detail endpoint specifications. All PR-OPS-4 spec acceptance criteria (AC-1 through AC-25) verified ✅. No pipeline changes, no new persistence. PR-OPS-5 (frontend wiring) is next.
 
@@ -409,7 +417,7 @@ Reduce the architectural split between runtime lanes and address broader converg
 8. ~~TD-3 — packaging/import-path stability~~ — ✅ Complete (12 March 2026). 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added. Spec: `docs/specs/td3_packaging_import_stability.md`.
 9. ~~Cleanup tranche~~ — ✅ Complete (13 March 2026). Async markers cleaned, TD-5 enum centralisation resolved, TD-9 unused vars resolved, doc consolidation complete.
 10. ~~Runtime-hardening sequence~~ — ✅ Complete. Obs P2, TD-3, and cleanup tranche all closed.
-11. **UI implementation is now the active lane.** PR-UI-1 through PR-UI-6 and PR-OPS-1 through PR-OPS-3 are complete. **Phase 6 is complete.** PR-OPS-4a (agent-trace) and PR-OPS-4b (agent-detail) are complete. Next: **PR-OPS-5** (frontend Agent Ops wiring with trace + detail endpoints).
+11. **UI implementation is now the active lane.** PR-UI-1 through PR-UI-6 and PR-OPS-1 through PR-OPS-3 are complete. **Phase 6 is complete.** PR-OPS-4a (agent-trace), PR-OPS-4b (agent-detail), and PR-OPS-5 (frontend wiring 5a + 5b) are complete. Agent Ops read-side stack fully wired (63 tests).
 12. Core product workflow lane is now complete end-to-end: Triage Board → Journey Studio → Analysis Run → Journal & Review.
 13. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
 
