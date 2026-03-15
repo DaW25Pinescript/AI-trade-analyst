@@ -1826,17 +1826,25 @@ def main():
     parser.add_argument("--folder", "-f", help="Auto-discover files in folder")
     args = parser.parse_args()
 
-    # Auto-discovery mode
+    # Auto-discovery mode — RECURSIVE + skips archive (matches your server)
     if args.folder:
         folder = Path(args.folder)
-        progress_files = list(folder.glob("*Progress*.md")) + list(folder.glob("*progress*.md"))
-        spec_files = list(folder.glob("*SPEC*.md")) + list(folder.glob("*spec*.md"))
+        progress_files = [
+            f for f in folder.rglob("*Progress*.md") if "archive" not in str(f).lower()
+        ] + [
+            f for f in folder.rglob("*progress*.md") if "archive" not in str(f).lower()
+        ]
+        spec_files = [
+            f for f in folder.rglob("*SPEC*.md") if "archive" not in str(f).lower()
+        ] + [
+            f for f in folder.rglob("*spec*.md") if "archive" not in str(f).lower()
+        ]
         if not progress_files:
             print("No progress file found in folder")
             sys.exit(1)
         args.progress = str(progress_files[0])
         args.specs = [str(f) for f in spec_files]
-        print(f"Auto-discovered: progress={args.progress}, specs={[str(f) for f in spec_files]}")
+        print(f"Auto-discovered (recursive, archive skipped): {len(progress_files)} progress + {len(spec_files)} specs")
 
     if not args.progress:
         print("Please provide --progress or --folder")

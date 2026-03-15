@@ -1,11 +1,7 @@
 @echo off
 :: ============================================================
-::  AI Trade Analyst — Dashboard Launcher
-::  Drop this file + generate_dashboard.py + dashboard_server.py
-::  in your repo root. Double-click to launch.
-::
-::  The server recursively scans for *Progress*.md and *SPEC*.md
-::  files, excluding .git, node_modules, __pycache__, etc.
+::  AI Trade Analyst — Fancy Dashboard Launcher
+::  Double-click this to launch the beautiful live dashboard
 :: ============================================================
 
 title AI Trade Analyst Dashboard
@@ -15,7 +11,7 @@ cd /d "%~dp0"
 
 echo.
 echo  =============================================
-echo   AI Trade Analyst — Dashboard Server
+echo   AI Trade Analyst — Fancy Dashboard Server
 echo  =============================================
 echo.
 
@@ -29,15 +25,14 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo  Starting live dashboard server...
-echo  Scanning for progress and spec files...
+echo  Starting live fancy dashboard server...
+echo  (Auto-detects docs folder + generate_dashboard.py)
 echo.
 
-:: Start the server in the background, give it a moment to boot,
-:: then open the browser
-start /b python dashboard_server.py --folder . --port 9090
+:: Start the server (no --folder needed anymore)
+start /b python dashboard_server.py --port 9090
 
-:: Wait for the server to start before opening Chrome
+:: Wait for the server to start
 timeout /t 3 /nobreak >nul
 
 :: Open the dashboard in the default browser
@@ -45,11 +40,11 @@ start "" "http://localhost:9090"
 
 echo.
 echo  Dashboard is running at http://localhost:9090
+echo  Refresh the page = live update from your MD files
 echo  Close this window to stop the server.
 echo.
 
-:: Keep the window alive so the background server keeps running
-:: (Ctrl+C or closing the window will stop everything)
+:: Keep the window alive
 :loop
 timeout /t 60 /nobreak >nul
 goto loop
