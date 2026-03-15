@@ -3,7 +3,7 @@
 **Phase:** 7 (continued)
 **Lane:** Operator / Observability
 **Type:** Frontend-only
-**Status:** ⏳ Spec drafted — implementation pending
+**Status:** ✅ Complete (5a + 5b)
 **Date:** 2026-03-15
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Extends:** PR-OPS-3 (workspace shell), `docs/ui/AGENT_OPS_CONTRACT.md` (all four endpoints now contracted)
@@ -314,34 +314,34 @@ All TBC from diagnostic — workspace shell, adapter pattern, hook pattern, type
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-1 | Roster wiring | Org mode renders live roster hierarchy | ⏳ Pending |
-| AC-2 | Health wiring | Org/Health modes merge health data onto roster cards | ⏳ Pending |
-| AC-3 | Roster-health join | Unknown health IDs discarded; missing health renders without badges | ⏳ Pending |
-| AC-4 | Health degraded | Health failure → roster without badges + degraded banner | ⏳ Pending |
-| AC-5 | Roster blocking | Roster failure → workspace-level blocking error | ⏳ Pending |
-| AC-6 | Health mode active | Health mode enabled, elevates degraded/stale entities | ⏳ Pending |
-| AC-7 | Relationship rendering | Org/Health modes render roster relationship lines | ⏳ Pending |
-| AC-8 | Trace wiring | Run mode renders ordered stage timeline | ⏳ Pending |
-| AC-9 | Participant cards | Participants render status and available contribution fields (stance/confidence/contribution/override when present) | ⏳ Pending |
-| AC-10 | Trace edges | Trace edges with correct types | ⏳ Pending |
-| AC-11 | Arbiter summary | Arbiter panel with override details | ⏳ Pending |
-| AC-12 | Arbiter null | Null arbiter → panel hidden, no fabrication | ⏳ Pending |
-| AC-13 | Trace not found | Invalid run_id → "run not found" | ⏳ Pending |
-| AC-14 | Partial run | Partial → available stages + incomplete indicator | ⏳ Pending |
-| AC-15 | Run selector | Mechanism to select run_id — not hardcoded | ⏳ Pending |
-| AC-16 | Detail persona | Persona click → PersonaDetail fields | ⏳ Pending |
-| AC-17 | Detail officer | Officer click → OfficerDetail fields | ⏳ Pending |
-| AC-18 | Detail arbiter | Arbiter click → ArbiterDetail fields | ⏳ Pending |
-| AC-19 | Detail subsystem | Subsystem click → SubsystemDetail fields | ⏳ Pending |
-| AC-20 | Detail not found | Unknown entity_id → "entity not found" | ⏳ Pending |
-| AC-21 | Detail degradation | Health unavailable → degraded status, rest normal | ⏳ Pending |
-| AC-22 | data_state banners | Stale/unavailable renders appropriate banner | ⏳ Pending |
-| AC-23 | Error envelope | OpsErrorEnvelope parsed, not generic error | ⏳ Pending |
-| AC-24 | Typed adapters | Four adapters matching contract shapes | ⏳ Pending |
-| AC-25 | No backend changes | Zero backend modifications | ⏳ Pending |
-| AC-26 | Existing UI preserved | Phase 6 + PR-OPS-3 Org mode — zero regressions | ⏳ Pending |
-| AC-27 | Mode switching | Selection preserved unless invalid in new context | ⏳ Pending |
-| AC-28 | Build + typecheck | Build and typecheck pass | ⏳ Pending |
+| AC-1 | Roster wiring | Org mode renders live roster hierarchy | ✅ Done (5a) |
+| AC-2 | Health wiring | Org/Health modes merge health data onto roster cards | ✅ Done (5a) |
+| AC-3 | Roster-health join | Unknown health IDs discarded; missing health renders without badges | ✅ Done (5a) |
+| AC-4 | Health degraded | Health failure → roster without badges + degraded banner | ✅ Done (5a) |
+| AC-5 | Roster blocking | Roster failure → workspace-level blocking error | ✅ Done (5a) |
+| AC-6 | Health mode active | Health mode enabled, elevates degraded/stale entities | ✅ Done (5a) |
+| AC-7 | Relationship rendering | Org/Health modes render roster relationship lines | ✅ Done (5a) |
+| AC-8 | Trace wiring | Run mode renders ordered stage timeline | ✅ Done (5b) |
+| AC-9 | Participant cards | Participants render status and available contribution fields (stance/confidence/contribution/override when present) | ✅ Done (5b) |
+| AC-10 | Trace edges | Trace edges with correct types | ✅ Done (5b) |
+| AC-11 | Arbiter summary | Arbiter panel with override details | ✅ Done (5b) |
+| AC-12 | Arbiter null | Null arbiter → panel hidden, no fabrication | ✅ Done (5b) |
+| AC-13 | Trace not found | Invalid run_id → "run not found" | ✅ Done (5b) |
+| AC-14 | Partial run | Partial → available stages + incomplete indicator | ✅ Done (5b) |
+| AC-15 | Run selector | Mechanism to select run_id — not hardcoded | ✅ Done (5b) |
+| AC-16 | Detail persona | Persona click → PersonaDetail fields | ✅ Done (5b) |
+| AC-17 | Detail officer | Officer click → OfficerDetail fields | ✅ Done (5b) |
+| AC-18 | Detail arbiter | Arbiter click → ArbiterDetail fields | ✅ Done (5b) |
+| AC-19 | Detail subsystem | Subsystem click → SubsystemDetail fields | ✅ Done (5b) |
+| AC-20 | Detail not found | Unknown entity_id → "entity not found" | ✅ Done (5b) |
+| AC-21 | Detail degradation | Health unavailable → degraded status, rest normal | ✅ Done (5b) |
+| AC-22 | data_state banners | Stale/unavailable renders appropriate banner | ✅ Done (5a) |
+| AC-23 | Error envelope | OpsErrorEnvelope parsed, not generic error | ✅ Done (5a) |
+| AC-24 | Typed adapters | Four adapters matching contract shapes | ✅ Done (5a) |
+| AC-25 | No backend changes | Zero backend modifications | ✅ Done (5a+5b) |
+| AC-26 | Existing UI preserved | Phase 6 + PR-OPS-3 Org mode — zero regressions | ✅ Done (5a+5b) |
+| AC-27 | Mode switching | Selection preserved unless invalid in new context | ✅ Done (5a+5b) |
+| AC-28 | Build + typecheck | Build and typecheck pass | ✅ Done (5a+5b) |
 
 ---
 
@@ -438,14 +438,25 @@ PR-OPS-5 is done when: workspace renders live data from all four endpoints; Org 
 | Phase 6 | Core product lane | ✅ Done |
 | PR-OPS-4a | Backend: agent-trace | ✅ Done — 70 tests |
 | PR-OPS-4b | Backend: agent-detail | ✅ Done — 72 tests |
-| **PR-OPS-5a** | **Frontend: types + adapters + Health mode** | **⏳ Spec drafted** |
-| PR-OPS-5b | Frontend: Run mode + Detail sidebar | ⏳ Blocked on 5a |
+| **PR-OPS-5a** | **Frontend: types + adapters + Health mode** | **✅ Done — 39 tests** |
+| PR-OPS-5b | Frontend: Run mode + Detail sidebar | ⏳ Ready (5a landed) |
 
 ---
 
 ## 24. Diagnostic Findings
 
-*To be populated after running the diagnostic protocol (Section 19).*
+### Diagnostic Results (PR-OPS-5a, 2026-03-15)
+
+| Step | Finding |
+|------|---------|
+| 1. Workspace shell | `ui/src/workspaces/ops/` — `AgentOpsPage`, `OpsEntityCard`, `OpsSummaryBar`, `OpsDegradedBanner`, `OpsLayerSection`, `OpsDepartmentSection`, `OpsSelectedDetailPanel`. Mode pills existed with Run/Health disabled. |
+| 2. Phase 6 patterns | Adapters in `workspaces/*/adapters/`, hooks in `shared/hooks/`, API clients in `shared/api/`. TanStack Query. Path aliases: `@shared`, `@workspaces`. |
+| 3. Existing wiring | `useAgentRoster` and `useAgentHealth` hooks exist with real API fetch. Types in `shared/api/ops.ts`. Roster-health join implemented in `opsViewModel.ts`. |
+| 4. Test patterns | Vitest + RTL + jsdom. 23 ops tests passing pre-5a. Test file: `ui/tests/ops.test.tsx`. |
+| 5. API config | `apiFetch` wrapper in `shared/api/client.ts`. Same-origin via Vite proxy (`/ops` → `localhost:8000`). |
+| 6. Run context | No run_id integration available. `/ops` route has no run_id input. Run mode deferred to 5b. |
+| 7. Baseline | 23 ops tests passing. 238/243 total tests passing (5 pre-existing journey test failures unrelated). |
+| 8. Patch set | Extended `shared/api/ops.ts` with §6/§7 types + OpsErrorEnvelope. Created `useAgentTrace`/`useAgentDetail` hooks. Created `OpsDataStateBanner`. Activated Health mode pill. 39 ops tests post-5a. |
 
 ---
 

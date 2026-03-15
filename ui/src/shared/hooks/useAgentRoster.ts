@@ -9,6 +9,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   fetchAgentRoster,
+  parseOpsErrorEnvelope,
   type AgentRosterResponse,
 } from "@shared/api/ops";
 
@@ -21,10 +22,13 @@ export function useAgentRoster(): UseQueryResult<AgentRosterResponse, Error> {
     queryFn: async () => {
       const result = await fetchAgentRoster();
       if (!result.ok) {
+        const opsError = parseOpsErrorEnvelope(result.detail);
         throw new Error(
-          typeof result.detail === "string"
-            ? result.detail
-            : result.detail.message ?? `Roster fetch failed (${result.status})`,
+          opsError
+            ? opsError.message
+            : typeof result.detail === "string"
+              ? result.detail
+              : `Roster fetch failed (${result.status})`,
         );
       }
       return result.data;

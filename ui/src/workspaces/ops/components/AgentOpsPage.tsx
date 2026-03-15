@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // AgentOpsPage — Agent Operations workspace main page.
 //
-// Org / Structure mode: roster hierarchy + health overlay.
-// Answers: "Why should I trust this system right now?"
+// Modes: Org (structural view), Health (operator attention view),
+//        Run (trace-driven view for a selected run).
 //
 // State handling per AGENT_OPS_CONTRACT.md:
 //   - loading
@@ -21,16 +21,36 @@ import type { OpsEntityViewModel } from "../adapters/opsViewModel";
 import { OpsSummaryBar } from "./OpsSummaryBar";
 import { OpsLayerSection } from "./OpsLayerSection";
 import { OpsDepartmentSection } from "./OpsDepartmentSection";
-import { OpsSelectedDetailPanel } from "./OpsSelectedDetailPanel";
 import { OpsDegradedBanner } from "./OpsDegradedBanner";
+import { OpsDataStateBanner } from "./OpsDataStateBanner";
+import { RunSelector } from "./RunSelector";
+import { RunTracePanel } from "./RunTracePanel";
+import { AgentDetailSidebar } from "./AgentDetailSidebar";
 
 type OpsMode = "org" | "run" | "health";
+
+/** Sort entities to elevate non-healthy to the top for Health mode. */
+function elevateDegraded(entities: OpsEntityViewModel[]): OpsEntityViewModel[] {
+  const priority: Record<string, number> = {
+    unavailable: 0,
+    degraded: 1,
+    stale: 2,
+    recovered: 3,
+    live: 4,
+  };
+  return [...entities].sort((a, b) => {
+    const pa = a.hasHealth ? (priority[a.healthState ?? "live"] ?? 4) : -1;
+    const pb = b.hasHealth ? (priority[b.healthState ?? "live"] ?? 4) : -1;
+    return pa - pb;
+  });
+}
 
 export function AgentOpsPage() {
   const rosterQuery = useAgentRoster();
   const healthQuery = useAgentHealth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode] = useState<OpsMode>("org");
+  const [mode, setMode] = useState<OpsMode>("org");
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const vm = useMemo(
     () =>
@@ -52,16 +72,31 @@ export function AgentOpsPage() {
     ],
   );
 
-  // Find selected entity across all layers
-  const selectedEntity = useMemo((): OpsEntityViewModel | null => {
-    if (!selectedId) return null;
-    const all = [
-      ...vm.governanceLayer,
-      ...vm.officerLayer,
-      ...vm.departments.flatMap((d) => d.entities),
-    ];
-    return all.find((e) => e.id === selectedId) ?? null;
-  }, [selectedId, vm]);
+  // In Health mode, elevate degraded/stale/unavailable entities
+  const displayGovernance = useMemo(
+    () =>
+      mode === "health"
+        ? elevateDegraded(vm.governanceLayer)
+        : vm.governanceLayer,
+    [mode, vm.governanceLayer],
+  );
+  const displayOfficers = useMemo(
+    () =>
+      mode === "health"
+        ? elevateDegraded(vm.officerLayer)
+        : vm.officerLayer,
+    [mode, vm.officerLayer],
+  );
+  const displayDepartments = useMemo(
+    () =>
+      mode === "health"
+        ? vm.departments.map((d) => ({
+            ...d,
+            entities: elevateDegraded(d.entities),
+          }))
+        : vm.departments,
+    [mode, vm.departments],
+  );
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId((prev) => (prev === id ? null : id));
@@ -70,6 +105,25 @@ export function AgentOpsPage() {
   const handleCloseDetail = useCallback(() => {
     setSelectedId(null);
   }, []);
+
+  const handleModeChange = useCallback((newMode: OpsMode) => {
+    setMode(newMode);
+    // Selection preserved across mode switch per §7.4
+  }, []);
+
+  const handleSelectRun = useCallback((runId: string | null) => {
+    setSelectedRunId(runId);
+  }, []);
+
+  // Navigate to Run mode from detail sidebar's "last run" link
+  const handleNavigateToRun = useCallback((runId: string) => {
+    setSelectedRunId(runId);
+    setMode("run");
+  }, []);
+
+  // Determine whether to show the backend-backed detail sidebar
+  // In Org/Health modes with a selected entity, show the full detail sidebar
+  const showDetailSidebar = selectedId !== null && mode !== "run";
 
   return (
     <PanelShell>
@@ -83,6 +137,7 @@ export function AgentOpsPage() {
         <div className="flex items-center gap-1 rounded-lg border border-gray-700/50 bg-gray-900/40 p-1">
           <button
             type="button"
+            onClick={() => handleModeChange("org")}
             className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
               mode === "org"
                 ? "bg-cyan-900/40 text-cyan-300"
@@ -93,17 +148,23 @@ export function AgentOpsPage() {
           </button>
           <button
             type="button"
-            disabled
-            title="Requires run trace endpoint (Phase 7)"
-            className="rounded px-3 py-1 text-xs font-medium text-gray-600 cursor-not-allowed"
+            onClick={() => handleModeChange("run")}
+            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+              mode === "run"
+                ? "bg-cyan-900/40 text-cyan-300"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
           >
             Run
           </button>
           <button
             type="button"
-            disabled
-            title="Requires run trace endpoint (Phase 7)"
-            className="rounded px-3 py-1 text-xs font-medium text-gray-600 cursor-not-allowed"
+            onClick={() => handleModeChange("health")}
+            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+              mode === "health"
+                ? "bg-cyan-900/40 text-cyan-300"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
           >
             Health
           </button>
@@ -134,67 +195,122 @@ export function AgentOpsPage() {
         vm.condition === "degraded" ||
         vm.condition === "empty-health") && (
         <>
-          {/* Degraded banners */}
-          {vm.condition === "degraded" && (
+          {/* Degraded banners (Org/Health modes) */}
+          {mode !== "run" && vm.condition === "degraded" && (
             <OpsDegradedBanner variant="health-failed" />
           )}
-          {vm.condition === "empty-health" && (
+          {mode !== "run" && vm.condition === "empty-health" && (
             <OpsDegradedBanner variant="empty-health" />
           )}
 
-          {/* Summary / trust region */}
-          <OpsSummaryBar vm={vm} />
+          {/* data_state banners per §5.6 (Org/Health modes) */}
+          {mode !== "run" && vm.rosterDataState === "stale" && (
+            <OpsDataStateBanner source="Roster" state="stale" />
+          )}
+          {mode !== "run" && vm.healthDataState === "stale" && (
+            <OpsDataStateBanner source="Health" state="stale" />
+          )}
 
-          {/* Main content + optional detail panel */}
-          <div className="flex gap-4">
-            {/* Left: hierarchy */}
-            <div className="min-w-0 flex-1 space-y-6">
-              {/* Governance layer */}
-              <OpsLayerSection
-                title="Governance Layer"
-                entities={vm.governanceLayer}
-                selectedId={selectedId}
-                onSelect={handleSelect}
-              />
-
-              {/* Officer layer */}
-              <OpsLayerSection
-                title="Officer Layer"
-                entities={vm.officerLayer}
-                selectedId={selectedId}
-                onSelect={handleSelect}
-              />
-
-              {/* Department sections */}
-              {vm.departments.map((dept) => (
-                <OpsDepartmentSection
-                  key={dept.key}
-                  department={dept}
-                  selectedId={selectedId}
-                  onSelect={handleSelect}
-                />
-              ))}
+          {/* Health mode attention header */}
+          {mode === "health" && (
+            <div
+              className="flex items-center gap-2 rounded border border-cyan-800/40 bg-cyan-950/20 px-4 py-2"
+              data-testid="health-mode-header"
+            >
+              <span className="text-xs font-bold uppercase tracking-widest text-cyan-400">
+                Health Mode
+              </span>
+              <span className="text-xs text-cyan-600">
+                Degraded and stale entities elevated for operator attention
+              </span>
             </div>
+          )}
 
-            {/* Right: selected detail panel */}
-            {selectedEntity && (
-              <div className="hidden w-80 shrink-0 lg:block">
-                <OpsSelectedDetailPanel
-                  entity={selectedEntity}
-                  onClose={handleCloseDetail}
-                />
+          {/* Run mode */}
+          {mode === "run" && (
+            <div className="space-y-4" data-testid="run-mode-view">
+              <RunSelector
+                currentRunId={selectedRunId}
+                onSelectRun={handleSelectRun}
+              />
+              {selectedRunId ? (
+                <RunTracePanel runId={selectedRunId} />
+              ) : (
+                <div
+                  className="rounded-lg border border-gray-700/40 bg-gray-900/40 px-6 py-8 text-center"
+                  data-testid="run-mode-empty"
+                >
+                  <p className="text-sm text-gray-400">
+                    Enter a run ID to view the agent trace
+                  </p>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Paste a run ID from Journey Studio or Analysis workspace
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Org/Health mode content */}
+          {mode !== "run" && (
+            <>
+              {/* Summary / trust region */}
+              <OpsSummaryBar vm={vm} />
+
+              {/* Main content + optional detail panel */}
+              <div className="flex gap-4">
+                {/* Left: hierarchy */}
+                <div className="min-w-0 flex-1 space-y-6">
+                  {/* Governance layer */}
+                  <OpsLayerSection
+                    title="Governance Layer"
+                    entities={displayGovernance}
+                    selectedId={selectedId}
+                    onSelect={handleSelect}
+                  />
+
+                  {/* Officer layer */}
+                  <OpsLayerSection
+                    title="Officer Layer"
+                    entities={displayOfficers}
+                    selectedId={selectedId}
+                    onSelect={handleSelect}
+                  />
+
+                  {/* Department sections */}
+                  {displayDepartments.map((dept) => (
+                    <OpsDepartmentSection
+                      key={dept.key}
+                      department={dept}
+                      selectedId={selectedId}
+                      onSelect={handleSelect}
+                    />
+                  ))}
+                </div>
+
+                {/* Right: backend-backed detail sidebar */}
+                {showDetailSidebar && (
+                  <div className="hidden w-80 shrink-0 lg:block">
+                    <AgentDetailSidebar
+                      entityId={selectedId!}
+                      onClose={handleCloseDetail}
+                      onSelectRun={handleNavigateToRun}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Detail panel for small screens — below content */}
-          {selectedEntity && (
-            <div className="lg:hidden">
-              <OpsSelectedDetailPanel
-                entity={selectedEntity}
-                onClose={handleCloseDetail}
-              />
-            </div>
+              {/* Detail sidebar for small screens — below content */}
+              {showDetailSidebar && (
+                <div className="lg:hidden">
+                  <AgentDetailSidebar
+                    entityId={selectedId!}
+                    onClose={handleCloseDetail}
+                    onSelectRun={handleNavigateToRun}
+                  />
+                </div>
+              )}
+            </>
           )}
         </>
       )}
