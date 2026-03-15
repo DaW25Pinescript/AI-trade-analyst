@@ -55,7 +55,7 @@
 | Priority | Phase | Description | Status | Depends On |
 |----------|-------|-------------|--------|------------|
 | 1 | PR-RUN-1 | Run Browser endpoint + frontend — replace paste-field run selector | 📋 Planned | Phase 7 complete |
-| 2 | PR-CHART-1 | OHLCV data endpoint + candlestick chart component (lightweight-charts) | 📋 Planned | PR-RUN-1 |
+| 2 | PR-CHART-1 | OHLCV data-seam validation + basic candlestick chart (lightweight-charts, embedded in Run mode) | 📋 Planned | PR-RUN-1 |
 | 3 | PR-CHART-2 | Run context overlay + multi-timeframe chart support | 📋 Planned | PR-CHART-1 |
 | 4 | PR-REFLECT-1 | Persona performance + pattern summary aggregation endpoints | 📋 Planned | PR-RUN-1 + run history |
 | 5 | PR-REFLECT-2 | Reflective dashboard frontend — performance tables + anomaly highlighting | 📋 Planned | PR-REFLECT-1 |
@@ -329,10 +329,10 @@ From repo docs and current structure, the meaningful remaining work is concentra
 The production-readiness gate is **satisfied**. The UI documentation lane is complete. The runtime-hardening sequence is complete. The core product lane (Phase 6) and Agent Ops read-side stack (Phase 7) are both **complete and shipped**. 
 
 **Phase 8 direction: Charts + Reflective Intelligence.** Two capability tracks after a Run Browser foundation:
-1. **Live candlestick charts** — OHLCV data served from MDO pipeline, rendered via `lightweight-charts`, tied to run context
-2. **Reflective Intelligence v1** — persona performance aggregation, pattern summaries, rules-based parameter suggestions (human-governed, not auto-applied)
+1. **Live candlestick charts** — OHLCV data served from MDO pipeline, rendered via `lightweight-charts`, embedded in Run mode context (not a separate workspace)
+2. **Reflective Intelligence v1** — persona performance aggregation, pattern summaries, rules-based advisory-only suggestions (aggregation only, no ML, minimum 10 runs per bucket before showing stats)
 
-Both depend on run history volume. Run Browser (PR-RUN-1) ships first to enable run discovery and make it easy to generate and inspect runs. Full plan: `docs/PHASE_8_PLAN.md`.
+Both depend on run history volume. Run Browser (PR-RUN-1) ships first — header-only run index, bounded and paginated. Full plan: `docs/PHASE_8_PLAN.md`.
 
 ### Priority A — Observability Phase 2: Cross-Lane Runtime Visibility (✅ complete)
 

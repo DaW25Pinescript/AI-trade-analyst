@@ -8,6 +8,8 @@
 
 ## Strategic Direction
 
+**Prerequisite gate:** Phase 8 does not start until PR-OPS-5 is merged and the Phase 7 Agent Ops read-side stack is fully wired. This gate is satisfied as of 15 March 2026 (PR-OPS-5b shipped, 63 frontend tests, all 28 ACs verified).
+
 Two high-value capabilities, sequenced by dependency:
 
 1. **Live charts in the UI** — candlestick charts rendered in the browser, tied to analysis run context, with market data served from the existing MDO pipeline
@@ -25,10 +27,13 @@ Both need **run volume** to deliver value. The first week focuses on run browser
 
 **Scope:**
 - `GET /runs/` — backend endpoint listing available runs (paginated, sorted by date, filterable by instrument/session)
-- Source: scan `ai_analyst/output/runs/` directories, read `run_record.json` headers
-- Response: compact run summaries (run_id, instrument, session, status, timestamp, final_decision)
+- Source: scan `ai_analyst/output/runs/` directories, read `run_record.json` **headers only** (run_id, instrument, session, status, timestamp, final_decision)
+- Response: compact run summaries — no analyst detail, no arbiter detail, no artifact content
+- Bounded: default page size 20, max 50, no unbounded directory walking
 - Frontend: `RunBrowserPanel` replacing the paste-field run selector in Agent Ops Run mode
 - Run browser becomes the entry point for Run mode — click a run to load its trace
+
+**Scope lock:** This is a run index, not an artifact browser. Do not return analyst results, arbiter metadata, or artifact content in v1. The trace endpoint already handles that — the browser just helps you find the run_id.
 
 **Why first:** Every feature after this depends on being able to find and inspect runs. The paste field is a blocker for real usage. This also gives you a natural workflow: run an analysis → see it appear in the browser → inspect it.
 
@@ -40,19 +45,22 @@ Both need **run volume** to deliver value. The first week focuses on run browser
 
 **Goal:** Render live OHLCV candlestick charts in the UI, tied to run context.
 
-**PR-CHART-1 (Week 2): Chart data endpoint + basic chart component**
+**PR-CHART-1 (Week 2): Data-seam validation + basic chart component**
+
+This PR is primarily a **data access proof** — confirming that OHLCV data can be served from the MDO pipeline to a frontend chart without scheduler coupling. The chart component is secondary to proving the seam.
 
 Backend:
 - `GET /market-data/{instrument}/ohlcv` — serve OHLCV candle data from MDO's existing data pipeline
 - Parameters: instrument, timeframe, period (e.g. last 100 candles)
 - Source: read from MDO's existing data store (yFinance-backed SQLite or cached DataFrames — diagnostic to confirm)
 - Response: array of `{ timestamp, open, high, low, close, volume }` — lightweight, frontend-ready
+- **Data-seam validation:** If the OHLCV data is scheduler-bound or requires pipeline execution to access, this becomes the real blocker — flag immediately. The endpoint must read stored data, not trigger new fetches.
 
 Frontend:
 - Install `lightweight-charts` (TradingView's open-source charting library — MIT licensed, ~40KB, purpose-built for financial charts)
 - `CandlestickChart` component rendering OHLCV data
 - `useMarketData(instrument, timeframe)` hook
-- Chart appears in a new **Chart workspace** or as a panel within Analysis Run / Journey Studio (diagnostic to decide placement)
+- Chart renders as an **embedded panel in Run context** (not a separate workspace — see Chart Placement below)
 
 **PR-CHART-2 (Week 3): Run context overlay + multi-timeframe**
 
@@ -61,6 +69,10 @@ Frontend:
 - Run timestamp marker on the chart (vertical line showing when the analysis was done)
 - Analyst verdict overlay: simple annotations showing the final bias / decision at the run timestamp
 - Stage: do NOT attempt full indicator overlays yet — that's a future phase
+
+**Chart Placement Decision (LOCKED)**
+
+Charts embed as a panel within Run mode context — not as a separate `/chart` workspace. Rationale: charts are valuable when tied to a specific run's instrument, session, and timestamp. A standalone chart workspace would be disconnected from the run context that gives charts meaning. If a standalone chart surface is needed later, it can be extracted — but v1 embeds in run context.
 
 **Why this library:** lightweight-charts is maintained by TradingView, renders candlesticks natively, handles time-axis correctly, supports overlays and markers, and looks exactly like what a discretionary trader expects. It's 40KB, not a full TradingView embed.
 
@@ -87,6 +99,12 @@ Backend:
 
 **Design principle:** This is **aggregation, not ML.** The first slice computes statistics over existing structured artifacts. No model training, no embeddings, no inference. Pure read-side projection — same philosophy as Phase 7.
 
+**Reflective Layer Operating Rules (LOCKED for v1):**
+
+1. **Aggregation only.** v1 computes statistics (counts, percentages, distributions) over existing run artifacts. No ML models, no statistical inference, no embeddings.
+2. **Advisory only.** All suggestions are presented as operator guidance. No config mutation path exists in v1. The system never auto-modifies its own behavior.
+3. **Minimum threshold: 10 runs per instrument/session bucket** before surfacing any persona performance or pattern statistics. Below this threshold, show "insufficient run history" instead of potentially misleading stats. This threshold is a default — diagnostics may adjust it if 10 proves too high or too low, but the principle of "don't show stats from too-small samples" is locked.
+
 **PR-REFLECT-2 (Week 5): Reflective dashboard in the UI**
 
 Frontend:
@@ -107,7 +125,7 @@ Frontend:
 
 **Goal:** Connect the pieces and add the first suggestion capability.
 
-- Chart ↔ Run integration: viewing a run in Agent Ops shows the chart for that instrument/session
+- Chart ↔ Run integration: chart panel already embedded in Run mode (from PR-CHART-1/2) — ensure trace participant highlighting syncs with chart annotations
 - Reflect ↔ Agent Ops integration: persona performance cards link to Agent Ops entity detail
 - **Parameter suggestions v0:** simple rules-based suggestions derived from the aggregated data:
   - "Persona X was overridden in 7 of last 10 runs — consider reviewing its analysis focus"
@@ -157,23 +175,33 @@ Same philosophy as Phase 7 trace endpoints: read-side projection over existing r
 
 ### Progressive improvement path
 ```
-Week 4-5: Observe (aggregation, statistics, tables)
+Week 4-5: Observe    (aggregation only, minimum 10-run threshold)
     ↓
-Week 6: Suggest (rules-based, human-approved)
+Week 6:   Suggest    (rules-based, advisory-only, human-governed)
     ↓
-Future: Adapt (statistical models, bounded hypothesis generation)
+Future:   Adapt      (statistical models, bounded hypothesis generation)
     ↓
-Future: Refine (reversible policy changes with human approval gate)
+Future:   Refine     (reversible policy changes with human approval gate)
 ```
 
-Each step builds on the previous and requires human governance. The system never auto-modifies its own behavior.
+Each step builds on the previous and requires human governance. The system never auto-modifies its own behavior. The jump from Suggest → Adapt requires sufficient run volume and a deliberate decision to introduce statistical methods.
 
 ---
 
-## Open Questions for Diagnostic
+## Locked Decisions
 
-1. **MDO data access:** How is OHLCV data stored? Can a new endpoint read it without going through the scheduler?
-2. **Chart placement:** New `/chart` workspace, or embedded panel within Analysis Run / Journey Studio / Agent Ops?
-3. **Reflect placement:** New `/reflect` workspace, or tab within Agent Ops?
-4. **Run volume needed:** How many runs before reflective aggregation becomes meaningful? (Suggest: minimum 10 runs per instrument before showing performance stats)
-5. **Suggestion governance:** Should parameter suggestions require explicit "accept" before any config change, or are they always advisory-only in v1?
+| Decision | Resolution |
+|----------|-----------|
+| Prerequisite gate | Phase 8 does not start until PR-OPS-5 merged and Phase 7 fully wired (satisfied 15 March 2026) |
+| Run Browser scope | Header-only run index, not artifact browser. Paginated, bounded, default 20 / max 50 |
+| Chart placement | Embedded panel in Run mode context, not a separate workspace |
+| Chart data access | Read-side only — endpoint reads stored OHLCV data, does not trigger new fetches |
+| Reflective layer approach | Aggregation only in v1 — no ML, no inference, no embeddings |
+| Suggestion governance | Advisory only in v1 — no config mutation path, human decides |
+| Minimum run threshold | 10 runs per instrument/session bucket before showing reflective stats |
+
+## Remaining Diagnostic Questions
+
+1. **MDO data access format:** How is OHLCV data stored? SQLite, cached DataFrames, raw CSV? Can a new endpoint read it without going through the scheduler? (This is the biggest uncertainty in the chart lane)
+2. **Reflect placement:** New `/reflect` workspace, or tab within Agent Ops? (Lower stakes — either works for v1)
+3. **Run directory structure:** Confirm `ai_analyst/output/runs/` directory naming convention for the run browser scan
