@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Dashboard — AI-trade-analyst</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-card: #1e2130;
+  --bg-card-hover: #252840;
+  --border: #2a2d3e;
+  --text-primary: #e8eaf0;
+  --text-secondary: #8b8fa3;
+  --text-muted: #5a5e72;
+  --accent-teal: #2dd4bf;
+  --accent-teal-dim: rgba(45,212,191,0.15);
+  --accent-green: #4ade80;
+  --accent-green-dim: rgba(74,222,128,0.15);
+  --accent-amber: #fbbf24;
+  --accent-amber-dim: rgba(251,191,36,0.15);
+  --accent-red: #f87171;
+  --accent-red-dim: rgba(248,113,113,0.15);
+  --accent-blue: #60a5fa;
+  --accent-blue-dim: rgba(96,165,250,0.15);
+  --accent-purple: #a78bfa;
+  --accent-purple-dim: rgba(167,139,250,0.15);
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* Enhanced Timeline Progress Hero */
+.timeline-hero {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  margin-bottom: 32px;
+  position: relative;
+  overflow: hidden;
+}
+.timeline-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at 20% 50%, rgba(45,212,191,0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+.hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+  position: relative;
+  z-index: 1;
+}
+.hero-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+.hero-badge {
+  display: flex;
+  gap: 8px;
+}
+.badge-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
+  border: 1px solid rgba(45,212,191,0.3);
+}
+.badge-sm {
+  padding: 3px 8px;
+  font-size: 9px;
+}
+.stat-right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.stat-badges {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.progress-track {
+  position: relative;
+  margin-bottom: 24px;
+}
+.progress-rail {
+  height: 20px;
+  background: var(--bg-primary);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2dd4bf 0%, #00FFAA 50%, #4ade80 100%);
+  border-radius: 10px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 20px rgba(45,212,191,0.5), 0 4px 12px rgba(0,255,170,0.3);
+  animation: shimmer-sweep 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes shimmer-sweep {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.progress-now {
+  position: absolute;
+  top: -8px;
+  width: 3px;
+  height: 36px;
+  background: #00FFAA;
+  border-radius: 2px;
+  box-shadow: 0 0 16px rgba(0,255,170,0.8), 0 0 32px rgba(0,255,170,0.4);
+  animation: pulse-now 2s ease-in-out infinite;
+  z-index: 5;
+  transition: left 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes pulse-now {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(0,255,170,0.8), 0 0 32px rgba(0,255,170,0.4);
+    transform: scaleY(1);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(0,255,170,0.95), 0 0 48px rgba(0,255,170,0.6);
+    transform: scaleY(1.1);
+  }
+}
+.progress-tooltip {
+  position: absolute;
+  top: -8px;
+  left: 89%;
+  transform: translateX(-50%) translateY(-100%);
+  background: #1a1d27;
+  border: 1px solid rgba(45,212,191,0.4);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 10px;
+  color: var(--accent-teal);
+  white-space: nowrap;
+  z-index: 6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  font-weight: 600;
+}
+.progress-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: var(--arrow-left, 50%);
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #1a1d27;
+}
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.phase-group-labels {
+  position: relative;
+  height: 20px;
+  margin-bottom: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.phase-group-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.task-slots-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.task-slots-track {
+  display: flex;
+  position: relative;
+  height: 6px;
+  background: var(--bg-primary);
+  border-radius: 3px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.task-slot {
+  position: absolute;
+  height: 100%;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+.task-slot.complete {
+  background: #4ade80;
+}
+.task-slot.active {
+  background: #2dd4bf;
+  animation: pulse-active 1.5s ease-in-out infinite;
+}
+@keyframes pulse-active {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.task-slot.next {
+  background: #fbbf24;
+}
+.task-slot.pending {
+  background: #5a5e72;
+}
+.milestone-dots {
+  display: none;
+}
+.milestone-dot {
+  display: none;
+}
+.phase-markers {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 8px;
+}
+.phase-marker {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+  flex: 1;
+}
+.hero-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.stat-number {
+  font-size: 72px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  background: linear-gradient(135deg, #2dd4bf, #00FFAA, #4ade80);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  line-height: 1;
+  filter: drop-shadow(0 0 20px rgba(45,212,191,0.6));
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+.stat-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+.refresh-indicator {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, #12141e 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 24px 32px;
+}
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.project-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+.project-meta {
+  display: flex;
+  gap: 24px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.project-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.meta-label { color: var(--text-muted); }
+.header-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.status-pill {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.pill-active { background: var(--accent-teal-dim); color: var(--accent-teal); }
+.pill-info { background: var(--accent-blue-dim); color: var(--accent-blue); }
+
+/* Layout */
+.dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+/* Summary Cards Row */
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+.summary-card:hover {
+  border-color: var(--accent-teal);
+  background: var(--bg-card-hover);
+}
+.summary-value {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  transition: all 0.6s ease;
+}
+.summary-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.summary-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.val-teal { color: var(--accent-teal); }
+.val-green { color: var(--accent-green); }
+.val-amber { color: var(--accent-amber); }
+.val-blue { color: var(--accent-blue); }
+.val-purple { color: var(--accent-purple); }
+
+/* Sections */
+.section {
+  margin-bottom: 32px;
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* Phase Timeline */
+.timeline {
+  position: relative;
+}
+.timeline-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.phase-chip {
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: default;
+  transition: all 0.2s;
+  position: relative;
+}
+.phase-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.phase-chip .chip-tests {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+.chip-complete { background: var(--accent-green-dim); color: var(--accent-green); border-color: rgba(74,222,128,0.2); }
+.chip-active { background: var(--accent-teal-dim); color: var(--accent-teal); border-color: rgba(45,212,191,0.3); animation: pulse-border 2s infinite; }
+.chip-next { background: var(--accent-amber-dim); color: var(--accent-amber); border-color: rgba(251,191,36,0.2); }
+.chip-pending { background: var(--bg-secondary); color: var(--text-muted); border-color: var(--border); }
+.chip-parked { background: var(--bg-secondary); color: var(--text-muted); border-color: var(--border); opacity: 0.5; }
+.chip-blocked { background: var(--accent-red-dim); color: var(--accent-red); border-color: rgba(248,113,113,0.2); }
+
+@keyframes pulse-border {
+  0%, 100% { border-color: rgba(45,212,191,0.3); }
+  50% { border-color: rgba(45,212,191,0.7); }
+}
+
+/* Tooltip */
+.tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2a2d40;
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  z-index: 10;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  pointer-events: none;
+}
+.phase-chip:hover .tooltip { display: block; }
+
+/* Spec Cards */
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 16px;
+}
+.spec-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+.spec-card:hover { border-color: var(--accent-teal); }
+.spec-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.spec-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.spec-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.spec-progress {
+  margin: 12px 0;
+}
+.spec-progress-bar {
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+.spec-progress-fill {
+  height: 100%;
+  transition: width 0.6s ease;
+}
+.fill-passed { background: var(--accent-green); }
+.fill-pending { background: var(--accent-amber); opacity: 0.4; }
+.spec-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.ac-list {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.ac-list.expanded {
+  max-height: 2000px;
+}
+.ac-toggle {
+  font-size: 12px;
+  color: var(--accent-teal);
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 4px 0;
+  margin-top: 8px;
+}
+.ac-toggle:hover { text-decoration: underline; }
+.ac-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(42,45,62,0.5);
+  font-size: 12px;
+}
+.ac-item:last-child { border-bottom: none; }
+.ac-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.dot-passed { background: var(--accent-green); }
+.dot-pending { background: var(--accent-amber); }
+.dot-failed { background: var(--accent-red); }
+.ac-id { color: var(--text-muted); font-weight: 600; min-width: 50px; }
+.ac-text { color: var(--text-secondary); }
+
+/* Tech Debt */
+.debt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+.debt-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.debt-resolved { opacity: 0.5; }
+.debt-resolved .debt-name { text-decoration: line-through; }
+.debt-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.debt-icon-resolved { background: var(--accent-green-dim); }
+.debt-icon-open { background: var(--accent-amber-dim); }
+.debt-name { font-weight: 600; color: var(--text-primary); }
+.debt-detail { color: var(--text-secondary); font-size: 11px; }
+
+/* Test Chart */
+.test-chart-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 180px;
+  padding: 0 8px;
+}
+.chart-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+.chart-bar {
+  width: 100%;
+  max-width: 40px;
+  background: linear-gradient(180deg, var(--accent-teal), rgba(45,212,191,0.4));
+  border-radius: 4px 4px 0 0;
+  transition: height 0.6s ease;
+  cursor: default;
+  position: relative;
+  min-height: 2px;
+}
+.chart-bar:hover {
+  background: linear-gradient(180deg, var(--accent-teal), rgba(45,212,191,0.7));
+}
+.chart-bar-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  text-align: center;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  max-height: 80px;
+  overflow: hidden;
+}
+.chart-bar-value {
+  font-size: 10px;
+  color: var(--accent-teal);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+/* Risks */
+.risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.risk-item {
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-amber);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.risk-name { font-weight: 600; color: var(--accent-amber); }
+.risk-detail { color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
+
+/* Activity Feed */
+.activity-feed {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.activity-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  align-items: flex-start;
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-date {
+  color: var(--text-muted);
+  font-size: 11px;
+  min-width: 85px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.activity-phase {
+  color: var(--accent-teal);
+  font-weight: 700;
+  min-width: 100px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.activity-text {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Roadmap */
+.roadmap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.roadmap-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+.roadmap-item:hover {
+  border-color: var(--accent-teal);
+  background: var(--bg-card-hover);
+}
+.roadmap-item.concept {
+  opacity: 0.6;
+  border-style: dashed;
+}
+.roadmap-priority {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.roadmap-priority.planned {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
+}
+.roadmap-priority.concept {
+  background: var(--accent-purple-dim);
+  color: var(--accent-purple);
+}
+.roadmap-name { font-weight: 600; color: var(--text-primary); }
+.roadmap-desc { color: var(--text-secondary); font-size: 12px; }
+.roadmap-dep {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* Phase Lane — Previous / Current / Next */
+.phase-lane {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.lane-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+.lane-card:hover {
+  border-color: var(--border);
+  background: var(--bg-card-hover);
+}
+.lane-card.lane-current {
+  border-color: var(--accent-teal);
+  box-shadow: 0 0 20px rgba(45,212,191,0.08);
+}
+.lane-card.lane-current:hover {
+  border-color: var(--accent-teal);
+}
+.lane-card.lane-next {
+  border-color: rgba(251,191,36,0.3);
+}
+.lane-card.lane-next:hover {
+  border-color: rgba(251,191,36,0.5);
+}
+.lane-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.lane-tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.tag-prev {
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
+}
+.tag-curr {
+  background: var(--accent-teal-dim);
+  color: var(--accent-teal);
+}
+.tag-next {
+  background: var(--accent-amber-dim);
+  color: var(--accent-amber);
+}
+.lane-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.lane-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.lane-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 18px;
+  position: absolute;
+  right: -13px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  background: var(--bg-primary);
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+@media (max-width: 768px) {
+  .phase-lane { grid-template-columns: 1fr; }
+  .lane-arrow { display: none; }
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-muted);
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header { padding: 16px; }
+  .dashboard { padding: 16px; }
+  .summary-row { grid-template-columns: repeat(2, 1fr); }
+  .spec-grid { grid-template-columns: 1fr; }
+  .project-meta { flex-wrap: wrap; gap: 12px; }
+  .header-top { flex-direction: column; gap: 12px; }
+  .timeline-hero { padding: 24px; }
+  .hero-stats { flex-direction: column; gap: 16px; align-items: flex-start; }
+  .stat-number { font-size: 40px; }
+}
+
+/* Tab system */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+.tab {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text-primary); }
+.tab.active {
+  color: var(--accent-teal);
+  border-bottom-color: var(--accent-teal);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="project-title">Ai Trade Analyst</div>
+      <div class="project-meta">
+        <span><span class="meta-label">Repo:</span> github.com/DaW25Pinescript/AI-trade-analyst</span>
+        <span><span class="meta-label">Updated:</span> 15 March 2026</span>
+        <span><span class="meta-label">Horizon:</span> Next 6–8 weeks</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard">
+
+  <!-- PROJECT TIMELINE PROGRESS Hero Section -->
+  <div class="timeline-hero" id="timeline-hero">
+    <div class="hero-header">
+      <div class="hero-title">PROJECT TIMELINE PROGRESS</div>
+    </div>
+
+    <div class="progress-track">
+      <div class="progress-labels">
+        <span>PROJECT START</span>
+        <span>PROJECT END</span>
+      </div>
+      <div class="phase-group-labels" id="phase-group-labels"></div>
+      <div class="progress-rail">
+        <div class="progress-fill" id="progress-fill" style="width: 89%"></div>
+      </div>
+      <div class="progress-now" id="progress-now" style="left: 89%"></div>
+      <div class="progress-tooltip" id="progress-tooltip">Phase 6 — Complete (Journey Studio ✅, Analysis Run ✅, Journal & Review ✅)</div>
+
+      <div class="task-slots-label">Dynamic Task Slots</div>
+      <div class="task-slots-track" id="task-slots-track"></div>
+
+      <div class="milestone-dots" id="milestone-dots"></div>
+
+      <div class="phase-markers" id="phase-markers"></div>
+    </div>
+
+    <div class="hero-stats">
+      <div>
+        <div class="stat-number" id="stat-number">89%</div>
+        <div class="stat-sub" id="stat-sub">32 of 36 phases</div>
+      </div>
+      <div class="stat-right">
+        <div class="stat-badges">
+          <div class="badge-pill badge-sm">DYNAMIC</div>
+          <div class="badge-pill badge-sm">REAL-TIME</div>
+        </div>
+        <div class="stat-label">Live-updating from progress file</div>
+        <div class="refresh-indicator" id="refresh-indicator">Last updated: now</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-row">
+    <div class="summary-card">
+      <div class="summary-value val-teal" id="card-completion">89%</div>
+      <div class="summary-label">Phases Complete</div>
+      <div class="summary-sub" id="card-completion-sub">32 of 36 phases</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-value val-green" id="card-debt">58%</div>
+      <div class="summary-label">Tech Debt Resolved</div>
+      <div class="summary-sub" id="card-debt-sub">7 of 12 items</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-value val-blue" id="card-ac">0%</div>
+      <div class="summary-label">Acceptance Criteria</div>
+      <div class="summary-sub" id="card-ac-sub">0 of 53 passing</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-value val-purple" id="card-tests">668</div>
+      <div class="summary-label">Latest Test Count</div>
+      <div class="summary-sub">Ops suite milestone</div>
+    </div>
+  </div>
+
+  <!-- Phase Lane: Previous → Current → Next -->
+  <div class="section">
+    <div class="phase-lane">
+      <div class="lane-card">
+        <div class="lane-tag tag-prev">COMPLETED</div>
+        <div class="lane-name">Phase 0 — UI Re-Entry Governance</div>
+        <div class="lane-desc">Governance unlock — progress hub + design note + phase plan</div>
+        <div class="lane-arrow">&#9654;</div>
+      </div>
+      <div class="lane-card lane-current">
+        <div class="lane-tag tag-curr">ACTIVE NOW</div>
+        <div class="lane-name">UI Phase 3A Impl</div>
+        <div class="lane-desc">First UI implementation slice — Triage Board first (React + TypeScript + Tailwind)</div>
+        <div class="lane-arrow">&#9654;</div>
+      </div>
+      <div class="lane-card lane-next">
+        <div class="lane-tag tag-next">UP NEXT</div>
+        <div class="lane-name">Phase 4 — Agent Ops Backend (PR-OPS-2)</div>
+        <div class="lane-desc">Backend implementation — roster + health endpoints</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('phases')">Phases</button>
+    <button class="tab" onclick="switchTab('activity')">Activity</button>
+    <button class="tab" onclick="switchTab('roadmap')">Roadmap</button>
+    <button class="tab" onclick="switchTab('specs')">Specs & ACs</button>
+    <button class="tab" onclick="switchTab('tests')">Test Progression</button>
+    <button class="tab" onclick="switchTab('debt')">Tech Debt</button>
+    <button class="tab" onclick="switchTab('risks')">Risks</button>
+  </div>
+
+  <!-- Phases Tab -->
+  <div id="tab-phases" class="tab-panel active">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Phase Roadmap</div>
+        <span class="section-badge pill-info">36 phases</span>
+      </div>
+      <div class="timeline">
+        <div class="timeline-track" id="phase-track"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity Tab -->
+  <div id="tab-activity" class="tab-panel">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Recent Activity</div>
+        <span class="section-badge pill-info">17 entries</span>
+      </div>
+      <div class="activity-feed" id="activity-feed"></div>
+    </div>
+  </div>
+
+  <!-- Roadmap Tab -->
+  <div id="tab-roadmap" class="tab-panel">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Roadmap & Future Phases</div>
+        <span class="section-badge pill-info">7 items</span>
+      </div>
+      <div class="roadmap-list" id="roadmap-list"></div>
+    </div>
+  </div>
+
+  <!-- Specs Tab -->
+  <div id="tab-specs" class="tab-panel">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Spec Files & Acceptance Criteria</div>
+        <span class="section-badge pill-info">53 ACs</span>
+      </div>
+      <div class="spec-grid" id="spec-grid"></div>
+    </div>
+  </div>
+
+  <!-- Tests Tab -->
+  <div id="tab-tests" class="tab-panel">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Test Count Progression</div>
+      </div>
+      <div class="test-chart-container">
+        <div class="chart-bars" id="test-chart"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debt Tab -->
+  <div id="tab-debt" class="tab-panel">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Technical Debt Register</div>
+        <span class="section-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">7/12 resolved</span>
+      </div>
+      <div class="debt-grid" id="debt-grid"></div>
+    </div>
+  </div>
+
+  <!-- Risks Tab -->
+  <div id="tab-risks" class="tab-panel">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">Active Risks</div>
+      </div>
+      <div class="risk-list" id="risk-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Generated 2026-03-15 16:27 &middot; Project Dashboard Generator v1.0
+</div>
+
+<script>
+const phases = [{"name": "Phase A", "description": "Single analyst smoke path", "status": "complete", "tests": null, "date": null, "order": 0}, {"name": "Phase B", "description": "Central provider/model config", "status": "complete", "tests": null, "date": null, "order": 1}, {"name": "Phase C", "description": "Quorum/degraded failure handling", "status": "complete", "tests": null, "date": null, "order": 2}, {"name": "Phase D", "description": "V1.1 snapshot integrity patch (H-1 \u2192 H-4)", "status": "complete", "tests": null, "date": null, "order": 3}, {"name": "Phase 1A", "description": "Market Data Officer \u2014 EURUSD baseline spine", "status": "complete", "tests": null, "date": null, "order": 4}, {"name": "Phase 1B", "description": "Market Data Officer \u2014 XAUUSD spine (15m, 1h, 4h, 1d)", "status": "complete", "tests": null, "date": null, "order": 5}, {"name": "Phase E+", "description": "Additional instruments, provider abstraction", "status": "complete", "tests": null, "date": null, "order": 6}, {"name": "Instrument Promotion", "description": "GBPUSD/XAGUSD/XPTUSD \u2192 trusted \u2014 419/419 tests", "status": "complete", "tests": null, "date": null, "order": 7}, {"name": "Per-Instrument Provider Routing", "description": "Explicit per-instrument provider policy \u2014 468/468 tests", "status": "complete", "tests": null, "date": null, "order": 8}, {"name": "Operationalise Phase 1", "description": "APScheduler feed refresh \u2014 494/494 tests", "status": "complete", "tests": null, "date": null, "order": 9}, {"name": "Operationalise Phase 2", "description": "Market-hours awareness, alerting, runtime posture \u2014 644/644 tests", "status": "complete", "tests": null, "date": null, "order": 10}, {"name": "TD-1 Micro-PR", "description": "Arbiter assert fix \u2014 explicit persona contract enforcement \u2014 645 tests", "status": "complete", "tests": null, "date": null, "order": 11}, {"name": "Security/API Hardening", "description": "Auth gate, graph + LLM timeouts, error contracts, body limits, TD-2 closure \u2014 677 tests", "status": "complete", "tests": null, "date": null, "order": 12}, {"name": "CI Seam Hardening", "description": "CI-gate MDO + root Python seams, stream event semantics \u2014 1743 tests across 5 CI jobs", "status": "complete", "tests": null, "date": null, "order": 13}, {"name": "LLM Routing Centralisation", "description": "Single-source routing via ResolvedRoute contract, 13 bypass removals, 27 new tests \u2014 643 tests", "status": "complete", "tests": null, "date": null, "order": 14}, {"name": "Observability Phase 1", "description": "Analyst pipeline run visibility \u2014 run_record.json + stdout summary \u2014 668 tests", "status": "complete", "tests": null, "date": null, "order": 15}, {"name": "UI Phase 1", "description": "Backend Capability Audit \u2014 `docs/ui/UI_BACKEND_AUDIT.md`", "status": "complete", "tests": null, "date": null, "order": 16}, {"name": "UI Phase 2", "description": "UI Contract \u2014 canonical frontend handoff / run-state + error semantics", "status": "complete", "tests": null, "date": null, "order": 17}, {"name": "UI Phase 3A", "description": "Workspace Blueprint + Visual Design \u2014 wireframes, component system, design notes, visual appendix", "status": "complete", "tests": null, "date": null, "order": 18}, {"name": "Phase 0 \u2014 UI Re-Entry Governance", "description": "Governance unlock \u2014 progress hub + design note + phase plan", "status": "complete", "tests": null, "date": null, "order": 19}, {"name": "UI Phase 3A Impl", "description": "First UI implementation slice \u2014 Triage Board first (React + TypeScript + Tailwind)", "status": "active", "tests": null, "date": null, "order": 20}, {"name": "Phase 1 \u2014 React App Shell + Triage Route", "description": "React app shell + routing + typed fetch \u2014 build clean, typecheck clean, 5 smoke tests", "status": "complete", "tests": null, "date": null, "order": 21}, {"name": "Phase 2 \u2014 Triage Board MVP", "description": "Real triage data + shared components + trust strip \u2014 build clean, typecheck clean, 30 tests", "status": "complete", "tests": null, "date": null, "order": 22}, {"name": "Phase 3 \u2014 Shared Component Extraction", "description": "Barrel exports, typed props, generic EntityRowCard, hook ownership, 36 component tests, shared README \u2014 66 tests", "status": "complete", "tests": null, "date": null, "order": 23}, {"name": "Phase 4 \u2014 Agent Ops Contract (PR-OPS-1)", "description": "Endpoint contract spec for /ops/agent-roster and /ops/agent-health \u2014 zero code changes", "status": "complete", "tests": null, "date": null, "order": 24}, {"name": "Phase 5 \u2014 Journey Studio MVP (PR-UI-4)", "description": "Journey Studio workspace \u2014 staged flow, freeze lifecycle, bootstrap context, 43 tests \u2014 132 tests", "status": "complete", "tests": null, "date": null, "order": 25}, {"name": "Phase 6a \u2014 Analysis Run MVP (PR-UI-5)", "description": "Analysis Run workspace \u2014 multipart /analyse, run lifecycle state machine, tab persistence, 69 tests \u2014 201 tests", "status": "complete", "tests": null, "date": null, "order": 26}, {"name": "Phase 6b \u2014 Journal & Review MVP (PR-UI-6)", "description": "Journal & Review workspace \u2014 decision readback, review toggle, outcome coverage, 42 tests \u2014 243 tests", "status": "complete", "tests": null, "date": null, "order": 27}, {"name": "Phase 4 \u2014 Agent Ops Backend (PR-OPS-2)", "description": "Backend implementation \u2014 roster + health endpoints", "status": "next", "tests": null, "date": null, "order": 28}, {"name": "UI Phase 3B", "description": "Backend capability exposure \u2014 Feeder, Ops, Analytics, optional streaming", "status": "parked", "tests": null, "date": null, "order": 29}, {"name": "Observability Phase 2", "description": "Cross-lane runtime visibility \u2014 structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories", "status": "complete", "tests": null, "date": null, "order": 30}, {"name": "TD-3", "description": "Packaging/import-path stability \u2014 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added \u2014 1603 tests", "status": "complete", "tests": null, "date": null, "order": 31}, {"name": "Cleanup Tranche", "description": "Async markers, doc consolidation, TD-5/TD-9 micro-PRs", "status": "complete", "tests": null, "date": null, "order": 32}, {"name": "Doc Consolidation (PR-4)", "description": "Consolidate status tracking around canonical progress hub \u2014 README de-conflict, architecture de-conflict, UI lane framing, historical placement hygiene", "status": "complete", "tests": null, "date": null, "order": 33}, {"name": "Tidy", "description": "Async marker cleanup (8 files)", "status": "complete", "tests": null, "date": null, "order": 34}, {"name": "Config", "description": "jCodeMunch API key config (Anthropic + GitHub PAT)", "status": "pending", "tests": null, "date": null, "order": 35}];
+const specs = [{"name": "PR_OPS_4_SPEC_FINAL", "title": "PR-OPS-4 \u2014 Agent Ops Trace + Detail Backend", "phase": "7", "status": "pending", "date": "2026-03-14", "acceptance_criteria": [{"id": "AC-1", "gate": "Trace shape", "condition": "`/runs/{run_id}/agent-trace` returns a valid `AgentTraceResponse` with all required fields", "status": "pending"}, {"id": "AC-2", "gate": "Trace ordering", "condition": "`stages` array is returned in ascending `stage_index` order", "status": "pending"}, {"id": "AC-3", "gate": "Trace participant join", "condition": "Every `entity_id` in `participants` maps to a valid roster `id`", "status": "pending"}, {"id": "AC-4", "gate": "Trace edges", "condition": "Every `from` and `to` in `trace_edges` maps to a valid roster `id`", "status": "pending"}, {"id": "AC-5", "gate": "Trace arbiter null", "condition": "`arbiter_summary` is `null` when run did not reach arbiter stage", "status": "pending"}, {"id": "AC-6", "gate": "Trace run not found", "condition": "Missing `run_id` returns 404 with `RUN_NOT_FOUND` error envelope", "status": "pending"}, {"id": "AC-7", "gate": "Trace bounded payload", "condition": "`contribution.summary` \u2264 500 chars, `override_reason` \u2264 300 chars \u2014 truncation proven by test", "status": "pending"}, {"id": "AC-8", "gate": "Trace summary block", "condition": "`summary` block contains valid `entity_count`, `stage_count`, `arbiter_override`", "status": "pending"}, {"id": "AC-9", "gate": "Trace artifact refs", "condition": "`artifact_refs` array present with valid `artifact_type` and `artifact_key`", "status": "pending"}, {"id": "AC-10", "gate": "Detail shape (persona)", "condition": "`/ops/agent-detail/{entity_id}` returns valid response with `PersonaDetail` variant", "status": "pending"}, {"id": "AC-11", "gate": "Detail shape (officer)", "condition": "Same endpoint returns valid response with `OfficerDetail` variant", "status": "pending"}, {"id": "AC-12", "gate": "Detail shape (arbiter)", "condition": "Same endpoint returns valid response with `ArbiterDetail` variant", "status": "pending"}, {"id": "AC-13", "gate": "Detail shape (subsystem)", "condition": "Same endpoint returns valid response with `SubsystemDetail` variant", "status": "pending"}, {"id": "AC-14", "gate": "Detail not found", "condition": "Unknown `entity_id` returns 404 with `ENTITY_NOT_FOUND` error envelope", "status": "pending"}, {"id": "AC-15", "gate": "Detail bounded payload", "condition": "`purpose` \u2264 500 chars, `RecentParticipation` array \u2264 5 entries \u2014 proven by test", "status": "pending"}, {"id": "AC-16", "gate": "Detail graceful degradation", "condition": "Health source unavailable \u2192 endpoint still returns with degraded `data_state`, not 500", "status": "pending"}, {"id": "AC-17", "gate": "Detail recent_warnings", "condition": "`recent_warnings` is a typed array, not freeform prose", "status": "pending"}, {"id": "AC-18", "gate": "ResponseMeta consistency", "condition": "Both endpoints include valid `ResponseMeta` with correct `version`, `generated_at`, `data_state`", "status": "pending"}, {"id": "AC-19", "gate": "Error envelope", "condition": "All HTTP errors from both endpoints use `OpsErrorEnvelope` \u2014 no freeform string `detail`", "status": "pending"}, {"id": "AC-20", "gate": "No raw dumps (negative)", "condition": "Neither endpoint returns raw prompt text, full LLM transcripts, or unbounded blobs \u2014 proven by content-length or field absence test", "status": "pending"}, {"id": "AC-21", "gate": "Existing endpoints unchanged", "condition": "PR-OPS-2 roster and health endpoint tests still pass \u2014 zero regressions", "status": "pending"}, {"id": "AC-22", "gate": "No new persistence", "condition": "No SQLite, no new database, no new file-write operations \u2014 read-side projection only", "status": "pending"}, {"id": "AC-23", "gate": "Contract doc updated", "condition": "`AGENT_OPS_CONTRACT.md` \u00a76 promoted from \"reserved\" to full contract \u2014 shapes match implementation", "status": "pending"}, {"id": "AC-24", "gate": "Envelope consistency", "condition": "Both new endpoints use flat `ResponseMeta & {}` pattern matching PR-OPS-2 \u2014 no `data`/`meta` wrapper", "status": "pending"}, {"id": "AC-25", "gate": "ID convention consistency", "condition": "Both new endpoints use existing roster/health `entity_id` convention \u2014 no namespaced ID migration", "status": "pending"}], "total_ac": 25, "passed_ac": 0, "pending_ac": 25}, {"name": "PR_OPS_5_SPEC", "title": "PR-OPS-5 \u2014 Agent Ops Frontend Wiring (Run Mode + Health Mode + Detail Sidebar)", "phase": "7 (continued)", "status": "pending", "date": "2026-03-15", "acceptance_criteria": [{"id": "AC-1", "gate": "Roster wiring", "condition": "Org mode renders live roster hierarchy", "status": "pending"}, {"id": "AC-2", "gate": "Health wiring", "condition": "Org/Health modes merge health data onto roster cards", "status": "pending"}, {"id": "AC-3", "gate": "Roster-health join", "condition": "Unknown health IDs discarded; missing health renders without badges", "status": "pending"}, {"id": "AC-4", "gate": "Health degraded", "condition": "Health failure \u2192 roster without badges + degraded banner", "status": "pending"}, {"id": "AC-5", "gate": "Roster blocking", "condition": "Roster failure \u2192 workspace-level blocking error", "status": "pending"}, {"id": "AC-6", "gate": "Health mode active", "condition": "Health mode enabled, elevates degraded/stale entities", "status": "pending"}, {"id": "AC-7", "gate": "Relationship rendering", "condition": "Org/Health modes render roster relationship lines", "status": "pending"}, {"id": "AC-8", "gate": "Trace wiring", "condition": "Run mode renders ordered stage timeline", "status": "pending"}, {"id": "AC-9", "gate": "Participant cards", "condition": "Participants with stance, confidence, contribution, override", "status": "pending"}, {"id": "AC-10", "gate": "Trace edges", "condition": "Trace edges with correct types", "status": "pending"}, {"id": "AC-11", "gate": "Arbiter summary", "condition": "Arbiter panel with override details", "status": "pending"}, {"id": "AC-12", "gate": "Arbiter null", "condition": "Null arbiter \u2192 panel hidden, no fabrication", "status": "pending"}, {"id": "AC-13", "gate": "Trace not found", "condition": "Invalid run_id \u2192 \"run not found\"", "status": "pending"}, {"id": "AC-14", "gate": "Partial run", "condition": "Partial \u2192 available stages + incomplete indicator", "status": "pending"}, {"id": "AC-15", "gate": "Run selector", "condition": "Mechanism to select run_id \u2014 not hardcoded", "status": "pending"}, {"id": "AC-16", "gate": "Detail persona", "condition": "Persona click \u2192 PersonaDetail fields", "status": "pending"}, {"id": "AC-17", "gate": "Detail officer", "condition": "Officer click \u2192 OfficerDetail fields", "status": "pending"}, {"id": "AC-18", "gate": "Detail arbiter", "condition": "Arbiter click \u2192 ArbiterDetail fields", "status": "pending"}, {"id": "AC-19", "gate": "Detail subsystem", "condition": "Subsystem click \u2192 SubsystemDetail fields", "status": "pending"}, {"id": "AC-20", "gate": "Detail not found", "condition": "Unknown entity_id \u2192 \"entity not found\"", "status": "pending"}, {"id": "AC-21", "gate": "Detail degradation", "condition": "Health unavailable \u2192 degraded status, rest normal", "status": "pending"}, {"id": "AC-22", "gate": "data_state banners", "condition": "Stale/unavailable renders appropriate banner", "status": "pending"}, {"id": "AC-23", "gate": "Error envelope", "condition": "OpsErrorEnvelope parsed, not generic error", "status": "pending"}, {"id": "AC-24", "gate": "Typed adapters", "condition": "Four adapters matching contract shapes", "status": "pending"}, {"id": "AC-25", "gate": "No backend changes", "condition": "Zero backend modifications", "status": "pending"}, {"id": "AC-26", "gate": "Existing UI preserved", "condition": "Phase 6 + PR-OPS-3 Org mode \u2014 zero regressions", "status": "pending"}, {"id": "AC-27", "gate": "Mode switching", "condition": "Selection preserved unless invalid in new context", "status": "pending"}, {"id": "AC-28", "gate": "Build + typecheck", "condition": "Build and typecheck pass", "status": "pending"}], "total_ac": 28, "passed_ac": 0, "pending_ac": 28}];
+const debt = [{"id": "TD-1", "item": "`assert` used for runtime contract enforcement", "location": "`analyst/arbiter.py`", "status": "resolved", "severity": "critical"}, {"id": "TD-2", "item": "`call_llm()` lacks timeout, retry, circuit-breaker", "location": "`analyst/analyst.py`, LLM call path", "status": "resolved", "severity": "critical"}, {"id": "TD-3", "item": "`sys.path.insert` used as dependency wiring", "location": "Multiple core modules", "status": "resolved", "severity": "critical"}, {"id": "TD-4", "item": "Orchestration duplication (single vs multi-analyst)", "location": "`analyst/service.py`, `analyst/multi_analyst_service.py`", "status": "open", "severity": "maintenance"}, {"id": "TD-5", "item": "Magic-string enum duplication", "location": "`analyst/analyst.py`, `analyst/personas.py`, `analyst/arbiter.py`", "status": "resolved", "severity": "maintenance"}, {"id": "TD-6", "item": "`build_market_packet()` God-function", "location": "`market_data_officer/officer/service.py`", "status": "open", "severity": "maintenance"}, {"id": "TD-7", "item": "`build_market_packet()` eager loading + `iterrows()`", "location": "`market_data_officer/officer/service.py`", "status": "open", "severity": "maintenance"}, {"id": "TD-8", "item": "Mixed data-shape handling in `classify_fvg_context`", "location": "`analyst/pre_filter.py`", "status": "open", "severity": "maintenance"}, {"id": "TD-9", "item": "~~Unused variables in `build_market_packet()`~~", "location": "`market_data_officer/officer/service.py`", "status": "resolved", "severity": "maintenance"}, {"id": "TD-10", "item": "LLM failure modes under-tested", "location": "Test suites for analyst path", "status": "resolved", "severity": "documentation"}, {"id": "TD-11", "item": "No import-path stability tests", "location": "No coverage for `sys.path.insert` patterns", "status": "resolved", "severity": "documentation"}, {"id": "TD-12", "item": "Cross-module architecture contracts undocumented", "location": "Core service boundaries", "status": "open", "severity": "documentation"}];
+const tests = [{"phase": "| Phase 1A", "count": 359, "description": "EURUSD full relay spine"}, {"phase": "Phase 1B", "count": 364, "description": "XAUUSD spine"}, {"phase": "Phase E+", "count": 404, "description": "Instrument registry"}, {"phase": "Provider Switchover", "count": 404, "description": "yFinance fallback + vendor provenance"}, {"phase": "Phase F", "count": 419, "description": "All 5 instruments trusted"}, {"phase": "Provider Routing", "count": 468, "description": "Per-instrument provider policy"}, {"phase": "Operationalise Phase 1", "count": 494, "description": "APScheduler feed refresh"}, {"phase": "Operationalise Phase 2 \u2014 PR 1", "count": 549, "description": "Market-hours awareness + freshness classification"}, {"phase": "Operationalise Phase 2 \u2014 PR 2", "count": 597, "description": "Deterministic failure alerting + edge-triggered recovery"}, {"phase": "Operationalise Phase 2 \u2014 PR 3", "count": 644, "description": "Runtime posture, startup validation, health-check, operator runbook"}, {"phase": "TD-1", "count": 645, "description": "Arbiter assert fix"}, {"phase": "Security/API Hardening", "count": 677, "description": "Auth gate, graph + LLM timeouts, error contracts, body limits, TD-2 closure"}, {"phase": "CI Seam Hardening", "count": 1743, "description": "MDO + root Python seams CI-gated, stream event semantics, 5 CI jobs"}, {"phase": "LLM Routing Centralisation", "count": 643, "description": "Single-source routing via ResolvedRoute; 13 bypass removals; 27 new deterministic route/bypass tests"}, {"phase": "Observability Phase 1", "count": 668, "description": "Run record + stdout summary; per-analyst result/skip/fail visibility; 25 new deterministic tests"}];
+const risks = [{"name": "Observability gap risk", "detail": "cross-lane failures remain invisible without structured logging; operators cannot diagnose issues without manual code tracing."}, {"name": "Contract drift risk", "detail": "frontend implementation (when resumed) bypasses `UI_CONTRACT.md` and rediscovers backend behavior ad hoc. Mitigated by Section 3.1 governance rule in the contract."}, {"name": "Design-implementation drift risk", "detail": "UI implementation (when resumed) diverges from locked wireframes and component system. Mitigated by `DESIGN_NOTES.md` and `VISUAL_APPENDIX.md` as written references."}, {"name": "UI split risk", "detail": "Journey and legacy workflow surfaces diverge further if compatibility boundaries are not documented clearly."}, {"name": "Seam blind-spot risk", "detail": "broad unit coverage may still miss cross-module orchestration and integration regressions."}, {"name": "Cleanup drift risk", "detail": "low-level debt can expand into architecture work if not kept tightly scoped."}, {"name": "Scope-creep risk", "detail": "future extensions such as Chart Evidence or Run Artifact Inspector could jump ahead of the runtime-hardening sequence."}];
+const activities = [{"date": "15 Mar 2026", "phase": "PR-OPS-4b", "activity": "Delivered agent-detail endpoint \u2014 72 new tests, all 25 spec ACs passing, 197 ops tests total"}, {"date": "15 Mar 2026", "phase": "PR-OPS-4a", "activity": "Delivered agent-trace endpoint \u2014 71 new tests, trace projection + audit log join, 126 ops tests"}, {"date": "14 Mar 2026", "phase": "PR-UI-6", "activity": "Journal & Review MVP shipped \u2014 decision readback, review toggle, 42 new tests, 243 total"}, {"date": "14 Mar 2026", "phase": "PR-UI-5", "activity": "Analysis Run MVP shipped \u2014 multipart /analyse, run lifecycle state machine, 69 new tests, 201 total"}, {"date": "14 Mar 2026", "phase": "PR-UI-4", "activity": "Journey Studio MVP shipped \u2014 staged flow, freeze lifecycle, bootstrap context, 43 new tests, 132 total"}, {"date": "13 Mar 2026", "phase": "PR-OPS-3", "activity": "Agent Ops workspace MVP \u2014 roster + health wiring, org view, 23 new tests, 89 total"}, {"date": "13 Mar 2026", "phase": "PR-OPS-1", "activity": "Agent Ops contract spec \u2014 endpoint contracts for roster + health, zero code changes"}, {"date": "13 Mar 2026", "phase": "PR-UI-3", "activity": "Shared component extraction \u2014 generic EntityRowCard, barrel exports, 36 new tests, 66 total"}, {"date": "13 Mar 2026", "phase": "PR-UI-2", "activity": "Triage Board MVP \u2014 live data, trust strip, 7 state conditions, 24 new tests, 30 total"}, {"date": "13 Mar 2026", "phase": "PR-UI-1", "activity": "React app shell \u2014 Vite + routing + typed fetch + TanStack Query, 5 smoke tests"}, {"date": "13 Mar 2026", "phase": "Phase 0", "activity": "UI re-entry governance \u2014 React + TS + Tailwind locked, execution plan committed"}, {"date": "13 Mar 2026", "phase": "Cleanup", "activity": "Doc consolidation, async markers, TD-5/TD-9 micro-PRs"}, {"date": "12 Mar 2026", "phase": "Obs Phase 2", "activity": "Cross-lane structured event logging \u2014 16 event codes, 18 new tests"}, {"date": "12 Mar 2026", "phase": "TD-3", "activity": "Packaging/import stability \u2014 27 sys.path.insert removed, 16 import tests"}, {"date": "12 Mar 2026", "phase": "UI Phase 3A", "activity": "Workspace blueprint + visual design \u2014 wireframes, component system, design notes"}, {"date": "12 Mar 2026", "phase": "UI Phase 2", "activity": "UI Contract \u2014 canonical frontend handoff locked"}, {"date": "12 Mar 2026", "phase": "UI Phase 1", "activity": "Backend capability audit \u2014 docs/ui/UI_BACKEND_AUDIT.md"}];
+const roadmap = [{"priority": 1, "phase": "PR-OPS-5", "description": "Frontend Agent Ops wiring \u2014 Run Mode + Health Mode + Detail Sidebar", "status": "planned", "depends_on": "PR-OPS-4"}, {"priority": 2, "phase": "UI Phase 3B", "description": "Backend capability exposure \u2014 Feeder, Ops, Analytics, optional streaming", "status": "planned", "depends_on": "Phase 6"}, {"priority": 3, "phase": "Chart Evidence Workspace", "description": "Visual chart evidence capture and annotation for trade analysis", "status": "concept", "depends_on": "UI Phase 3B"}, {"priority": 4, "phase": "Run Artifact Inspector", "description": "Deep inspection of individual run artifacts, logs, and decision traces", "status": "concept", "depends_on": "UI Phase 3B"}, {"priority": 5, "phase": "Reflective Intelligence Layer", "description": "Human-governed review and policy-refinement architecture on run-record audit trails", "status": "concept", "depends_on": "Agent Ops + Journal"}, {"priority": 6, "phase": "Runtime Lane Convergence", "description": "Reduce architectural split between analyst, graph, MDO, and legacy lanes", "status": "concept", "depends_on": "Observability complete"}, {"priority": 7, "phase": "Performance Optimisation", "description": "TD-6/TD-7 packet assembly decomposition + eager loading removal", "status": "concept", "depends_on": "Runtime convergence"}];
+
+// Render milestone dots, phase markers, group labels, and task slots
+function renderMilestones() {
+  const dotContainer = document.getElementById('milestone-dots');
+  const markerContainer = document.getElementById('phase-markers');
+  const groupLabelsContainer = document.getElementById('phase-group-labels');
+  const slotsContainer = document.getElementById('task-slots-track');
+  const totalPhases = phases.length;
+
+  dotContainer.innerHTML = '';
+  markerContainer.innerHTML = '';
+  groupLabelsContainer.innerHTML = '';
+  slotsContainer.innerHTML = '';
+
+  // Define milestone groups
+  const groups = [
+    { name: 'Phase 0', pct: 5 },
+    { name: 'UI Phases', pct: 25 },
+    { name: 'Ops Backend', pct: 45 },
+    { name: 'TD & Cleanup', pct: 60 },
+    { name: 'Security/API', pct: 75 },
+    { name: 'Launch', pct: 92 }
+  ];
+
+  // Render phase group labels
+  groups.forEach(g => {
+    const label = document.createElement('div');
+    label.className = 'phase-group-label';
+    label.style.left = g.pct + '%';
+    label.textContent = g.name;
+    groupLabelsContainer.appendChild(label);
+  });
+
+  // Render task slots
+  let slotPosition = 0;
+  phases.forEach((p, idx) => {
+    const slotWidth = (100 / totalPhases);
+    const slot = document.createElement('div');
+    slot.className = 'task-slot ' + (p.status === 'complete' ? 'complete' : p.status === 'active' ? 'active' : p.status === 'next' ? 'next' : 'pending');
+    slot.style.left = slotPosition + '%';
+    slot.style.width = slotWidth + '%';
+    slot.title = p.name;
+    slotsContainer.appendChild(slot);
+    slotPosition += slotWidth;
+  });
+
+  phases.forEach((p, idx) => {
+    const pct = (idx / (totalPhases - 1 || 1)) * 100;
+    const dot = document.createElement('div');
+    dot.className = 'milestone-dot ' + (p.status === 'complete' ? 'complete' : p.status === 'active' ? 'active' : 'pending');
+    dot.style.left = pct + '%';
+    dot.style.transform = 'translateX(-50%)';
+    dotContainer.appendChild(dot);
+
+    const marker = document.createElement('div');
+    marker.className = 'phase-marker';
+    marker.style.flex = '1';
+    marker.textContent = p.name.substring(0, 8);
+    markerContainer.appendChild(marker);
+  });
+}
+renderMilestones();
+
+// Clamp tooltip so it never overflows the track container
+function clampTooltip() {
+  const tooltip = document.getElementById('progress-tooltip');
+  const track = document.querySelector('.progress-track');
+  if (!tooltip || !track) return;
+
+  // Reset to centered on the NOW position
+  tooltip.style.transform = 'translateX(-50%) translateY(-100%)';
+
+  const tRect = tooltip.getBoundingClientRect();
+  const trackRect = track.getBoundingClientRect();
+  const pad = 8;
+
+  if (tRect.right > trackRect.right - pad) {
+    // Overflows right — shift left
+    const overflow = tRect.right - (trackRect.right - pad);
+    tooltip.style.transform = 'translateX(calc(-50% - ' + overflow + 'px)) translateY(-100%)';
+    // Move the arrow to stay pointing at the NOW line
+    const arrowOffset = 50 + (overflow / tRect.width * 100);
+    tooltip.style.setProperty('--arrow-left', Math.min(arrowOffset, 90) + '%');
+  } else if (tRect.left < trackRect.left + pad) {
+    const overflow = (trackRect.left + pad) - tRect.left;
+    tooltip.style.transform = 'translateX(calc(-50% + ' + overflow + 'px)) translateY(-100%)';
+    const arrowOffset = 50 - (overflow / tRect.width * 100);
+    tooltip.style.setProperty('--arrow-left', Math.max(arrowOffset, 10) + '%');
+  } else {
+    tooltip.style.setProperty('--arrow-left', '50%');
+  }
+}
+clampTooltip();
+window.addEventListener('resize', clampTooltip);
+
+// Tab switching
+function switchTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// Render phases
+const track = document.getElementById('phase-track');
+phases.forEach(p => {
+  const chip = document.createElement('div');
+  chip.className = 'phase-chip chip-' + p.status;
+  let label = p.name;
+  if (p.tests) label += ' <span class="chip-tests">(' + p.tests + ')</span>';
+  chip.innerHTML = label + '<div class="tooltip">' + p.description + (p.tests ? ' — ' + p.tests + ' tests' : '') + '</div>';
+  track.appendChild(chip);
+});
+
+// Render specs
+const specGrid = document.getElementById('spec-grid');
+specs.forEach((s, idx) => {
+  const passedPct = s.total_ac ? Math.round(s.passed_ac / s.total_ac * 100) : 0;
+  const pendingPct = s.total_ac ? Math.round(s.pending_ac / s.total_ac * 100) : 0;
+  const card = document.createElement('div');
+  card.className = 'spec-card';
+  card.innerHTML = `
+    <div class="spec-card-header">
+      <div>
+        <div class="spec-name">${s.name}</div>
+        <div class="spec-subtitle">${s.title}</div>
+      </div>
+      <span class="status-pill ${s.status === 'complete' ? 'pill-active' : 'pill-info'}">${s.status}</span>
+    </div>
+    <div class="spec-progress">
+      <div class="spec-progress-bar">
+        <div class="spec-progress-fill fill-passed" style="width:${passedPct}%"></div>
+        <div class="spec-progress-fill fill-pending" style="width:${pendingPct}%"></div>
+      </div>
+      <div class="spec-progress-label">
+        <span>${s.passed_ac} passed</span>
+        <span>${s.pending_ac} pending</span>
+        <span>${s.total_ac} total</span>
+      </div>
+    </div>
+    <button class="ac-toggle" onclick="toggleAC(${idx})">Show acceptance criteria</button>
+    <div class="ac-list" id="ac-list-${idx}">
+      ${s.acceptance_criteria.map(ac => `
+        <div class="ac-item">
+          <div class="ac-dot dot-${ac.status}"></div>
+          <span class="ac-id">${ac.id}</span>
+          <span class="ac-text">${ac.condition}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  specGrid.appendChild(card);
+});
+
+function toggleAC(idx) {
+  const list = document.getElementById('ac-list-' + idx);
+  list.classList.toggle('expanded');
+  const btn = list.previousElementSibling;
+  btn.textContent = list.classList.contains('expanded') ? 'Hide acceptance criteria' : 'Show acceptance criteria';
+}
+
+// Render test chart
+const chartEl = document.getElementById('test-chart');
+const maxTest = Math.max(...tests.map(t => t.count), 1);
+tests.forEach(t => {
+  const h = Math.max(2, (t.count / maxTest) * 160);
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chart-bar-wrapper';
+  wrapper.innerHTML = `
+    <div class="chart-bar-value">${t.count.toLocaleString()}</div>
+    <div class="chart-bar" style="height:${h}px" title="${t.phase}: ${t.count} tests — ${t.description}"></div>
+    <div class="chart-bar-label">${t.phase.length > 20 ? t.phase.substring(0,18) + '…' : t.phase}</div>
+  `;
+  chartEl.appendChild(wrapper);
+});
+
+// Render debt
+const debtGrid = document.getElementById('debt-grid');
+const sortedDebt = [...debt].sort((a,b) => {
+  if (a.status === 'open' && b.status !== 'open') return -1;
+  if (a.status !== 'open' && b.status === 'open') return 1;
+  return 0;
+});
+sortedDebt.forEach(d => {
+  const item = document.createElement('div');
+  item.className = 'debt-item' + (d.status === 'resolved' ? ' debt-resolved' : '');
+  item.innerHTML = `
+    <div class="debt-icon ${d.status === 'resolved' ? 'debt-icon-resolved' : 'debt-icon-open'}">
+      ${d.status === 'resolved' ? '&#10003;' : '&#9679;'}
+    </div>
+    <div>
+      <div class="debt-name">${d.id} — ${d.item.substring(0,60)}</div>
+      <div class="debt-detail">${d.severity} &middot; ${d.location.substring(0,60)}</div>
+    </div>
+  `;
+  debtGrid.appendChild(item);
+});
+
+// Render risks
+const riskList = document.getElementById('risk-list');
+risks.forEach(r => {
+  const item = document.createElement('div');
+  item.className = 'risk-item';
+  item.innerHTML = `
+    <div class="risk-name">${r.name}</div>
+    <div class="risk-detail">${r.detail}</div>
+  `;
+  riskList.appendChild(item);
+});
+
+// Render activity feed
+const activityFeed = document.getElementById('activity-feed');
+if (activityFeed) {
+  activities.forEach(a => {
+    const item = document.createElement('div');
+    item.className = 'activity-item';
+    item.innerHTML = `
+      <span class="activity-date">${a.date}</span>
+      <span class="activity-phase">${a.phase}</span>
+      <span class="activity-text">${a.activity}</span>
+    `;
+    activityFeed.appendChild(item);
+  });
+}
+
+// Render roadmap
+const roadmapList = document.getElementById('roadmap-list');
+if (roadmapList) {
+  roadmap.forEach(r => {
+    const item = document.createElement('div');
+    item.className = 'roadmap-item' + (r.status === 'concept' ? ' concept' : '');
+    item.innerHTML = `
+      <div class="roadmap-priority ${r.status}">${r.priority}</div>
+      <div>
+        <div class="roadmap-name">${r.phase}</div>
+        <div class="roadmap-desc">${r.description}</div>
+      </div>
+      <span class="roadmap-dep">depends: ${r.depends_on}</span>
+    `;
+    roadmapList.appendChild(item);
+  });
+}
+
+// Live-update capability (falls back gracefully if API unavailable)
+let lastUpdate = Date.now();
+function updateRefreshIndicator() {
+  const now = Date.now();
+  const secondsAgo = Math.floor((now - lastUpdate) / 1000);
+  const indicator = document.getElementById('refresh-indicator');
+  if (indicator) {
+    if (secondsAgo < 60) {
+      indicator.textContent = secondsAgo + 's ago';
+    } else {
+      const minutesAgo = Math.floor(secondsAgo / 60);
+      indicator.textContent = minutesAgo + 'm ago';
+    }
+  }
+}
+setInterval(updateRefreshIndicator, 5000);
+</script>
+
+</body>
+</html>
