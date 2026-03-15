@@ -3,7 +3,7 @@
 **Phase:** 7
 **Lane:** Operator / Observability
 **Type:** Backend + Contract Extension
-**Status:** ⏳ Diagnostic complete — split into PR-OPS-4a (trace) + PR-OPS-4b (detail) — implementation pending
+**Status:** ✅ Complete — PR-OPS-4a (trace) + PR-OPS-4b (detail) both implemented
 **Date:** 2026-03-14
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Extends:** `docs/ui/AGENT_OPS_CONTRACT.md` (Phase 7 reserved endpoints from §6)
@@ -926,31 +926,31 @@ These represent relationships that can be honestly derived from existing run art
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-1 | Trace shape | `/runs/{run_id}/agent-trace` returns a valid `AgentTraceResponse` with all required fields | ⏳ Pending |
-| AC-2 | Trace ordering | `stages` array is returned in ascending `stage_index` order | ⏳ Pending |
-| AC-3 | Trace participant join | Every `entity_id` in `participants` maps to a valid roster `id` | ⏳ Pending |
-| AC-4 | Trace edges | Every `from` and `to` in `trace_edges` maps to a valid roster `id` | ⏳ Pending |
-| AC-5 | Trace arbiter null | `arbiter_summary` is `null` when run did not reach arbiter stage | ⏳ Pending |
-| AC-6 | Trace run not found | Missing `run_id` returns 404 with `RUN_NOT_FOUND` error envelope | ⏳ Pending |
-| AC-7 | Trace bounded payload | `contribution.summary` ≤ 500 chars, `override_reason` ≤ 300 chars — truncation proven by test | ⏳ Pending |
-| AC-8 | Trace summary block | `summary` block contains valid `entity_count`, `stage_count`, `arbiter_override` | ⏳ Pending |
-| AC-9 | Trace artifact refs | `artifact_refs` array present with valid `artifact_type` and `artifact_key` | ⏳ Pending |
-| AC-10 | Detail shape (persona) | `/ops/agent-detail/{entity_id}` returns valid response with `PersonaDetail` variant | ⏳ Pending |
-| AC-11 | Detail shape (officer) | Same endpoint returns valid response with `OfficerDetail` variant | ⏳ Pending |
-| AC-12 | Detail shape (arbiter) | Same endpoint returns valid response with `ArbiterDetail` variant | ⏳ Pending |
-| AC-13 | Detail shape (subsystem) | Same endpoint returns valid response with `SubsystemDetail` variant | ⏳ Pending |
-| AC-14 | Detail not found | Unknown `entity_id` returns 404 with `ENTITY_NOT_FOUND` error envelope | ⏳ Pending |
-| AC-15 | Detail bounded payload | `purpose` ≤ 500 chars, `RecentParticipation` array ≤ 5 entries — proven by test | ⏳ Pending |
-| AC-16 | Detail graceful degradation | Health source unavailable → endpoint still returns with degraded `data_state`, not 500 | ⏳ Pending |
-| AC-17 | Detail recent_warnings | `recent_warnings` is a typed array, not freeform prose | ⏳ Pending |
-| AC-18 | ResponseMeta consistency | Both endpoints include valid `ResponseMeta` with correct `version`, `generated_at`, `data_state` | ⏳ Pending |
-| AC-19 | Error envelope | All HTTP errors from both endpoints use `OpsErrorEnvelope` — no freeform string `detail` | ⏳ Pending |
-| AC-20 | No raw dumps (negative) | Neither endpoint returns raw prompt text, full LLM transcripts, or unbounded blobs — proven by content-length or field absence test | ⏳ Pending |
-| AC-21 | Existing endpoints unchanged | PR-OPS-2 roster and health endpoint tests still pass — zero regressions | ⏳ Pending |
-| AC-22 | No new persistence | No SQLite, no new database, no new file-write operations — read-side projection only | ⏳ Pending |
-| AC-23 | Contract doc updated | `AGENT_OPS_CONTRACT.md` §6 promoted from "reserved" to full contract — shapes match implementation | ⏳ Pending |
-| AC-24 | Envelope consistency | Both new endpoints use flat `ResponseMeta & {}` pattern matching PR-OPS-2 — no `data`/`meta` wrapper | ⏳ Pending |
-| AC-25 | ID convention consistency | Both new endpoints use existing roster/health `entity_id` convention — no namespaced ID migration | ⏳ Pending |
+| AC-1 | Trace shape | `/runs/{run_id}/agent-trace` returns a valid `AgentTraceResponse` with all required fields | ✅ Pass |
+| AC-2 | Trace ordering | `stages` array is returned in ascending `stage_index` order | ✅ Pass |
+| AC-3 | Trace participant join | Every `entity_id` in `participants` maps to a valid roster `id` | ✅ Pass |
+| AC-4 | Trace edges | Every `from` and `to` in `trace_edges` maps to a valid roster `id` | ✅ Pass |
+| AC-5 | Trace arbiter null | `arbiter_summary` is `null` when run did not reach arbiter stage | ✅ Pass |
+| AC-6 | Trace run not found | Missing `run_id` returns 404 with `RUN_NOT_FOUND` error envelope | ✅ Pass |
+| AC-7 | Trace bounded payload | `contribution.summary` ≤ 500 chars, `override_reason` ≤ 300 chars — truncation proven by test | ✅ Pass |
+| AC-8 | Trace summary block | `summary` block contains valid `entity_count`, `stage_count`, `arbiter_override` | ✅ Pass |
+| AC-9 | Trace artifact refs | `artifact_refs` array present with valid `artifact_type` and `artifact_key` | ✅ Pass |
+| AC-10 | Detail shape (persona) | `/ops/agent-detail/{entity_id}` returns valid response with `PersonaDetail` variant | ✅ Pass |
+| AC-11 | Detail shape (officer) | Same endpoint returns valid response with `OfficerDetail` variant | ✅ Pass |
+| AC-12 | Detail shape (arbiter) | Same endpoint returns valid response with `ArbiterDetail` variant | ✅ Pass |
+| AC-13 | Detail shape (subsystem) | Same endpoint returns valid response with `SubsystemDetail` variant | ✅ Pass |
+| AC-14 | Detail not found | Unknown `entity_id` returns 404 with `ENTITY_NOT_FOUND` error envelope | ✅ Pass |
+| AC-15 | Detail bounded payload | `purpose` ≤ 500 chars, `RecentParticipation` array ≤ 5 entries — proven by test | ✅ Pass |
+| AC-16 | Detail graceful degradation | Health source unavailable → endpoint still returns with degraded `data_state`, not 500 | ✅ Pass |
+| AC-17 | Detail recent_warnings | `recent_warnings` is a typed array, not freeform prose | ✅ Pass |
+| AC-18 | ResponseMeta consistency | Both endpoints include valid `ResponseMeta` with correct `version`, `generated_at`, `data_state` | ✅ Pass |
+| AC-19 | Error envelope | All HTTP errors from both endpoints use `OpsErrorEnvelope` — no freeform string `detail` | ✅ Pass |
+| AC-20 | No raw dumps (negative) | Neither endpoint returns raw prompt text, full LLM transcripts, or unbounded blobs — proven by content-length or field absence test | ✅ Pass |
+| AC-21 | Existing endpoints unchanged | PR-OPS-2 roster and health endpoint tests still pass — zero regressions | ✅ Pass |
+| AC-22 | No new persistence | No SQLite, no new database, no new file-write operations — read-side projection only | ✅ Pass |
+| AC-23 | Contract doc updated | `AGENT_OPS_CONTRACT.md` §6 promoted from "reserved" to full contract — shapes match implementation | ✅ Pass |
+| AC-24 | Envelope consistency | Both new endpoints use flat `ResponseMeta & {}` pattern matching PR-OPS-2 — no `data`/`meta` wrapper | ✅ Pass |
+| AC-25 | ID convention consistency | Both new endpoints use existing roster/health `entity_id` convention — no namespaced ID migration | ✅ Pass |
 
 ---
 
@@ -1239,9 +1239,8 @@ This PR must update:
 | PR-OPS-2 | Backend: roster + health endpoints | ✅ Done |
 | PR-OPS-3 | Frontend: Agent Ops workspace shell | ✅ Done |
 | Phase 6 | Core product lane (PR-UI-0 through PR-UI-6) | ✅ Done |
-| **PR-OPS-4a** | **Backend: agent-trace endpoint** | **⏳ Diagnostic complete — implementation pending** |
-| PR-OPS-4b | Backend: agent-detail endpoint | ⏳ Blocked on PR-OPS-4a |
-| PR-OPS-5 | Frontend: wire Agent Ops to new endpoints | ⏳ Blocked on PR-OPS-4b |
+| **PR-OPS-4** | **Backend: agent-trace + agent-detail endpoints** | **✅ Complete** |
+| PR-OPS-5 | Frontend: wire Agent Ops to new endpoints | ⏳ Blocked on PR-OPS-4 |
 
 ---
 

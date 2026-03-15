@@ -1,7 +1,9 @@
 """Agent Operations router — read-only projection endpoints.
 
-GET /ops/agent-roster  — Static architecture and roster truth (§4)
-GET /ops/agent-health  — Current health snapshot (§5)
+GET /ops/agent-roster              — Static architecture and roster truth (§4)
+GET /ops/agent-health              — Current health snapshot (§5)
+GET /runs/{run_id}/agent-trace     — Run-level agent trace (§6, PR-OPS-4a)
+GET /ops/agent-detail/{entity_id}  — Entity detail (§7, PR-OPS-4b)
 
 Contract: docs/ui/AGENT_OPS_CONTRACT.md
 """
@@ -16,8 +18,10 @@ from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 
 from ai_analyst.api.models.ops import OpsError
-from ai_analyst.api.services.ops_roster import project_roster
+from ai_analyst.api.services.ops_roster import project_roster, get_all_roster_ids
 from ai_analyst.api.services.ops_health import project_health
+from ai_analyst.api.services.ops_trace import project_trace, TraceProjectionError
+from ai_analyst.api.services.ops_detail import project_detail, DetailProjectionError
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +95,80 @@ async def agent_health(request: Request):
         "ops.health.served",
         data_state=response.data_state,
         entity_count=len(response.entities),
+    )
+    return JSONResponse(
+        content=response.model_dump(by_alias=True),
+    )
+
+
+@router.get("/runs/{run_id}/agent-trace")
+async def agent_trace(run_id: str):
+    """Return the run-level agent trace for a given run.
+
+    Read-side projection from run_record.json + optional audit log (§6).
+    """
+    _emit_obs_event("ops.trace.requested", run_id=run_id)
+    try:
+        response = project_trace(run_id)
+    except FileNotFoundError:
+        _emit_obs_event("ops.trace.not_found", run_id=run_id)
+        raise _ops_error(404, "RUN_NOT_FOUND", f"No run artifacts for run_id={run_id}")
+    except TraceProjectionError as exc:
+        _emit_obs_event("ops.trace.malformed", run_id=run_id, error=str(exc))
+        raise _ops_error(422, "RUN_ARTIFACTS_MALFORMED", str(exc))
+    except Exception as exc:
+        _emit_obs_event("ops.trace.failed", run_id=run_id, error=str(exc))
+        raise _ops_error(500, "TRACE_PROJECTION_FAILED", f"Trace projection error: {exc}")
+
+    _emit_obs_event(
+        "ops.trace.served",
+        run_id=run_id,
+        data_state=response.data_state,
+        participant_count=len(response.participants),
+    )
+    return JSONResponse(
+        content=response.model_dump(by_alias=True),
+    )
+
+
+@router.get("/ops/agent-detail/{entity_id}")
+async def agent_detail(entity_id: str, request: Request):
+    """Return the entity-level detail for a given agent entity.
+
+    Composite read-side projection from roster + profile + health + runs (§7).
+    """
+    _emit_obs_event("ops.detail.requested", entity_id=entity_id)
+
+    # Validate entity_id exists in roster
+    if entity_id not in get_all_roster_ids():
+        _emit_obs_event("ops.detail.not_found", entity_id=entity_id)
+        raise _ops_error(404, "ENTITY_NOT_FOUND", f"Entity '{entity_id}' not in roster")
+
+    # Get health item for this entity (graceful degradation)
+    health_item = None
+    try:
+        health_snapshot = project_health(request.app.state)
+        for item in health_snapshot.entities:
+            if item.entity_id == entity_id:
+                health_item = item
+                break
+    except Exception as exc:
+        logger.warning("Health projection unavailable for detail: %s", exc)
+        # Continue with None — graceful degradation
+
+    try:
+        response = project_detail(entity_id, health_item=health_item)
+    except DetailProjectionError as exc:
+        _emit_obs_event("ops.detail.failed", entity_id=entity_id, error=str(exc))
+        raise _ops_error(422, "DETAIL_PROJECTION_FAILED", str(exc))
+    except Exception as exc:
+        _emit_obs_event("ops.detail.failed", entity_id=entity_id, error=str(exc))
+        raise _ops_error(500, "DETAIL_PROJECTION_FAILED", f"Detail projection error: {exc}")
+
+    _emit_obs_event(
+        "ops.detail.served",
+        entity_id=entity_id,
+        data_state=response.data_state,
     )
     return JSONResponse(
         content=response.model_dump(by_alias=True),
