@@ -3,7 +3,7 @@
 **Phase:** 7
 **Lane:** Operator / Observability
 **Type:** Backend + Contract Extension
-**Status:** ⏳ Spec drafted — implementation pending
+**Status:** 🔶 PR-OPS-4a complete (trace endpoint) — PR-OPS-4b pending (detail endpoint)
 **Date:** 2026-03-14
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Extends:** `docs/ui/AGENT_OPS_CONTRACT.md` (Phase 7 reserved endpoints from §6)
@@ -928,15 +928,15 @@ These represent relationships that can be honestly derived from existing run art
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-1 | Trace shape | `/runs/{run_id}/agent-trace` returns a valid `AgentTraceResponse` with all required fields | ⏳ Pending |
-| AC-2 | Trace ordering | `stages` array is returned in ascending `stage_index` order | ⏳ Pending |
-| AC-3 | Trace participant join | Every `entity_id` in `participants` maps to a valid roster `id` | ⏳ Pending |
-| AC-4 | Trace edges | Every `from` and `to` in `trace_edges` maps to a valid roster `id` | ⏳ Pending |
-| AC-5 | Trace arbiter null | `arbiter_summary` is `null` when run did not reach arbiter stage | ⏳ Pending |
-| AC-6 | Trace run not found | Missing `run_id` returns 404 with `RUN_NOT_FOUND` error envelope | ⏳ Pending |
-| AC-7 | Trace bounded payload | `contribution.summary` ≤ 500 chars, `override_reason` ≤ 300 chars — truncation proven by test | ⏳ Pending |
-| AC-8 | Trace summary block | `summary` block contains valid `entity_count`, `stage_count`, `arbiter_override` | ⏳ Pending |
-| AC-9 | Trace artifact refs | `artifact_refs` array present with valid `artifact_type` and `artifact_key` | ⏳ Pending |
+| AC-1 | Trace shape | `/runs/{run_id}/agent-trace` returns a valid `AgentTraceResponse` with all required fields | ✅ Pass |
+| AC-2 | Trace ordering | `stages` array is returned in ascending `stage_index` order | ✅ Pass |
+| AC-3 | Trace participant join | Every `entity_id` in `participants` maps to a valid roster `id` | ✅ Pass |
+| AC-4 | Trace edges | Every `from` and `to` in `trace_edges` maps to a valid roster `id` | ✅ Pass |
+| AC-5 | Trace arbiter null | `arbiter_summary` is `null` when run did not reach arbiter stage | ✅ Pass |
+| AC-6 | Trace run not found | Missing `run_id` returns 404 with `RUN_NOT_FOUND` error envelope | ✅ Pass |
+| AC-7 | Trace bounded payload | `contribution.summary` ≤ 500 chars, `override_reason` ≤ 300 chars — truncation proven by test | ✅ Pass |
+| AC-8 | Trace summary block | `summary` block contains valid `entity_count`, `stage_count`, `arbiter_override` | ✅ Pass |
+| AC-9 | Trace artifact refs | `artifact_refs` array present with valid `artifact_type` and `artifact_key` | ✅ Pass |
 | AC-10 | Detail shape (persona) | `/ops/agent-detail/{entity_id}` returns valid response with `PersonaDetail` variant | ⏳ Pending |
 | AC-11 | Detail shape (officer) | Same endpoint returns valid response with `OfficerDetail` variant | ⏳ Pending |
 | AC-12 | Detail shape (arbiter) | Same endpoint returns valid response with `ArbiterDetail` variant | ⏳ Pending |
@@ -945,14 +945,14 @@ These represent relationships that can be honestly derived from existing run art
 | AC-15 | Detail bounded payload | `purpose` ≤ 500 chars, `RecentParticipation` array ≤ 5 entries — proven by test | ⏳ Pending |
 | AC-16 | Detail graceful degradation | Health source unavailable → endpoint still returns with degraded `data_state`, not 500 | ⏳ Pending |
 | AC-17 | Detail recent_warnings | `recent_warnings` is a typed array, not freeform prose | ⏳ Pending |
-| AC-18 | ResponseMeta consistency | Both endpoints include valid `ResponseMeta` with correct `version`, `generated_at`, `data_state` | ⏳ Pending |
-| AC-19 | Error envelope | All HTTP errors from both endpoints use `OpsErrorEnvelope` — no freeform string `detail` | ⏳ Pending |
-| AC-20 | No raw dumps (negative) | Neither endpoint returns raw prompt text, full LLM transcripts, or unbounded blobs — proven by content-length or field absence test | ⏳ Pending |
-| AC-21 | Existing endpoints unchanged | PR-OPS-2 roster and health endpoint tests still pass — zero regressions | ⏳ Pending |
-| AC-22 | No new persistence | No SQLite, no new database, no new file-write operations — read-side projection only | ⏳ Pending |
+| AC-18 | ResponseMeta consistency | Both endpoints include valid `ResponseMeta` with correct `version`, `generated_at`, `data_state` | ✅ Pass (trace) |
+| AC-19 | Error envelope | All HTTP errors from both endpoints use `OpsErrorEnvelope` — no freeform string `detail` | ✅ Pass (trace) |
+| AC-20 | No raw dumps (negative) | Neither endpoint returns raw prompt text, full LLM transcripts, or unbounded blobs — proven by content-length or field absence test | ✅ Pass (trace) |
+| AC-21 | Existing endpoints unchanged | PR-OPS-2 roster and health endpoint tests still pass — zero regressions | ✅ Pass |
+| AC-22 | No new persistence | No SQLite, no new database, no new file-write operations — read-side projection only | ✅ Pass |
 | AC-23 | Contract doc updated | `AGENT_OPS_CONTRACT.md` §6 promoted from "reserved" to full contract — shapes match implementation | ⏳ Pending |
-| AC-24 | Envelope consistency | Both new endpoints use flat `ResponseMeta & {}` pattern matching PR-OPS-2 — no `data`/`meta` wrapper | ⏳ Pending |
-| AC-25 | ID convention consistency | Both new endpoints use existing roster/health `entity_id` convention — no namespaced ID migration | ⏳ Pending |
+| AC-24 | Envelope consistency | Both new endpoints use flat `ResponseMeta & {}` pattern matching PR-OPS-2 — no `data`/`meta` wrapper | ✅ Pass (trace) |
+| AC-25 | ID convention consistency | Both new endpoints use existing roster/health `entity_id` convention — no namespaced ID migration | ✅ Pass (trace) |
 
 ---
 
@@ -1220,14 +1220,50 @@ This PR must update:
 | PR-OPS-2 | Backend: roster + health endpoints | ✅ Done |
 | PR-OPS-3 | Frontend: Agent Ops workspace shell | ✅ Done |
 | Phase 6 | Core product lane (PR-UI-0 through PR-UI-6) | ✅ Done |
-| **PR-OPS-4** | **Backend: agent-trace + agent-detail endpoints** | **⏳ Spec drafted — implementation pending** |
+| **PR-OPS-4** | **Backend: agent-trace + agent-detail endpoints** | **🔶 PR-OPS-4a complete — PR-OPS-4b pending** |
 | PR-OPS-5 | Frontend: wire Agent Ops to new endpoints | ⏳ Blocked on PR-OPS-4 |
 
 ---
 
 ## 18. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 12).*
+### PR-OPS-4a Diagnostic (2026-03-15)
+
+**File paths found:**
+- Router: `ai_analyst/api/routers/ops.py`
+- Models: `ai_analyst/api/models/ops.py` (shared), `ai_analyst/api/models/ops_trace.py` (new)
+- Service: `ai_analyst/api/services/ops_trace.py` (new)
+- Tests: `tests/test_ops_trace_endpoints.py` (new)
+- Fixtures: `tests/fixtures/sample_run_record.json`, `tests/fixtures/sample_audit_log.jsonl`
+- Run artifacts: `ai_analyst/output/runs/{run_id}/run_record.json` (primary)
+- Audit log: `ai_analyst/logs/runs/{run_id}.jsonl` (secondary — analyst stances, override detail)
+
+**ID convention confirmed:** Plain lowercase slugs (e.g. `persona_default_analyst`, `arbiter`). No namespace prefix.
+
+**Envelope pattern confirmed:** Flat `ResponseMeta` inheritance — `AgentTraceResponse(ResponseMeta)`. No data/meta wrapper.
+
+**Assumption corrections:**
+1. `run_record.json` lacks per-analyst stances/confidence — audit log used as secondary source
+2. `run_record.json` stores bare persona names (e.g. `default_analyst`) — mapping to `persona_default_analyst` done in trace service
+3. No per-stage `started_at`/`finished_at` timestamps — `duration_ms` used instead
+4. `_dev_diagnostics.jsonl` is a single file for all runs, not per-run — skipped entirely
+
+**Artifact shape surprises:**
+- Arbiter block has `verdict`/`confidence` but no `risk_override_applied` — that field is only in `FinalVerdict` via audit log
+- Analyst entries in run_record have no stance/bias — only persona name, status, model, provider
+
+**Regression gate:** 55/55 PR-OPS-2 baseline preserved → 126/126 total (55 baseline + 71 new trace tests)
+
+**Patch set (PR-OPS-4a):**
+| File | Action | Lines |
+|------|--------|-------|
+| `ai_analyst/api/models/ops_trace.py` | Created | 109 |
+| `ai_analyst/api/services/ops_trace.py` | Created | 308 |
+| `ai_analyst/api/routers/ops.py` | Modified | +30 |
+| `tests/fixtures/sample_run_record.json` | Created | 48 |
+| `tests/fixtures/sample_audit_log.jsonl` | Created | 1 |
+| `tests/test_ops_trace_endpoints.py` | Created | 491 |
+| `docs/PR_OPS_4_SPEC_FINAL.md` | Updated | AC flips, §18 |
 
 ---
 

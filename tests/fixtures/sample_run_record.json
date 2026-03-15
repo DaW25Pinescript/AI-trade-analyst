@@ -1,0 +1,49 @@
+{
+  "run_id": "run_20260314_test001",
+  "timestamp": "2026-03-14T11:02:18Z",
+  "duration_ms": 18200,
+  "request": {
+    "instrument": "XAUUSD",
+    "session": "NY",
+    "timeframes": ["H4", "M15"],
+    "smoke_mode": false
+  },
+  "stages": [
+    {"stage": "validate_input", "status": "ok", "duration_ms": 120},
+    {"stage": "macro_context", "status": "ok", "duration_ms": 1800},
+    {"stage": "chart_setup", "status": "ok", "duration_ms": 500},
+    {"stage": "analyst_execution", "status": "ok", "duration_ms": 8200},
+    {"stage": "arbiter", "status": "ok", "duration_ms": 2100},
+    {"stage": "logging", "status": "ok", "duration_ms": 350}
+  ],
+  "analysts": [
+    {"persona": "default_analyst", "status": "success", "model": "claude-sonnet-4-6", "provider": "openai"},
+    {"persona": "ict_purist", "status": "success", "model": "claude-sonnet-4-6", "provider": "openai"},
+    {"persona": "risk_officer", "status": "success", "model": "claude-sonnet-4-6", "provider": "openai"}
+  ],
+  "analysts_skipped": [
+    {"persona": "prosecutor", "status": "skipped", "reason": "smoke_mode — roster sliced to 3"},
+    {"persona": "skeptical_quant", "status": "skipped", "reason": "smoke_mode — roster sliced to 3"}
+  ],
+  "analysts_failed": [],
+  "arbiter": {
+    "ran": true,
+    "verdict": "NO_TRADE",
+    "confidence": 0.42,
+    "model": "claude-opus-4-6",
+    "provider": "openai",
+    "duration_ms": 2100
+  },
+  "artifacts": {
+    "run_record": "ai_analyst/output/runs/run_20260314_test001/run_record.json",
+    "usage_jsonl": "ai_analyst/output/runs/run_20260314_test001/usage.jsonl"
+  },
+  "usage_summary": {
+    "total_calls": 4,
+    "successful_calls": 4,
+    "failed_calls": 0,
+    "total_cost_usd": 0.0312
+  },
+  "warnings": [],
+  "errors": []
+}
