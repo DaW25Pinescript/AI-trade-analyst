@@ -665,6 +665,25 @@ Backend implementation must include deterministic tests covering the following a
 - [x] Health items with unknown `entity_id` values are invalid
 - [x] Missing health for a known roster entity is a valid state
 
+### 8.9 Agent trace response shape tests (PR-OPS-4a)
+
+- [x] `/runs/{run_id}/agent-trace` returns valid `AgentTraceResponse`
+- [x] Stages ordered by `stage_index`
+- [x] Participant `entity_id`s join to roster
+- [x] Trace edges reference valid roster IDs
+- [x] Arbiter summary null when run did not reach arbiter
+- [x] Missing `run_id` returns 404 with `OpsErrorEnvelope`
+- [x] Bounded payload limits enforced
+
+### 8.10 Agent detail response shape tests (PR-OPS-4b)
+
+- [x] `/ops/agent-detail/{entity_id}` returns valid `AgentDetailResponse` per variant
+- [x] Discriminated union: `entity_type` matches `type_specific.variant`
+- [x] Unknown `entity_id` returns 404 with `OpsErrorEnvelope`
+- [x] Health unavailable returns degraded `data_state`, not 500
+- [x] Bounded payload limits enforced
+- [x] Department/type consistency with roster
+
 ---
 
 ## 9. Summary
