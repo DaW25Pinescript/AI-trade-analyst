@@ -152,7 +152,7 @@ Reopened UI implementation lane. Locked React + TypeScript + Tailwind as forward
 - Audited logging infrastructure across 8 runtime lanes.
 - Published spec: `docs/specs/observability_phase_2.md` with logging inventory, failure taxonomy, patch set proposal.
 
-### Latest increment — UI Phase 3A workspace blueprint + visual design (12 Mar 2026)
+### Previous increment — UI Phase 3A workspace blueprint + visual design (12 Mar 2026)
 
 - Completed the full workspace blueprint and visual design layer for Phase 3A core product workspaces.
 - Published `docs/ui/UI_WORKSPACES.md` — defines seven workspaces organized into Runtime, Review, and Operator lanes with a Triage Board → Journey Studio → Analysis Run → Journal & Review primary flow.
@@ -163,19 +163,19 @@ Reopened UI implementation lane. Locked React + TypeScript + Tailwind as forward
 - All design artifacts are contract-faithful — every element maps to `UI_CONTRACT.md` sections 6, 7, 9–12 and `UI_WORKSPACES.md` sections 5–7.
 - Phased exposure plan defined: Phase 3A (Triage Board, Journey Studio, Journal & Review, Analysis Run cleanup), Phase 3B (Feeder, Ops, Analytics, optional streaming), Phase 3C (Chart Evidence, Run Artifact Inspector).
 
-### Latest increment — UI Phase 2 UI contract (12 Mar 2026)
+### Previous increment — UI Phase 2 UI contract (12 Mar 2026)
 
 - Completed the canonical frontend handoff doc for the current repo surface: `docs/ui/UI_CONTRACT.md`.
 - The contract locks source-of-truth rules (Python routes first, stale generated OpenAPI second), endpoint-family error behavior, shared `data_state` semantics, and a canonical UI run-state model.
 - It also formalizes the Journey-vs-legacy split, timeout/retryability expectations, and the rule that frontend implementation should update the contract deliberately rather than rediscover backend behavior ad hoc.
 
-### Latest increment — UI Phase 1 backend capability audit (12 Mar 2026)
+### Previous increment — UI Phase 1 backend capability audit (12 Mar 2026)
 
 - Completed a repo-grounded backend-to-UI capability audit and published `docs/ui/UI_BACKEND_AUDIT.md`.
 - Inventory includes live FastAPI routes, request/response model shapes, runtime execution modes (sync vs SSE), artifact surfaces, and current `/app` usage coverage.
 - Audit explicitly maps active-used vs active-unused capabilities to guide follow-on `UI_CONTRACT` and `UI_WORKSPACES` documentation phases.
 
-### Latest increment — AI Analyst dev diagnostics (11 Mar 2026)
+### Previous increment — AI Analyst dev diagnostics (11 Mar 2026)
 
 - Added dev-gated diagnostics for `/analyse` and `/analyse/stream` to improve local failure triage without external observability tooling.
 - JSON-backed multipart fields now emit raw-value parse logs in dev mode and return structured 422 details (`field`, `raw_value`, `expected_shape`, parse error, `request_id`).
@@ -525,7 +525,7 @@ Most of the earlier production-readiness gate has now been satisfied.
 
 **The production-readiness gate is now satisfied.**
 
-The current execution gate is no longer production-readiness; it is runtime hardening — strengthening observability across orchestration seams, packaging stability, and developer/operator confidence before resuming UI buildout.
+The current execution gate is no longer production-readiness; runtime hardening (observability, packaging, developer/operator confidence) and UI buildout (Phase 6 core product lane + Phase 7 Agent Ops) are both complete. The repo is between active phases.
 
 ---
 

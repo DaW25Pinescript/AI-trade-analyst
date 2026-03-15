@@ -43,6 +43,7 @@ AI Trade Analyst is a multi-lane trading analysis system with a FastAPI + LangGr
 - Browser workflow lives in `app/` (dashboard/journey/journal/review pages + store/components).
 - API-first data access + snake_case↔camelCase boundary are handled in `app/lib/services.js` and `app/lib/adapters.js`.
 - Journey persistence contracts are served by backend routes in `ai_analyst/api/routers/journey.py` writing to `app/data/journeys/*`.
+- **Frontend:** The `ui/` directory contains the React + TypeScript + Tailwind frontend application (forward stack, introduced Phase 6). The legacy `app/` directory coexists but is not the forward UI surface.
 
 ### 7) Contracts / schemas / shared artifacts
 - API and persistence contracts: `docs/architecture/CONTRACTS.md`, `docs/architecture/openapi.json`.
@@ -111,7 +112,31 @@ flowchart LR
 - **AI runtime (`ai_analyst/`)** — active backend/API and graph orchestration lane; this is the primary live analysis surface for `/analyse` and streaming workflows.
 - **Legacy analyst lane (`analyst/`)** — retained arbitration/orchestration assets and contracts; still relevant to integration seams and governance semantics.
 - **UI (`app/`)** — API-first journey workflow with explicit adapter boundary and persisted review artifacts.
+- **Frontend (`ui/`)** — React + TypeScript + Tailwind frontend application (forward stack, introduced Phase 6). Coexists with legacy `app/`. Contains workspace-specific code under `ui/src/workspaces/` and shared components/hooks/types under `ui/src/shared/`.
 - **Docs/contracts (`docs/architecture`, `docs/specs`)** — contract and schema backbone for casing, API shapes, arbiter schema, and structured outputs.
+
+### 8) Agent Operations — Operator Observability Layer
+
+The Agent Ops subsystem exposes the multi-agent analysis engine's architecture, health, and run-level behavior as read-only projections for operator trust and explainability.
+
+**Endpoints (all read-only):**
+- `GET /ops/agent-roster` — static architecture and roster truth (config-derived)
+- `GET /ops/agent-health` — current health snapshot (observability-derived)
+- `GET /runs/{run_id}/agent-trace` — run-level participation and lineage projection
+- `GET /ops/agent-detail/{entity_id}` — entity-level detail with discriminated union
+
+**Backend components:**
+- Router: `ai_analyst/api/routers/ops.py`
+- Models: `ai_analyst/api/models/ops.py`, `ops_trace.py`, `ops_detail.py`
+- Services: `ai_analyst/api/services/ops_roster.py`, `ops_health.py`, `ops_trace.py`, `ops_detail.py`
+- Profile registry: `ai_analyst/api/services/ops_profile_registry.py` (static entity profiles)
+
+**Data sources (read-side only):**
+- Roster/detail: static persona config, profile registry
+- Health: observability events, scheduler lifecycle, feeder health
+- Trace: `run_record.json` (primary) + audit log `logs/runs/{run_id}.jsonl` (secondary for stances/overrides)
+
+**Contract:** `docs/ui/AGENT_OPS_CONTRACT.md` (§4–§7)
 
 ## Known architecture ambiguity (explicit)
 
