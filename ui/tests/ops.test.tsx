@@ -42,6 +42,7 @@ const mockFetchRoster = vi.fn();
 const mockFetchHealth = vi.fn();
 const mockFetchDetail = vi.fn();
 const mockFetchTrace = vi.fn();
+const mockFetchRuns = vi.fn();
 
 vi.mock("../src/shared/api/ops", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/shared/api/ops")>();
@@ -51,6 +52,14 @@ vi.mock("../src/shared/api/ops", async (importOriginal) => {
     fetchAgentHealth: (...args: unknown[]) => mockFetchHealth(...args),
     fetchAgentDetail: (...args: unknown[]) => mockFetchDetail(...args),
     fetchAgentTrace: (...args: unknown[]) => mockFetchTrace(...args),
+  };
+});
+
+vi.mock("../src/shared/api/runs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/shared/api/runs")>();
+  return {
+    ...actual,
+    fetchRuns: (...args: unknown[]) => mockFetchRuns(...args),
   };
 });
 
@@ -926,6 +935,13 @@ describe("AgentOpsPage — Run mode (PR-OPS-5b)", () => {
     mockFetchDetail.mockImplementation((entityId: string) =>
       Promise.resolve({ ok: true, data: makeDetail(entityId), status: 200 }),
     );
+    mockFetchRuns.mockResolvedValue({
+      ok: true, status: 200,
+      data: {
+        version: "2026.03", generated_at: "2026-03-14T12:00:00Z",
+        data_state: "live", items: [], page: 1, page_size: 20, total: 0, has_next: false,
+      },
+    });
   });
 
   function setupReady() {
@@ -935,7 +951,7 @@ describe("AgentOpsPage — Run mode (PR-OPS-5b)", () => {
     mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
   }
 
-  it("shows run selector and empty state when switching to Run mode", async () => {
+  it("shows run selector and browser panel when switching to Run mode", async () => {
     setupReady();
     renderWithRouter(<AgentOpsPage />);
     await screen.findByText("ARBITER");
@@ -943,8 +959,9 @@ describe("AgentOpsPage — Run mode (PR-OPS-5b)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Run" }));
 
     expect(screen.getByTestId("run-selector")).toBeInTheDocument();
-    expect(screen.getByTestId("run-mode-empty")).toBeInTheDocument();
-    expect(screen.getByText("Enter a run ID to view the agent trace")).toBeInTheDocument();
+    // Browser panel shows empty state when no runs exist
+    expect(screen.getByTestId("run-browser-empty")).toBeInTheDocument();
+    expect(screen.getByText("No analysis runs found")).toBeInTheDocument();
   });
 
   it("loads and displays trace after entering run ID", async () => {
@@ -1184,6 +1201,13 @@ describe("AgentOpsPage — Detail sidebar (PR-OPS-5b)", () => {
     mockFetchDetail.mockImplementation((entityId: string) =>
       Promise.resolve({ ok: true, data: makeDetail(entityId), status: 200 }),
     );
+    mockFetchRuns.mockResolvedValue({
+      ok: true, status: 200,
+      data: {
+        version: "2026.03", generated_at: "2026-03-14T12:00:00Z",
+        data_state: "live", items: [], page: 1, page_size: 20, total: 0, has_next: false,
+      },
+    });
   });
 
   function setupReady() {

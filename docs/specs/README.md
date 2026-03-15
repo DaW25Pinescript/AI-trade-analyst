@@ -19,6 +19,7 @@
 - [td3_packaging_import_stability.md](td3_packaging_import_stability.md) — ✅ Complete
 - [ui_reentry_phase_plan.md](ui_reentry_phase_plan.md) — ✅ Active — UI re-entry execution plan (React + TypeScript + Tailwind, phased build from Triage Board through Agent Operations)
 - [Agent Ops Contract](../ui/AGENT_OPS_CONTRACT.md) — ✅ Active — endpoint contract spec for `/ops/agent-roster` and `/ops/agent-health` (Phase 4, PR-OPS-1)
+- [PR_RUN_1_SPEC.md](PR_RUN_1_SPEC.md) — ✅ Complete — Run Browser endpoint + RunBrowserPanel (Phase 8, PR-RUN-1)
 
 ## Supporting Spec Assets
 

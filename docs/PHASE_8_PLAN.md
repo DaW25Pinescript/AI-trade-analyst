@@ -27,7 +27,7 @@ Both need **run volume** to deliver value. The first week focuses on run browser
 
 **Scope:**
 - `GET /runs/` — backend endpoint listing available runs (paginated, sorted by date, filterable by instrument/session)
-- Source: scan `ai_analyst/output/runs/` directories, read `run_record.json` **headers only** (run_id, instrument, session, status, timestamp, final_decision)
+- Source: scan `ai_analyst/output/runs/` directories, read `run_record.json` and project compact run summaries from the real artifact shape (run_id, timestamp, request.instrument, request.session, arbiter.verdict, derived run_status)
 - Response: compact run summaries — no analyst detail, no arbiter detail, no artifact content
 - Bounded: default page size 20, max 50, no unbounded directory walking
 - Frontend: `RunBrowserPanel` replacing the paste-field run selector in Agent Ops Run mode
@@ -108,7 +108,7 @@ Backend:
 **PR-REFLECT-2 (Week 5): Reflective dashboard in the UI**
 
 Frontend:
-- New **Reflect workspace** (or tab within Agent Ops) showing:
+- New top-level **`/reflect` workspace** showing:
   - Persona performance table: analyst name, participation %, override %, stance alignment %, avg confidence
   - Pattern summary: instrument × session heatmap or table showing verdict distribution
   - Highlighted anomalies: personas with >50% override rate, instruments with >80% NO_TRADE rate
@@ -143,7 +143,7 @@ Frontend:
 
 | Priority | Phase | Description | Status | Depends On | Target |
 |----------|-------|-------------|--------|------------|--------|
-| 1 | PR-RUN-1 | Run Browser endpoint + frontend | 📋 Planned | Phase 7 complete | Week 1 |
+| 1 | PR-RUN-1 | Run Browser endpoint + frontend | ✅ Done | Phase 7 complete | Week 1 |
 | 2 | PR-CHART-1 | OHLCV data endpoint + candlestick chart component | 📋 Planned | PR-RUN-1 | Week 2 |
 | 3 | PR-CHART-2 | Run context overlay + multi-timeframe charts | 📋 Planned | PR-CHART-1 | Week 3 |
 | 4 | PR-REFLECT-1 | Persona performance + pattern summary endpoints | 📋 Planned | PR-RUN-1 (needs run history) | Week 4 |
@@ -203,5 +203,5 @@ Each step builds on the previous and requires human governance. The system never
 ## Remaining Diagnostic Questions
 
 1. **MDO data access format:** How is OHLCV data stored? SQLite, cached DataFrames, raw CSV? Can a new endpoint read it without going through the scheduler? (This is the biggest uncertainty in the chart lane)
-2. **Reflect placement:** New `/reflect` workspace, or tab within Agent Ops? (Lower stakes — either works for v1)
+2. ~~**Reflect placement:**~~ **Resolved** — New top-level `/reflect` workspace. Locked decision per PR-RUN-1 spec §12.
 3. **Run directory structure:** Confirm `ai_analyst/output/runs/` directory naming convention for the run browser scan

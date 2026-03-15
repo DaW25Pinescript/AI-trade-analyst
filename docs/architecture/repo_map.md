@@ -41,21 +41,25 @@ Forward frontend stack: React + TypeScript + Tailwind.
 ## Agent Ops backend (`ai_analyst/api/`)
 
 - `ai_analyst/api/routers/ops.py` — Agent Ops router (roster, health, trace, detail)
+- `ai_analyst/api/routers/runs.py` — Run Browser router (`GET /runs/`, PR-RUN-1)
 - `ai_analyst/api/models/ops.py` — roster + health response models
 - `ai_analyst/api/models/ops_trace.py` — trace response models
 - `ai_analyst/api/models/ops_detail.py` — detail response models (discriminated union)
+- `ai_analyst/api/models/ops_run_browser.py` — run browser response models (PR-RUN-1)
 - `ai_analyst/api/services/ops_roster.py` — roster projection (static config)
 - `ai_analyst/api/services/ops_health.py` — health projection (observability)
 - `ai_analyst/api/services/ops_trace.py` — trace projection (run_record.json + audit log)
 - `ai_analyst/api/services/ops_detail.py` — detail projection (roster + health + profile registry)
 - `ai_analyst/api/services/ops_profile_registry.py` — static entity profiles
+- `ai_analyst/api/services/ops_run_browser.py` — run browser projection (directory scan, PR-RUN-1)
 
 ## Agent Ops tests
 
 - `tests/test_ops_endpoints.py` — roster + health endpoint tests (54 tests)
 - `tests/test_ops_trace_endpoints.py` — trace endpoint tests (70 tests)
 - `tests/test_ops_detail_endpoints.py` — detail endpoint tests (72 tests)
-- `tests/fixtures/sample_run_record.json` — trace test fixture
+- `tests/test_run_browser_endpoints.py` — run browser endpoint tests (42 tests, PR-RUN-1)
+- `tests/fixtures/sample_run_record.json` — trace + run browser test fixture
 - `tests/fixtures/sample_audit_log.jsonl` — trace test fixture
 
 ## Practical navigation tips
