@@ -158,17 +158,22 @@ It is a structured observability projection that answers:
 
 ### 6.3 Source data
 
-Read-side only. `/runs/{run_id}/agent-trace` is projected primarily from the per-run `run_record.json` artifact.
+Read-side only. `/runs/{run_id}/agent-trace` is projected from two existing per-run artifacts.
 
 **Primary source of truth:**
-- `run_record.json` → normalized run identity, request context, ordered stages, executed analysts, skipped analysts, failed analysts, arbiter summary, artifact references, usage summary, warnings/errors
+- `run_record.json` (path: `ai_analyst/output/runs/{run_id}/run_record.json`) → normalized run identity, request context (instrument, session), ordered stages with `duration_ms`, executed/skipped/failed analysts, high-level arbiter verdict, artifact references, usage summary, warnings/errors
 
-**Optional enrichment source:**
-- `dev_diagnostics.json` → request/event timing enrichment only when present and cheap to read
+**Secondary read-side source (required for full trace):**
+- Audit log (path: `ai_analyst/logs/runs/{run_id}.jsonl`) → per-analyst `htf_bias`, `confidence`, `recommended_action`, and `FinalVerdict` with `risk_override_applied`, `arbiter_notes`, `audit_log`
 
-`dev_diagnostics.json` is not required for a valid trace response. If diagnostics are absent, the endpoint must still return a valid trace projected from `run_record.json`.
+Both files already exist as pipeline output. Reading from two files instead of one is not a pipeline change — it is a read-side projection from existing artifacts.
 
-Do **not** introduce a new persistence layer. If the run artifacts are missing or malformed, return an appropriate error via `OpsErrorEnvelope`.
+**Not used in V1:**
+- `_dev_diagnostics.jsonl` — single global file, not per-run. Minimal trace value. Skipped entirely for PR-OPS-4.
+
+**ID mapping note:** `run_record.json` uses bare analyst names (e.g. `default_analyst`). Roster uses prefixed IDs (e.g. `persona_default_analyst`). The trace projection service must map `{persona}` → `persona_{persona}` for roster join. This mapping logic lives in the trace service, not in the contract shape.
+
+Do **not** introduce a new persistence layer. If either artifact is missing or malformed, return an appropriate error via `OpsErrorEnvelope`. If `run_record.json` exists but the audit log is missing, return a degraded trace (`data_state: "stale"`) with available fields from `run_record.json` only — stances and override details will be absent.
 
 ### 6.4 Response shape
 
@@ -223,20 +228,18 @@ type TraceStage = {
   stage_key: string;
   stage_index: number;
   status: "completed" | "failed" | "skipped";
-  started_at?: string;
-  finished_at?: string;
+  duration_ms?: number;
   participant_ids: string[];
 };
 ```
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
-| `stage_key` | `string` | yes | Machine-readable stage identifier (e.g. `"input_validation"`, `"analysis"`, `"arbiter"`) — stable for frontend routing |
+| `stage_key` | `string` | yes | Machine-readable stage identifier (e.g. `"validate_input"`, `"analyst_execution"`, `"arbiter"`) — from `run_record.json` stage vocabulary |
 | `stage_index` | `number` | yes | Explicit execution order — stages must be returned in ascending `stage_index` order |
 | `status` | see type | yes | Stage outcome |
-| `started_at` | `string` | no | ISO 8601 timestamp of stage start |
-| `finished_at` | `string` | no | ISO 8601 timestamp of stage completion |
-| `participant_ids` | `string[]` | yes | Entity IDs that participated in this stage — joins to roster `id` using existing convention (§5.2) |
+| `duration_ms` | `number` | no | Stage duration in milliseconds — available from `run_record.json` when present. V1 does not have per-stage start/end timestamps; only duration is available |
+| `participant_ids` | `string[]` | yes | Entity IDs that participated in this stage — joins to roster `id` using existing convention (§5.2). Trace service maps bare `run_record.json` analyst names to roster IDs (e.g. `default_analyst` → `persona_default_analyst`) |
 
 Stages must be returned in execution order (ascending `stage_index`). The frontend renders these as an ordered timeline.
 
@@ -453,40 +456,35 @@ Avoid vague string-only error responses.
       "stage_key": "validate_input",
       "stage_index": 1,
       "status": "completed",
-      "started_at": "2026-03-14T11:02:00Z",
-      "finished_at": "2026-03-14T11:02:01Z",
+      "duration_ms": 210,
       "participant_ids": ["input_validator"]
     },
     {
       "stage_key": "macro_context",
       "stage_index": 2,
       "status": "completed",
-      "started_at": "2026-03-14T11:02:01Z",
-      "finished_at": "2026-03-14T11:02:03Z",
+      "duration_ms": 1850,
       "participant_ids": ["market_data_officer"]
     },
     {
       "stage_key": "analyst_execution",
       "stage_index": 3,
       "status": "completed",
-      "started_at": "2026-03-14T11:02:03Z",
-      "finished_at": "2026-03-14T11:02:11Z",
+      "duration_ms": 8200,
       "participant_ids": ["persona_default_analyst", "persona_ict_purist", "persona_macro_analyst"]
     },
     {
       "stage_key": "arbiter",
       "stage_index": 4,
       "status": "completed",
-      "started_at": "2026-03-14T11:02:12Z",
-      "finished_at": "2026-03-14T11:02:14Z",
+      "duration_ms": 2100,
       "participant_ids": ["arbiter"]
     },
     {
       "stage_key": "logging",
       "stage_index": 5,
       "status": "completed",
-      "started_at": "2026-03-14T11:02:14Z",
-      "finished_at": "2026-03-14T11:02:18Z",
+      "duration_ms": 320,
       "participant_ids": []
     }
   ],
@@ -914,8 +912,8 @@ These represent relationships that can be honestly derived from existing run art
 | Router location | PR-OPS-2 established a router file for `/ops/` endpoints — new endpoints follow same placement |
 | Response models | PR-OPS-2 uses Pydantic models composing `ResponseMeta` — new models follow same style |
 | Error handling | `OpsErrorEnvelope` is already implemented and tested — reuse, do not redefine |
-| Run artifacts | `run_record.json` is the primary trace substrate per run; `dev_diagnostics.json` is optional timing enrichment |
-| Profile registry | Persona profile registry exists and is source of truth for entity metadata |
+| Run artifacts | `run_record.json` is the primary trace substrate; audit log (`logs/runs/{run_id}.jsonl`) is the secondary source for stances/override detail. `_dev_diagnostics.jsonl` skipped for V1 |
+| Profile registry | No separate registry module exists. Entity metadata is inline in `ops_roster.py`. Detail service requires a new static profile registry (`ops_profile_registry.py`) for extended fields (purpose, responsibilities, type-specific) — config-derived, matches PR-OPS-2 pattern |
 | Health projection | Health projection logic exists from PR-OPS-2 — agent-detail can reuse same health source |
 | Entity IDs | Stable and consistent between roster, health, and run artifacts — same namespace |
 | `DepartmentKey` | Closed enum of four values — unchanged, reused as-is |
@@ -1045,34 +1043,55 @@ Based on Steps 1–5, report:
 
 Follow the same backend patterns established by PR-OPS-2 unless the new endpoint requirements force a deviation. If a deviation is needed, document it in the diagnostic findings before proceeding.
 
-### 13.1b Implementation sequence
+### 13.1b Implementation sequence — PR-OPS-4a (agent-trace)
 
-1. **Create response models** for `AgentTraceResponse` and `AgentDetailResponse` (Pydantic)
+1. **Create trace response models** (`ai_analyst/api/models/ops_trace.py`) — `AgentTraceResponse`, `TraceSummary`, `TraceStage`, `TraceParticipant`, `ParticipantContribution`, `TraceEdge`, `ArbiterTraceSummary`, `ArtifactRef`
    - Verify: models import cleanly, no circular dependencies
-2. **Implement `/runs/{run_id}/agent-trace` endpoint** with artifact-based runtime projection logic and deterministic fixture-based tests
-   - Verify: PR-OPS-2 tests still pass (N/N)
-3. **Write trace endpoint tests** (AC-1 through AC-9, AC-18, AC-19, AC-20, AC-24, AC-25)
-   - Gate: all new tests pass + PR-OPS-2 baseline preserved
-4. **Implement `/ops/agent-detail/{entity_id}` endpoint** with artifact-based runtime projection logic (registry + health + run artifacts) and deterministic fixture-based tests
-   - Verify: all trace tests + PR-OPS-2 tests still pass
-5. **Write detail endpoint tests** (AC-10 through AC-17, AC-18, AC-19, AC-20, AC-24, AC-25)
-   - Gate: all new tests pass + all previous tests pass
-6. **Add regression safety tests** (AC-21, AC-22)
-   - Final gate: full test suite green (PR-OPS-2 baseline + all new tests)
-7. **Update `AGENT_OPS_CONTRACT.md`** — promote §6 to full contract (AC-23)
-   - Verify: no contradictions with existing contract sections
+2. **Create test fixtures** (`tests/fixtures/sample_run_record.json`, `tests/fixtures/sample_audit_log.jsonl`) — deterministic fixture data for trace projection
+3. **Implement trace projection service** (`ai_analyst/api/services/ops_trace.py`) — read `run_record.json` + audit log, map persona IDs, project to `AgentTraceResponse`
+4. **Add trace route** to `ai_analyst/api/routers/ops.py` — thin handler, same pattern as roster/health
+   - Gate: 55/55 PR-OPS-2 baseline still pass
+5. **Write trace endpoint tests** (`tests/test_ops_trace_endpoints.py`) — AC-1 through AC-9, AC-18–AC-20, AC-21, AC-22, AC-24, AC-25
+   - Final gate: all new tests pass + 55/55 baseline preserved
+6. **Update spec** — flip trace AC cells, note PR-OPS-4a complete in §18
+
+### 13.1c Implementation sequence — PR-OPS-4b (agent-detail)
+
+Starts from PR-OPS-4a green baseline.
+
+1. **Create detail response models** (`ai_analyst/api/models/ops_detail.py`) — `AgentDetailResponse`, `EntityIdentity`, `EntityStatus`, `EntityDependency`, `RecentParticipation`, `PersonaDetail`, `OfficerDetail`, `ArbiterDetail`, `SubsystemDetail`
+   - Verify: models import cleanly alongside trace models
+2. **Create static profile registry** (`ai_analyst/api/services/ops_profile_registry.py`) — purpose, responsibilities, type-specific fields per entity. Config-derived, matches `ops_roster.py` pattern
+3. **Implement detail projection service** (`ai_analyst/api/services/ops_detail.py`) — roster + health + profile registry + bounded recent-run scan
+4. **Add detail route** to `ai_analyst/api/routers/ops.py` — thin handler, same pattern
+   - Gate: all trace tests + 55/55 PR-OPS-2 baseline still pass
+5. **Write detail endpoint tests** (`tests/test_ops_detail_endpoints.py`) — AC-10 through AC-17, AC-18–AC-20, AC-21, AC-22, AC-24, AC-25
+   - Final gate: all new tests pass + all trace tests + 55/55 baseline preserved
+6. **Update `AGENT_OPS_CONTRACT.md`** — promote §6 from reserved to full contract (AC-23)
+   - Verify: no contradictions with §4/§5
+7. **Close spec and update docs** — flip all remaining AC cells, update progress doc, run cross-doc sanity check
 
 ### 13.2 Code change surface
 
-**New files (expected):**
-- Response models file for trace + detail types
-- Router endpoints for the two new routes (may be same file as PR-OPS-2 router — diagnostic decides)
-- Projection/service helpers for run artifact reading and entity detail assembly
-- Test file(s) for new endpoints
+**PR-OPS-4a new files:**
+- `ai_analyst/api/models/ops_trace.py` — trace response models (~120 lines)
+- `ai_analyst/api/services/ops_trace.py` — trace projection service (~250 lines)
+- `tests/test_ops_trace_endpoints.py` — trace tests (~400 lines)
+- `tests/fixtures/sample_run_record.json` — test fixture (~80 lines)
+- `tests/fixtures/sample_audit_log.jsonl` — test fixture (~30 lines)
 
-**Modified files (expected):**
-- Router registration (if endpoints are added to existing router)
-- `AGENT_OPS_CONTRACT.md` (§6 promotion)
+**PR-OPS-4a modified files:**
+- `ai_analyst/api/routers/ops.py` — add trace route (+30 lines)
+
+**PR-OPS-4b new files:**
+- `ai_analyst/api/models/ops_detail.py` — detail response models (~130 lines)
+- `ai_analyst/api/services/ops_detail.py` — detail projection service (~300 lines)
+- `ai_analyst/api/services/ops_profile_registry.py` — static profile data (~200 lines)
+- `tests/test_ops_detail_endpoints.py` — detail tests (~400 lines)
+
+**PR-OPS-4b modified files:**
+- `ai_analyst/api/routers/ops.py` — add detail route (+30 lines)
+- `docs/ui/AGENT_OPS_CONTRACT.md` — promote §6 (+150 lines)
 
 **No changes expected to:**
 - Existing roster/health endpoints or models
@@ -1126,7 +1145,7 @@ Explicit test coverage requirements for PR-OPS-4, following the PR-OPS-2 pattern
 - [ ] `stage_index` values are monotonically increasing
 - [ ] `stage_key` is present and non-empty for each stage
 - [ ] `participant_ids` in each stage reference valid roster entities
-- [ ] Stages with `status: "skipped"` have empty or absent timing fields
+- [ ] Stages with `status: "skipped"` have null or absent `duration_ms`
 
 ### 14.4 Agent trace — trace edge validity
 
@@ -1227,53 +1246,94 @@ This PR must update:
 
 ## 18. Diagnostic Findings
 
-### PR-OPS-4a Diagnostic (2026-03-15)
+*Populated from Section 12 diagnostic run — 2026-03-15.*
 
-**File paths found:**
-- Router: `ai_analyst/api/routers/ops.py`
-- Models: `ai_analyst/api/models/ops.py` (shared), `ai_analyst/api/models/ops_trace.py` (new)
-- Service: `ai_analyst/api/services/ops_trace.py` (new)
-- Tests: `tests/test_ops_trace_endpoints.py` (new)
-- Fixtures: `tests/fixtures/sample_run_record.json`, `tests/fixtures/sample_audit_log.jsonl`
-- Run artifacts: `ai_analyst/output/runs/{run_id}/run_record.json` (primary)
-- Audit log: `ai_analyst/logs/runs/{run_id}.jsonl` (secondary — analyst stances, override detail)
+### 18.1 Confirmed assumptions
 
-**ID convention confirmed:** Plain lowercase slugs (e.g. `persona_default_analyst`, `arbiter`). No namespace prefix.
+| Assumption | Result |
+|-----------|--------|
+| Flat `ResponseMeta` envelope | ✅ Confirmed — class inheritance pattern (`AgentRosterResponse(ResponseMeta)`) |
+| Plain slug entity IDs | ✅ Confirmed — `persona_default_analyst`, `arbiter`, `market_data_officer` etc. |
+| Stage vocabulary | ✅ Confirmed — `validate_input`, `macro_context`, `chart_setup`, `analyst_execution`, `arbiter`, `logging` |
+| Baseline tests | ✅ 55/55 pass (0.41s) |
+| No pipeline changes needed | ✅ Both artifact files are read-only existing outputs |
 
-**Envelope pattern confirmed:** Flat `ResponseMeta` inheritance — `AgentTraceResponse(ResponseMeta)`. No data/meta wrapper.
+### 18.2 Corrected assumptions
 
-**Assumption corrections:**
-1. `run_record.json` lacks per-analyst stances/confidence — audit log used as secondary source
-2. `run_record.json` stores bare persona names (e.g. `default_analyst`) — mapping to `persona_default_analyst` done in trace service
-3. No per-stage `started_at`/`finished_at` timestamps — `duration_ms` used instead
-4. `_dev_diagnostics.jsonl` is a single file for all runs, not per-run — skipped entirely
+| Spec assumption | Actual state | Resolution |
+|----------------|-------------|------------|
+| `run_record.json` has per-analyst stance/confidence | **No** — only persona, status, model, provider | Read audit log (`logs/runs/{run_id}.jsonl`) as secondary source |
+| `run_record.json` has arbiter override detail | **No** — only ran, verdict, confidence | Read `FinalVerdict` from audit log — `risk_override_applied` available there |
+| `run_record.json` has per-stage start/end timestamps | **No** — only `duration_ms` (optional) | `TraceStage` uses `duration_ms`; no `started_at`/`finished_at` in V1 |
+| `dev_diagnostics.json` co-located per-run | **No** — single `_dev_diagnostics.jsonl` for all runs | Skipped entirely for V1 |
+| Profile registry exists as separate module | **No** — entity metadata inline in `ops_roster.py` | Create `ops_profile_registry.py` — static config, matches PR-OPS-2 pattern |
+| Analyst IDs in `run_record.json` match roster IDs | **No** — bare names (`default_analyst`) vs roster (`persona_default_analyst`) | Trace service maps `{persona}` → `persona_{persona}` |
 
-**Artifact shape surprises:**
-- Arbiter block has `verdict`/`confidence` but no `risk_override_applied` — that field is only in `FinalVerdict` via audit log
-- Analyst entries in run_record have no stance/bias — only persona name, status, model, provider
+### 18.3 File paths confirmed
 
-**Regression gate:** 55/55 PR-OPS-2 baseline preserved → 126/126 total (55 baseline + 71 new trace tests)
+| Component | Path |
+|-----------|------|
+| Router | `ai_analyst/api/routers/ops.py` (97 lines) |
+| Models | `ai_analyst/api/models/ops.py` (126 lines) |
+| Service: roster | `ai_analyst/api/services/ops_roster.py` (318 lines) |
+| Service: health | `ai_analyst/api/services/ops_health.py` (218 lines) |
+| Tests | `tests/test_ops_endpoints.py` (703 lines, 54 tests) |
+| Tests | `ai_analyst/tests/test_roster_schema_invariants.py` (35 lines, 1 test) |
+| Router registration | `ai_analyst/api/main.py` (1826 lines) |
+| Run artifacts | `ai_analyst/output/runs/{run_id}/run_record.json` |
+| Audit logs | `ai_analyst/logs/runs/{run_id}.jsonl` |
 
-**Patch set (PR-OPS-4a):**
-| File | Action | Lines |
-|------|--------|-------|
-| `ai_analyst/api/models/ops_trace.py` | Created | 109 |
-| `ai_analyst/api/services/ops_trace.py` | Created | 308 |
-| `ai_analyst/api/routers/ops.py` | Modified | +30 |
-| `tests/fixtures/sample_run_record.json` | Created | 48 |
-| `tests/fixtures/sample_audit_log.jsonl` | Created | 1 |
-| `tests/test_ops_trace_endpoints.py` | Created | 491 |
-| `docs/PR_OPS_4_SPEC_FINAL.md` | Updated | AC flips, §18 |
+### 18.4 Implementation patterns observed
+
+- Thin router: validation + service handoff + observability emit + `JSONResponse`
+- `_ops_error()` helper builds `HTTPException` with `OpsError.model_dump()` as detail
+- Service layer returns typed Pydantic response models
+- `model_dump(by_alias=True)` for JSON serialization (needed for `EntityRelationship.from_` → `"from"` — relevant for `TraceEdge.from` field)
+
+### 18.5 Proposed patch set
+
+**New files (9):** ~1,910 lines — models (trace + detail), services (trace + detail + profile registry), tests (trace + detail), fixtures (run_record + audit log)
+
+**Modified files (4):** ~300 lines — ops router (+2 routes), contract doc (§6 promotion), spec (§18 findings), progress doc
+
+**Estimated total delta:** ~2,210 lines
+
+### 18.6 Split decision (post-diagnostic amendment)
+
+The ~2,210 line patch across 9 new files is too large for a single Claude Code pass. Split PR-OPS-4 into two sub-PRs executed sequentially:
+
+| Sub-PR | Scope | ACs | Est. lines |
+|--------|-------|-----|-----------|
+| **PR-OPS-4a** | `GET /runs/{run_id}/agent-trace` — models, trace service, route, tests, fixtures | AC-1 through AC-9, AC-18–AC-20, AC-24–AC-25 (15 ACs) | ~1,060 |
+| **PR-OPS-4b** | `GET /ops/agent-detail/{entity_id}` — models, detail service, profile registry, route, tests | AC-10 through AC-17, AC-18–AC-20, AC-24–AC-25 (16 ACs) | ~1,150 |
+
+**Sequencing rule:** PR-OPS-4a lands first. PR-OPS-4b starts from the PR-OPS-4a green baseline.
+
+**Shared work allocation:**
+- PR-OPS-4a creates `ops_trace.py` (models) and `ops_trace.py` (service), adds the trace route to `ops.py`, creates test fixtures (`sample_run_record.json`, `sample_audit_log.jsonl`)
+- PR-OPS-4b creates `ops_detail.py` (models), `ops_detail.py` (service), `ops_profile_registry.py` (static profile data), adds the detail route to `ops.py`
+- Contract doc update (`AGENT_OPS_CONTRACT.md` §6 promotion) happens in PR-OPS-4b (final sub-PR)
+- AC-21 (regression) and AC-22 (no new persistence) are verified in both sub-PRs
+- AC-23 (contract doc update) is PR-OPS-4b only
+
+**Why this split works:**
+- Trace and detail have zero shared projection logic
+- Trace reads run artifacts; detail reads roster + health + profile registry + recent runs
+- Each sub-PR is independently testable and mergeable
+- PR-OPS-4b can reference the trace test fixtures for its own recent-participation scan tests
 
 ---
 
-## 19. Follow-on PR
+## 19. Follow-on PRs
 
-After this backend PR lands:
-- draft and implement PR-OPS-5
-- wire Agent Ops workspace to: run mode, health mode, detail sidebar, trace visualization
+**After PR-OPS-4a lands:**
+- Start PR-OPS-4b (agent-detail endpoint) from the PR-OPS-4a green baseline
 
-No PR-OPS-5 wiring should begin against unstable endpoint shapes before this contract lands.
+**After PR-OPS-4b lands:**
+- Draft and implement PR-OPS-5
+- Wire Agent Ops workspace to: run mode, health mode, detail sidebar, trace visualization
+
+No PR-OPS-5 wiring should begin against unstable endpoint shapes before both sub-PRs land.
 
 ---
 
@@ -1289,7 +1349,7 @@ before changing any code:
 1. Locate PR-OPS-2 backend patterns (router, models, tests — exact paths)
 2. Confirm entity_id convention (plain slugs vs namespaced — report exact format)
 3. Confirm envelope style (flat ResponseMeta & {} vs data/meta wrapper)
-4. Audit run artifact structure (run_record.json as primary source, dev_diagnostics.json as optional enrichment)
+4. Read run artifacts: run_record.json (primary) + audit log {run_id}.jsonl (secondary for stances/overrides)
 5. Audit profile registry structure (available metadata fields per entity type)
 6. Run baseline test suite — confirm green, record count
 7. Propose smallest patch set: files, one-line description, estimated line delta
