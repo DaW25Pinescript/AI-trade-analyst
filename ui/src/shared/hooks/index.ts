@@ -4,3 +4,4 @@ export { useAgentRoster, AGENT_ROSTER_KEY } from "./useAgentRoster";
 export { useAgentHealth, AGENT_HEALTH_KEY } from "./useAgentHealth";
 export { useAgentTrace, agentTraceKey } from "./useAgentTrace";
 export { useAgentDetail, agentDetailKey } from "./useAgentDetail";
+export { useRuns, runsKey, RUNS_KEY } from "./useRuns";

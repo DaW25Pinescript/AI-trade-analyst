@@ -24,6 +24,7 @@ import { OpsDepartmentSection } from "./OpsDepartmentSection";
 import { OpsDegradedBanner } from "./OpsDegradedBanner";
 import { OpsDataStateBanner } from "./OpsDataStateBanner";
 import { RunSelector } from "./RunSelector";
+import { RunBrowserPanel } from "./RunBrowserPanel";
 import { RunTracePanel } from "./RunTracePanel";
 import { AgentDetailSidebar } from "./AgentDetailSidebar";
 
@@ -229,25 +230,20 @@ export function AgentOpsPage() {
           {/* Run mode */}
           {mode === "run" && (
             <div className="space-y-4" data-testid="run-mode-view">
-              <RunSelector
-                currentRunId={selectedRunId}
-                onSelectRun={handleSelectRun}
-              />
-              {selectedRunId ? (
-                <RunTracePanel runId={selectedRunId} />
-              ) : (
-                <div
-                  className="rounded-lg border border-gray-700/40 bg-gray-900/40 px-6 py-8 text-center"
-                  data-testid="run-mode-empty"
-                >
-                  <p className="text-sm text-gray-400">
-                    Enter a run ID to view the agent trace
-                  </p>
-                  <p className="mt-1 text-xs text-gray-600">
-                    Paste a run ID from Journey Studio or Analysis workspace
-                  </p>
-                </div>
-              )}
+              <RunBrowserPanel onSelectRun={handleSelectRun} />
+
+              {/* Demoted paste-field — secondary input */}
+              <div className="border-t border-gray-800/50 pt-3">
+                <p className="mb-2 text-center text-xs text-gray-600">
+                  — or enter run ID directly —
+                </p>
+                <RunSelector
+                  currentRunId={selectedRunId}
+                  onSelectRun={handleSelectRun}
+                />
+              </div>
+
+              {selectedRunId && <RunTracePanel runId={selectedRunId} />}
             </div>
           )}
 

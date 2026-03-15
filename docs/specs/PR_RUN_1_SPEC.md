@@ -1,6 +1,6 @@
 # AI Trade Analyst — PR-RUN-1: Run Browser Endpoint + Frontend Spec
 
-**Status:** ⏳ Spec drafted — implementation pending
+**Status:** ✅ Complete — implemented 15 March 2026
 **Date:** 15 March 2026
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Branch:** `pr-run-1-run-browser`
@@ -329,40 +329,40 @@ Stale time: 30 seconds.
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-1 | Endpoint exists | `GET /runs/` returns 200 with valid `RunBrowserResponse` shape | ⏳ Pending |
-| AC-2 | ResponseMeta present | Response includes `version`, `generated_at`, `data_state` | ⏳ Pending |
-| AC-3 | Pagination works | `page=1&page_size=5` returns ≤5 items with correct `page`, `total`, `has_next` | ⏳ Pending |
-| AC-4 | Page bounds enforced | `page_size=0` or `page_size=100` returns 422 with `INVALID_FILTER` | ⏳ Pending |
-| AC-5 | Newest-first sort | Runs returned in descending timestamp order | ⏳ Pending |
-| AC-6 | Instrument filter | `?instrument=XAUUSD` returns only XAUUSD runs | ⏳ Pending |
-| AC-7 | Session filter | `?session=NY` returns only NY session runs | ⏳ Pending |
-| AC-8 | Combined filter | `?instrument=XAUUSD&session=NY` returns correct intersection | ⏳ Pending |
-| AC-9 | No-match filter | Filtering to a nonexistent instrument returns empty `items: []` with 200 (not 404) | ⏳ Pending |
-| AC-10 | Malformed artifact tolerance | A `run_record.json` with missing required fields is skipped, not a 500 | ⏳ Pending |
-| AC-11 | Empty runs directory | Zero runs on disk → 200 with `items: []`, `total: 0` | ⏳ Pending |
-| AC-12 | Scan bound respected | With >200 run directories, only the most recent 200 are scanned | ⏳ Pending |
-| AC-13 | run_status: completed | A clean run with arbiter verdict, no errors, all stages ok → `"completed"` | ⏳ Pending |
-| AC-14 | run_status: partial | A run with evidence of execution but incomplete arbiter → `"partial"` | ⏳ Pending |
-| AC-15 | run_status: failed | A run with non-empty errors or stage failure → `"failed"` | ⏳ Pending |
-| AC-16 | run_status: unknown | A readable but unclassifiable run → `"unknown"` | ⏳ Pending |
-| AC-17 | final_decision gated | `final_decision` is `null` when `arbiter.ran != true` | ⏳ Pending |
-| AC-18 | trace_available field | Readable runs report `true`, malformed runs report `false` | ⏳ Pending |
-| AC-19 | No trace data leakage | Response contains no analyst results, no stage traces, no arbiter detail text | ⏳ Pending |
-| AC-20 | Error envelope | Scan failure returns `OpsErrorEnvelope` with `RUN_SCAN_FAILED` | ⏳ Pending |
-| AC-21 | Frontend: browser panel renders | `RunBrowserPanel` renders a list of run items from API response | ⏳ Pending |
-| AC-22 | Frontend: click-to-load | Clicking a run row triggers trace load for that `run_id` | ⏳ Pending |
-| AC-23 | Frontend: trace_available gating | Rows with `trace_available == false` are visually de-emphasized or disabled | ⏳ Pending |
-| AC-24 | Frontend: filter controls | Instrument and session filters update the query and re-fetch | ⏳ Pending |
-| AC-25 | Frontend: pagination | Next/prev controls work; next disabled when `has_next == false` | ⏳ Pending |
-| AC-26 | Frontend: empty state | Zero runs displays a welcoming empty state, not an error | ⏳ Pending |
-| AC-27 | Frontend: loading state | Loading skeleton shows while fetch is in-flight | ⏳ Pending |
-| AC-28 | Frontend: error state | API error renders ErrorState component with retry | ⏳ Pending |
-| AC-29 | Frontend: paste-field retained | Existing RunSelector paste-field remains functional as secondary input | ⏳ Pending |
-| AC-30 | No new persistence | No SQLite, no database, no index file introduced | ⏳ Pending |
-| AC-31 | No new top-level module | Work confined to existing `app/` and `ui/` packages | ⏳ Pending |
-| AC-32 | No trace endpoint changes | Existing `GET /runs/{run_id}/agent-trace` is unchanged | ⏳ Pending |
-| AC-33 | No run_record.json changes | The artifact format is not modified | ⏳ Pending |
-| AC-34 | Regression safety | All pre-existing backend and frontend tests still pass | ⏳ Pending |
+| AC-1 | Endpoint exists | `GET /runs/` returns 200 with valid `RunBrowserResponse` shape | ✅ Done |
+| AC-2 | ResponseMeta present | Response includes `version`, `generated_at`, `data_state` | ✅ Done |
+| AC-3 | Pagination works | `page=1&page_size=5` returns ≤5 items with correct `page`, `total`, `has_next` | ✅ Done |
+| AC-4 | Page bounds enforced | `page_size=0` or `page_size=100` returns 422 with `INVALID_FILTER` | ✅ Done |
+| AC-5 | Newest-first sort | Runs returned in descending timestamp order | ✅ Done |
+| AC-6 | Instrument filter | `?instrument=XAUUSD` returns only XAUUSD runs | ✅ Done |
+| AC-7 | Session filter | `?session=NY` returns only NY session runs | ✅ Done |
+| AC-8 | Combined filter | `?instrument=XAUUSD&session=NY` returns correct intersection | ✅ Done |
+| AC-9 | No-match filter | Filtering to a nonexistent instrument returns empty `items: []` with 200 (not 404) | ✅ Done |
+| AC-10 | Malformed artifact tolerance | A `run_record.json` with missing required fields is skipped, not a 500 | ✅ Done |
+| AC-11 | Empty runs directory | Zero runs on disk → 200 with `items: []`, `total: 0` | ✅ Done |
+| AC-12 | Scan bound respected | With >200 run directories, only the most recent 200 are scanned | ✅ Done |
+| AC-13 | run_status: completed | A clean run with arbiter verdict, no errors, all stages ok → `"completed"` | ✅ Done |
+| AC-14 | run_status: partial | A run with evidence of execution but incomplete arbiter → `"partial"` | ✅ Done |
+| AC-15 | run_status: failed | A run with non-empty errors or stage failure → `"failed"` | ✅ Done |
+| AC-16 | run_status: unknown | A readable but unclassifiable run → `"unknown"` | ✅ Done |
+| AC-17 | final_decision gated | `final_decision` is `null` when `arbiter.ran != true` | ✅ Done |
+| AC-18 | trace_available field | Readable runs report `true`, malformed runs report `false` | ✅ Done |
+| AC-19 | No trace data leakage | Response contains no analyst results, no stage traces, no arbiter detail text | ✅ Done |
+| AC-20 | Error envelope | Scan failure returns `OpsErrorEnvelope` with `RUN_SCAN_FAILED` | ✅ Done |
+| AC-21 | Frontend: browser panel renders | `RunBrowserPanel` renders a list of run items from API response | ✅ Done |
+| AC-22 | Frontend: click-to-load | Clicking a run row triggers trace load for that `run_id` | ✅ Done |
+| AC-23 | Frontend: trace_available gating | Rows with `trace_available == false` are visually de-emphasized or disabled | ✅ Done |
+| AC-24 | Frontend: filter controls | Instrument and session filters update the query and re-fetch | ✅ Done |
+| AC-25 | Frontend: pagination | Next/prev controls work; next disabled when `has_next == false` | ✅ Done |
+| AC-26 | Frontend: empty state | Zero runs displays a welcoming empty state, not an error | ✅ Done |
+| AC-27 | Frontend: loading state | Loading skeleton shows while fetch is in-flight | ✅ Done |
+| AC-28 | Frontend: error state | API error renders ErrorState component with retry | ✅ Done |
+| AC-29 | Frontend: paste-field retained | Existing RunSelector paste-field remains functional as secondary input | ✅ Done |
+| AC-30 | No new persistence | No SQLite, no database, no index file introduced | ✅ Done |
+| AC-31 | No new top-level module | Work confined to existing `app/` and `ui/` packages | ✅ Done |
+| AC-32 | No trace endpoint changes | Existing `GET /runs/{run_id}/agent-trace` is unchanged | ✅ Done |
+| AC-33 | No run_record.json changes | The artifact format is not modified | ✅ Done |
+| AC-34 | Regression safety | All pre-existing backend and frontend tests still pass | ✅ Done |
 
 ---
 
@@ -569,7 +569,7 @@ PR-RUN-1 is done when: the `GET /runs/` endpoint returns a paginated, filterable
 | Phase | Scope | Status |
 |-------|-------|--------|
 | Phase 7 — Agent Ops read-side stack | 4 endpoints, 3 workspace modes, detail sidebar | ✅ Done — 197 backend + 63 frontend tests |
-| **PR-RUN-1 — Run Browser** | **`GET /runs/` endpoint + RunBrowserPanel frontend** | **⏳ Spec drafted — implementation pending** |
+| **PR-RUN-1 — Run Browser** | **`GET /runs/` endpoint + RunBrowserPanel frontend** | **✅ Done — 15 March 2026** |
 | PR-CHART-1 — OHLCV data seam + chart | Candlestick chart in Run mode | 📋 Planned — depends on PR-RUN-1 |
 | PR-CHART-2 — Run context overlay | Multi-timeframe, run marker, verdict annotation | 📋 Planned — depends on PR-CHART-1 |
 | PR-REFLECT-1 — Aggregation endpoints | Persona performance + pattern summary | 📋 Planned — depends on PR-RUN-1 |
@@ -580,7 +580,74 @@ PR-RUN-1 is done when: the `GET /runs/` endpoint returns a paginated, filterable
 
 ## 13. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 8).*
+### run_record.json Field Paths — Confirmed
+
+| Browser field | Source path | Confirmed |
+|--------------|------------|-----------|
+| `run_id` | `run_record["run_id"]` (top-level) | ✅ |
+| `timestamp` | `run_record["timestamp"]` (top-level) | ✅ |
+| `instrument` | `run_record["request"]["instrument"]` | ✅ |
+| `session` | `run_record["request"]["session"]` | ✅ |
+| `final_decision` | `run_record["arbiter"]["verdict"]` when `arbiter["ran"] == true` | ✅ |
+| `errors[]` | `run_record["errors"]` (top-level array) | ✅ |
+| `warnings[]` | `run_record["warnings"]` (top-level array) | ✅ |
+| `analysts_failed[]` | `run_record["analysts_failed"]` (top-level array) | ✅ |
+| `stages[]` | `run_record["stages"]` — each has `stage`, `status`, `duration_ms` | ✅ |
+
+### run_status Derivation — Validated
+
+Three-value policy aligned with trace projection (`ops_trace.py` lines 226–233):
+
+- **`completed`**: no errors, `arbiter.ran == true`, verdict present, all stages `status == "ok"`
+- **`partial`**: meaningful execution evidence but completion conditions not met
+- **`failed`**: errors non-empty, stage failure, or analysts_failed with no arbiter verdict
+
+### trace_available Derivation
+
+`trace_available = true` when: JSON parseable + `run_id` present + `timestamp` present. This mirrors the minimum readability checks the trace endpoint (`project_trace()`) requires before attempting a projection.
+
+### Path Corrections from Spec Hypotheses
+
+| Spec hypothesis | Actual path |
+|----------------|-------------|
+| `app/services/ops/trace_projection.py` | `ai_analyst/api/services/ops_trace.py` |
+| `app/routes/` | `ai_analyst/api/routers/` |
+| `app/models/` | `ai_analyst/api/models/` |
+| `app/main.py` | `ai_analyst/api/main.py` |
+| `ui/src/components/ops/RunSelector.tsx` | `ui/src/workspaces/ops/components/RunSelector.tsx` |
+| `ui/src/pages/AgentOpsPage.tsx` | `ui/src/workspaces/ops/components/AgentOpsPage.tsx` |
+
+### Final Patch Set
+
+**New files (8):**
+
+| File | Role | Lines |
+|------|------|-------|
+| `ai_analyst/api/models/ops_run_browser.py` | Pydantic response models | 34 |
+| `ai_analyst/api/services/ops_run_browser.py` | Scan + project run summaries | 160 |
+| `ai_analyst/api/routers/runs.py` | `GET /runs/` endpoint | 82 |
+| `tests/test_run_browser_endpoints.py` | Backend contract tests (42 tests) | 317 |
+| `ui/src/shared/api/runs.ts` | `fetchRuns()` API function | 56 |
+| `ui/src/shared/hooks/useRuns.ts` | TanStack Query hook | 38 |
+| `ui/src/workspaces/ops/components/RunBrowserPanel.tsx` | Browser panel component | 188 |
+| `ui/tests/run-browser.test.tsx` | Frontend component tests (14 tests) | 310 |
+
+**Modified files (4):**
+
+| File | Change | Delta |
+|------|--------|-------|
+| `ai_analyst/api/main.py` | Register runs router | +4 |
+| `ui/src/workspaces/ops/components/AgentOpsPage.tsx` | Wire RunBrowserPanel, demote paste-field | +11 |
+| `ui/src/shared/hooks/index.ts` | Export useRuns | +1 |
+| `ui/tests/ops.test.tsx` | Add fetchRuns mock, update Run mode test for browser panel | +16 |
+
+**Test counts:**
+
+| Suite | Before | After | Delta |
+|-------|--------|-------|-------|
+| Backend (ops domain) | 197 | 239 | +42 |
+| Frontend (ops domain) | 63 | 77 | +14 |
+| **Total ops tests** | **260** | **316** | **+56** |
 
 ---
 

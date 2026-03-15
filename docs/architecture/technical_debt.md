@@ -24,7 +24,7 @@ This document is the enduring repository ledger for technical debt items.
 | TD-11 | Packaging test coverage | 16 import stability tests added in `tests/test_import_stability.py` including negative packaging test. | ~~Packaging regressions undetected~~ | Medium | **✅ Resolved** | Completed 12 March 2026 as part of TD-3 closure. |
 | TD-12 | Architecture contracts docs | Cross-module ownership/fallback/scaling boundaries under-documented. | Harder onboarding and seam reasoning for contributors/agents. | Medium | Open | Address alongside runtime-lane convergence or next architecture review. |
 
-| TD-13 | Agent Ops run selector | Run selector is paste-field only in Agent Ops Run mode. Operators must know `run_id` to inspect a run — no browse/search. | Operator friction; reduces discoverability of run artifacts. | Medium | Planned | Tracked in Roadmap as PR-RUN-1 (Phase 8 Week 1). |
+| TD-13 | Agent Ops run selector | Run selector is paste-field only in Agent Ops Run mode. Operators must know `run_id` to inspect a run — no browse/search. | Operator friction; reduces discoverability of run artifacts. | Medium | **✅ Resolved — 15 March 2026** | PR-RUN-1 shipped. `GET /runs/` endpoint + RunBrowserPanel. Paste-field retained as fallback. |
 
 ## See also
 

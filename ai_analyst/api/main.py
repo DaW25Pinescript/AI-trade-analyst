@@ -574,6 +574,11 @@ from .routers.ops import router as ops_router
 
 app.include_router(ops_router)
 
+# ── Run Browser router (PR-RUN-1) ────────────────────────────────────────
+from .routers.runs import router as runs_router
+
+app.include_router(runs_router)
+
 
 @app.get("/health")
 async def health():

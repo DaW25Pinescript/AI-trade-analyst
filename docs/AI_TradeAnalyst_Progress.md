@@ -3,8 +3,8 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 15 March 2026
 **Review date:** 10 March 2026
-**Current phase:** Phase 7 — Complete (Agent Ops backend ✅, Agent Ops frontend wiring ✅)
-**Planning horizon:** Next 6–8 weeks
+**Current phase:** Phase 8 — PR-RUN-1 Complete (Run Browser endpoint + frontend ✅)
+**Planning horizon:** Next 5–7 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
 
@@ -20,12 +20,12 @@
 
 ## Phase Index (at-a-glance)
 
-- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b).
-- **Current phase:** Phase 7 — Complete. Agent Ops read-side stack fully wired: 4 backend endpoints (197 tests), 3 workspace modes (63 frontend tests), typed detail sidebar, trace visualization.
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1.
+- **Current phase:** Phase 8 — PR-RUN-1 Complete. Run Browser endpoint + RunBrowserPanel wired: 5 backend endpoints (239 tests), 3 workspace modes with browsable run selector (77 frontend tests).
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
-- **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on four read-only projection endpoints (roster, health, trace, detail).
-- **Next actions:** Phase 8 planned — Run Browser (PR-RUN-1), Live Charts (PR-CHART-1/2), Reflective Intelligence (PR-REFLECT-1/2/3). Run Browser first to enable run discovery and artifact volume.
-- **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6) and Agent Ops read-side stack (Phase 7) are both complete.
+- **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on five read-only projection endpoints (roster, health, trace, detail, run browser).
+- **Next actions:** Phase 8 continues — Live Charts (PR-CHART-1/2), Reflective Intelligence (PR-REFLECT-1/2/3).
+- **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6), Agent Ops read-side stack (Phase 7), and Run Browser (PR-RUN-1) are all complete.
 
 ---
 
@@ -33,6 +33,7 @@
 
 | Date | Phase | Activity |
 |------|-------|----------|
+| 15 Mar 2026 | PR-RUN-1 | Run Browser endpoint + RunBrowserPanel — `GET /runs/`, browsable run index, paste-field demoted. +42 backend tests (239 total), +14 frontend tests (77 ops total) |
 | 15 Mar 2026 | PR-OPS-5b | Frontend Run mode + Detail sidebar — 7 new components, +24 tests (63 frontend total), Phase 7 complete |
 | 15 Mar 2026 | PR-OPS-5a | Frontend types + adapters + Health mode — +16 tests (39 frontend total), foundation wiring |
 | 15 Mar 2026 | PR-OPS-4b | Backend agent-detail endpoint — discriminated union, profile registry, +72 tests (197 backend total) |
@@ -54,7 +55,7 @@
 
 | Priority | Phase | Description | Status | Depends On |
 |----------|-------|-------------|--------|------------|
-| 1 | PR-RUN-1 | Run Browser endpoint + frontend — replace paste-field run selector | 📋 Planned | Phase 7 complete |
+| 1 | PR-RUN-1 | Run Browser endpoint + frontend — replace paste-field run selector | ✅ Done | Phase 7 complete |
 | 2 | PR-CHART-1 | OHLCV data-seam validation + basic candlestick chart (lightweight-charts, embedded in Run mode) | 📋 Planned | PR-RUN-1 |
 | 3 | PR-CHART-2 | Run context overlay + multi-timeframe chart support | 📋 Planned | PR-CHART-1 |
 | 4 | PR-REFLECT-1 | Persona performance + pattern summary aggregation endpoints | 📋 Planned | PR-RUN-1 + run history |
@@ -484,7 +485,7 @@ Full plan: `docs/PHASE_8_PLAN.md`
 - **Seam blind-spot risk:** broad unit coverage may still miss cross-module orchestration and integration regressions.
 - ~~**Cleanup drift risk:**~~ **Resolved** — cleanup tranche complete (13 March 2026).
 - **Scope-creep risk:** future extensions such as Chart Evidence or Run Artifact Inspector could jump ahead of prioritisation.
-- **Run discovery gap:** Agent Ops Run mode requires manual run_id entry (paste field). No run browser/search endpoint exists yet. Operators must know the run_id to inspect a run. Tracked in Roadmap as Priority 1.
+- ~~**Run discovery gap:**~~ **Resolved** — PR-RUN-1 complete (15 March 2026). `GET /runs/` endpoint + RunBrowserPanel. Operators can browse, filter, and click-to-load runs. Paste-field retained as fallback.
 
 ---
 
@@ -504,7 +505,8 @@ Full plan: `docs/PHASE_8_PLAN.md`
 12. Core product workflow lane is now complete end-to-end: Triage Board → Journey Studio → Analysis Run → Journal & Review.
 13. Agent Ops operator trust surface is now complete: Org mode → Health mode → Run mode → Detail sidebar, all wired to four backend endpoints.
 14. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
-15. **Next decision:** evaluate Phase 8 candidates — Run Browser endpoint (enables run discovery in Ops), Chart Evidence (Phase 3C), Control-Plane Actions, or Reflective Intelligence Layer. See Roadmap table.
+15. ~~**Next decision:** evaluate Phase 8 candidates~~ — ✅ PR-RUN-1 Run Browser complete (15 March 2026). `GET /runs/` endpoint + RunBrowserPanel. 239 backend + 77 frontend ops tests.
+16. **Next:** PR-CHART-1 (OHLCV data-seam + candlestick chart) — depends on PR-RUN-1 (now satisfied).
 
 ---
 
@@ -570,4 +572,5 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 5. **Completed:** Cleanup tranche (13 March 2026) — async markers, doc consolidation, TD-5, TD-9.
 6. **Completed:** UI Phase 3A Implementation (14 March 2026) — PR-UI-1 through PR-UI-6 shipped. Phase 6 core product lane complete.
 7. **Completed:** Phase 7 Agent Ops (15 March 2026) — PR-OPS-4a/4b (backend trace+detail) + PR-OPS-5a/5b (frontend wiring). 197 backend + 63 frontend tests.
-8. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
+8. **Completed:** PR-RUN-1 Run Browser (15 March 2026) — `GET /runs/` endpoint + RunBrowserPanel frontend. 239 backend + 77 frontend ops tests. TD-13 resolved.
+9. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).

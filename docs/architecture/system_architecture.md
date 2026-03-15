@@ -124,11 +124,12 @@ The Agent Ops subsystem exposes the multi-agent analysis engine's architecture, 
 - `GET /ops/agent-health` — current health snapshot (observability-derived)
 - `GET /runs/{run_id}/agent-trace` — run-level participation and lineage projection
 - `GET /ops/agent-detail/{entity_id}` — entity-level detail with discriminated union
+- `GET /runs/` — paginated, filterable run browser index (directory scan, PR-RUN-1)
 
 **Backend components:**
-- Router: `ai_analyst/api/routers/ops.py`
-- Models: `ai_analyst/api/models/ops.py`, `ops_trace.py`, `ops_detail.py`
-- Services: `ai_analyst/api/services/ops_roster.py`, `ops_health.py`, `ops_trace.py`, `ops_detail.py`
+- Routers: `ai_analyst/api/routers/ops.py`, `ai_analyst/api/routers/runs.py`
+- Models: `ai_analyst/api/models/ops.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`
+- Services: `ai_analyst/api/services/ops_roster.py`, `ops_health.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`
 - Profile registry: `ai_analyst/api/services/ops_profile_registry.py` (static entity profiles)
 
 **Data sources (read-side only):**
