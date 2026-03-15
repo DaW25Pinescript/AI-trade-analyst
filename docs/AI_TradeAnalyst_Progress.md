@@ -3,7 +3,7 @@
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Last updated:** 15 March 2026
 **Review date:** 10 March 2026
-**Current phase:** Phase 6 — Complete (Journey Studio ✅, Analysis Run ✅, Journal & Review ✅)
+**Current phase:** Phase 7 — Complete (Agent Ops backend ✅, Agent Ops frontend wiring ✅)
 **Planning horizon:** Next 6–8 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -20,12 +20,52 @@
 
 ## Phase Index (at-a-glance)
 
-- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-3.
-- **Current phase:** Phase 6 — Complete (Journey Studio ✅, Analysis Run ✅, Journal & Review ✅).
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b).
+- **Current phase:** Phase 7 — Complete. Agent Ops read-side stack fully wired: 4 backend endpoints (197 tests), 3 workspace modes (63 frontend tests), typed detail sidebar, trace visualization.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
-- **Agent Operations classification:** Agent Operations is classified as Phase 3B extension — an operator observability / explainability / trust workspace on new read-only projection endpoints.
-- **Next actions:** PR-OPS-5 complete (5a + 5b). Agent Ops read-side stack fully wired. 63 tests passing.
-- **Active decision gate:** the production-readiness gate remains satisfied; the runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. UI implementation is now the active lane. Phase 6 (core product lane) is complete.
+- **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on four read-only projection endpoints (roster, health, trace, detail).
+- **Next actions:** Phase 8 planned — Run Browser (PR-RUN-1), Live Charts (PR-CHART-1/2), Reflective Intelligence (PR-REFLECT-1/2/3). Run Browser first to enable run discovery and artifact volume.
+- **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6) and Agent Ops read-side stack (Phase 7) are both complete.
+
+---
+
+## Recent Activity
+
+| Date | Phase | Activity |
+|------|-------|----------|
+| 15 Mar 2026 | PR-OPS-5b | Frontend Run mode + Detail sidebar — 7 new components, +24 tests (63 frontend total), Phase 7 complete |
+| 15 Mar 2026 | PR-OPS-5a | Frontend types + adapters + Health mode — +16 tests (39 frontend total), foundation wiring |
+| 15 Mar 2026 | PR-OPS-4b | Backend agent-detail endpoint — discriminated union, profile registry, +72 tests (197 backend total) |
+| 14 Mar 2026 | PR-OPS-4a | Backend agent-trace endpoint — run_record.json + audit log projection, +70 tests (126 backend total) |
+| 14 Mar 2026 | PR-UI-6 | Journal & Review workspace MVP — decision readback + review toggle, +42 tests (243 total), Phase 6 complete |
+| 14 Mar 2026 | PR-UI-5 | Analysis Run workspace MVP — multipart /analyse, run lifecycle state machine, +69 tests (201 total) |
+| 14 Mar 2026 | PR-UI-4 | Journey Studio workspace MVP — staged flow, freeze lifecycle, +43 tests (132 total) |
+| 13 Mar 2026 | PR-OPS-3 | Agent Ops workspace shell — live roster + health, operator aesthetic, +23 tests (89 total) |
+| 13 Mar 2026 | PR-OPS-1 | Agent Ops contract spec — endpoint contracts for roster + health, zero code changes |
+| 13 Mar 2026 | PR-UI-3 | Shared component extraction — generic EntityRowCard, barrel exports, +36 tests (66 total) |
+| 13 Mar 2026 | PR-UI-2 | Triage Board MVP — real data rendering, shared components, trust strip, +24 tests (30 total) |
+| 13 Mar 2026 | PR-UI-1 | React app shell — Vite + routing + typed API client, 5 smoke tests |
+| 12 Mar 2026 | Obs Phase 2 | Cross-lane runtime visibility — 16 event codes, +18 tests |
+| 12 Mar 2026 | TD-3 | Packaging/import stability — 27 sys.path.insert removed, 16 import tests |
+
+---
+
+## Roadmap
+
+| Priority | Phase | Description | Status | Depends On |
+|----------|-------|-------------|--------|------------|
+| 1 | PR-RUN-1 | Run Browser endpoint + frontend — replace paste-field run selector | 📋 Planned | Phase 7 complete |
+| 2 | PR-CHART-1 | OHLCV data endpoint + candlestick chart component (lightweight-charts) | 📋 Planned | PR-RUN-1 |
+| 3 | PR-CHART-2 | Run context overlay + multi-timeframe chart support | 📋 Planned | PR-CHART-1 |
+| 4 | PR-REFLECT-1 | Persona performance + pattern summary aggregation endpoints | 📋 Planned | PR-RUN-1 + run history |
+| 5 | PR-REFLECT-2 | Reflective dashboard frontend — performance tables + anomaly highlighting | 📋 Planned | PR-REFLECT-1 |
+| 6 | PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | 📋 Planned | PR-CHART-2 + PR-REFLECT-2 |
+| — | Chart Indicators | Pine Script-style indicator overlays on candlestick charts | 💭 Concept | PR-CHART-2 |
+| — | ML Pattern Detection | Statistical models replacing rules-based suggestions | 💭 Concept | PR-REFLECT-2 + run volume |
+| — | Control-Plane Actions | Agent start/stop/retry in Ops workspace | 💭 Concept | Phase 7 complete |
+| — | Live Push Updates | SSE/WebSocket for real-time health and trace updates | 💭 Concept | Phase 7 complete |
+
+---
 
 ## 1) Executive Snapshot
 
@@ -145,7 +185,7 @@ Reopened UI implementation lane. Locked React + TypeScript + Tailwind as forward
 
 ### Current position (plain language)
 
-You are no longer proving feasibility or building first-pass runtime behavior. The full UI documentation lane (audit → contract → workspace blueprint → wireframes → component system) is complete and banked. The runtime-hardening sequence (Observability Phase 2, TD-3 packaging, cleanup tranche) is complete. **UI implementation is now the active lane.** The forward frontend stack is React + TypeScript + Tailwind. The first PR after governance is PR-UI-1 (React app shell). Agent Ops backend endpoints are Phase 4 (after Triage Board and component extraction).
+You are no longer proving feasibility, building runtime behavior, or standing up initial UI surfaces. The full UI documentation lane, runtime-hardening sequence, core product lane (Phase 6: Triage Board → Journey Studio → Analysis Run → Journal & Review), and Agent Ops read-side stack (Phase 7: roster, health, trace, detail endpoints + Org/Health/Run frontend modes) are all complete and shipped. **The repo is between active phases.** 197 backend ops tests + 63 frontend ops tests + 243 total frontend tests. Forward frontend stack remains React + TypeScript + Tailwind. Next decision: evaluate Phase 8 candidates (see Roadmap).
 
 ### Phase Status Overview
 
@@ -171,7 +211,7 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | UI Phase 2 | UI Contract — canonical frontend handoff / run-state + error semantics | ✅ Complete |
 | UI Phase 3A | Workspace Blueprint + Visual Design — wireframes, component system, design notes, visual appendix | ✅ Complete |
 | Phase 0 — UI Re-Entry Governance | Governance unlock — progress hub + design note + phase plan | ✅ Complete |
-| UI Phase 3A Impl | First UI implementation slice — Triage Board first (React + TypeScript + Tailwind) | 🟢 Active |
+| UI Phase 3A Impl | UI implementation — Triage Board through Journal & Review (Phase 6 core product lane) — 243 frontend tests | ✅ Complete |
 | Phase 1 — React App Shell + Triage Route | React app shell + routing + typed fetch — build clean, typecheck clean, 5 smoke tests | ✅ Complete |
 | Phase 2 — Triage Board MVP | Real triage data + shared components + trust strip — build clean, typecheck clean, 30 tests | ✅ Complete |
 | Phase 3 — Shared Component Extraction | Barrel exports, typed props, generic EntityRowCard, hook ownership, 36 component tests, shared README — 66 tests | ✅ Complete |
@@ -179,8 +219,12 @@ You are no longer proving feasibility or building first-pass runtime behavior. T
 | Phase 5 — Journey Studio MVP (PR-UI-4) | Journey Studio workspace — staged flow, freeze lifecycle, bootstrap context, 43 tests — 132 tests | ✅ Complete |
 | Phase 6a — Analysis Run MVP (PR-UI-5) | Analysis Run workspace — multipart /analyse, run lifecycle state machine, tab persistence, 69 tests — 201 tests | ✅ Complete |
 | Phase 6b — Journal & Review MVP (PR-UI-6) | Journal & Review workspace — decision readback, review toggle, outcome coverage, 42 tests — 243 tests | ✅ Complete |
-| Phase 4 — Agent Ops Backend (PR-OPS-2) | Backend implementation — roster + health endpoints | ▶️ Next |
-| UI Phase 3B | Backend capability exposure — Feeder, Ops, Analytics, optional streaming | ⏸️ Parked |
+| Phase 4 — Agent Ops Backend (PR-OPS-2) | Backend implementation — roster + health endpoints — 55 tests | ✅ Complete |
+| Phase 7 — Agent Trace (PR-OPS-4a) | Backend agent-trace endpoint — run_record.json + audit log projection — 70 tests (126 ops suite) | ✅ Complete |
+| Phase 7 — Agent Detail (PR-OPS-4b) | Backend agent-detail endpoint — discriminated union, profile registry — 72 tests (197 ops suite) | ✅ Complete |
+| Phase 7 — Frontend Health Mode (PR-OPS-5a) | Types, adapters, hooks, Health mode wiring — 16 new tests (39 frontend) | ✅ Complete |
+| Phase 7 — Frontend Run + Detail (PR-OPS-5b) | Run mode, trace vis, detail sidebar, run selector — 24 new tests (63 frontend) | ✅ Complete |
+| UI Phase 3B | Backend capability exposure — Agent Ops ✅ complete, Feeder/Analytics/streaming remain parked | ⏸️ Partial |
 | Observability Phase 2 | Cross-lane runtime visibility — structured events across MDO, feeder, triage, graph; 18 new tests, 16 event codes under 6 canonical categories | ✅ Complete |
 | TD-3 | Packaging/import-path stability — 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added — 1603 tests | ✅ Complete |
 | Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ✅ Complete |
@@ -250,35 +294,45 @@ Phase-closure counts should be read as **phase-gate numbers**, not as a single a
 | Observability Phase 2 (implementation) | 1236 passed, 70 failed (pre-existing), 4 collection errors | +18 new tests: MDO events (3), APScheduler listeners (5), feeder ingest (3), triage batch (1), graph routing (3), taxonomy completeness (3). Zero new regressions. |
 | PR-OPS-4a (Agent Trace) | 126 (ops suite) | +71 new trace tests. 55/55 baseline preserved. Zero regressions. |
 | PR-OPS-4b (Agent Detail) | 197 (ops suite) | +72 new detail tests. 125/125 baseline+trace preserved. Zero regressions. All 25 spec ACs pass. |
+| PR-OPS-5a (Health Mode Wiring) | 39 (frontend) | +16 new tests. Types, adapters, hooks, Health mode, data_state banners, OpsErrorEnvelope. 23/23 baseline preserved. |
+| PR-OPS-5b (Run + Detail Wiring) | 63 (frontend) | +24 new tests. Run mode, trace vis, detail sidebar, discriminated union rendering. 39/39 baseline preserved. Phase 7 complete. |
 
 ### Known gaps and debt themes
 
 From repo docs and current structure, the meaningful remaining work is concentrated in:
 
-1. **Observability and seam visibility** (highest non-UI priority)
-   - Important runtime paths still benefit from clearer pass/fail evidence, especially across orchestration boundaries.
-   - Observability Phase 1 shipped run records and stdout summaries; Phase 2 should standardize structured event logging across all lanes and tighten failure surfaces.
+1. **Observability and seam visibility** — ✅ **Phase 2 Complete** (12 March 2026)
+   - Observability Phase 1 shipped run records and stdout summaries.
+   - Observability Phase 2 shipped 16 structured event codes across MDO scheduler, feeder, triage, graph.
+   - Agent Ops trace endpoint (Phase 7) projects run-level observability to the UI.
 2. **Packaging and import stability** — ✅ **Complete** (TD-3, 12 March 2026)
    - 27 `sys.path.insert` calls removed; `pyproject.toml` fixed; `pip install -e .` works in clean venv.
    - 16 import stability tests added (TD-11 resolved).
-3. **Cleanup and consistency**
-   - Pending async-marker tidy and doc consolidation remain open.
-   - TD-5 (enum centralisation) and TD-9 (unused vars) are ready as micro-PRs.
-4. **UI implementation** (active — runtime hardening complete)
-   - ✅ UI Phase 1, UI Phase 2, and UI Phase 3A (design) are complete and banked.
-   - ✅ Runtime-hardening sequence complete. UI implementation is the active lane.
-   - Forward stack: React + TypeScript + Tailwind. First PR: PR-UI-1 (React app shell).
-   - Phase 3B (Feeder, Ops, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
+3. **Cleanup and consistency** — ✅ **Complete** (13 March 2026)
+   - Async-marker cleanup done (30 markers removed).
+   - TD-5 (enum centralisation) and TD-9 (unused vars) resolved.
+   - Doc consolidation complete.
+4. **UI implementation** — ✅ **Core product lane complete** (14 March 2026), **Agent Ops complete** (15 March 2026)
+   - Phase 6: Triage Board, Journey Studio, Analysis Run, Journal & Review — all shipped.
+   - Phase 7: Agent Ops Org/Health/Run modes + Detail sidebar — all shipped.
+   - Forward stack: React + TypeScript + Tailwind.
+   - Phase 3B remainder (Feeder, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
 5. **Future runtime-lane convergence**
    - The split between analyst, graph, MDO, and legacy lanes still shapes long-term architecture cleanup.
-   - Revisit only after observability, packaging, and cleanup are stronger.
+   - Now lower priority — observability, packaging, and cleanup are all done.
 
 ---
 
 
 ## 3) Where We Should Go Next
 
-The production-readiness gate is **already satisfied**. The UI documentation lane is complete and banked. The runtime-hardening sequence (Obs P2, TD-3, cleanup tranche) is complete. The current value lane is **UI implementation**: building the designed workspaces starting with the Triage Board as the first React workspace and component-system seed.
+The production-readiness gate is **satisfied**. The UI documentation lane is complete. The runtime-hardening sequence is complete. The core product lane (Phase 6) and Agent Ops read-side stack (Phase 7) are both **complete and shipped**. 
+
+**Phase 8 direction: Charts + Reflective Intelligence.** Two capability tracks after a Run Browser foundation:
+1. **Live candlestick charts** — OHLCV data served from MDO pipeline, rendered via `lightweight-charts`, tied to run context
+2. **Reflective Intelligence v1** — persona performance aggregation, pattern summaries, rules-based parameter suggestions (human-governed, not auto-applied)
+
+Both depend on run history volume. Run Browser (PR-RUN-1) ships first to enable run discovery and make it easy to generate and inspect runs. Full plan: `docs/PHASE_8_PLAN.md`.
 
 ### Priority A — Observability Phase 2: Cross-Lane Runtime Visibility (✅ complete)
 
@@ -340,24 +394,26 @@ Close small friction items that reduce drift and improve contributor experience,
 
 ---
 
-### Priority D — UI Phase 3A Implementation (active — runtime hardening complete)
+### Priority D — UI Phase 3A Implementation (✅ complete)
 
 #### Objective
 Build the Phase 3A core product workspaces using the locked design artifacts.
 
 #### Status
-The design phase is **complete and banked**. The runtime-hardening sequence is **complete**. UI implementation is now the **active lane**. Forward frontend stack: React + TypeScript + Tailwind. Execution plan: `docs/specs/ui_reentry_phase_plan.md`.
+**Complete.** All Phase 3A core product workspaces shipped (13–14 March 2026):
+- PR-UI-1: React app shell (5 tests)
+- PR-UI-2: Triage Board MVP (30 tests)
+- PR-UI-3: Shared component extraction (66 tests)
+- PR-UI-4: Journey Studio MVP (132 tests)
+- PR-UI-5: Analysis Run MVP (201 tests)
+- PR-UI-6: Journal & Review MVP (243 tests)
 
-#### Banked deliverables (ready for pickup)
-- ✅ `docs/ui/UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`
-- ✅ Wireframes: Triage Board, Journey Studio, Analysis Run (4-state lifecycle)
-- ✅ Component Design System with Composition Patterns
-- ✅ `UI_CONTRACT.md` governance rule (§3.1) prevents ad hoc contract drift while parked.
+Agent Ops read-side stack also complete (Phase 7, 15 March 2026):
+- PR-OPS-1/2/3: Contract, backend, workspace shell
+- PR-OPS-4a/4b: Trace + detail backend endpoints (197 backend tests)
+- PR-OPS-5a/5b: Frontend wiring — Org/Health/Run modes + detail sidebar (63 frontend tests)
 
-#### Implementation targets (when resumed)
-- Build Triage Board, Journey Studio, Journal & Review, Analysis Run cleanup.
-- The Triage → Journey → Freeze → Journal flow end-to-end.
-- Phase 3B (Feeder, Ops, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
+Phase 3B remainder (Feeder, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
 
 ---
 
@@ -382,26 +438,53 @@ Reduce the architectural split between runtime lanes and address broader converg
 
 ## 4) Proposed 6–8 Week Plan
 
-### Weeks 1–2
-- **PR-UI-1** (React app shell): React + TypeScript + Tailwind project setup, build tooling, routing framework, typed API client layer, Triage Board route placeholder.
-- **PR-UI-2** (Triage Board MVP): Live data rendering from `/watchlist/triage`, first shared component primitives (DataStateBadge, TrustStrip, StatusPill, EntityRowCard, PanelShell, state shells).
+### Completed (Weeks 1–4, 13–15 March 2026)
 
-### Weeks 3–4
-- **PR-UI-3** (component extraction): Harden Triage Board components into reusable shared layer.
-- **PR-OPS-1** (Agent Ops contract spec): Document endpoint contracts for `/ops/agent-roster` and `/ops/agent-health` before any backend implementation.
+- **PR-UI-1** (React app shell) ✅
+- **PR-UI-2** (Triage Board MVP) ✅
+- **PR-UI-3** (Shared component extraction) ✅
+- **PR-OPS-1** (Agent Ops contract spec) ✅
+- **PR-UI-4** (Journey Studio MVP) ✅
+- **PR-UI-5** (Analysis Run MVP) ✅
+- **PR-UI-6** (Journal & Review MVP) ✅ — Phase 6 complete
+- **PR-OPS-2** (Agent Ops roster + health backend) ✅
+- **PR-OPS-3** (Agent Ops workspace shell) ✅
+- **PR-OPS-4a/4b** (Agent trace + detail backend) ✅
+- **PR-OPS-5a/5b** (Agent Ops frontend wiring) ✅ — Phase 7 complete
+
+### Forward (Weeks 5–8, Phase 8: Charts + Reflective Intelligence)
+
+Prioritisation complete (15 March 2026). Two capability tracks running in parallel after Run Browser:
+
+**Week 5 (Week 1 of Phase 8): Run Browser**
+- PR-RUN-1: `GET /runs/` endpoint + RunBrowserPanel frontend — replaces paste-field run selector
+
+**Weeks 6–7 (Weeks 2–3): Live Candlestick Charts**
+- PR-CHART-1: OHLCV data endpoint + `lightweight-charts` candlestick component
+- PR-CHART-2: Run context overlay + multi-timeframe support
+
+**Weeks 7–8 (Weeks 4–5): Reflective Intelligence v1**
+- PR-REFLECT-1: Persona performance + pattern summary aggregation endpoints
+- PR-REFLECT-2: Reflective dashboard frontend — performance tables + anomaly highlighting
+
+**Week 9 (Week 6): Integration + Suggestions v0**
+- PR-REFLECT-3: Chart ↔ run integration, rules-based parameter suggestions
+
+Full plan: `docs/PHASE_8_PLAN.md`
 
 ---
 
 ## 5) Risks to Manage
 
-- **Observability gap risk:** cross-lane failures remain invisible without structured logging; operators cannot diagnose issues without manual code tracing.
+- ~~**Observability gap risk:**~~ **Resolved** — Obs Phase 1 + Phase 2 complete. Agent Ops trace endpoint ships run-level visibility to the UI.
 - ~~**Packaging fragility risk:**~~ **Resolved** — TD-3 complete (12 March 2026). All `sys.path.insert` calls removed; `pip install -e .` is the canonical install path.
-- **Contract drift risk:** frontend implementation (when resumed) bypasses `UI_CONTRACT.md` and rediscovers backend behavior ad hoc. Mitigated by Section 3.1 governance rule in the contract.
-- **Design-implementation drift risk:** UI implementation (when resumed) diverges from locked wireframes and component system. Mitigated by `DESIGN_NOTES.md` and `VISUAL_APPENDIX.md` as written references.
+- ~~**Contract drift risk:**~~ **Mitigated** — 12 PRs shipped against `UI_CONTRACT.md` and `AGENT_OPS_CONTRACT.md` without contract drift. Governance rules held.
+- ~~**Design-implementation drift risk:**~~ **Mitigated** — all Phase 3A wireframes implemented faithfully across PR-UI-1 through PR-UI-6.
 - **UI split risk:** Journey and legacy workflow surfaces diverge further if compatibility boundaries are not documented clearly.
 - **Seam blind-spot risk:** broad unit coverage may still miss cross-module orchestration and integration regressions.
-- **Cleanup drift risk:** low-level debt can expand into architecture work if not kept tightly scoped.
-- **Scope-creep risk:** future extensions such as Chart Evidence or Run Artifact Inspector could jump ahead of the runtime-hardening sequence.
+- ~~**Cleanup drift risk:**~~ **Resolved** — cleanup tranche complete (13 March 2026).
+- **Scope-creep risk:** future extensions such as Chart Evidence or Run Artifact Inspector could jump ahead of prioritisation.
+- **Run discovery gap:** Agent Ops Run mode requires manual run_id entry (paste field). No run browser/search endpoint exists yet. Operators must know the run_id to inspect a run. Tracked in Roadmap as Priority 1.
 
 ---
 
@@ -417,9 +500,11 @@ Reduce the architectural split between runtime lanes and address broader converg
 8. ~~TD-3 — packaging/import-path stability~~ — ✅ Complete (12 March 2026). 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added. Spec: `docs/specs/td3_packaging_import_stability.md`.
 9. ~~Cleanup tranche~~ — ✅ Complete (13 March 2026). Async markers cleaned, TD-5 enum centralisation resolved, TD-9 unused vars resolved, doc consolidation complete.
 10. ~~Runtime-hardening sequence~~ — ✅ Complete. Obs P2, TD-3, and cleanup tranche all closed.
-11. **UI implementation is now the active lane.** PR-UI-1 through PR-UI-6 and PR-OPS-1 through PR-OPS-3 are complete. **Phase 6 is complete.** PR-OPS-4a (agent-trace), PR-OPS-4b (agent-detail), and PR-OPS-5 (frontend wiring 5a + 5b) are complete. Agent Ops read-side stack fully wired (63 tests).
+11. ~~**UI + Agent Ops implementation lane**~~ — ✅ Complete (15 March 2026). PR-UI-1 through PR-UI-6 (Phase 6 core product lane) and PR-OPS-1 through PR-OPS-5b (Phase 7 Agent Ops read-side stack) all shipped. 197 backend tests + 63 frontend tests. All spec ACs verified.
 12. Core product workflow lane is now complete end-to-end: Triage Board → Journey Studio → Analysis Run → Journal & Review.
-13. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
+13. Agent Ops operator trust surface is now complete: Org mode → Health mode → Run mode → Detail sidebar, all wired to four backend endpoints.
+14. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
+15. **Next decision:** evaluate Phase 8 candidates — Run Browser endpoint (enables run discovery in Ops), Chart Evidence (Phase 3C), Control-Plane Actions, or Reflective Intelligence Layer. See Roadmap table.
 
 ---
 
@@ -483,5 +568,6 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 3. **Completed:** Observability Phase 2 (12 March 2026) — cross-lane runtime visibility.
 4. **Completed:** TD-3 (12 March 2026) — packaging/import stability.
 5. **Completed:** Cleanup tranche (13 March 2026) — async markers, doc consolidation, TD-5, TD-9.
-6. **Active:** UI Phase 3A Implementation — PR-UI-1 (React app shell) is next.
-7. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
+6. **Completed:** UI Phase 3A Implementation (14 March 2026) — PR-UI-1 through PR-UI-6 shipped. Phase 6 core product lane complete.
+7. **Completed:** Phase 7 Agent Ops (15 March 2026) — PR-OPS-4a/4b (backend trace+detail) + PR-OPS-5a/5b (frontend wiring). 197 backend + 63 frontend tests.
+8. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
