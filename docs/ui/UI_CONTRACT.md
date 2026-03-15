@@ -946,7 +946,7 @@ These endpoints exist and are valid UI-facing surfaces, but are not currently co
 
 ---
 
-## 10.6 Agent Operations Endpoints (Phase 3B)
+## 10.6 Agent Operations Endpoints (Implemented — Phase 7)
 
 The Agent Operations endpoint contracts are defined in a dedicated document:
 
@@ -963,14 +963,14 @@ The Agent Operations endpoint contracts are defined in a dedicated document:
 
 These endpoints are implemented and available. Frontend code may call these endpoints. See `AGENT_OPS_CONTRACT.md` for response shapes and behavioral rules.
 
-### Reserved future endpoints (Phase 7)
+### Trace and detail endpoints (Phase 7 — implemented)
 
 | Method | Route | Purpose | Contract status |
 |--------|-------|---------|----------------|
-| `GET` | `/runs/{run_id}/agent-trace` | Run-specific participation and lineage | Reserved — not yet contracted |
-| `GET` | `/ops/agent-detail/{entity_id}` | Full detail for selected entity | Reserved — not yet contracted |
+| `GET` | `/runs/{run_id}/agent-trace` | Run-specific participation and lineage | Implemented (PR-OPS-4a) |
+| `GET` | `/ops/agent-detail/{entity_id}` | Full detail for selected entity | Implemented (PR-OPS-4b) |
 
-These endpoints are acknowledged in the roadmap but have no contract specification. They will be contracted in a separate document before Phase 7 implementation begins.
+Implemented and contracted in `AGENT_OPS_CONTRACT.md` §6 (trace) and §7 (detail). Delivered in PR-OPS-4a/4b (15 March 2026). 197 backend tests.
 
 ---
 

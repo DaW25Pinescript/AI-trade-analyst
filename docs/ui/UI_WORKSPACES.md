@@ -502,48 +502,45 @@ A compact status widget may land earlier than a full dedicated page.
 
 ---
 
-## 10. Workspace F — Operations & Diagnostics
+## 10. Workspace F — Agent Operations (Implemented — Phase 7)
 
 ### 10.1 Purpose
 
-This workspace exposes system-health and engineering diagnostics that already exist in the backend but are not currently surfaced in the browser UI.
+The Agent Ops workspace is the operator observability, explainability, and trust surface. It answers the north-star question: **"Why should I trust this system right now?"**
 
-### 10.2 Backend basis
+### 10.2 Implementation status
 
-- `GET /metrics`
-- `GET /dashboard`
-- `GET /e2e`
-- `GET /plugins`
+**Fully implemented** (Phase 7, 15 March 2026). Contract: `AGENT_OPS_CONTRACT.md` §4–§7. Frontend: `ui/src/workspaces/ops/`.
 
-The audit confirmed all of these exist today and are active-unused from the UI perspective.
+### 10.3 Backend basis
 
-### 10.3 Recommended layout
+- `GET /ops/agent-roster` — static architecture and roster truth
+- `GET /ops/agent-health` — current health snapshot (poll-based)
+- `GET /runs/{run_id}/agent-trace` — run-level participation and lineage
+- `GET /ops/agent-detail/{entity_id}` — entity-level detail with discriminated union
 
-**Summary cards**
-- metrics snapshot
-- system status
-- plugin counts
-- e2e pass/fail overview
+### 10.4 Three internal modes
 
-**Link-out / embedded surfaces**
-- operator dashboard HTML
-- diagnostics reports
+- **Org mode** — structural roster view with governance → officer → department hierarchy and relationship lines
+- **Health mode** — operator health-focused lens that elevates degraded/stale entities for attention
+- **Run mode** — trace-driven view for a selected run: stage timeline, participants with stance/confidence/override indicators, trace edges, arbiter summary
 
-**Engineering utility blocks**
-- plugin registry / hook catalog
-- end-to-end check summary
+### 10.5 Selected Node Detail sidebar
 
-### 10.4 UX rules
+Backend-backed typed entity detail panel with discriminated union rendering. Switches on `entity_type` (persona/officer/arbiter/subsystem) to show type-specific sections: analysis focus, officer domain, synthesis method, subsystem resources.
+
+### 10.6 UX rules
 
 - treat this as an operator/engineering workspace, not a trader-first workspace
-- HTML dashboard endpoints should be linked or embedded intentionally, not forced into JSON UI assumptions
-- avoid mixing this page into the main runtime lane navigation hierarchy
+- roster is structural source of truth; health augments but does not define hierarchy
+- data_state stale/unavailable banners scoped to mode context
+- null arbiter summary → hidden (no fabrication)
+- 404 error handling for both trace and detail
 
-### 10.5 Build priority
+### 10.7 Legacy Operations & Diagnostics
 
-**Phase 3B — medium priority, already-backed capability exposure**
-
-This is a high-leverage UI improvement because the backend capability already exists.
+The following endpoints exist and remain available for future exposure but are not currently surfaced in the Agent Ops workspace:
+- `GET /metrics`, `GET /dashboard`, `GET /e2e`, `GET /plugins`
 
 ---
 
@@ -707,12 +704,11 @@ Objective:
 
 ### 14.2 Phase 3B — backend capability exposure
 
-After the core product workspaces are coherent, surface already-existing but currently unused capabilities:
+Agent Operations workspace is **complete** (Phase 7, 15 March 2026). Remaining Phase 3B items:
 
 1. Feeder & Macro Context
-2. Operations & Diagnostics
-3. Analytics & Export
-4. optional `/analyse/stream` live mode inside Analysis Run
+2. Analytics & Export
+3. optional `/analyse/stream` live mode inside Analysis Run
 
 Objective:
 - expose dormant backend power without inventing new backend work
