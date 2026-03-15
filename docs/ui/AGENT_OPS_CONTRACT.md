@@ -1,8 +1,8 @@
 # Agent Operations — Endpoint Contract Specification
 
 **File:** `docs/ui/AGENT_OPS_CONTRACT.md`
-**Status:** Active — contract locked, endpoints implemented (PR-OPS-2)
-**Phase:** PR-OPS-1 (contract docs) ✓ — PR-OPS-2 (backend implementation) ✓ — PR-OPS-3 (frontend) follows
+**Status:** Active — contract locked, endpoints implemented (PR-OPS-2, PR-OPS-4a, PR-OPS-4b)
+**Phase:** PR-OPS-1 (contract docs) ✓ — PR-OPS-2 (backend) ✓ — PR-OPS-4a (agent-trace) ✓ — PR-OPS-4b (agent-detail) ✓ — PR-OPS-3 (frontend) follows
 **Scope:** Backend → UI contract extension for Agent Operations read-only projection endpoints
 **Depends on:** `UI_CONTRACT.md`, `agent_operations_workspace.schema.refined.md`, `agent_operations_component_adapter_plan.refined.md`, `DESIGN_NOTES.md` §5
 **Classification:** Phase 3B extension — operator observability / explainability / trust workspace
@@ -11,7 +11,7 @@
 
 ## 1. Purpose
 
-This document defines the implementation-ready endpoint contracts for the first two Agent Operations endpoints. It extends `UI_CONTRACT.md` with the response shapes, state semantics, error contracts, and behavioral rules needed to implement both the backend (PR-OPS-2) and the frontend workspace (PR-OPS-3).
+This document defines the implementation-ready endpoint contracts for all four Agent Operations endpoints. It extends `UI_CONTRACT.md` with the response shapes, state semantics, error contracts, and behavioral rules needed to implement the backend (PR-OPS-2, PR-OPS-4a, PR-OPS-4b) and the frontend workspace (PR-OPS-3).
 
 These endpoints expose the multi-agent analysis engine's architecture and health as read-only projections. They answer the Agent Operations north-star question: **"Why should I trust this system right now?"**
 
@@ -339,27 +339,282 @@ All HTTP errors use `OpsErrorEnvelope`.
 
 ---
 
-## 6. Reserved Future Endpoints
+## 6. `GET /runs/{run_id}/agent-trace` (PR-OPS-4a)
 
-The following endpoints are acknowledged as part of the Agent Operations roadmap but are **not contracted in this document**. They are reserved for Phase 7 (PR-OPS-4 / PR-OPS-5).
+### 6.1 Purpose
 
-### `GET /runs/{run_id}/agent-trace` — Phase 7
+Run-level agent trace for a specific analysis run. Projects participation, lineage, stage ordering, and arbiter verdict from existing run artifacts.
 
-Run-specific participation and lineage overlay for Run mode. Will power participant highlighting, influence overlays, lineage edge rendering, and arbiter override indicators.
+### 6.2 Backend source
 
-### `GET /ops/agent-detail/{entity_id}` — Phase 7
+Read-side projection from two artifact sources:
+- **Primary:** `run_record.json` — stage ordering, participation, arbiter verdict
+- **Secondary:** `logs/runs/{run_id}.jsonl` (audit log) — analyst stances, override details
 
-Full detail payload for the Selected Node Detail sidebar. Must use a discriminated union (`entity_type`) to prevent dumping-ground payloads.
+When the audit log is unavailable, the response degrades to `data_state: "stale"` rather than failing.
 
-These endpoints must not be implemented or consumed until their own contract specification is written and merged. The design-level response shapes in `agent_operations_workspace.schema.refined.md` §5.5–5.6 serve as input for that future contract, not as the contract itself.
+### 6.3 Response shape
+
+```typescript
+type AgentTraceResponse = ResponseMeta & {
+  run_id: string;
+  summary: TraceSummary;
+  stages: TraceStage[];
+  participants: TraceParticipant[];
+  edges: TraceEdge[];
+  arbiter_summary: ArbiterTraceSummary | null;
+  artifacts: ArtifactRef[];
+};
+```
+
+### 6.4 TraceSummary
+
+```typescript
+type TraceSummary = {
+  instrument: string;
+  session: string;
+  timeframes: string[];
+  duration_ms: number | null;
+  completed_at: string | null;
+  final_verdict: string | null;
+  final_confidence: number | null;
+};
+```
+
+### 6.5 TraceStage
+
+```typescript
+type TraceStage = {
+  stage: string;
+  status: string;
+  order: number;
+  duration_ms: number | null;
+};
+```
+
+Stage vocabulary (locked): `validate_input`, `macro_context`, `chart_setup`, `analyst_execution`, `arbiter`, `logging`.
+
+### 6.6 TraceParticipant
+
+```typescript
+type TraceParticipant = {
+  entity_id: string;
+  display_name: string;
+  role: string;
+  participation_status: "active" | "skipped" | "failed";
+  contribution: ParticipantContribution;
+};
+
+type ParticipantContribution = {
+  summary: string;          // max 500 chars
+  stance: string | null;
+  confidence: number | null;
+  was_overridden: boolean;
+  override_reason: string | null;  // max 300 chars
+};
+```
+
+### 6.7 TraceEdge
+
+```typescript
+type TraceEdge = {
+  from: string;
+  to: string;
+  type: "supports" | "challenges" | "feeds" | "synthesizes" | "overrides"
+        | "degraded_dependency" | "recovered_dependency";
+  summary: string | null;  // max 300 chars
+};
+```
+
+### 6.8 ArbiterTraceSummary
+
+```typescript
+type ArbiterTraceSummary = {
+  verdict: string;
+  confidence: number | null;
+  method: string | null;
+  override_applied: boolean;
+  dissent_summary: string | null;  // max 500 chars
+};
+```
+
+### 6.9 Bounded payload limits
+
+| Field | Limit |
+|-------|-------|
+| `contribution.summary` | ≤ 500 chars |
+| `contribution.override_reason` | ≤ 300 chars |
+| `edge.summary` | ≤ 300 chars |
+| `arbiter_summary.dissent_summary` | ≤ 500 chars |
+| `edges` array | ≤ 50 entries |
+
+### 6.10 Error responses
+
+| HTTP status | `error` code | When |
+|------------|-------------|------|
+| 404 | `RUN_NOT_FOUND` | No run artifacts for the given `run_id` |
+| 422 | `RUN_ARTIFACTS_MALFORMED` | Artifacts exist but cannot be parsed |
+| 500 | `TRACE_PROJECTION_FAILED` | Unexpected projection error |
 
 ---
 
-## 7. Contract Test Priorities
+## 7. `GET /ops/agent-detail/{entity_id}` (PR-OPS-4b)
 
-PR-OPS-2 (backend implementation) must include deterministic tests covering the following areas. These are the minimum acceptance bar for the backend PR.
+### 7.1 Purpose
 
-### 7.1 Response shape tests
+Entity-level detail for the Selected Node Detail sidebar. Returns extended metadata, current status, dependency graph, recent participation, and type-specific detail via a discriminated union.
+
+### 7.2 Backend source
+
+Composite read-side projection from:
+- **Roster** — identity, department, visual_family, capabilities
+- **Profile registry** — purpose, responsibilities, type-specific variant
+- **Health snapshot** — run_state, health_state (graceful degradation when unavailable)
+- **Recent run scan** — bounded participation history from run artifacts
+
+### 7.3 Response shape
+
+```typescript
+type AgentDetailResponse = ResponseMeta & {
+  entity_id: string;
+  entity_type: "persona" | "officer" | "arbiter" | "subsystem";
+  display_name: string;
+  department: DepartmentKey | null;
+  identity: EntityIdentity;
+  status: EntityStatus;
+  dependencies: EntityDependency[];
+  recent_participation: RecentParticipation[];  // max 5 entries
+  recent_warnings: string[];                     // max 10 entries
+  type_specific: TypeSpecific;
+};
+```
+
+### 7.4 EntityIdentity
+
+```typescript
+type EntityIdentity = {
+  purpose: string;          // max 500 chars
+  role: string;
+  visual_family: VisualFamily;
+  capabilities: string[];
+  responsibilities: string[];
+  initials: string | null;
+};
+```
+
+### 7.5 EntityStatus
+
+```typescript
+type EntityStatus = {
+  run_state: RunState;
+  health_state: HealthState;
+  last_active_at: string | null;
+  last_run_id: string | null;
+  health_summary: string | null;  // max 300 chars
+};
+```
+
+### 7.6 EntityDependency
+
+```typescript
+type EntityDependency = {
+  entity_id: string;
+  display_name: string;
+  direction: "upstream" | "downstream";
+  relationship_type: RelationshipType;
+};
+```
+
+### 7.7 RecentParticipation
+
+```typescript
+type RecentParticipation = {
+  run_id: string;
+  run_completed_at: string | null;
+  verdict_direction: "bullish" | "bearish" | "neutral" | "abstain" | null;
+  was_overridden: boolean;
+  contribution_summary: string;  // max 500 chars
+};
+```
+
+### 7.8 TypeSpecific (discriminated union)
+
+`entity_type` is the discriminant. `type_specific.variant` contains the variant tag.
+
+```typescript
+type PersonaDetail = {
+  variant: "persona";
+  analysis_focus: string[];
+  verdict_style: string;
+  department_role: string;
+  typical_outputs: string[];
+};
+
+type OfficerDetail = {
+  variant: "officer";
+  officer_domain: string;
+  data_sources: string[];
+  monitored_surfaces: string[];
+  update_cadence: string | null;
+};
+
+type ArbiterDetail = {
+  variant: "arbiter";
+  synthesis_method: string;
+  veto_gates: string[];
+  quorum_rule: string;
+  override_capable: boolean;
+  policy_summary: string;  // max 500 chars
+};
+
+type SubsystemDetail = {
+  variant: "subsystem";
+  subsystem_type: string;
+  monitored_resources: string[];
+  health_check_method: string | null;
+  runtime_role: string;
+};
+
+type TypeSpecific = PersonaDetail | OfficerDetail | ArbiterDetail | SubsystemDetail;
+```
+
+### 7.9 Bounded payload limits
+
+| Field | Limit |
+|-------|-------|
+| `identity.purpose` | ≤ 500 chars |
+| `status.health_summary` | ≤ 300 chars |
+| `recent_participation` array | ≤ 5 entries |
+| `recent_warnings` array | ≤ 10 entries |
+| `contribution_summary` | ≤ 500 chars |
+| `policy_summary` | ≤ 500 chars |
+
+### 7.10 Recent participation scan bounds
+
+- Max 20 run artifact directories scanned
+- Max 7 days lookback
+- Whichever bound is hit first stops the scan
+- Returned array capped at 5 most recent entries
+
+### 7.11 Graceful degradation
+
+When health data is unavailable, the endpoint returns a valid response with `data_state: "stale"` and default status (`run_state: "idle"`, `health_state: "unavailable"`). It does not return a 500 error.
+
+### 7.12 Error responses
+
+| HTTP status | `error` code | When |
+|------------|-------------|------|
+| 404 | `ENTITY_NOT_FOUND` | `entity_id` not in roster |
+| 422 | `DETAIL_PROJECTION_FAILED` | Entity exists but projection failed |
+| 500 | `DETAIL_PROJECTION_FAILED` | Unexpected projection error |
+
+---
+
+## 8. Contract Test Priorities
+
+Backend implementation must include deterministic tests covering the following areas. These are the minimum acceptance bar.
+
+### 8.1 Response shape tests
 
 - [x] `/ops/agent-roster` returns a valid `AgentRosterResponse` with all required fields
 - [x] `/ops/agent-health` returns a valid `AgentHealthSnapshotResponse` with all required fields
@@ -367,44 +622,44 @@ PR-OPS-2 (backend implementation) must include deterministic tests covering the 
 - [x] `AgentSummary` contains all required fields with correct types
 - [x] `AgentHealthItem` contains all required fields with correct types
 
-### 7.2 Department key tests
+### 8.2 Department key tests
 
 - [x] `departments` record contains exactly the four canonical `DepartmentKey` values
 - [x] No freeform or misspelled department keys are accepted
 - [x] Each department key maps to a non-empty array of `AgentSummary` objects
 
-### 7.3 Relationship array tests
+### 8.3 Relationship array tests
 
 - [x] `relationships` array is present in roster response
 - [x] Every `from` and `to` value references a valid roster entity `id`
 - [x] Relationship `type` values are within the allowed enum
 
-### 7.4 `data_state` tests
+### 8.4 `data_state` tests
 
 - [x] Roster response includes `data_state` with a valid value
 - [x] Health response includes `data_state` with a valid value
 - [x] `data_state: "unavailable"` triggers appropriate error handling
 
-### 7.5 Structured error envelope tests
+### 8.5 Structured error envelope tests
 
 - [x] HTTP errors return `OpsErrorEnvelope` shape (not freeform string `detail`)
 - [x] `OpsError` contains `error` and `message` fields
 - [x] Error responses use appropriate HTTP status codes
 
-### 7.6 Separate `run_state` / `health_state` tests
+### 8.6 Separate `run_state` / `health_state` tests
 
 - [x] `run_state` and `health_state` are separate fields on `AgentHealthItem`
 - [x] Both fields accept only their respective allowed values
 - [x] An entity can have independent values for each dimension (e.g. `run_state: "completed"` with `health_state: "degraded"`)
 
-### 7.7 Empty and degraded scenario tests
+### 8.7 Empty and degraded scenario tests
 
 - [x] Empty roster (zero entities) returns HTTP error, not empty response
 - [x] Empty health `entities` array is a valid response (returns 200)
 - [x] Health failure with roster success is a handled degraded scenario
 - [x] Roster failure is a workspace-level blocking error
 
-### 7.8 Health `entity_id` ↔ roster `id` join tests
+### 8.8 Health `entity_id` ↔ roster `id` join tests
 
 - [x] Every `entity_id` in health response matches a roster `id`
 - [x] Health items with unknown `entity_id` values are invalid
@@ -412,14 +667,16 @@ PR-OPS-2 (backend implementation) must include deterministic tests covering the 
 
 ---
 
-## 8. Summary
+## 9. Summary
 
-This contract specifies the first two Agent Operations endpoints:
+This contract specifies all four Agent Operations endpoints:
 
-| Endpoint | Purpose | Backend source | Response shape |
-|----------|---------|---------------|----------------|
-| `GET /ops/agent-roster` | Static architecture and roster truth | Persona config, roster definitions | `AgentRosterResponse` |
-| `GET /ops/agent-health` | Current health snapshot | Obs P2 events, scheduler, feeder health | `AgentHealthSnapshotResponse` |
+| Endpoint | Purpose | Backend source | Response shape | PR |
+|----------|---------|---------------|----------------|-----|
+| `GET /ops/agent-roster` | Static architecture and roster truth | Persona config, roster definitions | `AgentRosterResponse` | PR-OPS-2 |
+| `GET /ops/agent-health` | Current health snapshot | Obs P2 events, scheduler, feeder health | `AgentHealthSnapshotResponse` | PR-OPS-2 |
+| `GET /runs/{run_id}/agent-trace` | Run-level agent trace | `run_record.json` + audit log | `AgentTraceResponse` | PR-OPS-4a |
+| `GET /ops/agent-detail/{entity_id}` | Entity-level detail | Roster + profile + health + run scan | `AgentDetailResponse` | PR-OPS-4b |
 
 Key contract decisions:
 
@@ -431,7 +688,13 @@ Key contract decisions:
 - **Roster authority** — roster is structural source of truth; health augments but does not define hierarchy
 - **Empty roster is invalid** — backend must return an error, not an empty response
 - **Join rule is explicit** — health `entity_id` must map to roster `id`; unknown health items are invalid; missing health for known entities is valid
+- **Flat envelope** — all endpoints use `ResponseMeta & {}` pattern, no `data`/`meta` wrapper
+- **Plain slug IDs** — no namespace prefix (e.g. `persona_default_analyst`, not `agent:persona_default_analyst`)
+- **Discriminated union** — detail `type_specific` keyed by `entity_type` with `variant` tag
+- **Graceful degradation** — missing audit log → `data_state: "stale"`; missing health → degraded status, not 500
+- **Bounded payloads** — all text fields and arrays have explicit size limits
 
 The contract is sufficient for:
-- PR-OPS-2 to implement the backend endpoints with deterministic tests
+- PR-OPS-2 to implement roster/health backend endpoints
+- PR-OPS-4a/4b to implement trace/detail backend endpoints
 - PR-OPS-3 to build the React workspace using typed adapters and hooks
