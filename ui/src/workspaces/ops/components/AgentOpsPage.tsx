@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // AgentOpsPage — Agent Operations workspace main page.
 //
-// Org / Structure mode: roster hierarchy + health overlay.
-// Answers: "Why should I trust this system right now?"
+// Modes: Org (structural view), Health (operator attention view).
+// Run mode is disabled pending PR-OPS-5b.
 //
 // State handling per AGENT_OPS_CONTRACT.md:
 //   - loading
@@ -23,14 +23,31 @@ import { OpsLayerSection } from "./OpsLayerSection";
 import { OpsDepartmentSection } from "./OpsDepartmentSection";
 import { OpsSelectedDetailPanel } from "./OpsSelectedDetailPanel";
 import { OpsDegradedBanner } from "./OpsDegradedBanner";
+import { OpsDataStateBanner } from "./OpsDataStateBanner";
 
 type OpsMode = "org" | "run" | "health";
+
+/** Sort entities to elevate non-healthy to the top for Health mode. */
+function elevateDegraded(entities: OpsEntityViewModel[]): OpsEntityViewModel[] {
+  const priority: Record<string, number> = {
+    unavailable: 0,
+    degraded: 1,
+    stale: 2,
+    recovered: 3,
+    live: 4,
+  };
+  return [...entities].sort((a, b) => {
+    const pa = a.hasHealth ? (priority[a.healthState ?? "live"] ?? 4) : -1;
+    const pb = b.hasHealth ? (priority[b.healthState ?? "live"] ?? 4) : -1;
+    return pa - pb;
+  });
+}
 
 export function AgentOpsPage() {
   const rosterQuery = useAgentRoster();
   const healthQuery = useAgentHealth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode] = useState<OpsMode>("org");
+  const [mode, setMode] = useState<OpsMode>("org");
 
   const vm = useMemo(
     () =>
@@ -52,6 +69,32 @@ export function AgentOpsPage() {
     ],
   );
 
+  // In Health mode, elevate degraded/stale/unavailable entities
+  const displayGovernance = useMemo(
+    () =>
+      mode === "health"
+        ? elevateDegraded(vm.governanceLayer)
+        : vm.governanceLayer,
+    [mode, vm.governanceLayer],
+  );
+  const displayOfficers = useMemo(
+    () =>
+      mode === "health"
+        ? elevateDegraded(vm.officerLayer)
+        : vm.officerLayer,
+    [mode, vm.officerLayer],
+  );
+  const displayDepartments = useMemo(
+    () =>
+      mode === "health"
+        ? vm.departments.map((d) => ({
+            ...d,
+            entities: elevateDegraded(d.entities),
+          }))
+        : vm.departments,
+    [mode, vm.departments],
+  );
+
   // Find selected entity across all layers
   const selectedEntity = useMemo((): OpsEntityViewModel | null => {
     if (!selectedId) return null;
@@ -71,6 +114,11 @@ export function AgentOpsPage() {
     setSelectedId(null);
   }, []);
 
+  const handleModeChange = useCallback((newMode: OpsMode) => {
+    setMode(newMode);
+    // Selection preserved across mode switch per §7.4
+  }, []);
+
   return (
     <PanelShell>
       {/* Top bar: title + mode pills */}
@@ -83,6 +131,7 @@ export function AgentOpsPage() {
         <div className="flex items-center gap-1 rounded-lg border border-gray-700/50 bg-gray-900/40 p-1">
           <button
             type="button"
+            onClick={() => handleModeChange("org")}
             className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
               mode === "org"
                 ? "bg-cyan-900/40 text-cyan-300"
@@ -94,16 +143,19 @@ export function AgentOpsPage() {
           <button
             type="button"
             disabled
-            title="Requires run trace endpoint (Phase 7)"
+            title="Requires run trace wiring (PR-OPS-5b)"
             className="rounded px-3 py-1 text-xs font-medium text-gray-600 cursor-not-allowed"
           >
             Run
           </button>
           <button
             type="button"
-            disabled
-            title="Requires run trace endpoint (Phase 7)"
-            className="rounded px-3 py-1 text-xs font-medium text-gray-600 cursor-not-allowed"
+            onClick={() => handleModeChange("health")}
+            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+              mode === "health"
+                ? "bg-cyan-900/40 text-cyan-300"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
           >
             Health
           </button>
@@ -142,6 +194,29 @@ export function AgentOpsPage() {
             <OpsDegradedBanner variant="empty-health" />
           )}
 
+          {/* data_state banners per §5.6 */}
+          {vm.rosterDataState === "stale" && (
+            <OpsDataStateBanner source="Roster" state="stale" />
+          )}
+          {vm.healthDataState === "stale" && (
+            <OpsDataStateBanner source="Health" state="stale" />
+          )}
+
+          {/* Health mode attention header */}
+          {mode === "health" && (
+            <div
+              className="flex items-center gap-2 rounded border border-cyan-800/40 bg-cyan-950/20 px-4 py-2"
+              data-testid="health-mode-header"
+            >
+              <span className="text-xs font-bold uppercase tracking-widest text-cyan-400">
+                Health Mode
+              </span>
+              <span className="text-xs text-cyan-600">
+                Degraded and stale entities elevated for operator attention
+              </span>
+            </div>
+          )}
+
           {/* Summary / trust region */}
           <OpsSummaryBar vm={vm} />
 
@@ -152,7 +227,7 @@ export function AgentOpsPage() {
               {/* Governance layer */}
               <OpsLayerSection
                 title="Governance Layer"
-                entities={vm.governanceLayer}
+                entities={displayGovernance}
                 selectedId={selectedId}
                 onSelect={handleSelect}
               />
@@ -160,13 +235,13 @@ export function AgentOpsPage() {
               {/* Officer layer */}
               <OpsLayerSection
                 title="Officer Layer"
-                entities={vm.officerLayer}
+                entities={displayOfficers}
                 selectedId={selectedId}
                 onSelect={handleSelect}
               />
 
               {/* Department sections */}
-              {vm.departments.map((dept) => (
+              {displayDepartments.map((dept) => (
                 <OpsDepartmentSection
                   key={dept.key}
                   department={dept}

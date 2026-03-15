@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Agent Operations workspace tests — PR-OPS-3.
+// Agent Operations workspace tests — PR-OPS-3 + PR-OPS-5a.
 //
 // Explicit assertions (no snapshots) covering:
 //   - healthy render
@@ -9,6 +9,8 @@
 //   - entity selection detail behavior
 //   - join safety / unknown health-only item ignored
 //   - route render
+//   - PR-OPS-5a: Health mode activation, data_state banners,
+//     OpsErrorEnvelope parsing, typed adapters, mode switching
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -21,6 +23,7 @@ import type {
   AgentHealthSnapshotResponse,
   AgentHealthItem,
 } from "../src/shared/api/ops";
+import { parseOpsErrorEnvelope } from "../src/shared/api/ops";
 import {
   buildOpsWorkspaceViewModel,
   resolveOpsCondition,
@@ -496,19 +499,18 @@ describe("AgentOpsPage", () => {
     expect(screen.queryByTestId("selected-detail-panel")).not.toBeInTheDocument();
   });
 
-  it("disables Run and Health mode pills with tooltip", async () => {
+  it("disables Run mode pill, enables Health mode pill", async () => {
     mockFetchRoster.mockReturnValue(new Promise(() => {}));
     mockFetchHealth.mockReturnValue(new Promise(() => {}));
 
     renderWithRouter(<AgentOpsPage />);
 
-    const runButton = screen.getByText("Run");
-    const healthButton = screen.getByText("Health");
+    const runButton = screen.getByRole("button", { name: "Run" });
+    const healthButton = screen.getByRole("button", { name: "Health" });
 
     expect(runButton).toBeDisabled();
-    expect(healthButton).toBeDisabled();
-    expect(runButton).toHaveAttribute("title", "Requires run trace endpoint (Phase 7)");
-    expect(healthButton).toHaveAttribute("title", "Requires run trace endpoint (Phase 7)");
+    expect(runButton).toHaveAttribute("title", "Requires run trace wiring (PR-OPS-5b)");
+    expect(healthButton).not.toBeDisabled();
   });
 });
 
@@ -537,5 +539,238 @@ describe("AgentOpsRoute", () => {
     );
 
     expect(screen.getByText("Agent Operations")).toBeInTheDocument();
+  });
+});
+
+// ---- PR-OPS-5a: OpsErrorEnvelope parsing ----
+
+describe("parseOpsErrorEnvelope", () => {
+  it("parses direct OpsError shape", () => {
+    const result = parseOpsErrorEnvelope({
+      error: "ROSTER_UNAVAILABLE",
+      message: "Config could not be loaded",
+    });
+    expect(result).toEqual({
+      error: "ROSTER_UNAVAILABLE",
+      message: "Config could not be loaded",
+      entity_id: undefined,
+    });
+  });
+
+  it("parses OpsError with entity_id", () => {
+    const result = parseOpsErrorEnvelope({
+      error: "ENTITY_NOT_FOUND",
+      message: "Entity not found",
+      entity_id: "phantom",
+    });
+    expect(result).toEqual({
+      error: "ENTITY_NOT_FOUND",
+      message: "Entity not found",
+      entity_id: "phantom",
+    });
+  });
+
+  it("parses wrapped OpsErrorEnvelope { detail: { error, message } }", () => {
+    const result = parseOpsErrorEnvelope({
+      detail: {
+        error: "HEALTH_PROJECTION_FAILED",
+        message: "Projection failed",
+      },
+    });
+    expect(result).toEqual({
+      error: "HEALTH_PROJECTION_FAILED",
+      message: "Projection failed",
+      entity_id: undefined,
+    });
+  });
+
+  it("returns null for non-object input", () => {
+    expect(parseOpsErrorEnvelope("just a string")).toBeNull();
+    expect(parseOpsErrorEnvelope(null)).toBeNull();
+    expect(parseOpsErrorEnvelope(42)).toBeNull();
+  });
+
+  it("returns null for unrecognized object shape", () => {
+    expect(parseOpsErrorEnvelope({ foo: "bar" })).toBeNull();
+  });
+});
+
+// ---- PR-OPS-5a: Health mode activation ----
+
+describe("AgentOpsPage — Health mode (PR-OPS-5a)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("activates Health mode and shows health mode header", async () => {
+    const roster = makeRoster();
+    const health = makeHealth();
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+
+    // Wait for entities
+    await screen.findByText("ARBITER");
+
+    // Click Health pill
+    const healthButton = screen.getByRole("button", { name: "Health" });
+    await userEvent.click(healthButton);
+
+    // Health mode header should appear
+    expect(screen.getByTestId("health-mode-header")).toBeInTheDocument();
+    expect(screen.getByText("Health Mode")).toBeInTheDocument();
+  });
+
+  it("preserves selection when switching from Org to Health mode", async () => {
+    const roster = makeRoster();
+    const health = makeHealth();
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+
+    // Select entity in Org mode
+    const arbiterCard = await screen.findByTestId("entity-card-arbiter");
+    await userEvent.click(arbiterCard);
+    expect(screen.getAllByTestId("selected-detail-panel").length).toBeGreaterThan(0);
+
+    // Switch to Health mode — use getByRole to target button specifically
+    const healthPill = screen.getByRole("button", { name: "Health" });
+    await userEvent.click(healthPill);
+
+    // Selection should be preserved
+    expect(screen.getAllByTestId("selected-detail-panel").length).toBeGreaterThan(0);
+    const panel = screen.getAllByTestId("selected-detail-panel")[0];
+    expect(within(panel).getByText("ARBITER")).toBeInTheDocument();
+  });
+
+  it("switches back to Org mode from Health mode", async () => {
+    const roster = makeRoster();
+    const health = makeHealth();
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+
+    // Switch to Health then back to Org
+    await userEvent.click(screen.getByRole("button", { name: "Health" }));
+    expect(screen.getByTestId("health-mode-header")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Org" }));
+    expect(screen.queryByTestId("health-mode-header")).not.toBeInTheDocument();
+  });
+
+  it("shows data_state stale banner when roster is stale", async () => {
+    const roster = makeRoster({ data_state: "stale" });
+    const health = makeHealth();
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+
+    expect(screen.getByTestId("data-state-banner-roster")).toBeInTheDocument();
+    expect(screen.getByText("Roster data is stale")).toBeInTheDocument();
+  });
+
+  it("shows data_state stale banner when health is stale", async () => {
+    const roster = makeRoster();
+    const health = makeHealth(undefined, { data_state: "stale" });
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+
+    expect(screen.getByTestId("data-state-banner-health")).toBeInTheDocument();
+    expect(screen.getByText("Health data is stale")).toBeInTheDocument();
+  });
+
+  it("renders without data_state banners when both are live", async () => {
+    const roster = makeRoster();
+    const health = makeHealth();
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({ ok: true, data: health, status: 200 });
+
+    renderWithRouter(<AgentOpsPage />);
+    await screen.findByText("ARBITER");
+
+    expect(screen.queryByTestId("data-state-banner-roster")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("data-state-banner-health")).not.toBeInTheDocument();
+  });
+});
+
+// ---- PR-OPS-5a: Typed adapters contract compliance ----
+
+describe("PR-OPS-5a contract compliance", () => {
+  it("roster-health join: unknown health IDs discarded (§5.10 rule 1)", () => {
+    const roster = makeRoster();
+    const health = makeHealth([
+      { entity_id: "arbiter", run_state: "idle", health_state: "live" },
+      { entity_id: "ghost", run_state: "idle", health_state: "degraded" },
+    ]);
+    const vm = buildOpsWorkspaceViewModel(roster, health, false, false, false, false);
+    const allIds = [
+      ...vm.governanceLayer,
+      ...vm.officerLayer,
+      ...vm.departments.flatMap((d) => d.entities),
+    ].map((e) => e.id);
+    expect(allIds).not.toContain("ghost");
+  });
+
+  it("roster-health join: missing health for known entity is valid (§5.10 rule 2)", () => {
+    const roster = makeRoster();
+    const health = makeHealth([
+      { entity_id: "arbiter", run_state: "idle", health_state: "live" },
+    ]);
+    const vm = buildOpsWorkspaceViewModel(roster, health, false, false, false, false);
+    const senate = vm.governanceLayer.find((e) => e.id === "senate");
+    expect(senate).toBeDefined();
+    expect(senate!.hasHealth).toBe(false);
+  });
+
+  it("roster is structural source of truth (§5.10 rule 3)", () => {
+    const roster = makeRoster();
+    const vm = buildOpsWorkspaceViewModel(roster, null, false, false, false, true);
+    expect(vm.condition).toBe("degraded");
+    // All roster entities should still exist
+    expect(vm.entityCount).toBe(7);
+    expect(vm.governanceLayer).toHaveLength(2);
+    expect(vm.officerLayer).toHaveLength(1);
+    expect(vm.departments).toHaveLength(4);
+  });
+
+  it("health failure → roster without badges + degraded banner (§5.9)", async () => {
+    const roster = makeRoster();
+    mockFetchRoster.mockResolvedValue({ ok: true, data: roster, status: 200 });
+    mockFetchHealth.mockResolvedValue({
+      ok: false,
+      status: 500,
+      detail: { error: "HEALTH_PROJECTION_FAILED", message: "Failed" },
+    });
+
+    renderWithRouter(<AgentOpsPage />);
+
+    // Roster still renders
+    expect(await screen.findByText("ARBITER")).toBeInTheDocument();
+    expect(screen.getByText("Health data unavailable")).toBeInTheDocument();
+
+    // NO HEALTH indicators should appear for entities
+    const noHealthBadges = screen.getAllByText("NO HEALTH");
+    expect(noHealthBadges.length).toBeGreaterThan(0);
+  });
+
+  it("relationships array is preserved in view model", () => {
+    const roster = makeRoster();
+    const health = makeHealth();
+    const vm = buildOpsWorkspaceViewModel(roster, health, false, false, false, false);
+    expect(vm.relationships).toHaveLength(2);
+    expect(vm.relationships[0]).toEqual({
+      from: "arbiter",
+      to: "senate",
+      type: "synthesizes",
+    });
   });
 });
