@@ -9,6 +9,7 @@ import { JourneyStudioRoute } from "@workspaces/journey/routes/JourneyStudioRout
 import { AnalysisRunRoute } from "@workspaces/analysis/routes/AnalysisRunRoute";
 import { AgentOpsRoute } from "@workspaces/ops/routes/AgentOpsRoute";
 import { JournalReviewRoute } from "@workspaces/journal/routes/JournalReviewRoute";
+import { ReflectRoute } from "@workspaces/reflect/routes/ReflectRoute";
 import { NotFoundPage } from "@shared/components/NotFoundPage";
 
 const router = createHashRouter([
@@ -31,6 +32,7 @@ const router = createHashRouter([
         element: <JournalReviewRoute />,
       },
       { path: "ops", element: <AgentOpsRoute /> },
+      { path: "reflect", element: <ReflectRoute /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
