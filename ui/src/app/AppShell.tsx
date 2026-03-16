@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { to: "/analysis", label: "Analysis" },
   { to: "/journal", label: "Journal" },
   { to: "/ops", label: "Ops" },
+  { to: "/reflect", label: "Reflect" },
 ] as const;
 
 export function AppShell() {

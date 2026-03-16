@@ -41,6 +41,10 @@ Forward frontend stack: React + TypeScript + Tailwind.
 - `ui/src/workspaces/analysis/` — Analysis Run workspace
 - `ui/src/workspaces/journal/` — Journal & Review workspace
 - `ui/src/workspaces/ops/` — Agent Ops workspace (Org/Health/Run modes + detail sidebar)
+- `ui/src/workspaces/reflect/` — Reflect workspace (Overview/Runs tabs, PR-REFLECT-2)
+- `ui/src/shared/api/reflect.ts` — Reflect typed API layer (PR-REFLECT-2)
+- `ui/src/shared/hooks/useReflect.ts` — Reflect TanStack Query hooks (PR-REFLECT-2)
+- `ui/tests/reflect.test.tsx` — Reflect workspace tests (+55 tests, PR-REFLECT-2)
 
 ## Agent Ops backend (`ai_analyst/api/`)
 

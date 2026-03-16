@@ -544,6 +544,43 @@ The following endpoints exist and remain available for future exposure but are n
 
 ---
 
+## 10b. Workspace — Reflect (Implemented — PR-REFLECT-2)
+
+### 10b.1 Purpose
+
+The Reflect workspace is the AI system's **self-evaluation lab**. It provides cross-run persona performance analysis, pattern distribution summaries, and individual run deep-dives via artifact bundles.
+
+### 10b.2 Implementation status
+
+**Fully implemented** (PR-REFLECT-2, 16 March 2026). Contract: `docs/specs/PR_REFLECT_2_SPEC.md`. Frontend: `ui/src/workspaces/reflect/`.
+
+### 10b.3 Backend basis
+
+- `GET /reflect/persona-performance` — per-persona participation/override/alignment/confidence aggregation
+- `GET /reflect/pattern-summary` — instrument × session verdict distribution buckets
+- `GET /reflect/run/{run_id}` — run artifact bundle (run_record, usage, artifact status)
+- `GET /runs/` — shared run browser index (reused from PR-RUN-1 via `useRuns` hook)
+
+### 10b.4 Two internal tabs
+
+- **Overview tab** (default) — persona performance table + pattern summary table consuming aggregation endpoints
+- **Runs tab** — paginated run history list + inline run detail panel for inspecting individual bundles
+
+### 10b.5 Key UX states
+
+- Below-threshold: welcoming message (not error) — "Need at least N runs"
+- Null metrics: display as "—", table renders cleanly even when ALL metrics are null
+- Stale + populated: coexist — stale banner above populated table
+- Bundle 404: "Run not found" with reselection guidance
+- Flagged items: amber text + "⚠ " prefix on persona/instrument name
+- No filter controls in v1 (deferred to PR-REFLECT-2a)
+
+### 10b.6 Route
+
+`#/reflect` — same level as `#/ops`, `#/journal`, etc. in the hash router.
+
+---
+
 ## 11. Workspace G — Analytics & Export
 
 ### 11.1 Purpose

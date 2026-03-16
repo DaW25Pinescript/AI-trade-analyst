@@ -144,6 +144,24 @@ The Agent Ops subsystem exposes the multi-agent analysis engine's architecture, 
 
 **Contract:** `docs/ui/AGENT_OPS_CONTRACT.md` (§4–§7)
 
+### 9) Reflect — AI Decision Evaluation Workspace
+
+The Reflect workspace is a read-only frontend surface consuming the three Reflect backend endpoints (PR-REFLECT-1). It provides cross-run persona performance analysis, pattern distribution summaries, and individual run deep-dives.
+
+**Frontend components** (`ui/src/workspaces/reflect/`):
+- `ReflectPage` — workspace orchestrator with two-tab navigation (Overview / Runs)
+- `PersonaPerformanceTable` — per-persona stats table with flagged highlighting
+- `PatternSummaryTable` — instrument × session verdict distribution table
+- `RunDetailView` — full artifact bundle inspector
+- `UsageSummaryCard` — token/model/cost display from usage data
+- `reflectAdapter.ts` — view-model normalisation layer
+
+**Route:** `#/reflect` (hash router, same level as `#/ops`, `#/journal`, etc.)
+
+**Endpoints consumed:** `/reflect/persona-performance`, `/reflect/pattern-summary`, `/reflect/run/{run_id}`, `/runs/` (via shared `useRuns` hook)
+
+**Contract:** `docs/specs/PR_REFLECT_2_SPEC.md`
+
 ## Known architecture ambiguity (explicit)
 
 - The repository and progress doc indicate coherent lane-level architecture, but not yet a single fully unified runtime where active `ai_analyst` graph execution always consumes MDO packets directly. Treat this as **emerging/in-progress convergence**, not fully complete coupling.
