@@ -75,6 +75,7 @@ Forward frontend stack: React + TypeScript + Tailwind.
 - `tests/test_ops_detail_endpoints.py` — detail endpoint tests (72 tests)
 - `tests/test_run_browser_endpoints.py` — run browser endpoint tests (42 tests, PR-RUN-1)
 - `tests/test_market_data_endpoints.py` — market data endpoint tests (39 tests, PR-CHART-1)
+- `tests/test_reflect_endpoints.py` — reflect endpoint tests (11 tests, PR-REFLECT-1)
 - `tests/fixtures/sample_run_record.json` — trace + run browser test fixture
 - `tests/fixtures/sample_audit_log.jsonl` — trace test fixture
 

@@ -1,7 +1,7 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 16 March 2026 (PR-REFLECT-2 closure)
+**Last updated:** 16 March 2026 (Phase 8 progress audit)
 **Review date:** 10 March 2026
 **Current phase:** Phase 8 — PR-REFLECT-2 Complete (Reflect workspace frontend shipped ✅)
 **Planning horizon:** Next 5–7 weeks
@@ -24,7 +24,7 @@
 - **Current phase:** Phase 8 — PR-REFLECT-2 Complete. Reflect workspace frontend shipped: `#/reflect` route with Overview tab (persona performance + pattern summary tables) and Runs tab (run history + inline bundle detail). +55 frontend tests.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on six read-only projection endpoints (roster, health, trace, detail, run browser, market data).
-- **Backend test count update:** Full backend regression after PR-REFLECT-1: 1895 passed, 1 pre-existing failure, 13 skipped (failure count unchanged).
+- **Backend test count update:** Full backend collection: 1811 tests collected (3 MDO collection errors in scheduler tests due to missing apscheduler). From tests/ + ai_analyst/tests/: 954 passed, 61 failed (pre-existing code-vs-test drift). MDO lane: 546 collected.
 - **Frontend test count update:** Full frontend regression after PR-REFLECT-2: 361 total (356 passing, 5 pre-existing journey failures unchanged).
 - **Frontend test count:** 361 total (356 passing, 5 pre-existing journey failures).
 - **Next actions:** Phase 8 continues — PR-REFLECT-2a (filter controls for Reflect), PR-CHART-2 (run context overlay + multi-timeframe), PR-REFLECT-3 (suggestions + influence).
@@ -237,6 +237,12 @@ You are no longer proving feasibility, building runtime behavior, or standing up
 | Cleanup Tranche | Async markers, doc consolidation, TD-5/TD-9 micro-PRs | ✅ Complete |
 | Doc Consolidation (PR-4) | Consolidate status tracking around canonical progress hub — README de-conflict, architecture de-conflict, UI lane framing, historical placement hygiene | ✅ Complete |
 | Tidy | Async marker cleanup (8 files) | ✅ Complete — all 30 redundant `@pytest.mark.asyncio` markers removed; `asyncio_mode = "auto"` handles detection |
+| Phase 8 — PR-RUN-1 | Run Browser endpoint + RunBrowserPanel — `GET /runs/`, +42 backend tests | ✅ Complete |
+| Phase 8 — PR-CHART-1 | OHLCV data-seam + candlestick chart — `GET /market-data/{instrument}/ohlcv`, +39 backend / +9 frontend tests | ✅ Complete |
+| Phase 8 — PR-REFLECT-1 | Persona performance + pattern summary endpoints — 3 `/reflect` endpoints, +11 backend tests | ✅ Complete |
+| Phase 8 — PR-REFLECT-2 | Reflect workspace frontend — `#/reflect` route, Overview + Runs tabs, +55 frontend tests | ✅ Complete |
+| Phase 8 — PR-CHART-2 | Run context overlay + multi-timeframe charts | 📋 Next |
+| Phase 8 — PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | 📋 Planned |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
 
 ---
@@ -303,6 +309,10 @@ Phase-closure counts should be read as **phase-gate numbers**, not as a single a
 | PR-OPS-4b (Agent Detail) | 197 (ops suite) | +72 new detail tests. 125/125 baseline+trace preserved. Zero regressions. All 25 spec ACs pass. |
 | PR-OPS-5a (Health Mode Wiring) | 39 (frontend) | +16 new tests. Types, adapters, hooks, Health mode, data_state banners, OpsErrorEnvelope. 23/23 baseline preserved. |
 | PR-OPS-5b (Run + Detail Wiring) | 63 (frontend) | +24 new tests. Run mode, trace vis, detail sidebar, discriminated union rendering. 39/39 baseline preserved. Phase 7 complete. |
+| PR-RUN-1 (Run Browser) | +42 (backend) | Run browser endpoint + RunBrowserPanel. 239 total backend ops tests. +14 frontend tests (77 ops total). |
+| PR-CHART-1 (OHLCV Chart) | +39 backend, +9 frontend | Market data endpoint + CandlestickChart. 432 total backend, 301 total frontend. |
+| PR-REFLECT-1 (Reflect Backend) | +11 (backend) | Persona performance, pattern summary, run bundle endpoints. Audit-log enrichment. |
+| PR-REFLECT-2 (Reflect Frontend) | +55 (frontend) | Reflect workspace: Overview tab + Runs tab. 361 total frontend. |
 
 ### Known gaps and debt themes
 
@@ -492,6 +502,8 @@ Full plan: `docs/PHASE_8_PLAN.md`
 - ~~**Cleanup drift risk:**~~ **Resolved** — cleanup tranche complete (13 March 2026).
 - **Scope-creep risk:** future extensions such as Chart Evidence or Run Artifact Inspector could jump ahead of prioritisation.
 - ~~**Run discovery gap:**~~ **Resolved** — PR-RUN-1 complete (15 March 2026). `GET /runs/` endpoint + RunBrowserPanel. Operators can browse, filter, and click-to-load runs. Paste-field retained as fallback.
+- **MDO collection errors:** 3 MDO scheduler test files fail collection due to missing `apscheduler` dependency — masks ~250 tests in CI.
+- **Pre-existing test failures:** 61 backend failures (code-vs-test drift, not new regressions) and 5 frontend journey freeze-error failures remain unchanged across Phase 8.
 
 ---
 
@@ -561,6 +573,8 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 | TD-6 | `build_market_packet()` God-function | `market_data_officer/officer/service.py` | Trust policy, quality, feature extraction, serialization, and logging in one function; hard to test in isolation | **Future cleanup** — decompose when packet assembly needs to evolve; not blocking current work |
 | TD-7 | `build_market_packet()` eager loading + `iterrows()` | `market_data_officer/officer/service.py` | O(total_rows) Python loop per request; CPU/memory pressure scales with instrument count | **Future optimisation** — current scale (5 instruments, 4–6 TFs) is within tolerance; revisit when concurrency or instrument count grows |
 | TD-8 | Mixed data-shape handling in `classify_fvg_context` | `analyst/pre_filter.py` | `hasattr`/`get` branches for object vs dict payloads; weak upstream contracts | **Resolves with runtime lane convergence** — architectural, not a standalone cleanup |
+| TD-13 | Agent Ops run selector paste-field only | `ui/src/workspaces/ops/` | Operator friction; no browse/search for run artifacts | **✅ Resolved — 15 March 2026** — PR-RUN-1 shipped `GET /runs/` + RunBrowserPanel. Paste-field retained as fallback. |
+| TD-14 | Reflect artifact richness gap | `ai_analyst/api/services/reflect_aggregation.py` | `run_record.json` analyst entries omit stance/confidence/override; reflect metrics rely on optional audit-log enrichment | **Open** — consider enriched analyst metadata in future observability phase |
 | TD-9 | ~~Unused variables in `build_market_packet()`~~ | `market_data_officer/officer/service.py` | ~~`is_provisional`, `quality_label`, `quality_flags`, `struct_kwargs` assigned but unused~~ | ✅ **Resolved** (13 March 2026) — all four dead locals removed in PR-3 |
 
 ### Documentation / testing gaps — address as part of related phases
@@ -582,4 +596,7 @@ Findings from the senior architect audit conducted after Operationalise Phase 2 
 6. **Completed:** UI Phase 3A Implementation (14 March 2026) — PR-UI-1 through PR-UI-6 shipped. Phase 6 core product lane complete.
 7. **Completed:** Phase 7 Agent Ops (15 March 2026) — PR-OPS-4a/4b (backend trace+detail) + PR-OPS-5a/5b (frontend wiring). 197 backend + 63 frontend tests.
 8. **Completed:** PR-RUN-1 Run Browser (15 March 2026) — `GET /runs/` endpoint + RunBrowserPanel frontend. 239 backend + 77 frontend ops tests. TD-13 resolved.
-9. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs).
+9. **Completed:** PR-CHART-1 (16 March 2026) — OHLCV data-seam + CandlestickChart. +39 backend / +9 frontend tests.
+10. **Completed:** PR-REFLECT-1 (16 March 2026) — 3 Reflect endpoints. +11 backend tests.
+11. **Completed:** PR-REFLECT-2 (16 March 2026) — Reflect workspace frontend. +55 frontend tests.
+12. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs), TD-14 (reflect artifact richness gap).
