@@ -436,7 +436,7 @@ def generate_html(dash: ProjectDashboard) -> str:
 <title>Dashboard — {escape(project_name)}</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <script>
   tailwind.config = {{
@@ -881,10 +881,10 @@ def generate_html(dash: ProjectDashboard) -> str:
       const dataArr = D[activeTab] || D.activities;
       if (!dataArr || !dataArr.length) return alert('No data to export.');
       const keys = Object.keys(dataArr[0]);
-      let csvContent = 'data:text/csv;charset=utf-8,' + keys.join(',') + '\n';
+      let csvContent = 'data:text/csv;charset=utf-8,' + keys.join(',') + '\\n';
       dataArr.forEach(item => {{
         const row = keys.map(k => `"${{String(item[k] ?? '').replace(/"/g, '""')}}"`).join(',');
-        csvContent += row + '\n';
+        csvContent += row + '\\n';
       }});
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');

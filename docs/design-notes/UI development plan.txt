@@ -1,0 +1,783 @@
+Yes. Here’s a repo-ready **design / future UI development plan** that translates the flow, style, and ease-of-use patterns from your new dashboard into **AI Trade Analyst** without turning it into the same app.
+
+Grounding reference: the interaction style we’re borrowing comes from the generated dashboard and live-regeneration server you uploaded: [generate_dashboard.py](sandbox:/mnt/data/generate_dashboard.py) and [dashboard_server.py](sandbox:/mnt/data/dashboard_server.py).  
+
+---
+
+# AI Trade Analyst — Future UI Development Plan
+
+## Adapting Dashboard-Style Flow, Clarity, and Ease of Use into the Core Product
+
+## 1. Purpose
+
+This plan defines how the **usability strengths** of the new progress dashboard should be adapted into the **AI Trade Analyst** product UI.
+
+The goal is **not** to merge the dashboard itself into the product.
+The goal is to transfer the underlying UI qualities that made it feel better:
+
+* fast orientation
+* clear hierarchy
+* low-friction navigation
+* visible status
+* progressive disclosure
+* strong scanability
+* immediate “what matters / what next?” comprehension
+
+This should improve the core AI Trade Analyst experience across:
+
+* Triage Board
+* Journey Studio
+* Analysis Run
+* Agent Ops
+* Reflect
+
+---
+
+## 2. Core Design Thesis
+
+AI Trade Analyst should feel like a **guided decision workspace**, not a pile of disconnected technical panels.
+
+The dashboard demonstrated a stronger interaction pattern because it made the user feel:
+
+* oriented immediately
+* confident about where they were
+* able to move laterally with low effort
+* able to scan high-level state before drilling down
+* supported by clear loading / status / summary cues
+
+That same model should now shape the product.
+
+### Design principle
+
+**Summary first. Detail on demand. Context always visible.**
+
+---
+
+## 3. What Exactly Should Be Carried Over
+
+## 3.1 Fast orientation on entry
+
+Each workspace should tell the operator, within seconds:
+
+* what case is selected
+* what state it is in
+* what matters most
+* what can be done next
+
+This is one of the strongest transferable traits from the dashboard.
+
+### AI Trade Analyst implication
+
+Every major workspace should have a **top summary strip** containing some combination of:
+
+* instrument
+* timeframe/session
+* verdict
+* confidence
+* setup state
+* trace availability
+* reflect availability
+* timestamp
+* gating state
+* next recommended action
+
+The user should never land in a blank or contextless surface.
+
+---
+
+## 3.2 Card-first information architecture
+
+The dashboard style works because it favors **compact visual blocks** over raw density.
+
+### Carryover rule
+
+Use cards for:
+
+* summaries
+* analyst positions
+* verdicts
+* gates
+* warnings
+* “why interesting”
+* next-step prompts
+* insight clusters
+
+Use tables only when:
+
+* the user needs comparison across many rows
+* the user needs audit-style detail
+* the user is already in a deeper inspection mode
+
+### Product implication
+
+* **Triage Board** should become more card-oriented
+* **Analysis Run** should lead with a verdict card cluster
+* **Reflect** should use insight cards before deeper grids
+* **Agent Ops** should present agent status and trace slices as structured role cards, not only raw lists
+
+---
+
+## 3.3 Strong scanability
+
+The dashboard makes it easy to visually skim because state is chunked and labeled well.
+
+### Carryover rule
+
+Prioritize:
+
+* strong section headers
+* visible status chips
+* compact metadata lines
+* repeated card structure
+* consistent icon use
+* clear spacing between summary and detail zones
+
+### Product implication
+
+Across all workspaces, the user should be able to quickly identify:
+
+* system conclusion
+* supporting evidence
+* objections/dissent
+* operational failures
+* missing artifacts
+* blocked next steps
+
+without reading large text blocks.
+
+---
+
+## 3.4 Progressive disclosure
+
+The dashboard avoids overwhelming the user by revealing detail only when needed.
+
+### Carryover rule
+
+Use a layered reveal model:
+
+1. headline state
+2. short rationale
+3. structured evidence summary
+4. raw detail / artifact / trace
+
+### Product implication
+
+For AI Trade Analyst this becomes:
+
+#### Analysis Run
+
+Layer 1:
+
+* verdict
+* confidence
+* trade / no-trade
+* invalidation
+* key reasons
+
+Layer 2:
+
+* analyst summaries
+* risk gates
+* arbiter reasoning
+* macro context summary
+
+Layer 3:
+
+* detailed trace
+* raw artifact payloads
+* expanded supporting evidence
+
+#### Reflect
+
+Layer 1:
+
+* strongest patterns
+* warning clusters
+* persona drift flags
+
+Layer 2:
+
+* pattern groups
+* no-trade clusters
+* override clusters
+
+Layer 3:
+
+* run-linked drilldown
+* supporting evidence history
+
+---
+
+## 3.5 Lateral navigation with low friction
+
+The dashboard works well because moving between views is cheap.
+
+### Carryover rule
+
+AI Trade Analyst should feel like one coherent workspace with different lenses, not multiple disconnected products.
+
+### Product implication
+
+Navigation should support quick movement between:
+
+* Triage
+* Journey
+* Run
+* Agent Ops
+* Reflect
+
+while preserving:
+
+* selected instrument
+* selected run
+* selected verdict context
+* timestamp context where relevant
+
+The user should feel they are still inside the same decision case.
+
+---
+
+## 3.6 Explicit empty, loading, partial, and degraded states
+
+The dashboard lesson is not just visual polish. It is also about avoiding dead surfaces.
+
+### Carryover rule
+
+No panel should fail silently.
+
+Every workspace should have explicit states for:
+
+* loading
+* ready
+* empty
+* partial
+* degraded
+* unavailable
+* failed
+
+### Product implication
+
+Examples:
+
+* “No run selected”
+* “Run selected, trace unavailable”
+* “Reflect view built from last 50 runs”
+* “Chart markers unavailable for this run”
+* “Arbiter verdict present, analyst trace incomplete”
+* “No comparable patterns found yet”
+
+This increases trust and reduces confusion.
+
+---
+
+## 4. Product-Level UI Direction
+
+## 4.1 AI Trade Analyst should evolve into a guided decision journey
+
+The interface should emphasize that the product is helping the operator move through a decision process:
+
+* identify opportunity
+* evaluate quality
+* inspect evidence
+* resolve disagreement
+* decide / no-trade
+* record override or execution
+* reflect later
+
+The dashboard’s ease-of-use suggests a UI direction that is less “toolbox of panels” and more “guided professional workflow.”
+
+---
+
+## 4.2 The app should privilege “decision confidence” over “feature exposure”
+
+A common failure mode in technical apps is showing every feature equally.
+
+The new direction should instead prioritize:
+
+* current case state
+* most relevant signal
+* blocking objections
+* next best action
+
+This reduces cognitive load and improves practical use.
+
+---
+
+## 5. Workspace-by-Workspace Adaptation Plan
+
+## 5.1 Triage Board
+
+### Current role
+
+Initial discovery surface.
+
+### Future style direction
+
+Make it feel like an intelligent radar screen, not a rough staging table.
+
+### UI upgrades
+
+* move from heavy row-first presentation toward **setup cards**
+* each card should show:
+
+  * instrument
+  * bias
+  * setup quality
+  * why interesting
+  * key gate state
+  * freshness/time context
+* include compact status chips:
+
+  * ready
+  * gated
+  * weak
+  * high-interest
+  * no-trade risk
+* add obvious quick actions:
+
+  * open journey
+  * inspect run
+  * view chart
+  * dismiss / defer
+
+### Outcome
+
+Triage becomes immediately legible and action-oriented.
+
+---
+
+## 5.2 Journey Studio
+
+### Current role
+
+Guided path through the trade idea.
+
+### Future style direction
+
+This should become the clearest expression of the “guided workflow” philosophy.
+
+### UI upgrades
+
+* strong top context header
+* visible current stage in the journey
+* stage cards or ribbons that make progress obvious
+* keep “now / next / blocked by” highly visible
+* support guided decision checkpoints rather than passive panels
+
+### Outcome
+
+Journey Studio becomes the spine of the product experience.
+
+---
+
+## 5.3 Analysis Run
+
+### Current role
+
+Detailed inspection of a selected run.
+
+### Future style direction
+
+Lead with conclusion, not raw payload.
+
+### UI upgrades
+
+Top band:
+
+* verdict
+* confidence
+* invalidation
+* setup quality
+* run status
+* timestamp
+* trace availability
+
+Primary card row:
+
+* arbiter ruling
+* top supporting reasons
+* top objections
+* risk gate outcome
+
+Secondary row:
+
+* technical analyst summary
+* macro summary
+* dissent / contested points
+* chart context availability
+
+Deep section:
+
+* trace
+* evidence ledger
+* raw artifacts
+
+### Outcome
+
+The operator gets decision clarity first, then depth.
+
+---
+
+## 5.4 Agent Ops
+
+### Current role
+
+Operational visibility into agents and traces.
+
+### Future style direction
+
+Keep it technical, but improve readability and role perception.
+
+### UI upgrades
+
+* render agents as role cards with health/state chips
+* trace participants should feel like identifiable actors, not generic rows
+* selected node / agent detail should use a clear side panel or drilldown section
+* show:
+
+  * stance
+  * last contribution
+  * failure/degraded state
+  * evidence contribution
+  * disagreement relationship
+
+### Outcome
+
+Agent Ops becomes easier to reason about, especially during disagreement or failure.
+
+---
+
+## 5.5 Reflect
+
+### Current role
+
+Longer-horizon performance / pattern review.
+
+### Future style direction
+
+Reflect should feel like an insight dashboard, not a report dump.
+
+### UI upgrades
+
+Top summary cards:
+
+* persona performance highlights
+* no-trade cluster themes
+* override patterns
+* recurring failure motifs
+
+Secondary panels:
+
+* pattern buckets
+* analyst drift
+* regime-linked issues
+* run-linked drilldown
+
+Important:
+Reflect should feel interpretive and actionable, not merely archival.
+
+### Outcome
+
+Reflect becomes a true feedback loop for governance and improvement.
+
+---
+
+## 6. Shared UI Patterns to Standardize
+
+## 6.1 Persistent context header
+
+A unified header strip across key workspaces should show the selected case context.
+
+Suggested fields:
+
+* instrument
+* session
+* selected run
+* verdict
+* confidence
+* timestamp
+* artifact availability
+* last update state
+
+---
+
+## 6.2 Status chips
+
+Create a shared design system for chips used across the app:
+
+* active
+* complete
+* pending
+* failed
+* gated
+* no-trade
+* partial
+* stale
+* trace ready
+* chart unavailable
+* override recorded
+
+These should be visually consistent across all workspaces.
+
+---
+
+## 6.3 Summary cards
+
+Define a reusable card pattern:
+
+* title
+* primary value or state
+* one supporting line
+* optional icon/chip
+* optional quick action
+
+Use across:
+
+* Triage
+* Run summary
+* Agent Ops
+* Reflect
+* risk / governance surfaces
+
+---
+
+## 6.4 Empty-state components
+
+Create consistent empty/degraded-state components for:
+
+* no selection
+* no data
+* partial artifact
+* load failure
+* unavailable chart
+* insufficient reflect history
+
+Each should include:
+
+* short explanation
+* what is still available
+* next best action
+
+---
+
+## 6.5 Drilldown pattern
+
+Adopt a shared drilldown structure:
+
+* summary view
+* expanded inspection
+* full trace / raw payload
+
+Avoid jumping directly from top-level view to raw technical output.
+
+---
+
+## 7. Interaction Principles
+
+## 7.1 Every screen must answer “what now?”
+
+This is the single strongest usability rule to import.
+
+Each workspace should make the next action obvious:
+
+* inspect run
+* compare viewpoints
+* view chart
+* record decision
+* move to review
+* return to triage
+
+---
+
+## 7.2 Minimize cognitive startup cost
+
+A user should not need to reconstruct system state from scattered widgets.
+
+State should be obvious from the first screenful.
+
+---
+
+## 7.3 Preserve operator trust through visibility
+
+Trust is improved when the UI clearly communicates:
+
+* what succeeded
+* what failed
+* what is missing
+* what is inferred
+* what is still only provisional
+
+---
+
+## 7.4 Complexity should be available, not forced
+
+The product should remain sophisticated, but complexity should not hit the operator all at once.
+
+---
+
+## 8. Suggested Phase-Based Implementation Plan
+
+## Phase U1 — Shared UI Principles + Pattern Library
+
+Create a repo document that defines:
+
+* summary cards
+* status chips
+* context header
+* empty states
+* drilldown rules
+* loading/degraded-state language
+* workspace hierarchy rules
+
+### Output
+
+A canonical UI principles / pattern doc.
+
+---
+
+## Phase U2 — Triage Board Polish Pass
+
+Apply the new design language to Triage first.
+
+### Goals
+
+* stronger scanability
+* card-first setup discovery
+* clearer “why interesting”
+* faster action routing
+
+### Why first
+
+Triage is the best place to capture the dashboard-style ease-of-use gains quickly.
+
+---
+
+## Phase U3 — Analysis Run Summary Refactor
+
+Restructure Analysis Run to lead with:
+
+* verdict
+* confidence
+* objections
+* invalidation
+* top reasons
+
+### Goal
+
+Make the run page decision-centric before trace-centric.
+
+---
+
+## Phase U4 — Shared Status / Empty / Degraded States
+
+Standardize all non-happy-path rendering across the app.
+
+### Goal
+
+No dead-feeling panels. No silent failure.
+
+---
+
+## Phase U5 — Reflect Insight-Layer Redesign
+
+Turn Reflect into a true insight surface.
+
+### Goal
+
+Insight-first, drilldown-second.
+
+---
+
+## Phase U6 — Agent Ops Readability Pass
+
+Improve role clarity and trace readability without changing core backend behavior.
+
+---
+
+## Phase U7 — Context Continuity Across Workspaces
+
+Unify selected case context as users move between:
+
+* Triage
+* Journey
+* Run
+* Agent Ops
+* Reflect
+
+### Goal
+
+The app feels like one coherent decision environment.
+
+---
+
+## 9. What This Plan Explicitly Does Not Mean
+
+This plan does **not** mean:
+
+* rebuild the app to look like the dashboard
+* replace the product’s workflow with a generic dashboard shell
+* prioritize cosmetics over contract reliability
+* duplicate logic already solved in backend projections
+* create a second parallel UI architecture
+
+This is a **UI quality and interaction model transfer**, not a UI transplant.
+
+---
+
+## 10. Success Criteria
+
+This adaptation is successful if:
+
+* users can understand the state of a trade case faster
+* the app feels more coherent and less fragmented
+* the first screenful of each workspace is more useful
+* empty/error/partial states are clear and non-dead
+* operator trust improves because status is explicit
+* deep technical detail remains available without dominating the default view
+
+---
+
+## 11. Recommended Next Deliverable
+
+The best practical next document would be:
+
+**`docs/ui/UI_FUTURE_DEVELOPMENT_PLAN.md`**
+
+followed by:
+
+**`docs/ui/UI_PRINCIPLES_AND_PATTERNS.md`**
+
+and then a first scoped implementation spec:
+
+**`PR-UI-TRIAGE-1`**
+for the Triage Board polish pass.
+
+If you want, I can turn this into a **repo-ready markdown file** in your usual phase/spec style, with:
+
+* purpose
+* scope
+* non-goals
+* design principles
+* phased rollout
+* acceptance criteria
+* documentation closure block.
+
+
+Key note recorded for the progress dashboard:
+
+Lucide worked via:
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+Also worth keeping alongside that note:
+
+Chart.js stability variant:
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+Python-generated JS strings must use escaped newlines like \\n, not raw \n, or the dashboard can die with a browser syntax error.
+
+
+
+
+
