@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 15 March 2026
+**Last updated:** 16 March 2026
 **Review date:** 10 March 2026
-**Current phase:** Phase 8 — PR-RUN-1 Complete (Run Browser endpoint + frontend ✅)
+**Current phase:** Phase 8 — PR-CHART-1 Complete (OHLCV seam validated, candlestick chart shipped ✅)
 **Planning horizon:** Next 5–7 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -20,12 +20,12 @@
 
 ## Phase Index (at-a-glance)
 
-- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1.
-- **Current phase:** Phase 8 — PR-RUN-1 Complete. Run Browser endpoint + RunBrowserPanel wired: 5 backend endpoints (239 tests), 3 workspace modes with browsable run selector (77 frontend tests).
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1.
+- **Current phase:** Phase 8 — PR-CHART-1 Complete. OHLCV data-seam validated (Outcome A), `GET /market-data/{instrument}/ohlcv` endpoint + CandlestickChart shipped: 6 backend endpoints (432 tests), candlestick chart in Run mode (301 frontend tests).
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
-- **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on five read-only projection endpoints (roster, health, trace, detail, run browser).
-- **Next actions:** Phase 8 continues — Live Charts (PR-CHART-1/2), Reflective Intelligence (PR-REFLECT-1/2/3).
-- **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6), Agent Ops read-side stack (Phase 7), and Run Browser (PR-RUN-1) are all complete.
+- **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on six read-only projection endpoints (roster, health, trace, detail, run browser, market data).
+- **Next actions:** Phase 8 continues — PR-CHART-2 (run context overlay + multi-timeframe), Reflective Intelligence (PR-REFLECT-1/2/3).
+- **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6), Agent Ops read-side stack (Phase 7), Run Browser (PR-RUN-1), and OHLCV Chart (PR-CHART-1) are all complete.
 
 ---
 
@@ -33,6 +33,7 @@
 
 | Date | Phase | Activity |
 |------|-------|----------|
+| 16 Mar 2026 | PR-CHART-1 | OHLCV data-seam validation (Outcome A) + `GET /market-data/{instrument}/ohlcv` endpoint + CandlestickChart in Run mode. +39 backend tests (432 total), +9 frontend tests (301 total) |
 | 15 Mar 2026 | PR-RUN-1 | Run Browser endpoint + RunBrowserPanel — `GET /runs/`, browsable run index, paste-field demoted. +42 backend tests (239 total), +14 frontend tests (77 ops total) |
 | 15 Mar 2026 | PR-OPS-5b | Frontend Run mode + Detail sidebar — 7 new components, +24 tests (63 frontend total), Phase 7 complete |
 | 15 Mar 2026 | PR-OPS-5a | Frontend types + adapters + Health mode — +16 tests (39 frontend total), foundation wiring |
@@ -56,8 +57,8 @@
 | Priority | Phase | Description | Status | Depends On |
 |----------|-------|-------------|--------|------------|
 | 1 | PR-RUN-1 | Run Browser endpoint + frontend — replace paste-field run selector | ✅ Done | Phase 7 complete |
-| 2 | PR-CHART-1 | OHLCV data-seam validation + basic candlestick chart (lightweight-charts, embedded in Run mode) | 📋 Planned | PR-RUN-1 |
-| 3 | PR-CHART-2 | Run context overlay + multi-timeframe chart support | 📋 Planned | PR-CHART-1 |
+| 2 | PR-CHART-1 | OHLCV data-seam validation + basic candlestick chart (lightweight-charts, embedded in Run mode) | ✅ Done | PR-RUN-1 |
+| 3 | PR-CHART-2 | Run context overlay + multi-timeframe chart support | 📋 Planned | PR-CHART-1 ✅ |
 | 4 | PR-REFLECT-1 | Persona performance + pattern summary aggregation endpoints | 📋 Planned | PR-RUN-1 + run history |
 | 5 | PR-REFLECT-2 | Reflective dashboard frontend — performance tables + anomaly highlighting | 📋 Planned | PR-REFLECT-1 |
 | 6 | PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | 📋 Planned | PR-CHART-2 + PR-REFLECT-2 |
@@ -83,9 +84,9 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — PR-OPS-5b: Agent Ops Frontend Wiring Complete (15 Mar 2026)
+### Latest increment — PR-CHART-1: OHLCV Data Seam + Candlestick Chart (16 Mar 2026)
 
-Delivered PR-OPS-5b — Run mode + Detail sidebar wiring for the Agent Ops workspace (Phase 7). New components: `RunSelector` (paste-field run ID input), `TraceStageTimeline` (ordered stages with status-aware dots and partial run indicator), `TraceParticipantList` (participants with stance/confidence/override indicators), `TraceEdgeList` (conservative from→to edge rendering with type labels), `ArbiterSummaryCard` (verdict/confidence/method/override/dissent), `RunTracePanel` (orchestrates full Run mode view with trace summary, stages, participants, edges, arbiter, artifacts), `AgentDetailSidebar` (backend-backed detail panel with discriminated union rendering — switches on `entity_type` NOT `type_specific.variant`). Four type-specific sections: `PersonaSection`, `OfficerSection`, `ArbiterSection`, `SubsystemSection`. `AgentOpsPage` updated: Run pill activated, run selector + trace panel wired, detail sidebar replaces old roster-based panel, degraded/stale banners scoped to Org/Health modes. Null arbiter → hidden (no fabrication). 404 error handling for both trace and detail. data_state stale indicators at both workspace and entity level. 63 frontend tests passing (39 baseline + 24 new). All 28 spec ACs (AC-1 through AC-28) verified ✅. PR-OPS-5 spec marked complete. Zero backend modifications. Agent Ops read-side stack fully wired.
+Delivered PR-CHART-1 — OHLCV data-seam validation (Outcome A confirmed: seam exists and is clean) + `GET /market-data/{instrument}/ohlcv` endpoint + CandlestickChart component embedded in Run mode. Diagnostic confirmed MDO persists OHLCV as CSV files in `market_data/packages/latest/`, readable via `loader.load_timeframe()` with zero scheduler coupling. New backend: market data read service (projects DataFrame rows to epoch-second Candles with malformed-row tolerance and deterministic data_state derivation), Pydantic models (Candle + OHLCVResponse with flat ResponseMeta pattern), market_data router with error semantics (404 INSTRUMENT_NOT_FOUND / TIMEFRAME_NOT_FOUND, 422 INVALID_PARAMS, 200 with empty candles for valid-but-empty store). New frontend: `fetchOHLCV()` typed API client, `useMarketData` TanStack Query hook (60s stale time), `CandlestickChart` component with candlestick + volume histogram via lightweight-charts, loading/error/empty/stale states, failure-tolerant embedding in Run mode (chart error does not block trace rendering). `RunBrowserPanel` updated to pass instrument alongside runId. `AgentOpsPage` updated to embed chart panel between browser and trace. 39 new backend tests (432 total), 9 new frontend tests (301 total). All 37 implementation ACs (AC-1 through AC-37) verified ✅. Zero regressions. Default timeframe: 4h (confirmed persisted for all instruments).
 
 ### Previous increment — PR-OPS-5a: Agent Ops Frontend Wiring — Types + Health Mode (15 Mar 2026)
 
@@ -506,7 +507,8 @@ Full plan: `docs/PHASE_8_PLAN.md`
 13. Agent Ops operator trust surface is now complete: Org mode → Health mode → Run mode → Detail sidebar, all wired to four backend endpoints.
 14. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
 15. ~~**Next decision:** evaluate Phase 8 candidates~~ — ✅ PR-RUN-1 Run Browser complete (15 March 2026). `GET /runs/` endpoint + RunBrowserPanel. 239 backend + 77 frontend ops tests.
-16. **Next:** PR-CHART-1 (OHLCV data-seam + candlestick chart) — depends on PR-RUN-1 (now satisfied).
+16. ~~**Next:** PR-CHART-1 (OHLCV data-seam + candlestick chart)~~ — ✅ Complete (16 March 2026). Outcome A confirmed. `GET /market-data/{instrument}/ohlcv` + CandlestickChart in Run mode. 432 backend + 301 frontend tests.
+17. **Next:** PR-CHART-2 (run context overlay + multi-timeframe chart) — depends on PR-CHART-1 (now satisfied). PR-REFLECT-1 (aggregation endpoints) can proceed in parallel.
 
 ---
 
