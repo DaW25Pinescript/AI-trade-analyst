@@ -25,6 +25,7 @@ Quick orientation for contributors and coding agents.
 3. **Arbiter/verdict layer:** arbiter logic consolidates analyst outputs into final decision artifacts with contract-aware semantics.
 4. **UI/workflow surfaces:** `ui/` (forward React stack) and `app/` (legacy) expose triage/analyse/review workflow interfaces over the API/runtime outputs.
 5. **Operator observability:** `ai_analyst/api/` serves Agent Ops read-only projection endpoints (roster, health, trace, detail, market data) consumed by the `ui/src/workspaces/ops/` workspace.
+6. **Reflective intelligence backend:** `ai_analyst/api/` now also serves `/reflect` aggregation and run bundle endpoints for cross-run analysis (PR-REFLECT-1).
 
 ## ui/ — React Frontend (Phase 6+)
 
@@ -58,6 +59,10 @@ Forward frontend stack: React + TypeScript + Tailwind.
 - `ai_analyst/api/routers/market_data.py` — Market Data router (`GET /market-data/{instrument}/ohlcv`, PR-CHART-1)
 - `ai_analyst/api/models/market_data.py` — OHLCV response models (Candle, OHLCVResponse, PR-CHART-1)
 - `ai_analyst/api/services/market_data_read.py` — market data read service (hot package CSV projection, PR-CHART-1)
+- `ai_analyst/api/routers/reflect.py` — Reflect router (`/reflect/persona-performance`, `/reflect/pattern-summary`, `/reflect/run/{run_id}`)
+- `ai_analyst/api/models/reflect.py` — Reflect response models (persona stats, pattern buckets, run bundle)
+- `ai_analyst/api/services/reflect_aggregation.py` — bounded run scan + optional audit-log enrichment aggregation
+- `ai_analyst/api/services/reflect_bundle.py` — run bundle loader with graceful artifact degradation
 
 ## Agent Ops tests
 

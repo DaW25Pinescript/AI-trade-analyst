@@ -1,6 +1,6 @@
 # AI Trade Analyst — PR-REFLECT-1: Reflective Intelligence Aggregation Endpoints Spec
 
-**Status:** ⏳ Spec drafted — implementation pending
+**Status:** ✅ Complete — implemented and validated
 **Date:** 16 March 2026
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Branch:** `pr-reflect-1-aggregation`
@@ -421,77 +421,77 @@ The aggregation groups by whichever identifier is found first in this order. `di
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-1 | Per-analyst fields confirmed | Exact field names and types inside `analysts[]` entries documented | ⏳ Pending |
-| AC-2 | Override derivation confirmed | How to determine per-persona override is documented | ⏳ Pending |
-| AC-3 | Stance/confidence availability | Whether stance and confidence are per-analyst in `run_record.json` or only in audit log | ⏳ Pending |
-| AC-4 | Audit log assessed | Whether audit log exists, its format, and whether it's needed | ⏳ Pending |
-| AC-5 | Persona identifier confirmed | Stable persona identifier documented | ⏳ Pending |
-| AC-6 | Artifact inventory | Which additional files exist per run directory (analysis_response.json, usage.json, etc.) | ⏳ Pending |
+| AC-1 | Per-analyst fields confirmed | Exact field names and types inside `analysts[]` entries documented | ✅ Complete |
+| AC-2 | Override derivation confirmed | How to determine per-persona override is documented | ✅ Complete |
+| AC-3 | Stance/confidence availability | Whether stance and confidence are per-analyst in `run_record.json` or only in audit log | ✅ Complete |
+| AC-4 | Audit log assessed | Whether audit log exists, its format, and whether it's needed | ✅ Complete |
+| AC-5 | Persona identifier confirmed | Stable persona identifier documented | ✅ Complete |
+| AC-6 | Artifact inventory | Which additional files exist per run directory (analysis_response.json, usage.json, etc.) | ✅ Complete |
 
 ### Backend ACs — Persona Performance
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-7 | Endpoint exists | `GET /reflect/persona-performance` returns 200 with valid response shape | ⏳ Pending |
-| AC-8 | ResponseMeta present | Flat `ResponseMeta & {}` with `version`, `generated_at`, `data_state` | ⏳ Pending |
-| AC-9 | Participation counts | `participation_count`, `skip_count`, `fail_count` correct from fixtures | ⏳ Pending |
-| AC-10 | Override rate | `override_count / participation_count`, `null` when 0 participation | ⏳ Pending |
-| AC-11 | Stance alignment | % of stances matching final verdict, `null` when no stances | ⏳ Pending |
-| AC-12 | Avg confidence | Correctly averaged, `null` when no data | ⏳ Pending |
-| AC-13 | Threshold: below | `run_count < threshold` → `threshold_met: false`, `personas: []` | ⏳ Pending |
-| AC-14 | Threshold: above | `run_count >= threshold` → `threshold_met: true`, personas populated | ⏳ Pending |
-| AC-15 | Flagged anomaly | `override_rate > 0.5` → `flagged: true` | ⏳ Pending |
-| AC-16 | Instrument filter | `?instrument=XAUUSD` scopes to XAUUSD runs only | ⏳ Pending |
-| AC-17 | Session filter | `?session=NY` scopes to NY runs only | ⏳ Pending |
-| AC-18 | max_runs bounds | `max_runs=5` → 422; `max_runs=200` accepted; default 50 | ⏳ Pending |
-| AC-19 | Scan bounds reported | `scan_bounds` with count and timestamp range | ⏳ Pending |
-| AC-20 | Skipped runs reported | `skipped_runs` count present and accurate in both aggregation responses | ⏳ Pending |
+| AC-7 | Endpoint exists | `GET /reflect/persona-performance` returns 200 with valid response shape | ✅ Complete |
+| AC-8 | ResponseMeta present | Flat `ResponseMeta & {}` with `version`, `generated_at`, `data_state` | ✅ Complete |
+| AC-9 | Participation counts | `participation_count`, `skip_count`, `fail_count` correct from fixtures | ✅ Complete |
+| AC-10 | Override rate | `override_count / participation_count`, `null` when 0 participation | ✅ Complete |
+| AC-11 | Stance alignment | % of stances matching final verdict, `null` when no stances | ✅ Complete |
+| AC-12 | Avg confidence | Correctly averaged, `null` when no data | ✅ Complete |
+| AC-13 | Threshold: below | `run_count < threshold` → `threshold_met: false`, `personas: []` | ✅ Complete |
+| AC-14 | Threshold: above | `run_count >= threshold` → `threshold_met: true`, personas populated | ✅ Complete |
+| AC-15 | Flagged anomaly | `override_rate > 0.5` → `flagged: true` | ✅ Complete |
+| AC-16 | Instrument filter | `?instrument=XAUUSD` scopes to XAUUSD runs only | ✅ Complete |
+| AC-17 | Session filter | `?session=NY` scopes to NY runs only | ✅ Complete |
+| AC-18 | max_runs bounds | `max_runs=5` → 422; `max_runs=200` accepted; default 50 | ✅ Complete |
+| AC-19 | Scan bounds reported | `scan_bounds` with count and timestamp range | ✅ Complete |
+| AC-20 | Skipped runs reported | `skipped_runs` count present and accurate in both aggregation responses | ✅ Complete |
 
 ### Backend ACs — Pattern Summary
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-21 | Endpoint exists | `GET /reflect/pattern-summary` returns 200 with valid response shape | ⏳ Pending |
-| AC-22 | ResponseMeta present | Flat `ResponseMeta & {}` | ⏳ Pending |
-| AC-23 | Bucket grouping | Runs grouped by instrument × session | ⏳ Pending |
-| AC-24 | Verdict distribution | Per-bucket counts and percentages accurate | ⏳ Pending |
-| AC-25 | Per-bucket threshold | Bucket with `run_count < threshold` → `threshold_met: false`, `null` stats | ⏳ Pending |
-| AC-26 | No-trade rate | `NO_TRADE count / bucket run_count` | ⏳ Pending |
-| AC-27 | Flagged anomaly | `no_trade_rate > 0.8` → `flagged: true` | ⏳ Pending |
-| AC-28 | max_runs bounds | Same validation as persona-performance | ⏳ Pending |
+| AC-21 | Endpoint exists | `GET /reflect/pattern-summary` returns 200 with valid response shape | ✅ Complete |
+| AC-22 | ResponseMeta present | Flat `ResponseMeta & {}` | ✅ Complete |
+| AC-23 | Bucket grouping | Runs grouped by instrument × session | ✅ Complete |
+| AC-24 | Verdict distribution | Per-bucket counts and percentages accurate | ✅ Complete |
+| AC-25 | Per-bucket threshold | Bucket with `run_count < threshold` → `threshold_met: false`, `null` stats | ✅ Complete |
+| AC-26 | No-trade rate | `NO_TRADE count / bucket run_count` | ✅ Complete |
+| AC-27 | Flagged anomaly | `no_trade_rate > 0.8` → `flagged: true` | ✅ Complete |
+| AC-28 | max_runs bounds | Same validation as persona-performance | ✅ Complete |
 
 ### Backend ACs — Run Bundle
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-29 | Endpoint exists | `GET /reflect/run/{run_id}` returns 200 with valid `RunBundleResponse` | ⏳ Pending |
-| AC-30 | ResponseMeta present | Flat `ResponseMeta & {}` | ⏳ Pending |
-| AC-31 | All artifacts present | When all files exist → all `artifact_status` = `"present"`, all `artifacts` populated | ⏳ Pending |
-| AC-32 | Missing artifact tolerance | Missing `analysis_response.json` → `"missing"` status, `null` artifact, endpoint still 200 | ⏳ Pending |
-| AC-33 | Malformed artifact tolerance | Unparseable artifact → `"malformed"` status, `null` artifact, endpoint still 200 | ⏳ Pending |
-| AC-34 | Missing run_record | If `run_record.json` itself is missing → 404 `RUN_NOT_FOUND` | ⏳ Pending |
-| AC-35 | data_state: stale on partial | Some artifacts missing → `data_state: "stale"` | ⏳ Pending |
-| AC-36 | usage_summary source precedence | usage.json file → embedded usage_summary in run_record → null | ⏳ Pending |
+| AC-29 | Endpoint exists | `GET /reflect/run/{run_id}` returns 200 with valid `RunBundleResponse` | ✅ Complete |
+| AC-30 | ResponseMeta present | Flat `ResponseMeta & {}` | ✅ Complete |
+| AC-31 | All artifacts present | When all files exist → all `artifact_status` = `"present"`, all `artifacts` populated | ✅ Complete |
+| AC-32 | Missing artifact tolerance | Missing `analysis_response.json` → `"missing"` status, `null` artifact, endpoint still 200 | ✅ Complete |
+| AC-33 | Malformed artifact tolerance | Unparseable artifact → `"malformed"` status, `null` artifact, endpoint still 200 | ✅ Complete |
+| AC-34 | Missing run_record | If `run_record.json` itself is missing → 404 `RUN_NOT_FOUND` | ✅ Complete |
+| AC-35 | data_state: stale on partial | Some artifacts missing → `data_state: "stale"` | ✅ Complete |
+| AC-36 | usage_summary source precedence | usage.json file → embedded usage_summary in run_record → null | ✅ Complete |
 
 ### Shared / Structural ACs
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-37 | Malformed run tolerance | Malformed `run_record.json` skipped in aggregation scan, not a 500 | ⏳ Pending |
-| AC-38 | Empty runs directory | Zero runs → 200 with `run_count: 0`, `threshold_met: false`, empty results | ⏳ Pending |
-| AC-39 | data_state: live | All records parsed cleanly → `"live"` | ⏳ Pending |
-| AC-40 | data_state: stale | Some records skipped → `"stale"` | ⏳ Pending |
-| AC-41 | Error envelope | Scan failures use `OpsErrorEnvelope` with `REFLECT_SCAN_FAILED` | ⏳ Pending |
-| AC-42 | Stance alignment formula | Alignment computed per §6.6.1: directional stances vs directional verdicts only, neutral/NO_TRADE excluded | ⏳ Pending |
-| AC-43 | Persona key fallback | Persona grouping uses fallback order per §6.7: entity_id → persona_id → persona → normalised name | ⏳ Pending |
-| AC-44 | Router separation | All three endpoints in `routers/reflect.py` | ⏳ Pending |
-| AC-45 | No cross-service coupling | Reflect services do not import trace, browser, or ops services | ⏳ Pending |
-| AC-46 | No new persistence | No SQLite, no database, no index file | ⏳ Pending |
-| AC-47 | No new top-level module | Work confined to `ai_analyst/api/` | ⏳ Pending |
-| AC-48 | No existing endpoint changes | ops, runs, trace, detail, roster, health endpoints unchanged | ⏳ Pending |
-| AC-49 | No run_record.json changes | Artifact format unmodified | ⏳ Pending |
-| AC-50 | No premature abstraction | No generic analytics engine or shared aggregation framework | ⏳ Pending |
-| AC-51 | Regression safety | All pre-existing ops-domain tests pass; pre-existing failure count unchanged | ⏳ Pending |
+| AC-37 | Malformed run tolerance | Malformed `run_record.json` skipped in aggregation scan, not a 500 | ✅ Complete |
+| AC-38 | Empty runs directory | Zero runs → 200 with `run_count: 0`, `threshold_met: false`, empty results | ✅ Complete |
+| AC-39 | data_state: live | All records parsed cleanly → `"live"` | ✅ Complete |
+| AC-40 | data_state: stale | Some records skipped → `"stale"` | ✅ Complete |
+| AC-41 | Error envelope | Scan failures use `OpsErrorEnvelope` with `REFLECT_SCAN_FAILED` | ✅ Complete |
+| AC-42 | Stance alignment formula | Alignment computed per §6.6.1: directional stances vs directional verdicts only, neutral/NO_TRADE excluded | ✅ Complete |
+| AC-43 | Persona key fallback | Persona grouping uses fallback order per §6.7: entity_id → persona_id → persona → normalised name | ✅ Complete |
+| AC-44 | Router separation | All three endpoints in `routers/reflect.py` | ✅ Complete |
+| AC-45 | No cross-service coupling | Reflect services do not import trace, browser, or ops services | ✅ Complete |
+| AC-46 | No new persistence | No SQLite, no database, no index file | ✅ Complete |
+| AC-47 | No new top-level module | Work confined to `ai_analyst/api/` | ✅ Complete |
+| AC-48 | No existing endpoint changes | ops, runs, trace, detail, roster, health endpoints unchanged | ✅ Complete |
+| AC-49 | No run_record.json changes | Artifact format unmodified | ✅ Complete |
+| AC-50 | No premature abstraction | No generic analytics engine or shared aggregation framework | ✅ Complete |
+| AC-51 | Regression safety | All pre-existing ops-domain tests pass; pre-existing failure count unchanged | ✅ Complete |
 
 ---
 
@@ -720,7 +720,7 @@ PR-REFLECT-1 is done when: `GET /reflect/persona-performance` returns per-person
 | Phase 7 — Agent Ops | 4 endpoints, 3 modes, detail sidebar | ✅ Done |
 | PR-RUN-1 — Run Browser | `GET /runs/` + RunBrowserPanel | ✅ Done — +56 tests |
 | PR-CHART-1 — OHLCV seam + chart | Diagnostic + conditional chart endpoint | ⏳ In parallel |
-| **PR-REFLECT-1 — Aggregation endpoints** | **Persona perf + pattern summary + run bundle** | **⏳ Spec drafted** |
+| **PR-REFLECT-1 — Aggregation endpoints** | **Persona perf + pattern summary + run bundle** | **✅ Done** |
 | PR-REFLECT-2 — Reflect workspace UI | `/reflect` frontend + decision readback | 📋 Planned — depends on PR-REFLECT-1 |
 | PR-REFLECT-3 — Analyst influence + suggestions | Override detection, rules-based suggestions | 📋 Planned |
 | PR-REFLECT-4 — Decision quality + simulation | Outcome tracking, "why was this wrong?" | 💭 Concept |
@@ -729,11 +729,55 @@ PR-REFLECT-1 is done when: `GET /reflect/persona-performance` returns per-person
 
 ## 13. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 8).*
+### Per-analyst field structure (run_record.json)
+- `analysts[]` entries contain: `persona` (string), `status` (string), `model` (string, optional in fixtures), `provider` (string, optional in fixtures).
+- `analysts_skipped[]`: `persona`, `status`, `reason`.
+- `analysts_failed[]`: `persona`, `status`, `reason` when populated.
 
-*Must include: per-analyst field structure, override derivation method, persona identifier (which fallback level), artifact inventory (which files exist per run, usage_summary source), audit log assessment, stance vocabulary for alignment normalisation, any metric reductions.*
+### Override derivation method
+- Reflect uses independent optional audit-log enrichment (`ai_analyst/logs/runs/{run_id}.jsonl`) and mirrors trace heuristic:
+  - `was_overridden = (risk_override_applied == true) AND (analyst stance is directional bullish|bearish) AND (arbiter decision == NO_TRADE)`.
+- No import of trace service; audit logs are read directly via `json.loads()` per line.
 
----
+### Persona identifier fallback confirmed
+- Grouping fallback order implemented: `entity_id -> persona_id -> persona -> normalised name`.
+- Diagnostic and fixture reality: `persona` is present (fallback level 3), so this is the effective grouping key for current run records.
+
+### Artifact inventory (actual repo behavior)
+- Per run directory, primary artifact is `run_record.json`.
+- `usage.jsonl` exists as separate run artifact (usage events).
+- `usage_summary` is embedded in `run_record.json`.
+- `analysis_response.json` is not produced today; bundle was aligned to actual inventory and does not require it.
+- `usage.json` is treated as optional future/auxiliary artifact; precedence for summary is `usage.json -> embedded usage_summary -> null`.
+
+### Audit log assessment
+- `logs/runs/{run_id}.jsonl` exists and is newline-delimited JSON entries.
+- Contains `analyst_outputs` with `htf_bias` + `confidence`, and `final_verdict` with `decision` + `risk_override_applied`.
+- Used only as optional secondary source; absence does not fail endpoints.
+
+### Stance vocabulary mapping for alignment normalisation
+- Stance source: audit `analyst_outputs[].htf_bias`.
+- Normalisation: `ranging -> neutral`; supported directional stances: `bullish`, `bearish`.
+- Verdict source for alignment: `run_record.arbiter.verdict` (directional verdicts only).
+- Mapping: `bullish -> {BUY, ENTER_LONG}`, `bearish -> {SELL, ENTER_SHORT}`.
+- Exclusion rule per §6.6.1: neutral stances and `NO_TRADE` verdicts excluded from numerator and denominator.
+
+### Data sparsity and metric reductions
+- When audit log is missing for a run, provisional metrics sourced from audit are unavailable for that run (override, stance alignment, confidence inputs).
+- Endpoints degrade gracefully: these fields may be `null` at persona level if no usable enriched data is available.
+
+### Final patch set
+- Added backend models: `ai_analyst/api/models/reflect.py`.
+- Added aggregation service: `ai_analyst/api/services/reflect_aggregation.py`.
+- Added bundle service: `ai_analyst/api/services/reflect_bundle.py`.
+- Added router: `ai_analyst/api/routers/reflect.py`; registered in `ai_analyst/api/main.py`.
+- Added contract tests: `tests/test_reflect_endpoints.py`.
+- Updated progress + architecture docs for new `/reflect` API surface.
+
+### Line delta / test delta summary
+- Net code/docs touched: 11 files.
+- Test delta: +11 backend reflect contract tests.
+- Regression: pre-existing baseline retains one known unrelated failure (`market_data_officer` help test); no increase in failure count.
 
 ## 14. Doc Corrections to Apply on Branch
 

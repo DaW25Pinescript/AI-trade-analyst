@@ -126,11 +126,14 @@ The Agent Ops subsystem exposes the multi-agent analysis engine's architecture, 
 - `GET /ops/agent-detail/{entity_id}` — entity-level detail with discriminated union
 - `GET /runs/` — paginated, filterable run browser index (directory scan, PR-RUN-1)
 - `GET /market-data/{instrument}/ohlcv` — stored OHLCV candle data for chart rendering (PR-CHART-1)
+- `GET /reflect/persona-performance` — per-persona participation/override/alignment/confidence aggregation
+- `GET /reflect/pattern-summary` — instrument × session verdict distribution buckets
+- `GET /reflect/run/{run_id}` — run artifact bundle (run_record required, usage artifacts optional)
 
 **Backend components:**
-- Routers: `ai_analyst/api/routers/ops.py`, `ai_analyst/api/routers/runs.py`, `ai_analyst/api/routers/market_data.py`
-- Models: `ai_analyst/api/models/ops.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`, `market_data.py`
-- Services: `ai_analyst/api/services/ops_roster.py`, `ops_health.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`, `market_data_read.py`
+- Routers: `ai_analyst/api/routers/ops.py`, `ai_analyst/api/routers/runs.py`, `ai_analyst/api/routers/market_data.py`, `ai_analyst/api/routers/reflect.py`
+- Models: `ai_analyst/api/models/ops.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`, `market_data.py`, `reflect.py`
+- Services: `ai_analyst/api/services/ops_roster.py`, `ops_health.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`, `market_data_read.py`, `reflect_aggregation.py`, `reflect_bundle.py`
 - Profile registry: `ai_analyst/api/services/ops_profile_registry.py` (static entity profiles)
 
 **Data sources (read-side only):**
