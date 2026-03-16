@@ -24,7 +24,7 @@ Quick orientation for contributors and coding agents.
 2. **Analysis pipeline:** `ai_analyst/` consumes context, runs analyst/persona orchestration, and produces structured outputs.
 3. **Arbiter/verdict layer:** arbiter logic consolidates analyst outputs into final decision artifacts with contract-aware semantics.
 4. **UI/workflow surfaces:** `ui/` (forward React stack) and `app/` (legacy) expose triage/analyse/review workflow interfaces over the API/runtime outputs.
-5. **Operator observability:** `ai_analyst/api/` serves Agent Ops read-only projection endpoints (roster, health, trace, detail) consumed by the `ui/src/workspaces/ops/` workspace.
+5. **Operator observability:** `ai_analyst/api/` serves Agent Ops read-only projection endpoints (roster, health, trace, detail, market data) consumed by the `ui/src/workspaces/ops/` workspace.
 
 ## ui/ — React Frontend (Phase 6+)
 
@@ -32,6 +32,9 @@ Forward frontend stack: React + TypeScript + Tailwind.
 
 - `ui/src/shared/` — cross-workspace code (API client, hooks, types, components)
 - `ui/src/shared/api/ops.ts` — Agent Ops typed API layer
+- `ui/src/shared/api/marketData.ts` — Market Data typed API layer (PR-CHART-1)
+- `ui/src/shared/hooks/useMarketData.ts` — Market Data TanStack Query hook (PR-CHART-1)
+- `ui/src/workspaces/ops/components/CandlestickChart.tsx` — Candlestick chart component (PR-CHART-1)
 - `ui/src/workspaces/triage/` — Triage Board workspace
 - `ui/src/workspaces/journey/` — Journey Studio workspace
 - `ui/src/workspaces/analysis/` — Analysis Run workspace
@@ -52,6 +55,9 @@ Forward frontend stack: React + TypeScript + Tailwind.
 - `ai_analyst/api/services/ops_detail.py` — detail projection (roster + health + profile registry)
 - `ai_analyst/api/services/ops_profile_registry.py` — static entity profiles
 - `ai_analyst/api/services/ops_run_browser.py` — run browser projection (directory scan, PR-RUN-1)
+- `ai_analyst/api/routers/market_data.py` — Market Data router (`GET /market-data/{instrument}/ohlcv`, PR-CHART-1)
+- `ai_analyst/api/models/market_data.py` — OHLCV response models (Candle, OHLCVResponse, PR-CHART-1)
+- `ai_analyst/api/services/market_data_read.py` — market data read service (hot package CSV projection, PR-CHART-1)
 
 ## Agent Ops tests
 
@@ -59,6 +65,7 @@ Forward frontend stack: React + TypeScript + Tailwind.
 - `tests/test_ops_trace_endpoints.py` — trace endpoint tests (70 tests)
 - `tests/test_ops_detail_endpoints.py` — detail endpoint tests (72 tests)
 - `tests/test_run_browser_endpoints.py` — run browser endpoint tests (42 tests, PR-RUN-1)
+- `tests/test_market_data_endpoints.py` — market data endpoint tests (39 tests, PR-CHART-1)
 - `tests/fixtures/sample_run_record.json` — trace + run browser test fixture
 - `tests/fixtures/sample_audit_log.jsonl` — trace test fixture
 

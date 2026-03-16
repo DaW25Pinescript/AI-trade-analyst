@@ -579,6 +579,11 @@ from .routers.runs import router as runs_router
 
 app.include_router(runs_router)
 
+# ── Market Data router (PR-CHART-1) ─────────────────────────────────────
+from .routers.market_data import router as market_data_router
+
+app.include_router(market_data_router)
+
 
 @app.get("/health")
 async def health():

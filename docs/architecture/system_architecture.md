@@ -125,17 +125,19 @@ The Agent Ops subsystem exposes the multi-agent analysis engine's architecture, 
 - `GET /runs/{run_id}/agent-trace` — run-level participation and lineage projection
 - `GET /ops/agent-detail/{entity_id}` — entity-level detail with discriminated union
 - `GET /runs/` — paginated, filterable run browser index (directory scan, PR-RUN-1)
+- `GET /market-data/{instrument}/ohlcv` — stored OHLCV candle data for chart rendering (PR-CHART-1)
 
 **Backend components:**
-- Routers: `ai_analyst/api/routers/ops.py`, `ai_analyst/api/routers/runs.py`
-- Models: `ai_analyst/api/models/ops.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`
-- Services: `ai_analyst/api/services/ops_roster.py`, `ops_health.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`
+- Routers: `ai_analyst/api/routers/ops.py`, `ai_analyst/api/routers/runs.py`, `ai_analyst/api/routers/market_data.py`
+- Models: `ai_analyst/api/models/ops.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`, `market_data.py`
+- Services: `ai_analyst/api/services/ops_roster.py`, `ops_health.py`, `ops_trace.py`, `ops_detail.py`, `ops_run_browser.py`, `market_data_read.py`
 - Profile registry: `ai_analyst/api/services/ops_profile_registry.py` (static entity profiles)
 
 **Data sources (read-side only):**
 - Roster/detail: static persona config, profile registry
 - Health: observability events, scheduler lifecycle, feeder health
 - Trace: `run_record.json` (primary) + audit log `logs/runs/{run_id}.jsonl` (secondary for stances/overrides)
+- Market data: MDO hot package CSVs in `market_data/packages/latest/` (read via `loader.load_timeframe()`)
 
 **Contract:** `docs/ui/AGENT_OPS_CONTRACT.md` (§4–§7)
 

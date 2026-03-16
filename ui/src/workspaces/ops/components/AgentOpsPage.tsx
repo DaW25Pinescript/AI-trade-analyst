@@ -26,6 +26,7 @@ import { OpsDataStateBanner } from "./OpsDataStateBanner";
 import { RunSelector } from "./RunSelector";
 import { RunBrowserPanel } from "./RunBrowserPanel";
 import { RunTracePanel } from "./RunTracePanel";
+import { CandlestickChart } from "./CandlestickChart";
 import { AgentDetailSidebar } from "./AgentDetailSidebar";
 
 type OpsMode = "org" | "run" | "health";
@@ -52,6 +53,7 @@ export function AgentOpsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<OpsMode>("org");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedInstrument, setSelectedInstrument] = useState<string | null>(null);
 
   const vm = useMemo(
     () =>
@@ -112,8 +114,9 @@ export function AgentOpsPage() {
     // Selection preserved across mode switch per §7.4
   }, []);
 
-  const handleSelectRun = useCallback((runId: string | null) => {
+  const handleSelectRun = useCallback((runId: string | null, instrument?: string | null) => {
     setSelectedRunId(runId);
+    setSelectedInstrument(instrument ?? null);
   }, []);
 
   // Navigate to Run mode from detail sidebar's "last run" link
@@ -242,6 +245,10 @@ export function AgentOpsPage() {
                   onSelectRun={handleSelectRun}
                 />
               </div>
+
+              {selectedRunId && selectedInstrument && (
+                <CandlestickChart instrument={selectedInstrument} />
+              )}
 
               {selectedRunId && <RunTracePanel runId={selectedRunId} />}
             </div>
