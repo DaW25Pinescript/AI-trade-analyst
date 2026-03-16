@@ -410,20 +410,15 @@ def generate_html(dash: ProjectDashboard) -> str:
 
     dash.total_ac = sum(s.total_ac for s in dash.specs)
     dash.passed_ac = sum(s.passed_ac for s in dash.specs)
-    ac_pct = round((dash.passed_ac / dash.total_ac) * 100) if dash.total_ac else 0
 
     active_phases = [p for p in dash.phases if p.status == "active"]
     next_phases = [p for p in dash.phases if p.status in ("next", "planned")]
     current_label = active_phases[0].name if active_phases else (next_phases[0].name if next_phases else "—")
-    blocked_count = sum(1 for p in dash.phases if p.status == "blocked")
-    open_debt = sum(1 for d in dash.debt if d.status == "open")
-    resolved_debt = sum(1 for d in dash.debt if d.status == "resolved")
 
     project_name = dash.project or (dash.repo.split("/")[-1] if "/" in dash.repo else dash.repo) or "Project"
     updated = str(dash.last_updated) or datetime.now().strftime("%Y-%m-%d")
     horizon = dash.planning_horizon or "Active planning"
 
-    # JSON data for JS
     phases_json = json.dumps([asdict(p) for p in dash.phases])
     specs_json = json.dumps([asdict(s) for s in dash.specs])
     activities_json = json.dumps([asdict(a) for a in dash.activities])
@@ -433,340 +428,492 @@ def generate_html(dash: ProjectDashboard) -> str:
     risks_json = json.dumps([asdict(r) for r in dash.risks])
     test_history_json = json.dumps([asdict(t) for t in dash.test_history])
 
-    return f'''<!DOCTYPE html>
-<html lang="en">
+    return f"""<!DOCTYPE html>
+<html lang="en" class="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — {escape(project_name)}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {{
+    darkMode: 'class',
+    theme: {{
+      extend: {{
+        fontFamily: {{ sans: ['Inter', 'sans-serif'], display: ['Space Grotesk', 'sans-serif'] }},
+        colors: {{
+          gray: {{ 850: '#1f2937', 900: '#111827', 950: '#030712' }},
+          accent: {{ 400: '#2dd4bf', 500: '#14b8a6' }}
+        }}
+      }}
+    }}
+  }}
+</script>
 <style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-:root{{
-  --bg:#0f1117;--bg2:#1a1d27;--card:#1e2130;--border:#2a2d3e;
-  --text:#e8eaf0;--text2:#8b8fa3;--muted:#5a5e72;
-  --teal:#2dd4bf;--green:#4ade80;--amber:#fbbf24;--red:#f87171;--blue:#60a5fa;--purple:#a78bfa;
-  --teal-d:rgba(45,212,191,.12);--green-d:rgba(74,222,128,.12);--amber-d:rgba(251,191,36,.12);
-  --red-d:rgba(248,113,113,.12);--blue-d:rgba(96,165,250,.12);--purple-d:rgba(167,139,250,.12);
-  --r:8px;--rl:12px;
-}}
-html,body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}}
-a{{color:var(--teal);text-decoration:none}}a:hover{{text-decoration:underline}}
-
-/* Header */
-.header{{background:var(--bg2);border-bottom:1px solid var(--border);padding:20px 28px}}
-.header h1{{font-size:22px;font-weight:700}}
-.meta{{display:flex;gap:20px;color:var(--text2);font-size:13px;margin-top:6px;flex-wrap:wrap}}
-.meta b{{color:var(--muted);font-weight:400}}
-
-/* Layout */
-.wrap{{max-width:1400px;margin:0 auto;padding:24px 28px}}
-
-/* Progress bar */
-.progress-box{{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:24px;margin-bottom:20px}}
-.progress-box h2{{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:12px}}
-.rail{{height:14px;background:var(--bg);border-radius:8px;overflow:hidden}}
-.fill{{height:100%;background:linear-gradient(90deg,var(--teal),var(--green));border-radius:8px;transition:width .4s ease}}
-.progress-info{{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--text2)}}
-
-/* Stats row */
-.stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}}
-.stat{{background:var(--card);border:1px solid var(--border);border-radius:var(--rl);padding:16px;text-align:center}}
-.stat .n{{font-size:32px;font-weight:800;line-height:1}}
-.stat .l{{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-top:4px}}
-.stat .s{{font-size:10px;color:var(--muted);margin-top:2px}}
-.c-teal{{color:var(--teal)}}.c-blue{{color:var(--blue)}}.c-green{{color:var(--green)}}.c-purple{{color:var(--purple)}}.c-amber{{color:var(--amber)}}.c-red{{color:var(--red)}}
-
-/* Tabs */
-.tabs{{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap}}
-.tab{{padding:8px 18px;font-size:13px;font-weight:600;color:var(--text2);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}}
-.tab.active{{color:var(--teal);border-bottom-color:var(--teal)}}
-.panel{{display:none}}.panel.active{{display:block}}
-
-/* Filter row */
-.filters{{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}}
-.fbtn{{background:var(--card);color:var(--text2);border:1px solid var(--border);border-radius:99px;padding:5px 12px;cursor:pointer;font-size:12px}}
-.fbtn.active{{color:var(--teal);border-color:var(--teal)}}
-
-/* Cards & chips */
-.card{{background:var(--card);border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:10px}}
-.card:hover{{border-color:rgba(45,212,191,.3)}}
-.chip-complete{{border-left:3px solid var(--green)}}.chip-active{{border-left:3px solid var(--teal)}}.chip-next,.chip-planned{{border-left:3px solid var(--amber)}}.chip-blocked{{border-left:3px solid var(--red)}}.chip-parked{{border-left:3px solid var(--muted)}}.chip-concept{{border-left:3px solid var(--purple);opacity:.75;border-style:dashed}}
-.card-head{{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}}
-.card-title{{font-weight:700;font-size:14px}}.card-desc{{color:var(--text2);font-size:12px;margin-top:4px}}.card-meta{{color:var(--muted);font-size:11px;margin-top:6px}}
-.pill{{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap}}
-.pill-teal{{background:var(--teal-d);color:var(--teal)}}.pill-amber{{background:var(--amber-d);color:var(--amber)}}.pill-red{{background:var(--red-d);color:var(--red)}}.pill-green{{background:var(--green-d);color:var(--green)}}.pill-blue{{background:var(--blue-d);color:var(--blue)}}.pill-purple{{background:var(--purple-d);color:var(--purple)}}
-
-/* Activity feed */
-.act{{display:grid;grid-template-columns:90px 110px 1fr;gap:10px;align-items:start;padding:10px 14px}}
-.act-date{{color:var(--muted);font-size:11px;font-weight:700}}.act-phase{{color:var(--teal);font-weight:700;font-size:12px}}.act-text{{color:var(--text2);font-size:12px}}
-
-/* Roadmap */
-.rm-priority{{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--teal-d);color:var(--teal);flex-shrink:0}}
-.rm-concept .rm-priority{{background:var(--purple-d);color:var(--purple)}}
-
-/* Spec cards */
-.spec-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}}
-.spec-bar{{height:6px;background:var(--bg);border-radius:4px;overflow:hidden;display:flex;margin:8px 0 6px}}
-.spec-fill-pass{{background:var(--green)}}.spec-fill-pend{{background:var(--amber)}}
-.ac-toggle{{margin-top:10px;width:100%;background:var(--bg);color:var(--text2);border:1px solid var(--border);padding:6px 8px;border-radius:6px;cursor:pointer;font-size:11px}}
-.ac-list{{margin-top:8px;display:none;flex-direction:column;gap:6px}}.ac-list.open{{display:flex}}
-.ac-item{{display:flex;gap:8px;align-items:flex-start;font-size:11px;color:var(--text2)}}
-.ac-dot{{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0}}.dot-passed{{background:var(--green)}}.dot-pending{{background:var(--amber)}}.dot-failed{{background:var(--red)}}
-
-/* Debt grid */
-.debt-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}}
-.sev-critical{{border-left:3px solid var(--red)}}.sev-maintenance{{border-left:3px solid var(--amber)}}.sev-low{{border-left:3px solid var(--blue)}}
-
-/* Test history chart */
-.th-bar-wrap{{display:flex;align-items:flex-end;gap:6px;height:120px;padding:8px 0}}
-.th-bar{{flex:1;background:var(--teal-d);border-radius:4px 4px 0 0;position:relative;min-width:20px;transition:height .3s ease}}
-.th-bar:hover{{background:var(--teal)}}
-.th-bar .tip{{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:10px;white-space:nowrap;display:none;z-index:10}}
-.th-bar:hover .tip{{display:block}}
-.th-labels{{display:flex;gap:6px}}.th-labels span{{flex:1;text-align:center;font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:20px}}
-
-/* Week cards */
-.week-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}}
-.wk-num{{color:var(--teal);font-weight:800;font-size:16px}}.wk-pr{{background:var(--amber-d);color:var(--amber);padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}}.wk-title{{font-weight:700;margin:6px 0 4px}}.wk-goal{{color:var(--green);font-size:13px}}.wk-scope{{color:var(--text2);font-size:12px;margin-top:6px}}
-
-/* Risk cards */
-.risk-name{{font-weight:700;color:var(--amber);margin-bottom:4px}}
-
-/* Empty state */
-.empty{{color:var(--muted);font-size:13px;padding:16px;border:1px dashed var(--border);border-radius:var(--r)}}
-
-/* Footer */
-.footer{{max-width:1400px;margin:40px auto 0;padding:0 28px 28px;color:var(--muted);font-size:11px;border-top:1px solid var(--border);padding-top:16px}}
-
-@media(max-width:768px){{
-  .header{{padding:14px}}.wrap{{padding:14px}}.stats{{grid-template-columns:repeat(2,1fr)}}
-  .spec-grid,.debt-grid,.week-grid{{grid-template-columns:1fr}}.act{{grid-template-columns:1fr}}
-}}
+  body {{ background-color: #030712; color: #f3f4f6; }}
+  .glass {{ background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }}
+  .hide-scroll::-webkit-scrollbar {{ display: none; }}
+  .hide-scroll {{ -ms-overflow-style: none; scrollbar-width: none; }}
+  .nav-item.active {{ background: rgba(45, 212, 191, 0.1); color: #2dd4bf; border-right: 2px solid #2dd4bf; }}
+  .fade-in {{ animation: fadeIn 0.3s ease-in-out; }}
+  @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(4px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+  .accordion-content {{ transition: max-height 0.3s ease-out, padding 0.3s ease; max-height: 0; overflow: hidden; }}
+  .accordion-content.open {{ max-height: 500px; padding-top: 1rem; padding-bottom: 1rem; }}
+  @media print {{
+    aside, header button, #global-search {{ display: none !important; }}
+    main {{ overflow: visible !important; }}
+    body {{ background: white !important; color: black !important; }}
+    .glass {{ background: white !important; border: 1px solid #e5e7eb !important; backdrop-filter: none !important; }}
+  }}
 </style>
 </head>
-<body>
+<body class="flex h-screen overflow-hidden text-sm selection:bg-accent-500 selection:text-white">
 
-<div class="header">
-  <h1>{escape(project_name)}</h1>
-  <div class="meta">
-    <span><b>Repo:</b> {escape(dash.repo or '—')}</span>
-    <span><b>Updated:</b> {escape(updated)}</span>
-    <span><b>Horizon:</b> {escape(horizon)}</span>
-    <span><b>Source:</b> <a href="{escape(dash.progress_source_path)}">{escape(dash.progress_source_path)}</a></span>
-  </div>
-</div>
-
-<div class="wrap">
-  <!-- Progress bar -->
-  <div class="progress-box">
-    <h2>Project Timeline</h2>
-    <div class="rail"><div class="fill" style="width:{completion_pct}%"></div></div>
-    <div class="progress-info">
-      <span>{completion_pct}% complete — {complete_phases} of {total_phases} phases</span>
-      <span>Active: {escape(current_label)}</span>
+  <aside class="w-64 flex-shrink-0 border-r border-gray-800 bg-gray-950 flex flex-col justify-between hidden md:flex z-20">
+    <div>
+      <div class="h-16 flex items-center px-6 border-b border-gray-800 glass">
+        <i data-lucide="hexagon" class="text-accent-400 mr-3"></i>
+        <h1 class="font-display font-bold text-lg tracking-tight truncate">{escape(project_name)}</h1>
+      </div>
+      <nav class="mt-6 px-3 space-y-1" id="sidebar-nav"></nav>
     </div>
-  </div>
+    <div class="p-6 border-t border-gray-800 text-xs text-gray-500">
+      <p>Updated: {escape(updated)}</p>
+      <p class="mt-1 truncate" title="{escape(dash.repo)}">{escape(dash.repo or 'Local')}</p>
+    </div>
+  </aside>
 
-  <!-- Stats -->
-  <div class="stats">
-    <div class="stat"><div class="n c-teal">{completion_pct}%</div><div class="l">Phases done</div><div class="s">{complete_phases}/{total_phases}</div></div>
-    <div class="stat"><div class="n c-blue">{ac_pct}%</div><div class="l">Acceptance criteria</div><div class="s">{dash.passed_ac}/{dash.total_ac} passing</div></div>
-    <div class="stat"><div class="n c-purple">{dash.latest_test_count:,}</div><div class="l">Latest tests</div><div class="s">Peak count detected</div></div>
-    <div class="stat"><div class="n c-green">{len(dash.specs)}</div><div class="l">Spec files</div><div class="s">Parsed from docs</div></div>
-    <div class="stat"><div class="n c-amber">{open_debt}</div><div class="l">Open debt</div><div class="s">{resolved_debt} resolved</div></div>
-    <div class="stat"><div class="n c-red">{len(dash.risks)}</div><div class="l">Risks</div><div class="s">{blocked_count} blocked phases</div></div>
-  </div>
+  <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+    <header class="h-16 glass flex items-center justify-between px-6 border-b border-gray-800 z-10 sticky top-0">
+      <div class="flex items-center flex-1 max-w-md bg-gray-900/50 border border-gray-700 rounded-lg px-3 py-1.5 focus-within:border-accent-400 transition-colors">
+        <i data-lucide="search" class="w-4 h-4 text-gray-400 mr-2"></i>
+        <input type="text" id="global-search" placeholder="Search across dashboard (Press '/')" class="bg-transparent border-none outline-none text-gray-200 w-full placeholder-gray-500 text-sm">
+      </div>
+      <div class="flex items-center space-x-3 ml-4">
+        <button onclick="exportCSV()" class="flex items-center px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-md transition-colors text-xs font-medium">
+          <i data-lucide="download" class="w-3.5 h-3.5 mr-2"></i> Export CSV
+        </button>
+        <button onclick="window.print()" class="flex items-center px-3 py-1.5 bg-accent-500 hover:bg-accent-400 text-gray-950 border border-transparent rounded-md transition-colors text-xs font-medium shadow-[0_0_15px_rgba(45,212,191,0.2)]">
+          <i data-lucide="printer" class="w-3.5 h-3.5 mr-2"></i> Report
+        </button>
+      </div>
+    </header>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab active" data-tab="phases">Phases</button>
-    <button class="tab" data-tab="activity">Activity</button>
-    <button class="tab" data-tab="roadmap">Roadmap</button>
-    <button class="tab" data-tab="specs">Specs</button>
-    <button class="tab" data-tab="debt">Tech Debt</button>
-    <button class="tab" data-tab="risks">Risks</button>
-    <button class="tab" data-tab="tests">Test History</button>
-    <button class="tab" data-tab="phase8">Phase 8</button>
-  </div>
+    <div class="flex-1 overflow-y-auto hide-scroll p-6 md:p-8 relative bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wMykiLz48L3N2Zz4=')]">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="glass rounded-xl p-5 border border-gray-800 flex items-center justify-between hover:border-gray-700 transition-colors">
+          <div>
+            <h3 class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1">Current Phase</h3>
+            <p class="font-display text-2xl font-bold" id="widget-current-phase">{escape(current_label)}</p>
+            <p class="text-xs text-gray-500 mt-2"><span id="widget-phase-count">{complete_phases}/{total_phases}</span> phases completed</p>
+          </div>
+          <div class="relative w-16 h-16 flex items-center justify-center">
+            <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+              <path class="text-gray-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="100, 100" />
+              <path class="text-accent-400" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="{completion_pct}, 100" />
+            </svg>
+            <span class="absolute text-xs font-bold">{completion_pct}%</span>
+          </div>
+        </div>
 
-  <div id="p-phases" class="panel active"><div class="filters" id="phase-filters"></div><div id="phase-list"></div></div>
-  <div id="p-activity" class="panel"><div id="activity-list"></div></div>
-  <div id="p-roadmap" class="panel"><div id="roadmap-list"></div></div>
-  <div id="p-specs" class="panel"><div class="filters" id="spec-filters"></div><div class="spec-grid" id="spec-grid"></div></div>
-  <div id="p-debt" class="panel"><div class="debt-grid" id="debt-grid"></div></div>
-  <div id="p-risks" class="panel"><div id="risk-list"></div></div>
-  <div id="p-tests" class="panel"><div id="test-chart"></div></div>
-  <div id="p-phase8" class="panel"><div class="week-grid" id="week-grid"></div></div>
-</div>
+        <div class="glass rounded-xl p-5 border border-gray-800 flex flex-col justify-center hover:border-gray-700 transition-colors">
+          <h3 class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 flex items-center"><i data-lucide="milestone" class="w-3.5 h-3.5 mr-1.5"></i> Next Milestone</h3>
+          <p class="font-display text-lg font-bold truncate mt-1" id="widget-next-milestone">Loading...</p>
+          <p class="text-xs text-gray-500 mt-2"><span id="widget-horizon">{escape(horizon)}</span> Horizon</p>
+        </div>
 
-<div class="footer">Generated {datetime.now().strftime('%Y-%m-%d %H:%M')} &middot; AI Trade Analyst Dashboard v2</div>
-
-<script>
-const D = {{
-  phases: {phases_json},
-  specs: {specs_json},
-  activities: {activities_json},
-  roadmap: {roadmap_json},
-  phase8: {phase8_json},
-  debt: {debt_json},
-  risks: {risks_json},
-  testHistory: {test_history_json}
-}};
-
-const $ = s => document.querySelector(s);
-const $$ = s => document.querySelectorAll(s);
-const esc = t => String(t??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-// --- Tabs ---
-$$('.tab').forEach(btn => btn.addEventListener('click', () => {{
-  $$('.tab').forEach(t => t.classList.remove('active'));
-  $$('.panel').forEach(p => p.classList.remove('active'));
-  btn.classList.add('active');
-  const p = $('#p-' + btn.dataset.tab);
-  if (p) p.classList.add('active');
-}}));
-
-// --- Phases ---
-let pf = 'all';
-function renderPhases() {{
-  const items = pf === 'all' ? D.phases : D.phases.filter(p => p.status === pf);
-  const el = $('#phase-list');
-  if (!items.length) {{ el.innerHTML = '<div class="empty">No phases match this filter.</div>'; return; }}
-  el.innerHTML = items.map(p => `
-    <div class="card chip-${{esc(p.status)}}">
-      <div class="card-head"><div class="card-title">${{esc(p.name)}}</div><span class="pill pill-teal">${{esc(p.status)}}</span></div>
-      <div class="card-desc">${{esc(p.description)}}</div>
-      ${{p.tests ? `<div class="card-meta">${{p.tests.toLocaleString()}} tests</div>` : ''}}
-    </div>`).join('');
-}}
-function renderPhaseFilters() {{
-  const statuses = ['all', ...new Set(D.phases.map(p => p.status))];
-  const el = $('#phase-filters');
-  el.innerHTML = statuses.map(s => `<button class="fbtn ${{pf===s?'active':''}}" data-v="${{s}}">${{s}}</button>`).join('');
-  el.querySelectorAll('.fbtn').forEach(b => b.addEventListener('click', () => {{ pf = b.dataset.v; renderPhaseFilters(); renderPhases(); }}));
-}}
-renderPhaseFilters(); renderPhases();
-
-// --- Activity ---
-(function() {{
-  const el = $('#activity-list');
-  if (!D.activities.length) {{ el.innerHTML = '<div class="empty">No activity entries found.</div>'; return; }}
-  el.innerHTML = D.activities.map(a => `
-    <div class="card act">
-      <div class="act-date">${{esc(a.date)}}</div>
-      <div class="act-phase">${{esc(a.phase)}}</div>
-      <div class="act-text">${{esc(a.activity)}}</div>
-    </div>`).join('');
-}})();
-
-// --- Roadmap ---
-(function() {{
-  const el = $('#roadmap-list');
-  if (!D.roadmap.length) {{ el.innerHTML = '<div class="empty">No roadmap items found.</div>'; return; }}
-  el.innerHTML = D.roadmap.map(r => `
-    <div class="card chip-${{esc(r.status)}} rm-${{esc(r.status)}}">
-      <div style="display:flex;gap:12px;align-items:flex-start">
-        <div class="rm-priority">${{esc(r.priority)}}</div>
-        <div>
-          <div class="card-title">${{esc(r.phase)}}</div>
-          <div class="card-desc">${{esc(r.description)}}</div>
-          <div class="card-meta">Depends on: ${{esc(r.depends_on || '—')}}</div>
+        <div class="glass rounded-xl p-5 border border-gray-800 flex items-center justify-between hover:border-gray-700 transition-colors">
+          <div>
+            <h3 class="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 flex items-center"><i data-lucide="activity" class="w-3.5 h-3.5 mr-1.5"></i> Health Score</h3>
+            <p class="font-display text-3xl font-bold mt-1" id="widget-health-score">0</p>
+            <p class="text-xs text-gray-500 mt-1"><span id="widget-health-status">Calculating...</span></p>
+          </div>
+          <div class="w-12 h-12 rounded-full border-4 border-gray-800 flex items-center justify-center bg-gray-900 shadow-inner" id="widget-health-ring">
+            <i data-lucide="heart-pulse" class="w-5 h-5 text-gray-500" id="widget-health-icon"></i>
+          </div>
         </div>
       </div>
-    </div>`).join('');
-}})();
 
-// --- Specs ---
-let sf = 'all';
-function renderSpecs() {{
-  const items = sf === 'all' ? D.specs : D.specs.filter(s => s.status === sf);
-  const el = $('#spec-grid');
-  if (!items.length) {{ el.innerHTML = '<div class="empty">No specs match this filter.</div>'; return; }}
-  el.innerHTML = '';
-  items.forEach(s => {{
-    const pp = s.total_ac ? Math.round((s.passed_ac/s.total_ac)*100) : 0;
-    const pn = s.total_ac ? Math.round((s.pending_ac/s.total_ac)*100) : 0;
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div class="card-head">
-        <div><div class="card-title"><a href="${{esc(s.source_path)}}">${{esc(s.name)}}</a></div><div class="card-desc">${{esc(s.title)}}</div></div>
-        <span class="pill pill-teal">${{esc(s.status)}}</span>
-      </div>
-      <div class="spec-bar"><div class="spec-fill-pass" style="width:${{pp}}%"></div><div class="spec-fill-pend" style="width:${{pn}}%"></div></div>
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span>${{s.passed_ac}} passed</span><span>${{s.pending_ac}} pending</span><span>${{s.total_ac}} total</span></div>
-      <button class="ac-toggle">Show acceptance criteria</button>
-      <div class="ac-list">${{(s.acceptance_criteria||[]).map(ac => `<div class="ac-item"><div class="ac-dot dot-${{esc(ac.status)}}"></div><span><b>${{esc(ac.id)}}</b> ${{esc(ac.condition)}}</span></div>`).join('') || '<div class="empty">No ACs parsed.</div>'}}</div>`;
-    card.querySelector('.ac-toggle').addEventListener('click', function() {{
-      const list = card.querySelector('.ac-list');
-      list.classList.toggle('open');
-      this.textContent = list.classList.contains('open') ? 'Hide acceptance criteria' : 'Show acceptance criteria';
+      <div id="panels-container" class="relative min-h-[500px] w-full pb-20"></div>
+    </div>
+  </main>
+
+  <script>
+    const D = {{
+      phases: {phases_json},
+      specs: {specs_json},
+      activities: {activities_json},
+      roadmap: {roadmap_json},
+      phase8: {phase8_json},
+      debt: {debt_json},
+      risks: {risks_json},
+      testHistory: {test_history_json}
+    }};
+
+    let activeTab = 'phases';
+    let phaseFilter = 'All';
+    const TABS = [
+      {{ id: 'phases', name: 'Phases', icon: 'git-merge' }},
+      {{ id: 'roadmap', name: 'Roadmap', icon: 'map' }},
+      {{ id: 'specs', name: 'Specs & ACs', icon: 'check-square' }},
+      {{ id: 'activity', name: 'Activity Log', icon: 'activity' }},
+      {{ id: 'debt', name: 'Tech Debt', icon: 'alert-triangle' }},
+      {{ id: 'risks', name: 'Risks', icon: 'shield-alert' }},
+      {{ id: 'tests', name: 'Test History', icon: 'bar-chart-2' }},
+      {{ id: 'phase8', name: 'Phase 8 Plan', icon: 'calendar' }}
+    ];
+
+    function renderSidebar() {{
+      const nav = document.getElementById('sidebar-nav');
+      nav.innerHTML = TABS.map(tab => `
+        <a href="#" onclick="switchTab('${{tab.id}}'); return false;" id="nav-${{tab.id}}" class="nav-item group flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors mb-1 ${{activeTab === tab.id ? 'active' : ''}}">
+          <i data-lucide="${{tab.icon}}" class="mr-3 w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors ${{activeTab === tab.id ? 'text-accent-400' : ''}}"></i>
+          ${{tab.name}}
+        </a>
+      `).join('');
+      lucide.createIcons();
+    }}
+
+    function switchTab(tabId) {{
+      activeTab = tabId;
+      renderSidebar();
+      renderPanel();
+    }}
+
+    function getStatusColor(status) {{
+      const s = String(status || '').toLowerCase();
+      if (['complete', 'passed', 'resolved'].includes(s)) return 'text-emerald-400 bg-emerald-400/10 border-emerald-500/20';
+      if (['active', 'current'].includes(s)) return 'text-accent-400 bg-accent-400/10 border-accent-500/20';
+      if (['next', 'planned', 'pending', 'maintenance', 'open'].includes(s)) return 'text-amber-400 bg-amber-400/10 border-amber-500/20';
+      if (['blocked', 'failed', 'critical'].includes(s)) return 'text-red-400 bg-red-400/10 border-red-500/20';
+      if (['concept', 'parked', 'low'].includes(s)) return 'text-purple-400 bg-purple-400/10 border-purple-500/20';
+      return 'text-gray-400 bg-gray-800 border-gray-700';
+    }}
+
+    function lower(val) {{
+      return String(val || '').toLowerCase();
+    }}
+
+    function titleEscape(val) {{
+      return String(val ?? '').replace(/"/g, '&quot;');
+    }}
+
+    function matchesSearch(item, keys, searchTerm) {{
+      if (!searchTerm) return true;
+      return keys.some(k => lower(item[k]).includes(searchTerm));
+    }}
+
+    function renderPanel() {{
+      const container = document.getElementById('panels-container');
+      container.innerHTML = `<div class="fade-in pb-12" id="panel-${{activeTab}}"></div>`;
+      const panel = document.getElementById(`panel-${{activeTab}}`);
+      const searchTerm = lower(document.getElementById('global-search').value);
+
+      if (activeTab === 'phases') {{
+        const statuses = ['All', 'Complete', 'Active', 'Planned', 'Concept', 'Blocked'];
+        let html = `<div class="flex items-center space-x-2 mb-6 overflow-x-auto hide-scroll pb-2">`;
+        statuses.forEach(s => {{
+          html += `<button onclick="setPhaseFilter('${{s}}')" class="px-3 py-1 text-xs font-medium rounded-full border transition-colors ${{phaseFilter === s ? 'border-accent-400 text-accent-400 bg-accent-400/10' : 'border-gray-700 hover:border-gray-500 text-gray-300'}}">${{s}}</button>`;
+        }});
+        html += `</div><div class="space-y-3">`;
+
+        const filtered = D.phases.filter(p => {{
+          const textMatch = lower(p.name).includes(searchTerm) || lower(p.description).includes(searchTerm);
+          const statusMatch = phaseFilter === 'All' || lower(p.status) === lower(phaseFilter);
+          return textMatch && statusMatch;
+        }});
+        if (!filtered.length) html += emptyState('No phases found matching your search.');
+
+        filtered.forEach((p, i) => {{
+          const colorClass = getStatusColor(p.status);
+          const linkedSpecs = D.specs.filter(s => lower(s.phase).includes(lower(p.name)) || lower(s.name).includes(lower(p.name)));
+          html += `
+            <div class="glass border border-gray-800 rounded-lg overflow-hidden transition-all duration-300 searchable-item">
+              <button class="w-full flex items-center justify-between p-4 hover:bg-gray-800/50 transition-colors text-left" onclick="toggleAccordion('phase-${{i}}')">
+                <div class="flex items-center space-x-4">
+                  <div class="flex-shrink-0 w-2 h-8 rounded-sm ${{colorClass.split(' ')[1].replace('/10', '')}}"></div>
+                  <div>
+                    <h4 class="font-display font-medium text-gray-100">${{p.name}}</h4>
+                    <p class="text-xs text-gray-400 mt-0.5 line-clamp-1">${{p.description || '—'}}</p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-4 ml-4">
+                  ${{p.tests ? `<span class="text-xs text-gray-500 flex items-center"><i data-lucide="beaker" class="w-3 h-3 mr-1"></i> ${{Number(p.tests).toLocaleString()}} tests</span>` : ''}}
+                  <span class="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border ${{colorClass}}">${{p.status}}</span>
+                  <i data-lucide="chevron-down" class="w-4 h-4 text-gray-500 transform transition-transform" id="icon-phase-${{i}}"></i>
+                </div>
+              </button>
+              <div id="phase-${{i}}" class="accordion-content bg-gray-900/30 px-4 text-sm text-gray-300 border-t border-transparent">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+                   <div class="p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                     <p class="text-xs text-gray-500 uppercase font-semibold tracking-wider mb-2">Specs linked to phase</p>
+                     <p class="text-gray-300">${{linkedSpecs.length ? linkedSpecs.map(s => `&bull; ${{s.name}}`).join('<br>') : 'None specifically linked.'}}</p>
+                   </div>
+                   <div class="p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                     <p class="text-xs text-gray-500 uppercase font-semibold tracking-wider mb-2">Summary</p>
+                     <p class="text-gray-300">Status: <span class="capitalize">${{p.status}}</span>${{p.tests ? ` · Tests: ${{Number(p.tests).toLocaleString()}}` : ''}}</p>
+                   </div>
+                 </div>
+              </div>
+            </div>`;
+        }});
+        html += `</div>`;
+        panel.innerHTML = html;
+      }}
+
+      else if (activeTab === 'tests') {{
+        panel.innerHTML = `
+          <div class="glass border border-gray-800 rounded-xl p-6 mb-6">
+            <div class="flex justify-between items-center mb-6">
+              <h2 class="font-display font-semibold text-lg flex items-center"><i data-lucide="trending-up" class="w-5 h-5 mr-2 text-accent-400"></i>Test Count Over Time</h2>
+            </div>
+            <div class="h-64 w-full"><canvas id="testHistoryChart"></canvas></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="glass border border-gray-800 rounded-xl p-6">
+              <h3 class="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-4">Phase Test Counts</h3>
+              <div class="space-y-3">
+                ${{D.testHistory.slice().reverse().slice(0, 10).map(t => `<div class="flex justify-between items-center text-sm border-b border-gray-800 pb-2 last:border-0"><span class="text-gray-300 truncate pr-4">${{t.phase}}</span><span class="font-mono text-accent-400">${{Number(t.count || 0).toLocaleString()}}</span></div>`).join('')}}
+              </div>
+            </div>
+          </div>`;
+
+        setTimeout(() => {{
+          const chartEl = document.getElementById('testHistoryChart');
+          if (!chartEl || !D.testHistory.length) return;
+          const ctx = chartEl.getContext('2d');
+          new Chart(ctx, {{
+            type: 'line',
+            data: {{
+              labels: D.testHistory.map(t => t.phase.length > 15 ? t.phase.substring(0, 12) + '...' : t.phase),
+              datasets: [{{
+                label: 'Test Count',
+                data: D.testHistory.map(t => t.count),
+                borderColor: '#2dd4bf',
+                backgroundColor: 'rgba(45, 212, 191, 0.1)',
+                borderWidth: 2,
+                pointBackgroundColor: '#111827',
+                pointBorderColor: '#2dd4bf',
+                pointHoverBackgroundColor: '#2dd4bf',
+                fill: true,
+                tension: 0.3
+              }}]
+            }},
+            options: {{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {{ legend: {{ display: false }} }},
+              scales: {{
+                y: {{ beginAtZero: true, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#6b7280' }} }},
+                x: {{ grid: {{ display: false }}, ticks: {{ color: '#6b7280', maxRotation: 45, minRotation: 45 }} }}
+              }}
+            }}
+          }});
+        }}, 100);
+      }}
+
+      else if (activeTab === 'specs') {{
+        const filtered = D.specs.filter(s => lower(s.name).includes(searchTerm) || lower(s.title).includes(searchTerm) || lower(s.phase).includes(searchTerm));
+        if (!filtered.length) {{
+          panel.innerHTML = emptyState('No specifications match this search.');
+        }} else {{
+          let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">`;
+          filtered.forEach(s => {{
+            const pp = s.total_ac ? Math.round((s.passed_ac / s.total_ac) * 100) : 0;
+            const pn = s.total_ac ? Math.round((s.pending_ac / s.total_ac) * 100) : 0;
+            const statusClass = getStatusColor(s.status);
+            html += `
+              <div class="glass border border-gray-800 rounded-xl p-5 flex flex-col hover:border-gray-700 transition-colors searchable-item">
+                <div class="flex justify-between items-start mb-3 gap-3">
+                  <h4 class="font-display font-medium text-gray-100 truncate pr-2"><a href="${{s.source_path || '#'}}" class="hover:text-accent-400 hover:underline transition-colors" title="${{titleEscape(s.name)}}">${{s.name}}</a></h4>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border whitespace-nowrap ${{statusClass}}">${{s.status}}</span>
+                </div>
+                <p class="text-xs text-gray-400 line-clamp-2 mb-2" title="${{titleEscape(s.title)}}">${{s.title || '—'}}</p>
+                <p class="text-[11px] text-gray-500 mb-4">Phase: ${{s.phase || '—'}}</p>
+                <div class="w-full bg-gray-800 rounded-full h-1.5 mb-2 overflow-hidden flex">
+                  <div class="bg-emerald-500 h-1.5 rounded-l-full" style="width: ${{pp}}%"></div>
+                  <div class="bg-amber-500 h-1.5" style="width: ${{pn}}%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-gray-500 font-medium">
+                  <span class="text-emerald-500">${{s.passed_ac}} passed</span>
+                  <span class="text-amber-500">${{s.pending_ac}} pending</span>
+                  <span>${{s.total_ac}} total</span>
+                </div>
+              </div>`;
+          }});
+          html += `</div>`;
+          panel.innerHTML = html;
+        }}
+      }}
+
+      else if (activeTab === 'roadmap') {{
+        const filtered = D.roadmap.filter(r => lower(r.phase).includes(searchTerm) || lower(r.description).includes(searchTerm) || lower(r.depends_on).includes(searchTerm));
+        let html = `<div class="space-y-4">`;
+        if (!filtered.length) html += emptyState('No roadmap items match this search.');
+        filtered.forEach(r => {{
+          const colorClass = getStatusColor(r.status);
+          html += `
+            <div class="glass border border-gray-800 rounded-xl p-5 flex items-start space-x-4 searchable-item">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${{colorClass.replace('/10', '/20')}}">${{r.priority ?? '—'}}</div>
+              <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-center mb-1 gap-3">
+                  <h4 class="font-display font-medium text-gray-100">${{r.phase}}</h4>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${{colorClass}}">${{r.status}}</span>
+                </div>
+                <p class="text-sm text-gray-400 mb-2">${{r.description}}</p>
+                <p class="text-xs text-gray-500 flex items-center"><i data-lucide="git-commit" class="w-3 h-3 mr-1"></i> Depends on: ${{r.depends_on || '—'}}</p>
+              </div>
+            </div>`;
+        }});
+        html += `</div>`;
+        panel.innerHTML = html;
+      }}
+
+      else {{
+        const dataArr = D[activeTab] || D.activities;
+        if (!dataArr || !dataArr.length) {{
+          panel.innerHTML = emptyState(`No entries found for ${{activeTab}}.`);
+        }} else {{
+          let renderedRows = 0;
+          let html = `<div class="glass border border-gray-800 rounded-xl overflow-hidden overflow-x-auto"><table class="w-full text-left border-collapse">`;
+          const keys = Object.keys(dataArr[0]);
+          html += `<thead class="bg-gray-800/50 border-b border-gray-700"><tr>${{keys.map(k => `<th class="p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">${{k.replaceAll('_', ' ')}}</th>`).join('')}}</tr></thead><tbody class="divide-y divide-gray-800/50 text-sm">`;
+          dataArr.forEach(item => {{
+            if (!matchesSearch(item, keys, searchTerm)) return;
+            renderedRows += 1;
+            html += `<tr class="hover:bg-gray-800/30 transition-colors">`;
+            keys.forEach(k => {{
+              let val = item[k];
+              if (k === 'status' || k === 'severity') {{
+                const c = getStatusColor(val);
+                val = `<span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase border ${{c}}">${{val}}</span>`;
+              }} else {{
+                val = (val === null || val === undefined || val === '') ? '—' : String(val);
+              }}
+              html += `<td class="p-4 text-gray-300 max-w-xs truncate" title="${{titleEscape(item[k])}}">${{val}}</td>`;
+            }});
+            html += `</tr>`;
+          }});
+          html += `</tbody></table></div>`;
+          panel.innerHTML = renderedRows ? html : emptyState(`No entries found for ${{activeTab}}.`);
+        }}
+      }}
+
+      lucide.createIcons();
+    }}
+
+    function toggleAccordion(id) {{
+      const content = document.getElementById(id);
+      const icon = document.getElementById('icon-' + id);
+      if (!content || !icon) return;
+      if (content.classList.contains('open')) {{
+        content.classList.remove('open');
+        icon.classList.remove('rotate-180');
+        content.style.borderColor = 'transparent';
+      }} else {{
+        content.classList.add('open');
+        icon.classList.add('rotate-180');
+        content.style.borderColor = 'rgba(255,255,255,0.05)';
+      }}
+    }}
+
+    function emptyState(msg) {{
+      return `
+        <div class="glass border-dashed border-2 border-gray-800 rounded-xl p-12 flex flex-col items-center justify-center text-center">
+          <div class="w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center mb-4">
+            <i data-lucide="search-x" class="w-6 h-6 text-gray-500"></i>
+          </div>
+          <h3 class="font-medium text-gray-300 mb-1">Nothing found</h3>
+          <p class="text-sm text-gray-500">${{msg}}</p>
+        </div>`;
+    }}
+
+    function calcWidgets() {{
+      const nextPlanned = D.roadmap.find(r => r.status === 'planned' || r.status === 'next');
+      document.getElementById('widget-next-milestone').innerText = nextPlanned ? nextPlanned.phase : 'No upcoming milestones';
+
+      const passedAC = D.specs.reduce((acc, s) => acc + (Number(s.passed_ac) || 0), 0);
+      const totalAC = D.specs.reduce((acc, s) => acc + (Number(s.total_ac) || 0), 0);
+      let score = totalAC > 0 ? (passedAC / totalAC) * 100 : 100;
+
+      const openDebt = D.debt.filter(d => lower(d.status) === 'open').length;
+      const riskCount = D.risks.length;
+      score -= (openDebt * 2) + (riskCount * 5);
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
+      const scoreEl = document.getElementById('widget-health-score');
+      const statusEl = document.getElementById('widget-health-status');
+      const ringEl = document.getElementById('widget-health-ring');
+      const iconEl = document.getElementById('widget-health-icon');
+
+      let animateScore = 0;
+      const interval = setInterval(() => {{
+        animateScore += 3;
+        if (animateScore >= score) {{
+          animateScore = score;
+          clearInterval(interval);
+        }}
+        scoreEl.innerText = animateScore;
+      }}, 20);
+
+      if (score >= 85) {{
+        statusEl.innerText = 'System Healthy';
+        statusEl.className = 'text-xs text-emerald-500 font-medium mt-1';
+        ringEl.className = 'w-12 h-12 rounded-full border-4 border-emerald-500/20 flex items-center justify-center bg-emerald-500/10 shadow-inner';
+        iconEl.className = 'w-5 h-5 text-emerald-400';
+      }} else if (score >= 60) {{
+        statusEl.innerText = 'Needs Attention';
+        statusEl.className = 'text-xs text-amber-500 font-medium mt-1';
+        ringEl.className = 'w-12 h-12 rounded-full border-4 border-amber-500/20 flex items-center justify-center bg-amber-500/10 shadow-inner';
+        iconEl.className = 'w-5 h-5 text-amber-400';
+      }} else {{
+        statusEl.innerText = 'At Risk';
+        statusEl.className = 'text-xs text-red-500 font-medium mt-1';
+        ringEl.className = 'w-12 h-12 rounded-full border-4 border-red-500/20 flex items-center justify-center bg-red-500/10 shadow-inner';
+        iconEl.className = 'w-5 h-5 text-red-400';
+      }}
+    }}
+
+    function exportCSV() {{
+      const dataArr = D[activeTab] || D.activities;
+      if (!dataArr || !dataArr.length) return alert('No data to export.');
+      const keys = Object.keys(dataArr[0]);
+      let csvContent = 'data:text/csv;charset=utf-8,' + keys.join(',') + '\n';
+      dataArr.forEach(item => {{
+        const row = keys.map(k => `"${{String(item[k] ?? '').replace(/"/g, '""')}}"`).join(',');
+        csvContent += row + '\n';
+      }});
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `ai_trade_analyst_${{activeTab}}_export.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }}
+
+    function setPhaseFilter(value) {{
+      phaseFilter = value;
+      renderPanel();
+    }}
+
+    document.getElementById('global-search').addEventListener('keyup', renderPanel);
+    document.addEventListener('keydown', e => {{
+      if (e.key === '/' && document.activeElement !== document.getElementById('global-search')) {{
+        e.preventDefault();
+        document.getElementById('global-search').focus();
+      }}
     }});
-    el.appendChild(card);
-  }});
-}}
-function renderSpecFilters() {{
-  const filters = ['all','complete','active','planned','pending'];
-  const el = $('#spec-filters');
-  el.innerHTML = filters.map(s => `<button class="fbtn ${{sf===s?'active':''}}" data-v="${{s}}">${{s}}</button>`).join('');
-  el.querySelectorAll('.fbtn').forEach(b => b.addEventListener('click', () => {{ sf = b.dataset.v; renderSpecFilters(); renderSpecs(); }}));
-}}
-renderSpecFilters(); renderSpecs();
 
-// --- Tech Debt ---
-(function() {{
-  const el = $('#debt-grid');
-  if (!D.debt.length) {{ el.innerHTML = '<div class="empty">No technical debt items found.</div>'; return; }}
-  el.innerHTML = D.debt.map(d => `
-    <div class="card sev-${{esc(d.severity)}}">
-      <div class="card-head">
-        <div class="card-title">${{esc(d.id)}}: ${{esc(d.item)}}</div>
-        <span class="pill ${{d.status==='resolved'?'pill-green':'pill-amber'}}">${{esc(d.status)}}</span>
-      </div>
-      <div class="card-desc">${{esc(d.location)}}</div>
-      <div class="card-meta">Severity: ${{esc(d.severity)}}</div>
-    </div>`).join('');
-}})();
-
-// --- Risks ---
-(function() {{
-  const el = $('#risk-list');
-  if (!D.risks.length) {{ el.innerHTML = '<div class="empty">No risks registered.</div>'; return; }}
-  el.innerHTML = D.risks.map(r => `
-    <div class="card" style="border-left:3px solid var(--amber)">
-      <div class="risk-name">${{esc(r.name)}}</div>
-      <div class="card-desc">${{esc(r.detail)}}</div>
-    </div>`).join('');
-}})();
-
-// --- Test History Chart ---
-(function() {{
-  const el = $('#test-chart');
-  if (!D.testHistory.length) {{ el.innerHTML = '<div class="empty">No test history entries found.</div>'; return; }}
-  const maxCount = Math.max(...D.testHistory.map(t => t.count));
-  el.innerHTML = `
-    <div class="th-bar-wrap">${{D.testHistory.map(t => {{
-      const h = maxCount ? Math.max(8, Math.round((t.count/maxCount)*100)) : 8;
-      return `<div class="th-bar" style="height:${{h}}%"><div class="tip">${{esc(t.phase)}}: ${{t.count.toLocaleString()}} tests</div></div>`;
-    }}).join('')}}</div>
-    <div class="th-labels">${{D.testHistory.map(t => `<span title="${{esc(t.phase)}}">${{esc(t.phase.length > 12 ? t.phase.slice(0,10)+'…' : t.phase)}}</span>`).join('')}}</div>`;
-}})();
-
-// --- Phase 8 ---
-(function() {{
-  const el = $('#week-grid');
-  if (!D.phase8.length) {{ el.innerHTML = '<div class="empty">No Phase 8 roadmap file found.</div>'; return; }}
-  el.innerHTML = D.phase8.map(w => `
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span class="wk-num">${{esc(w.week)}}</span><span class="wk-pr">${{esc(w.pr)}}</span></div>
-      <div class="wk-title">${{esc(w.title)}}</div>
-      <div class="wk-goal">${{esc(w.goal)}}</div>
-      ${{w.scope_summary ? `<div class="wk-scope">${{esc(w.scope_summary)}}</div>` : ''}}
-    </div>`).join('');
-}})();
-</script>
+    renderSidebar();
+    calcWidgets();
+    switchTab('phases');
+  </script>
 </body>
-</html>'''
+</html>"""
 
 
 # ========================== Main ==========================================
