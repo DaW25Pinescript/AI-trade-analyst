@@ -1,7 +1,7 @@
 @echo off
 :: ============================================================
-::  AI Trade Analyst — Fancy Dashboard Launcher
-::  Double-click this to launch the beautiful live dashboard
+::  AI Trade Analyst — Dashboard Launcher (v2)
+::  Double-click to launch the live dashboard
 :: ============================================================
 
 title AI Trade Analyst Dashboard
@@ -11,7 +11,7 @@ cd /d "%~dp0"
 
 echo.
 echo  =============================================
-echo   AI Trade Analyst — Fancy Dashboard Server
+echo   AI Trade Analyst — Dashboard Server v2
 echo  =============================================
 echo.
 
@@ -25,11 +25,27 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo  Starting live fancy dashboard server...
-echo  (Auto-detects docs folder + generate_dashboard.py)
+:: Check PyYAML
+python -c "import yaml" >nul 2>nul
+if %errorlevel% neq 0 (
+    echo  [NOTE] PyYAML is not installed.
+    echo         The dashboard will work but frontmatter parsing
+    echo         will use a limited fallback.
+    echo.
+    echo  To install:  pip install pyyaml
+    echo.
+    choice /C YN /M "Install PyYAML now?"
+    if errorlevel 2 goto :skip_yaml
+    echo  Installing PyYAML...
+    pip install pyyaml
+    echo.
+)
+:skip_yaml
+
+echo  Starting dashboard server...
 echo.
 
-:: Start the server (no --folder needed anymore)
+:: Start the server
 start /b python dashboard_server.py --port 9090
 
 :: Wait for the server to start
@@ -39,8 +55,8 @@ timeout /t 3 /nobreak >nul
 start "" "http://localhost:9090"
 
 echo.
-echo  Dashboard is running at http://localhost:9090
-echo  Refresh the page = live update from your MD files
+echo  Dashboard running at http://localhost:9090
+echo  Refresh the page = live update from your Markdown files
 echo  Close this window to stop the server.
 echo.
 
