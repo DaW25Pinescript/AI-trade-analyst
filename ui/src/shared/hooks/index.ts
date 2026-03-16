@@ -6,3 +6,4 @@ export { useAgentTrace, agentTraceKey } from "./useAgentTrace";
 export { useAgentDetail, agentDetailKey } from "./useAgentDetail";
 export { useRuns, runsKey, RUNS_KEY } from "./useRuns";
 export { useMarketData, marketDataKey, MARKET_DATA_KEY } from "./useMarketData";
+export { usePersonaPerformance, personaPerformanceKey, PERSONA_PERFORMANCE_KEY, usePatternSummary, patternSummaryKey, PATTERN_SUMMARY_KEY, useRunBundle, runBundleKey, RUN_BUNDLE_KEY } from "./useReflect";

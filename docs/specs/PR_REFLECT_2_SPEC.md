@@ -1,6 +1,6 @@
 # AI Trade Analyst — PR-REFLECT-2: Reflect Workspace Frontend Spec
 
-**Status:** ⏳ Spec drafted — implementation pending
+**Status:** ✅ Complete — all 44 ACs passed, +55 frontend tests
 **Date:** 16 March 2026
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Branch:** `pr-reflect-2-workspace`
@@ -332,70 +332,70 @@ The diagnostic must confirm the exact router file and navigation component to mo
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-1 | Route exists | `#/reflect` route renders `ReflectPage` | ⏳ Pending |
-| AC-2 | Navigation link | "Reflect" link in app navigation, navigates to `#/reflect` | ⏳ Pending |
-| AC-3 | Tab navigation | Overview and Runs tabs switch content within the workspace | ⏳ Pending |
-| AC-4 | Default tab | Overview tab is the default on workspace load | ⏳ Pending |
-| AC-5 | Existing routes unaffected | All existing workspace routes (`#/ops`, `#/journey`, etc.) still work | ⏳ Pending |
+| AC-1 | Route exists | `#/reflect` route renders `ReflectPage` | ✅ Pass |
+| AC-2 | Navigation link | "Reflect" link in app navigation, navigates to `#/reflect` | ✅ Pass |
+| AC-3 | Tab navigation | Overview and Runs tabs switch content within the workspace | ✅ Pass |
+| AC-4 | Default tab | Overview tab is the default on workspace load | ✅ Pass |
+| AC-5 | Existing routes unaffected | All existing workspace routes (`#/ops`, `#/journey`, etc.) still work | ✅ Pass |
 
 ### Overview Tab — Persona Performance
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-6 | Table renders | PersonaPerformanceTable displays persona rows from API response | ⏳ Pending |
-| AC-7 | Null metrics | Columns with `null` values display "—", table still renders | ⏳ Pending |
-| AC-8 | All-null columns | When ALL personas have null override/stance/confidence, table renders with "—" in every cell of those columns — no column hiding, no layout collapse | ⏳ Pending |
-| AC-9 | Flagged highlight | Flagged personas show amber text + "⚠ " prefix | ⏳ Pending |
-| AC-10 | Below threshold | `threshold_met: false` → welcoming message, no table | ⏳ Pending |
-| AC-11 | Stale banner | `data_state: "stale"` → stale warning banner above table | ⏳ Pending |
-| AC-12 | Stale + populated coexist | Stale banner AND populated table render simultaneously | ⏳ Pending |
-| AC-13 | Scan info footer | Run count, skipped count, and timestamp range shown below table | ⏳ Pending |
-| AC-14 | Loading state | LoadingSkeleton while fetching | ⏳ Pending |
-| AC-15 | Error state | ErrorState with retry on API failure | ⏳ Pending |
+| AC-6 | Table renders | PersonaPerformanceTable displays persona rows from API response | ✅ Pass |
+| AC-7 | Null metrics | Columns with `null` values display "—", table still renders | ✅ Pass |
+| AC-8 | All-null columns | When ALL personas have null override/stance/confidence, table renders with "—" in every cell of those columns — no column hiding, no layout collapse | ✅ Pass |
+| AC-9 | Flagged highlight | Flagged personas show amber text + "⚠ " prefix | ✅ Pass |
+| AC-10 | Below threshold | `threshold_met: false` → welcoming message, no table | ✅ Pass |
+| AC-11 | Stale banner | `data_state: "stale"` → stale warning banner above table | ✅ Pass |
+| AC-12 | Stale + populated coexist | Stale banner AND populated table render simultaneously | ✅ Pass |
+| AC-13 | Scan info footer | Run count, skipped count, and timestamp range shown below table | ✅ Pass |
+| AC-14 | Loading state | LoadingSkeleton while fetching | ✅ Pass |
+| AC-15 | Error state | ErrorState with retry on API failure | ✅ Pass |
 
 ### Overview Tab — Pattern Summary
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-16 | Table renders | PatternSummaryTable displays instrument × session rows | ⏳ Pending |
-| AC-17 | Verdict distribution | Per-bucket verdict breakdown displayed inline | ⏳ Pending |
-| AC-18 | Per-bucket threshold | Below-threshold buckets show "insufficient data (N/threshold runs)" | ⏳ Pending |
-| AC-19 | Flagged highlight | Flagged buckets show amber text + "⚠ " prefix | ⏳ Pending |
-| AC-20 | Loading state | LoadingSkeleton while fetching | ⏳ Pending |
-| AC-21 | Error state | ErrorState with retry | ⏳ Pending |
+| AC-16 | Table renders | PatternSummaryTable displays instrument × session rows | ✅ Pass |
+| AC-17 | Verdict distribution | Per-bucket verdict breakdown displayed inline | ✅ Pass |
+| AC-18 | Per-bucket threshold | Below-threshold buckets show "insufficient data (N/threshold runs)" | ✅ Pass |
+| AC-19 | Flagged highlight | Flagged buckets show amber text + "⚠ " prefix | ✅ Pass |
+| AC-20 | Loading state | LoadingSkeleton while fetching | ✅ Pass |
+| AC-21 | Error state | ErrorState with retry | ✅ Pass |
 
 ### Runs Tab — Run History + Run Detail
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-22 | Run history renders | Run list displays with timestamp, instrument, session, decision, status | ⏳ Pending |
-| AC-23 | Run history pagination | Next/prev controls work, using `useRuns` pagination (has_next gating) | ⏳ Pending |
-| AC-24 | Empty run history | Zero runs → welcoming message, not an error | ⏳ Pending |
-| AC-25 | Run selection | Clicking a run loads bundle via `GET /reflect/run/{run_id}` | ⏳ Pending |
-| AC-26 | Detail: verdict | Arbiter verdict displayed; confidence/method show "—" if absent | ⏳ Pending |
-| AC-27 | Detail: analysts | Analyst contributions listed with persona name; status/stance/confidence show "—" if absent | ⏳ Pending |
-| AC-28 | Detail: usage | Usage summary displayed or "Not available" if null | ⏳ Pending |
-| AC-29 | Detail: artifact status | Missing/malformed artifacts indicated, other sections still render | ⏳ Pending |
-| AC-30 | Detail: partial bundle | `data_state: "stale"` on bundle + missing artifacts → stale indicator AND remaining sections both render (coexist) | ⏳ Pending |
-| AC-31 | No selection state | "Select a run" placeholder when no run selected | ⏳ Pending |
-| AC-32 | Detail: 404 handling | Bundle returns 404 → "Run not found" message with reselection guidance | ⏳ Pending |
-| AC-33 | Loading state | LoadingSkeleton in detail panel while bundle fetches | ⏳ Pending |
-| AC-34 | Error state | ErrorState with retry in detail panel — history panel still usable | ⏳ Pending |
+| AC-22 | Run history renders | Run list displays with timestamp, instrument, session, decision, status | ✅ Pass |
+| AC-23 | Run history pagination | Next/prev controls work, using `useRuns` pagination (has_next gating) | ✅ Pass |
+| AC-24 | Empty run history | Zero runs → welcoming message, not an error | ✅ Pass |
+| AC-25 | Run selection | Clicking a run loads bundle via `GET /reflect/run/{run_id}` | ✅ Pass |
+| AC-26 | Detail: verdict | Arbiter verdict displayed; confidence/method show "—" if absent | ✅ Pass |
+| AC-27 | Detail: analysts | Analyst contributions listed with persona name; status/stance/confidence show "—" if absent | ✅ Pass |
+| AC-28 | Detail: usage | Usage summary displayed or "Not available" if null | ✅ Pass |
+| AC-29 | Detail: artifact status | Missing/malformed artifacts indicated, other sections still render | ✅ Pass |
+| AC-30 | Detail: partial bundle | `data_state: "stale"` on bundle + missing artifacts → stale indicator AND remaining sections both render (coexist) | ✅ Pass |
+| AC-31 | No selection state | "Select a run" placeholder when no run selected | ✅ Pass |
+| AC-32 | Detail: 404 handling | Bundle returns 404 → "Run not found" message with reselection guidance | ✅ Pass |
+| AC-33 | Loading state | LoadingSkeleton in detail panel while bundle fetches | ✅ Pass |
+| AC-34 | Error state | ErrorState with retry in detail panel — history panel still usable | ✅ Pass |
 
 ### API / Adapter / Structural
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-35 | API functions | `fetchPersonaPerformance`, `fetchPatternSummary`, `fetchRunBundle` typed and working | ⏳ Pending |
-| AC-36 | TanStack hooks | `usePersonaPerformance`, `usePatternSummary`, `useRunBundle` with stale times | ⏳ Pending |
-| AC-37 | Adapter layer | `reflectAdapter.ts` normalises all response shapes | ⏳ Pending |
-| AC-38 | Percentage formatting | Rates formatted as percentages (0.85 → "85%") | ⏳ Pending |
-| AC-39 | Null display | All nullable fields show "—" when null | ⏳ Pending |
-| AC-40 | useRuns not modified | Shared `useRuns` hook contract unchanged; Reflect adapts via local adapter | ⏳ Pending |
-| AC-41 | No backend changes | Zero modifications to any backend files | ⏳ Pending |
-| AC-42 | No workspace internal changes | Agent Ops, Journey, Analysis, Journal workspace internals unchanged | ⏳ Pending |
-| AC-43 | Shared component reuse | Uses existing PanelShell, LoadingSkeleton, EmptyState, ErrorState where appropriate | ⏳ Pending |
-| AC-44 | Regression safety | All pre-existing frontend tests pass; pre-existing failure count unchanged | ⏳ Pending |
+| AC-35 | API functions | `fetchPersonaPerformance`, `fetchPatternSummary`, `fetchRunBundle` typed and working | ✅ Pass |
+| AC-36 | TanStack hooks | `usePersonaPerformance`, `usePatternSummary`, `useRunBundle` with stale times | ✅ Pass |
+| AC-37 | Adapter layer | `reflectAdapter.ts` normalises all response shapes | ✅ Pass |
+| AC-38 | Percentage formatting | Rates formatted as percentages (0.85 → "85%") | ✅ Pass |
+| AC-39 | Null display | All nullable fields show "—" when null | ✅ Pass |
+| AC-40 | useRuns not modified | Shared `useRuns` hook contract unchanged; Reflect adapts via local adapter | ✅ Pass |
+| AC-41 | No backend changes | Zero modifications to any backend files | ✅ Pass |
+| AC-42 | No workspace internal changes | Agent Ops, Journey, Analysis, Journal workspace internals unchanged | ✅ Pass |
+| AC-43 | Shared component reuse | Uses existing PanelShell, LoadingSkeleton, EmptyState, ErrorState where appropriate | ✅ Pass |
+| AC-44 | Regression safety | All pre-existing frontend tests pass; pre-existing failure count unchanged | ✅ Pass |
 
 ---
 
@@ -631,7 +631,7 @@ PR-REFLECT-2 is done when: the `#/reflect` route renders a Reflect workspace wit
 | PR-RUN-1 — Run Browser | `GET /runs/` + RunBrowserPanel | ✅ Done — +56 |
 | PR-CHART-1 — OHLCV seam + chart | Market data endpoint + candlestick chart | ✅ Done — +48 |
 | PR-REFLECT-1 — Aggregation endpoints | Persona perf + pattern summary + run bundle | ✅ Done — +11 |
-| **PR-REFLECT-2 — Reflect workspace** | **`#/reflect` route, overview tables, run detail** | **⏳ Spec drafted** |
+| **PR-REFLECT-2 — Reflect workspace** | **`#/reflect` route, overview tables, run detail** | **✅ Done — +55 tests** |
 | PR-REFLECT-2a — Reflect filters | Instrument/session filters on persona performance | 📋 Planned |
 | PR-CHART-2 — Run context overlay | Multi-timeframe, run marker, verdict annotation | 📋 Planned |
 | PR-REFLECT-3 — Suggestions + influence | Rules-based suggestions, analyst influence | 📋 Planned |
@@ -640,9 +640,93 @@ PR-REFLECT-2 is done when: the `#/reflect` route renders a Reflect workspace wit
 
 ## 12. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 7).*
+### Workspace Directory Structure
 
-*Must include: exact router file, navigation component file, tab pattern, shared component prop compatibility, useRuns semantics, edge-state endpoint responses. Also record any deviations or scope reductions if implementation requires them.*
+```
+ui/src/workspaces/reflect/
+├── adapters/
+│   └── reflectAdapter.ts        (224 lines — view-model normalisation)
+├── components/
+│   ├── ReflectPage.tsx           (173 lines — orchestrator + two-tab nav)
+│   ├── PersonaPerformanceTable.tsx (96 lines — persona stats table)
+│   ├── PatternSummaryTable.tsx   (88 lines — pattern distribution table)
+│   ├── RunDetailView.tsx         (193 lines — bundle inspector)
+│   └── UsageSummaryCard.tsx      (55 lines — usage display)
+└── routes/
+    └── ReflectRoute.tsx          (9 lines — route wrapper)
+```
+
+### Router and Navigation Files
+
+- **Router:** `ui/src/app/router.tsx` — added `{ path: "reflect", element: <ReflectRoute /> }` before catch-all `*` route (+2 lines)
+- **Navigation:** `ui/src/app/AppShell.tsx` — added `{ to: "/reflect", label: "Reflect" }` to `NAV_ITEMS` (+1 line)
+
+### Tab Pattern Used
+
+Analysis tab bar pattern (from `AnalysisRunPage.tsx`): `useState<Tab>("overview")` with `border-b-2` active indicator, blue highlight. NOT the Ops mode pills pattern.
+
+### Shared Components Used
+
+| Component | Path | Usage |
+|-----------|------|-------|
+| PanelShell | `@shared/components/layout/PanelShell` | ReflectPage wrapper |
+| LoadingSkeleton | `@shared/components/feedback/LoadingSkeleton` | All loading states |
+| EmptyState | `@shared/components/feedback/EmptyState` | Below-threshold, empty runs |
+| ErrorState | `@shared/components/feedback/ErrorState` | API error with retry |
+
+### useRuns Adaptation Approach
+
+- `useRuns` hook used as-is (contract unchanged) for run history in Runs tab
+- Output adapted through `normalizeRunForReflect()` in `reflectAdapter.ts` for display formatting
+- No Reflect-specific parameters added to shared hook
+
+### Field Name Mappings in Adapter
+
+| Backend field | Adapter output | Notes |
+|--------------|---------------|-------|
+| `persona` | Used as display name | No `display_name` field in backend |
+| `stance_alignment` | Mapped to `stanceAlignment` | Spec said `stance_alignment_rate` — adjusted |
+| `stats[]` | Mapped to `personas[]` in view model | Array rename for clarity |
+
+### Deviations / Reductions
+
+1. **Scan info footer:** `ScanBounds` lacks `oldest_run_timestamp`/`newest_run_timestamp`. Footer shows: "Based on {valid_runs} runs ({skipped_runs} skipped), generated {relative_time}" using `generated_at` instead.
+2. **`analysis_response` artifact:** Not produced by backend. `ArtifactStatus` only has `run_record`, `usage_jsonl`, `usage_json`.
+3. **404 detection in RunDetailView:** Uses `[ERROR_CODE] message` pattern in thrown error to detect `RUN_NOT_FOUND` code from OpsErrorEnvelope.
+
+### Final Patch Set
+
+**New files (10):**
+
+| File | Lines |
+|------|-------|
+| `ui/src/shared/api/reflect.ts` | 119 |
+| `ui/src/shared/hooks/useReflect.ts` | 99 |
+| `ui/src/workspaces/reflect/adapters/reflectAdapter.ts` | 224 |
+| `ui/src/workspaces/reflect/components/ReflectPage.tsx` | 173 |
+| `ui/src/workspaces/reflect/components/PersonaPerformanceTable.tsx` | 96 |
+| `ui/src/workspaces/reflect/components/PatternSummaryTable.tsx` | 88 |
+| `ui/src/workspaces/reflect/components/RunDetailView.tsx` | 193 |
+| `ui/src/workspaces/reflect/components/UsageSummaryCard.tsx` | 55 |
+| `ui/src/workspaces/reflect/routes/ReflectRoute.tsx` | 9 |
+| `ui/tests/reflect.test.tsx` | 576 |
+
+**Modified files (3):**
+
+| File | Change | Delta |
+|------|--------|-------|
+| `ui/src/app/router.tsx` | Reflect route + import | +2 |
+| `ui/src/app/AppShell.tsx` | Reflect nav item | +1 |
+| `ui/src/shared/hooks/index.ts` | Reflect hook exports | +1 |
+
+**Total delta:** ~1,636 lines added, 0 deleted (net +1,636)
+
+### Test Count Delta
+
+- **Before:** 306 total (301 passing, 5 pre-existing journey failures)
+- **After:** 361 total (356 passing, 5 pre-existing journey failures)
+- **New:** +55 reflect tests (all passing)
+- **Regressions:** 0
 
 ---
 
