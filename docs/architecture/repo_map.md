@@ -33,9 +33,10 @@ Forward frontend stack: React + TypeScript + Tailwind.
 
 - `ui/src/shared/` — cross-workspace code (API client, hooks, types, components)
 - `ui/src/shared/api/ops.ts` — Agent Ops typed API layer
-- `ui/src/shared/api/marketData.ts` — Market Data typed API layer (PR-CHART-1)
+- `ui/src/shared/api/marketData.ts` — Market Data typed API layer (PR-CHART-1, PR-CHART-2 added `fetchTimeframes`)
 - `ui/src/shared/hooks/useMarketData.ts` — Market Data TanStack Query hook (PR-CHART-1)
-- `ui/src/workspaces/ops/components/CandlestickChart.tsx` — Candlestick chart component (PR-CHART-1)
+- `ui/src/shared/hooks/useTimeframes.ts` — Timeframe discovery TanStack Query hook (PR-CHART-2)
+- `ui/src/workspaces/ops/components/CandlestickChart.tsx` — Candlestick chart component with timeframe tabs, run markers, verdict annotation (PR-CHART-1 + PR-CHART-2)
 - `ui/src/workspaces/triage/` — Triage Board workspace
 - `ui/src/workspaces/journey/` — Journey Studio workspace
 - `ui/src/workspaces/analysis/` — Analysis Run workspace
@@ -60,9 +61,9 @@ Forward frontend stack: React + TypeScript + Tailwind.
 - `ai_analyst/api/services/ops_detail.py` — detail projection (roster + health + profile registry)
 - `ai_analyst/api/services/ops_profile_registry.py` — static entity profiles
 - `ai_analyst/api/services/ops_run_browser.py` — run browser projection (directory scan, PR-RUN-1)
-- `ai_analyst/api/routers/market_data.py` — Market Data router (`GET /market-data/{instrument}/ohlcv`, PR-CHART-1)
-- `ai_analyst/api/models/market_data.py` — OHLCV response models (Candle, OHLCVResponse, PR-CHART-1)
-- `ai_analyst/api/services/market_data_read.py` — market data read service (hot package CSV projection, PR-CHART-1)
+- `ai_analyst/api/routers/market_data.py` — Market Data router (`GET /market-data/{instrument}/ohlcv` + `/timeframes`, PR-CHART-1 + PR-CHART-2)
+- `ai_analyst/api/models/market_data.py` — OHLCV + timeframe response models (Candle, OHLCVResponse, TimeframesResponse, PR-CHART-1 + PR-CHART-2)
+- `ai_analyst/api/services/market_data_read.py` — market data read service + timeframe discovery (hot package CSV projection + INSTRUMENT_REGISTRY lookup, PR-CHART-1 + PR-CHART-2)
 - `ai_analyst/api/routers/reflect.py` — Reflect router (`/reflect/persona-performance`, `/reflect/pattern-summary`, `/reflect/run/{run_id}`)
 - `ai_analyst/api/models/reflect.py` — Reflect response models (persona stats, pattern buckets, run bundle)
 - `ai_analyst/api/services/reflect_aggregation.py` — bounded run scan + optional audit-log enrichment aggregation
@@ -74,7 +75,7 @@ Forward frontend stack: React + TypeScript + Tailwind.
 - `tests/test_ops_trace_endpoints.py` — trace endpoint tests (70 tests)
 - `tests/test_ops_detail_endpoints.py` — detail endpoint tests (72 tests)
 - `tests/test_run_browser_endpoints.py` — run browser endpoint tests (42 tests, PR-RUN-1)
-- `tests/test_market_data_endpoints.py` — market data endpoint tests (39 tests, PR-CHART-1)
+- `tests/test_market_data_endpoints.py` — market data endpoint tests (50 tests, PR-CHART-1 + PR-CHART-2)
 - `tests/test_reflect_endpoints.py` — reflect endpoint tests (11 tests, PR-REFLECT-1)
 - `tests/fixtures/sample_run_record.json` — trace + run browser test fixture
 - `tests/fixtures/sample_audit_log.jsonl` — trace test fixture

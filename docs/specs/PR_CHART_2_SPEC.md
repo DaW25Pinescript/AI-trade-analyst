@@ -1,6 +1,6 @@
 # AI Trade Analyst — PR-CHART-2: Run Context Overlay + Multi-Timeframe Charts Spec
 
-**Status:** ⏳ Spec drafted — implementation pending  
+**Status:** ✅ Complete  
 **Date:** 16 March 2026  
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
 **Branch:** `pr-chart-2-run-context`  
@@ -379,69 +379,69 @@ At the top of the diagnostic report, prominently record:
 
 | # | Acceptance Condition | Status |
 |---|---------------------|--------|
-| AC-1 | When an instrument with available timeframes is selected, the UI renders timeframe controls from data-driven values | ⏳ Pending |
-| AC-2 | When the selected instrument changes and the previous timeframe is still valid, the timeframe selection is preserved | ⏳ Pending |
-| AC-3 | When the selected instrument changes and the previous timeframe is invalid, the UI falls back to `4h` if available | ⏳ Pending |
-| AC-4 | If `4h` is unavailable, the UI falls back to the first available timeframe | ⏳ Pending |
-| AC-5 | If timeframe discovery returns an empty list, no tabs are shown and "No chart timeframes available for this instrument." is displayed | ⏳ Pending |
-| AC-6 | If timeframe discovery fails, no tabs are shown and "Unable to load chart timeframes." is displayed | ⏳ Pending |
-| AC-7 | If timeframe discovery payload is malformed, the UI degrades safely to the same state as AC-6 | ⏳ Pending |
-| AC-8 | If chart fetch for a selected timeframe fails, the UI shows "Unable to load chart data for this timeframe." — **other tabs remain functional** | ⏳ Pending |
-| AC-9 | When the selected instrument changes, TF tabs visually refresh to show the new instrument's available timeframes | ⏳ Pending |
+| AC-1 | When an instrument with available timeframes is selected, the UI renders timeframe controls from data-driven values | ✅ Done |
+| AC-2 | When the selected instrument changes and the previous timeframe is still valid, the timeframe selection is preserved | ✅ Done |
+| AC-3 | When the selected instrument changes and the previous timeframe is invalid, the UI falls back to `4h` if available | ✅ Done |
+| AC-4 | If `4h` is unavailable, the UI falls back to the first available timeframe | ✅ Done |
+| AC-5 | If timeframe discovery returns an empty list, no tabs are shown and "No chart timeframes available for this instrument." is displayed | ✅ Done |
+| AC-6 | If timeframe discovery fails, no tabs are shown and "Unable to load chart timeframes." is displayed | ✅ Done |
+| AC-7 | If timeframe discovery payload is malformed, the UI degrades safely to the same state as AC-6 | ✅ Done |
+| AC-8 | If chart fetch for a selected timeframe fails, the UI shows "Unable to load chart data for this timeframe." — **other tabs remain functional** | ✅ Done |
+| AC-9 | When the selected instrument changes, TF tabs visually refresh to show the new instrument's available timeframes | ✅ Done |
 
 ### Run overlay behavior
 
 | # | Acceptance Condition | Status |
 |---|---------------------|--------|
-| AC-10 | If no run is selected, no run-time marker or verdict annotation is shown | ⏳ Pending |
-| AC-11 | If a selected run has a valid timestamp within the loaded candle range, a run-time visual marker is shown | ⏳ Pending |
-| AC-12 | If a selected run has a valid timestamp within the loaded candle range, a compact verdict annotation is shown using normalized verdict values | ⏳ Pending |
-| AC-13 | If the selected run timestamp is invalid or unparsable, no marker is shown and "Selected run timestamp is invalid." is displayed | ⏳ Pending |
-| AC-14 | If the selected run timestamp is valid but outside the loaded chart range, no marker is shown and "Selected run is outside the loaded chart range." is displayed | ⏳ Pending |
-| AC-15 | If no candle exists at or before the run timestamp in the loaded range, the UI behaves as AC-14 | ⏳ Pending |
+| AC-10 | If no run is selected, no run-time marker or verdict annotation is shown | ✅ Done |
+| AC-11 | If a selected run has a valid timestamp within the loaded candle range, a run-time visual marker is shown | ✅ Done |
+| AC-12 | If a selected run has a valid timestamp within the loaded candle range, a compact verdict annotation is shown using normalized verdict values | ✅ Done |
+| AC-13 | If the selected run timestamp is invalid or unparsable, no marker is shown and "Selected run timestamp is invalid." is displayed | ✅ Done |
+| AC-14 | If the selected run timestamp is valid but outside the loaded chart range, no marker is shown and "Selected run is outside the loaded chart range." is displayed | ✅ Done |
+| AC-15 | If no candle exists at or before the run timestamp in the loaded range, the UI behaves as AC-14 | ✅ Done |
 
 ### Verdict normalization
 
 | # | Acceptance Condition | Status |
 |---|---------------------|--------|
-| AC-16 | `BUY`, `LONG`, and `ENTER_LONG` display as `BUY` with bullish styling | ⏳ Pending |
-| AC-17 | `SELL`, `SHORT`, and `ENTER_SHORT` display as `SELL` with bearish styling | ⏳ Pending |
-| AC-18 | `NO_TRADE`, `FLAT`, and `SKIP` display as `NO_TRADE` with neutral styling | ⏳ Pending |
-| AC-19 | Unknown, null, or malformed verdict values display as "Unknown" with muted neutral styling | ⏳ Pending |
+| AC-16 | `BUY`, `LONG`, and `ENTER_LONG` display as `BUY` with bullish styling | ✅ Done |
+| AC-17 | `SELL`, `SHORT`, and `ENTER_SHORT` display as `SELL` with bearish styling | ✅ Done |
+| AC-18 | `NO_TRADE`, `FLAT`, and `SKIP` display as `NO_TRADE` with neutral styling | ✅ Done |
+| AC-19 | Unknown, null, or malformed verdict values display as "Unknown" with muted neutral styling | ✅ Done |
 
 ### Timestamp compatibility
 
 | # | Acceptance Condition | Status |
 |---|---------------------|--------|
-| AC-20 | Valid UTC ISO run timestamps align deterministically against candle timestamps without timezone drift | ⏳ Pending |
-| AC-21 | If timestamp conversion fails, the UI degrades safely to AC-13 | ⏳ Pending |
+| AC-20 | Valid UTC ISO run timestamps align deterministically against candle timestamps without timezone drift | ✅ Done |
+| AC-21 | If timestamp conversion fails, the UI degrades safely to AC-13 | ✅ Done |
 
 ### Regression / isolation
 
 | # | Acceptance Condition | Status |
 |---|---------------------|--------|
-| AC-22 | Existing non-run chart behavior continues to work without requiring a selected run | ⏳ Pending |
-| AC-23 | Existing `useMarketData` consumers outside the intended chart lane do not change behavior unexpectedly | ⏳ Pending |
-| AC-24 | Any backend seam added for this PR is read-only, additive, and does not break existing endpoint contracts | ⏳ Pending |
-| AC-25 | Chart failure (overlays, TF fetch, marker error) does NOT block trace panel rendering | ⏳ Pending |
+| AC-22 | Existing non-run chart behavior continues to work without requiring a selected run | ✅ Done |
+| AC-23 | Existing `useMarketData` consumers outside the intended chart lane do not change behavior unexpectedly | ✅ Done |
+| AC-24 | Any backend seam added for this PR is read-only, additive, and does not break existing endpoint contracts | ✅ Done |
+| AC-25 | Chart failure (overlays, TF fetch, marker error) does NOT block trace panel rendering | ✅ Done |
 
 ### Defensive handling
 
 | # | Acceptance Condition | Status |
 |---|---------------------|--------|
-| AC-26 | Malformed OHLCV payloads do not crash the page and degrade to chart-fetch failure state | ⏳ Pending |
-| AC-27 | Malformed timeframe payloads do not crash the page and degrade to discovery-failure state | ⏳ Pending |
-| AC-28 | Null or missing selected run values do not crash the page | ⏳ Pending |
-| AC-29 | Missing verdict values do not crash the page and normalize to `UNKNOWN` | ⏳ Pending |
-| AC-30 | Missing timestamp values do not crash the page and degrade to invalid-timestamp state | ⏳ Pending |
+| AC-26 | Malformed OHLCV payloads do not crash the page and degrade to chart-fetch failure state | ✅ Done |
+| AC-27 | Malformed timeframe payloads do not crash the page and degrade to discovery-failure state | ✅ Done |
+| AC-28 | Null or missing selected run values do not crash the page | ✅ Done |
+| AC-29 | Missing verdict values do not crash the page and normalize to `UNKNOWN` | ✅ Done |
+| AC-30 | Missing timestamp values do not crash the page and degrade to invalid-timestamp state | ✅ Done |
 
 ### Diagnostics / closure
 
 | # | Acceptance Condition | Status |
 |---|---------------------|--------|
-| AC-31 | The implementation report records the chosen timeframe-discovery path: existing source vs new endpoint | ⏳ Pending |
-| AC-32 | The implementation report records the chosen marker implementation: vertical-style vs candle-marker fallback | ⏳ Pending |
-| AC-33 | The implementation report records the backend additions used: none, timeframe discovery, OHLCV window enhancement, or both | ⏳ Pending |
+| AC-31 | The implementation report records the chosen timeframe-discovery path: existing source vs new endpoint | ✅ Done |
+| AC-32 | The implementation report records the chosen marker implementation: vertical-style vs candle-marker fallback | ✅ Done |
+| AC-33 | The implementation report records the backend additions used: none, timeframe discovery, OHLCV window enhancement, or both | ✅ Done |
 
 ---
 
@@ -510,17 +510,51 @@ PR-CHART-2 is done when:
 
 ## 12. Diagnostic findings
 
-*To be populated after running the pre-code diagnostic protocol.*
+### Marker implementation chosen
 
-*Must include:*
+**Candle-marker via `createSeriesMarkers`** (lightweight-charts v5.1.0 native plugin). No native vertical-line API exists in lightweight-charts v5. Series markers support `position` (aboveBar/belowBar), `shape` (arrowUp/arrowDown/circle), `color`, `text`, and `size`. Failure-tolerant — if markers fail to render, candlestick rendering continues unaffected.
 
-- *marker implementation chosen,*
-- *timeframe discovery path chosen,*
-- *time-window alignment path chosen,*
-- *timestamp compatibility confirmation,*
-- *useMarketData backward-compatibility assessment,*
-- *backend additions used and why,*
-- *any deferred issues.*
+### Timeframe discovery path chosen
+
+**New endpoint: `GET /market-data/{instrument}/timeframes`** — reads from `INSTRUMENT_REGISTRY` (the canonical per-instrument metadata source). No existing API exposed per-instrument available timeframes. The `KNOWN_TIMEFRAMES` constant in `market_data_read.py` is incorrect for metals (assumes all 6 TFs) and was NOT used.
+
+Response shape: `{ "instrument": "XAUUSD", "available_timeframes": ["15m", "1h", "4h", "1d"] }`
+Error contract: 404 `INSTRUMENT_NOT_FOUND`, 500 `TIMEFRAME_DISCOVERY_FAILED` (OpsErrorEnvelope).
+
+### Time-window alignment path chosen
+
+**Frontend-only** — no OHLCV backend enhancement required. The default `limit=100` at 4h covers ~16.7 days of history, sufficient for recent runs. The existing `limit` query param (1–500) can be increased if needed. Out-of-range runs degrade gracefully to the "outside loaded chart range" UI state.
+
+### Timestamp compatibility confirmation
+
+- Run timestamps: ISO 8601 UTC strings (Z suffix, e.g. `"2026-03-14T11:02:18Z"`)
+- Candle timestamps: Unix epoch seconds (integer)
+- Conversion: `Math.floor(new Date(isoString).getTime() / 1000)` — deterministic, lossless, both UTC
+- Invalid timestamps caught with NaN guard and degrade to "timestamp invalid" UI state
+
+### useMarketData backward-compatibility assessment
+
+**Confirmed backward-compatible.** One active consumer (`CandlestickChart.tsx`). Hook signature unchanged — no new required params. The hook's return type `UseQueryResult<OHLCVResponse, Error>` is preserved. All existing query keys, stale times, and cache behavior unchanged.
+
+### Backend additions used
+
+**TF discovery endpoint only** (1 addition). No OHLCV window enhancement needed. The new endpoint is:
+- Read-only, additive, uses `OpsErrorEnvelope` for errors
+- Reads from `INSTRUMENT_REGISTRY` (already imported in `market_data_read.py`)
+- No existing endpoint contracts broken
+- No write paths changed
+
+### Test count delta
+
+- **Backend:** 454 passing (was 443) — +11 new TF discovery tests
+- **Frontend:** 376 passing (was 356) — +20 new PR-CHART-2 tests (timeframe tabs, run markers, verdict normalization, chart isolation, defensive handling)
+- **Pre-existing failures unchanged:** 5 journey.test.tsx (frontend), 1 MDO scheduler import (backend)
+
+### Deferred issues
+
+- **True vertical line marker:** deferred to a future phase if needed. Custom `ISeriesPrimitive` implementation would be required. Series markers are sufficient for PR-CHART-2 scope.
+- **lightweight-charts v5 API migration:** The existing chart code used deprecated v4 APIs (`addCandlestickSeries`, `addHistogramSeries`). Fixed to v5 API (`addSeries(CandlestickSeries, ...)`) as part of this PR.
+- **Confidence display:** not included — `RunBrowserItem` does not expose confidence data, and adding it would require backend work outside scope.
 
 ---
 

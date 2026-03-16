@@ -234,7 +234,7 @@ describe("RunBrowserPanel — click-to-load", () => {
     const rows = await screen.findAllByTestId("run-browser-row");
     await user.click(rows[0]);
 
-    expect(onSelectRun).toHaveBeenCalledWith("run_001", "XAUUSD");
+    expect(onSelectRun).toHaveBeenCalledWith("run_001", "XAUUSD", "2026-03-14T11:00:00Z", "BUY");
   });
 });
 

@@ -513,3 +513,106 @@ class TestAC34ImportBoundary:
         assert "from market_data_officer.officer.loader" in source
         assert "from market_data_officer.instrument_registry" in source
         assert "from market_data_officer.feed.config" in source
+
+
+# ── PR-CHART-2: Timeframe Discovery Endpoint ────────────────────────────────
+
+
+class TestTimeframeDiscoveryService:
+    """Service-level tests for discover_timeframes (PR-CHART-2 §4.2)."""
+
+    def test_fx_instrument_returns_six_timeframes(self):
+        from ai_analyst.api.services.market_data_read import discover_timeframes
+        result = discover_timeframes("EURUSD")
+        assert result == ["1m", "5m", "15m", "1h", "4h", "1d"]
+
+    def test_metal_instrument_returns_four_timeframes(self):
+        from ai_analyst.api.services.market_data_read import discover_timeframes
+        result = discover_timeframes("XAUUSD")
+        assert result == ["15m", "1h", "4h", "1d"]
+
+    def test_another_metal_instrument(self):
+        from ai_analyst.api.services.market_data_read import discover_timeframes
+        result = discover_timeframes("XAGUSD")
+        assert result == ["15m", "1h", "4h", "1d"]
+
+    def test_unknown_instrument_raises(self):
+        from ai_analyst.api.services.market_data_read import (
+            InstrumentNotFound,
+            discover_timeframes,
+        )
+        with pytest.raises(InstrumentNotFound):
+            discover_timeframes("NOTREAL")
+
+    def test_gbpusd_fx_timeframes(self):
+        from ai_analyst.api.services.market_data_read import discover_timeframes
+        result = discover_timeframes("GBPUSD")
+        assert result == ["1m", "5m", "15m", "1h", "4h", "1d"]
+
+    def test_xptusd_metal_timeframes(self):
+        from ai_analyst.api.services.market_data_read import discover_timeframes
+        result = discover_timeframes("XPTUSD")
+        assert result == ["15m", "1h", "4h", "1d"]
+
+    def test_all_registry_instruments_discoverable(self):
+        from market_data_officer.instrument_registry import INSTRUMENT_REGISTRY
+        from ai_analyst.api.services.market_data_read import discover_timeframes
+        for symbol in INSTRUMENT_REGISTRY:
+            result = discover_timeframes(symbol)
+            assert isinstance(result, list)
+            assert len(result) > 0
+            assert "4h" in result  # All instruments should have 4h
+
+
+class TestTimeframeDiscoveryEndpoint:
+    """Router-level tests for GET /market-data/{instrument}/timeframes."""
+
+    def test_valid_instrument_response_shape(self):
+        from fastapi.testclient import TestClient
+        from ai_analyst.api.routers.market_data import router
+        from fastapi import FastAPI
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+        resp = client.get("/market-data/XAUUSD/timeframes")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["instrument"] == "XAUUSD"
+        assert body["available_timeframes"] == ["15m", "1h", "4h", "1d"]
+
+    def test_fx_instrument_response(self):
+        from fastapi.testclient import TestClient
+        from ai_analyst.api.routers.market_data import router
+        from fastapi import FastAPI
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+        resp = client.get("/market-data/EURUSD/timeframes")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["instrument"] == "EURUSD"
+        assert body["available_timeframes"] == ["1m", "5m", "15m", "1h", "4h", "1d"]
+
+    def test_unknown_instrument_404(self):
+        from fastapi.testclient import TestClient
+        from ai_analyst.api.routers.market_data import router
+        from fastapi import FastAPI
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+        resp = client.get("/market-data/NOTREAL/timeframes")
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["detail"]["error"] == "INSTRUMENT_NOT_FOUND"
+
+    def test_response_has_no_extra_envelope(self):
+        """Response must be flat {instrument, available_timeframes} per §4.2."""
+        from fastapi.testclient import TestClient
+        from ai_analyst.api.routers.market_data import router
+        from fastapi import FastAPI
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+        resp = client.get("/market-data/XAUUSD/timeframes")
+        body = resp.json()
+        assert set(body.keys()) == {"instrument", "available_timeframes"}
