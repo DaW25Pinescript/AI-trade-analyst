@@ -126,6 +126,7 @@ The Agent Ops subsystem exposes the multi-agent analysis engine's architecture, 
 - `GET /ops/agent-detail/{entity_id}` — entity-level detail with discriminated union
 - `GET /runs/` — paginated, filterable run browser index (directory scan, PR-RUN-1)
 - `GET /market-data/{instrument}/ohlcv` — stored OHLCV candle data for chart rendering (PR-CHART-1)
+- `GET /market-data/{instrument}/timeframes` — per-instrument available timeframes from instrument registry (PR-CHART-2)
 - `GET /reflect/persona-performance` — per-persona participation/override/alignment/confidence aggregation
 - `GET /reflect/pattern-summary` — instrument × session verdict distribution buckets
 - `GET /reflect/run/{run_id}` — run artifact bundle (run_record required, usage artifacts optional)

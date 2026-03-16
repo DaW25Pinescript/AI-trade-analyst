@@ -83,7 +83,7 @@ Features such as chart evidence, run artifact inspection, and richer replay shou
 | Feeder & Macro Context | Operator / support | `/feeder/ingest`, `/feeder/health` | current and active-used | Medium |
 | Operations & Diagnostics | Operator | `/metrics`, `/dashboard`, `/e2e`, `/plugins` | current but active-unused | Medium |
 | Analytics & Export | Review / operator | `/analytics/csv`, `/analytics/dashboard`, `/backtest` | current but active-unused | Medium |
-| Chart Evidence Workspace | Extension | proposed future surface only | not current | Later |
+| Chart Evidence (embedded) | Active | OHLCV chart in Run mode with TF tabs + run marker + verdict annotation (PR-CHART-1 + PR-CHART-2) | current | Done |
 | Run Artifact Inspector | Extension | no public read contract yet | not current | Later |
 
 This sequencing follows the audit's recommended workspace structure and current capability map.

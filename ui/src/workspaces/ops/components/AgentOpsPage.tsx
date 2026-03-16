@@ -12,8 +12,8 @@
 //   - roster failure (error — workspace-level block)
 // ---------------------------------------------------------------------------
 
-import { useState, useMemo, useCallback } from "react";
-import { useAgentRoster, useAgentHealth } from "@shared/hooks";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useAgentRoster, useAgentHealth, useTimeframes } from "@shared/hooks";
 import { PanelShell } from "@shared/components/layout";
 import { LoadingSkeleton, ErrorState } from "@shared/components/feedback";
 import { buildOpsWorkspaceViewModel } from "../adapters/opsViewModel";
@@ -54,6 +54,31 @@ export function AgentOpsPage() {
   const [mode, setMode] = useState<OpsMode>("org");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedInstrument, setSelectedInstrument] = useState<string | null>(null);
+  const [selectedRunTimestamp, setSelectedRunTimestamp] = useState<string | null>(null);
+  const [selectedRunVerdict, setSelectedRunVerdict] = useState<string | null>(null);
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string | null>(null);
+
+  // Timeframe discovery for the selected instrument (PR-CHART-2)
+  const tfQuery = useTimeframes(selectedInstrument);
+  const availableTimeframes = tfQuery.data?.available_timeframes ?? null;
+
+  // Deterministic TF fallback on instrument change per §4.3
+  useEffect(() => {
+    if (!availableTimeframes || availableTimeframes.length === 0) {
+      setSelectedTimeframe(null);
+      return;
+    }
+    // Keep current TF if still valid
+    if (selectedTimeframe && availableTimeframes.includes(selectedTimeframe)) {
+      return;
+    }
+    // Fallback: 4h → first available
+    if (availableTimeframes.includes("4h")) {
+      setSelectedTimeframe("4h");
+    } else {
+      setSelectedTimeframe(availableTimeframes[0]);
+    }
+  }, [availableTimeframes]); // intentionally only depends on availableTimeframes
 
   const vm = useMemo(
     () =>
@@ -114,9 +139,16 @@ export function AgentOpsPage() {
     // Selection preserved across mode switch per §7.4
   }, []);
 
-  const handleSelectRun = useCallback((runId: string | null, instrument?: string | null) => {
+  const handleSelectRun = useCallback((
+    runId: string | null,
+    instrument?: string | null,
+    timestamp?: string | null,
+    finalDecision?: string | null,
+  ) => {
     setSelectedRunId(runId);
     setSelectedInstrument(instrument ?? null);
+    setSelectedRunTimestamp(timestamp ?? null);
+    setSelectedRunVerdict(finalDecision ?? null);
   }, []);
 
   // Navigate to Run mode from detail sidebar's "last run" link
@@ -247,7 +279,32 @@ export function AgentOpsPage() {
               </div>
 
               {selectedRunId && selectedInstrument && (
-                <CandlestickChart instrument={selectedInstrument} />
+                <>
+                  {/* TF discovery states per §5.3 */}
+                  {tfQuery.isLoading && (
+                    <div className="rounded-lg border border-gray-700/40 bg-gray-900/40 px-4 py-2" data-testid="tf-loading">
+                      <p className="text-xs text-gray-500">Loading timeframes…</p>
+                    </div>
+                  )}
+                  {tfQuery.isError && (
+                    <div className="rounded-lg border border-amber-800/40 bg-amber-950/20 px-4 py-2" data-testid="tf-discovery-failed">
+                      <p className="text-xs text-amber-400">Unable to load chart timeframes.</p>
+                    </div>
+                  )}
+                  {!tfQuery.isLoading && !tfQuery.isError && availableTimeframes && availableTimeframes.length === 0 && (
+                    <div className="rounded-lg border border-gray-700/40 bg-gray-900/40 px-4 py-2" data-testid="tf-no-timeframes">
+                      <p className="text-xs text-gray-500">No chart timeframes available for this instrument.</p>
+                    </div>
+                  )}
+                  <CandlestickChart
+                    instrument={selectedInstrument}
+                    selectedRunTimestamp={selectedRunTimestamp}
+                    selectedRunVerdict={selectedRunVerdict}
+                    availableTimeframes={availableTimeframes}
+                    selectedTimeframe={selectedTimeframe}
+                    onTimeframeChange={setSelectedTimeframe}
+                  />
+                </>
               )}
 
               {selectedRunId && <RunTracePanel runId={selectedRunId} />}

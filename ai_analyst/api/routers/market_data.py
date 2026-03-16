@@ -1,9 +1,11 @@
-"""Market Data router — GET /market-data/{instrument}/ohlcv (PR-CHART-1).
+"""Market Data router — GET /market-data/{instrument}/ohlcv + /timeframes.
 
 Read-side market data surface. Serves stored OHLCV candle data from
-MDO's hot package layer. No writes, no fetches, no scheduler.
+MDO's hot package layer and per-instrument timeframe discovery.
+No writes, no fetches, no scheduler.
 
 Spec: docs/specs/PR_CHART_1_SPEC.md §6.2, §6.6
+      docs/specs/PR_CHART_2_SPEC.md §4.2
 """
 
 import json
@@ -19,7 +21,9 @@ from ai_analyst.api.models.ops import OpsError
 from ai_analyst.api.services.market_data_read import (
     InstrumentNotFound,
     MarketDataReadError,
+    TimeframeDiscoveryFailed,
     TimeframeNotFound,
+    discover_timeframes,
     read_ohlcv,
 )
 
@@ -115,3 +119,45 @@ async def get_ohlcv(
     )
 
     return JSONResponse(content=response.model_dump(by_alias=True))
+
+
+@router.get("/market-data/{instrument}/timeframes")
+async def get_timeframes(
+    instrument: str = Path(..., description="Instrument symbol (e.g. XAUUSD)"),
+):
+    """Return available chart timeframes for the given instrument.
+
+    Read-side discovery — reads from instrument registry.
+    Spec: docs/specs/PR_CHART_2_SPEC.md §4.2
+    """
+    _emit_obs_event(
+        "market_data.timeframes.requested",
+        instrument=instrument,
+    )
+
+    try:
+        timeframes = discover_timeframes(instrument)
+    except InstrumentNotFound:
+        _emit_obs_event(
+            "market_data.timeframes.not_found",
+            instrument=instrument,
+        )
+        raise _ops_error(404, "INSTRUMENT_NOT_FOUND", f"Unknown instrument: {instrument}")
+    except TimeframeDiscoveryFailed as exc:
+        _emit_obs_event(
+            "market_data.timeframes.discovery_failed",
+            instrument=instrument,
+            error=str(exc),
+        )
+        raise _ops_error(500, "TIMEFRAME_DISCOVERY_FAILED", str(exc))
+
+    _emit_obs_event(
+        "market_data.timeframes.served",
+        instrument=instrument,
+        count=len(timeframes),
+    )
+
+    return JSONResponse(content={
+        "instrument": instrument,
+        "available_timeframes": timeframes,
+    })

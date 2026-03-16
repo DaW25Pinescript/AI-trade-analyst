@@ -46,6 +46,36 @@ class MarketDataReadError(Exception):
     pass
 
 
+class TimeframeDiscoveryFailed(Exception):
+    pass
+
+
+def discover_timeframes(instrument: str) -> list[str]:
+    """Return available timeframes for an instrument from the registry.
+
+    Args:
+        instrument: Instrument symbol (e.g. "XAUUSD").
+
+    Returns:
+        List of timeframe strings in registry order.
+
+    Raises:
+        InstrumentNotFound: Instrument not in registry.
+        TimeframeDiscoveryFailed: Registry unreadable.
+    """
+    try:
+        if instrument not in INSTRUMENT_REGISTRY:
+            raise InstrumentNotFound(f"Instrument not found: {instrument}")
+        meta = INSTRUMENT_REGISTRY[instrument]
+        return list(meta.timeframes)
+    except InstrumentNotFound:
+        raise
+    except Exception as exc:
+        raise TimeframeDiscoveryFailed(
+            f"Failed to discover timeframes for {instrument}: {exc}"
+        ) from exc
+
+
 def _is_valid_candle_row(row: dict) -> bool:
     """Check if a row dict has valid OHLCV numeric values."""
     for field in ("open", "high", "low", "close", "volume"):
