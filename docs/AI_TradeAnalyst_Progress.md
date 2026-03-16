@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 16 March 2026
+**Last updated:** 16 March 2026 (PR-REFLECT-1 closure)
 **Review date:** 10 March 2026
-**Current phase:** Phase 8 — PR-CHART-1 Complete (OHLCV seam validated, candlestick chart shipped ✅)
+**Current phase:** Phase 8 — PR-REFLECT-1 Complete (reflect aggregation endpoints shipped ✅)
 **Planning horizon:** Next 5–7 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -21,10 +21,11 @@
 ## Phase Index (at-a-glance)
 
 - **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1.
-- **Current phase:** Phase 8 — PR-CHART-1 Complete. OHLCV data-seam validated (Outcome A), `GET /market-data/{instrument}/ohlcv` endpoint + CandlestickChart shipped: 6 backend endpoints (432 tests), candlestick chart in Run mode (301 frontend tests).
+- **Current phase:** Phase 8 — PR-REFLECT-1 Complete. Reflect aggregation backend shipped: `/reflect/persona-performance`, `/reflect/pattern-summary`, `/reflect/run/{run_id}` with optional audit-log enrichment and graceful run-bundle degradation.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on six read-only projection endpoints (roster, health, trace, detail, run browser, market data).
-- **Next actions:** Phase 8 continues — PR-CHART-2 (run context overlay + multi-timeframe), Reflective Intelligence (PR-REFLECT-1/2/3).
+- **Backend test count update:** Full backend regression after PR-REFLECT-1: 1895 passed, 1 pre-existing failure, 13 skipped (failure count unchanged).
+- **Next actions:** Phase 8 continues — PR-CHART-2 (run context overlay + multi-timeframe), Reflective Intelligence (PR-REFLECT-2/3).
 - **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6), Agent Ops read-side stack (Phase 7), Run Browser (PR-RUN-1), and OHLCV Chart (PR-CHART-1) are all complete.
 
 ---
@@ -33,6 +34,7 @@
 
 | Date | Phase | Activity |
 |------|-------|----------|
+| 16 Mar 2026 | PR-REFLECT-1 | Backend reflect aggregation shipped: `/reflect/persona-performance`, `/reflect/pattern-summary`, `/reflect/run/{run_id}` with audit-log enrichment + bundle degradation. +11 backend tests (reflect) |
 | 16 Mar 2026 | PR-CHART-1 | OHLCV data-seam validation (Outcome A) + `GET /market-data/{instrument}/ohlcv` endpoint + CandlestickChart in Run mode. +39 backend tests (432 total), +9 frontend tests (301 total) |
 | 15 Mar 2026 | PR-RUN-1 | Run Browser endpoint + RunBrowserPanel — `GET /runs/`, browsable run index, paste-field demoted. +42 backend tests (239 total), +14 frontend tests (77 ops total) |
 | 15 Mar 2026 | PR-OPS-5b | Frontend Run mode + Detail sidebar — 7 new components, +24 tests (63 frontend total), Phase 7 complete |
@@ -59,7 +61,7 @@
 | 1 | PR-RUN-1 | Run Browser endpoint + frontend — replace paste-field run selector | ✅ Done | Phase 7 complete |
 | 2 | PR-CHART-1 | OHLCV data-seam validation + basic candlestick chart (lightweight-charts, embedded in Run mode) | ✅ Done | PR-RUN-1 |
 | 3 | PR-CHART-2 | Run context overlay + multi-timeframe chart support | 📋 Planned | PR-CHART-1 ✅ |
-| 4 | PR-REFLECT-1 | Persona performance + pattern summary aggregation endpoints | 📋 Planned | PR-RUN-1 + run history |
+| 4 | PR-REFLECT-1 | Persona performance + pattern summary aggregation endpoints | ✅ Done | PR-RUN-1 + run history |
 | 5 | PR-REFLECT-2 | Reflective dashboard frontend — performance tables + anomaly highlighting | 📋 Planned | PR-REFLECT-1 |
 | 6 | PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | 📋 Planned | PR-CHART-2 + PR-REFLECT-2 |
 | — | Chart Indicators | Pine Script-style indicator overlays on candlestick charts | 💭 Concept | PR-CHART-2 |

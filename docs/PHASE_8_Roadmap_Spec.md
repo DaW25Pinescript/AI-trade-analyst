@@ -146,7 +146,7 @@ Frontend:
 | 1 | PR-RUN-1 | Run Browser endpoint + frontend | ✅ Done | Phase 7 complete | Week 1 |
 | 2 | PR-CHART-1 | OHLCV data endpoint + candlestick chart component | ✅ Done | PR-RUN-1 | Week 2 |
 | 3 | PR-CHART-2 | Run context overlay + multi-timeframe charts | 📋 Planned | PR-CHART-1 ✅ | Week 3 |
-| 4 | PR-REFLECT-1 | Persona performance + pattern summary endpoints | 📋 Planned | PR-RUN-1 (needs run history) | Week 4 |
+| 4 | PR-REFLECT-1 | Persona performance + pattern summary endpoints | ✅ Done | PR-RUN-1 (needs run history) | Week 4 |
 | 5 | PR-REFLECT-2 | Reflective dashboard frontend | 📋 Planned | PR-REFLECT-1 | Week 5 |
 | 6 | PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | 📋 Planned | PR-CHART-2, PR-REFLECT-2 | Week 6 |
 | — | Chart indicators overlay | Pine Script-style indicators on candlestick charts | 💭 Concept | PR-CHART-2 | Future |

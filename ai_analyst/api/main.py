@@ -584,6 +584,11 @@ from .routers.market_data import router as market_data_router
 
 app.include_router(market_data_router)
 
+# ── Reflect router (PR-REFLECT-1) ────────────────────────────────────────
+from .routers.reflect import router as reflect_router
+
+app.include_router(reflect_router)
+
 
 @app.get("/health")
 async def health():

@@ -25,6 +25,7 @@ This document is the enduring repository ledger for technical debt items.
 | TD-12 | Architecture contracts docs | Cross-module ownership/fallback/scaling boundaries under-documented. | Harder onboarding and seam reasoning for contributors/agents. | Medium | Open | Address alongside runtime-lane convergence or next architecture review. |
 
 | TD-13 | Agent Ops run selector | Run selector is paste-field only in Agent Ops Run mode. Operators must know `run_id` to inspect a run — no browse/search. | Operator friction; reduces discoverability of run artifacts. | Medium | **✅ Resolved — 15 March 2026** | PR-RUN-1 shipped. `GET /runs/` endpoint + RunBrowserPanel. Paste-field retained as fallback. |
+| TD-14 | Reflect artifact richness gap | `run_record.json` analyst entries currently omit per-analyst stance/confidence/override fields; reflect metrics rely on optional audit-log enrichment for these provisional fields. | Some persona metrics can be null when audit logs are absent. | Medium | Open | Consider adding non-breaking enriched analyst metadata in future observability phase (without changing existing contract semantics). |
 
 ## See also
 
