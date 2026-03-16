@@ -202,6 +202,6 @@ Each step builds on the previous and requires human governance. The system never
 
 ## Remaining Diagnostic Questions
 
-1. **MDO data access format:** How is OHLCV data stored? SQLite, cached DataFrames, raw CSV? Can a new endpoint read it without going through the scheduler? (This is the biggest uncertainty in the chart lane)
+1. ~~**MDO data access format:**~~ **Resolved** — OHLCV data stored as CSV files in `market_data/packages/latest/`. Readable via `market_data_officer.officer.loader.load_timeframe()` with zero scheduler coupling. Confirmed by PR-CHART-1 diagnostic (Outcome A).
 2. ~~**Reflect placement:**~~ **Resolved** — New top-level `/reflect` workspace. Locked decision per PR-RUN-1 spec §12.
-3. **Run directory structure:** Confirm `ai_analyst/output/runs/` directory naming convention for the run browser scan
+3. ~~**Run directory structure:**~~ **Resolved** — `ai_analyst/output/runs/` directory scan implemented in PR-RUN-1 with bounded walking (max 20 dirs or 7 days).
