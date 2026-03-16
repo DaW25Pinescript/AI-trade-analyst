@@ -31,6 +31,15 @@ export type FetchOHLCVParams = {
   limit?: number;
 };
 
+// ---- Timeframe discovery types (PR-CHART-2 §4.2) ----
+
+export type TimeframesResponse = {
+  instrument: string;
+  available_timeframes: string[];
+};
+
+// ---- Endpoint functions ----
+
 /** Fetch OHLCV candle data for a given instrument and timeframe. */
 export function fetchOHLCV(
   params: FetchOHLCVParams,
@@ -44,4 +53,12 @@ export function fetchOHLCV(
   const path = `/market-data/${encodeURIComponent(params.instrument)}/ohlcv${query ? `?${query}` : ""}`;
 
   return apiFetch<OHLCVResponse>(path);
+}
+
+/** Fetch available timeframes for an instrument (PR-CHART-2 §4.2). */
+export function fetchTimeframes(
+  instrument: string,
+): Promise<ApiResult<TimeframesResponse>> {
+  const path = `/market-data/${encodeURIComponent(instrument)}/timeframes`;
+  return apiFetch<TimeframesResponse>(path);
 }

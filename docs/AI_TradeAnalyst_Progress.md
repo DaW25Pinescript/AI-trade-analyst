@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 16 March 2026 (Phase 8 progress audit)
+**Last updated:** 16 March 2026 (PR-CHART-2 complete)
 **Review date:** 10 March 2026
-**Current phase:** Phase 8 — PR-REFLECT-2 Complete (Reflect workspace frontend shipped ✅)
+**Current phase:** Phase 8 — PR-CHART-2 Complete (Run context overlay + multi-timeframe charts shipped ✅)
 **Planning horizon:** Next 5–7 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -20,14 +20,14 @@
 
 ## Phase Index (at-a-glance)
 
-- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2.
-- **Current phase:** Phase 8 — PR-REFLECT-2 Complete. Reflect workspace frontend shipped: `#/reflect` route with Overview tab (persona performance + pattern summary tables) and Runs tab (run history + inline bundle detail). +55 frontend tests.
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, PR-CHART-2.
+- **Current phase:** Phase 8 — PR-CHART-2 Complete. Run context overlay + multi-timeframe charts shipped: data-driven timeframe tabs, run-time candle markers via `createSeriesMarkers`, verdict annotation with normalization, TF discovery endpoint. +20 frontend tests, +11 backend tests.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on six read-only projection endpoints (roster, health, trace, detail, run browser, market data).
-- **Backend test count update:** Full backend collection: 1811 tests collected (3 MDO collection errors in scheduler tests due to missing apscheduler). From tests/ + ai_analyst/tests/: 954 passed, 61 failed (pre-existing code-vs-test drift). MDO lane: 546 collected.
-- **Frontend test count update:** Full frontend regression after PR-REFLECT-2: 361 total (356 passing, 5 pre-existing journey failures unchanged).
-- **Frontend test count:** 361 total (356 passing, 5 pre-existing journey failures).
-- **Next actions:** Phase 8 continues — PR-REFLECT-2a (filter controls for Reflect), PR-CHART-2 (run context overlay + multi-timeframe), PR-REFLECT-3 (suggestions + influence).
+- **Backend test count update:** Full backend collection: tests/ lane: 454 passed, 1 failed (pre-existing MDO scheduler import). +11 new tests for TF discovery endpoint (PR-CHART-2).
+- **Frontend test count update:** Full frontend regression after PR-CHART-2: 381 total (376 passing, 5 pre-existing journey failures unchanged). +20 new tests for timeframe tabs, run markers, verdict normalization, chart isolation.
+- **Frontend test count:** 381 total (376 passing, 5 pre-existing journey failures).
+- **Next actions:** Phase 8 continues — PR-REFLECT-2a (filter controls for Reflect), PR-REFLECT-3 (suggestions + influence), Chart Indicators (future phase).
 - **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6), Agent Ops read-side stack (Phase 7), Run Browser (PR-RUN-1), and OHLCV Chart (PR-CHART-1) are all complete.
 
 ---
@@ -36,6 +36,7 @@
 
 | Date | Phase | Activity |
 |------|-------|----------|
+| 16 Mar 2026 | PR-CHART-2 | Run context overlay + multi-timeframe charts shipped: data-driven TF tabs (from TF discovery endpoint), run-time candle markers via `createSeriesMarkers`, verdict annotation with §4.4 normalization, 10 UI states per §5.3, TF discovery endpoint (`GET /market-data/{instrument}/timeframes`). +20 frontend tests (381 total), +11 backend tests (454 total) |
 | 16 Mar 2026 | PR-REFLECT-2 | Reflect workspace frontend shipped: `#/reflect` route, Overview tab (persona performance + pattern summary tables), Runs tab (run history + inline bundle detail). +55 frontend tests (361 total) |
 | 16 Mar 2026 | PR-REFLECT-1 | Backend reflect aggregation shipped: `/reflect/persona-performance`, `/reflect/pattern-summary`, `/reflect/run/{run_id}` with audit-log enrichment + bundle degradation. +11 backend tests (reflect) |
 | 16 Mar 2026 | PR-CHART-1 | OHLCV data-seam validation (Outcome A) + `GET /market-data/{instrument}/ohlcv` endpoint + CandlestickChart in Run mode. +39 backend tests (432 total), +9 frontend tests (301 total) |
@@ -63,7 +64,7 @@
 |----------|-------|-------------|--------|------------|
 | 1 | PR-RUN-1 | Run Browser endpoint + frontend — replace paste-field run selector | ✅ Done | Phase 7 complete |
 | 2 | PR-CHART-1 | OHLCV data-seam validation + basic candlestick chart (lightweight-charts, embedded in Run mode) | ✅ Done | PR-RUN-1 |
-| 3 | PR-CHART-2 | Run context overlay + multi-timeframe chart support | 📋 Planned | PR-CHART-1 ✅ |
+| 3 | PR-CHART-2 | Run context overlay + multi-timeframe chart support | ✅ Done | PR-CHART-1 ✅ |
 | 4 | PR-REFLECT-1 | Persona performance + pattern summary aggregation endpoints | ✅ Done | PR-RUN-1 + run history |
 | 5 | PR-REFLECT-2 | Reflective dashboard frontend — performance tables + anomaly highlighting | ✅ Done | PR-REFLECT-1 ✅ |
 | 6 | PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | 📋 Planned | PR-CHART-2 + PR-REFLECT-2 |

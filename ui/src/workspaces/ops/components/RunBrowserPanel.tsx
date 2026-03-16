@@ -13,7 +13,12 @@ import { LoadingSkeleton, EmptyState, ErrorState } from "@shared/components/feed
 import type { RunBrowserItem } from "@shared/api/runs";
 
 export interface RunBrowserPanelProps {
-  onSelectRun: (runId: string | null, instrument?: string | null) => void;
+  onSelectRun: (
+    runId: string | null,
+    instrument?: string | null,
+    timestamp?: string | null,
+    finalDecision?: string | null,
+  ) => void;
 }
 
 const STATUS_LABELS: Record<string, { text: string; className: string }> = {
@@ -68,7 +73,7 @@ export function RunBrowserPanel({ onSelectRun }: RunBrowserPanelProps) {
   const handleRowClick = useCallback(
     (item: RunBrowserItem) => {
       if (!item.trace_available) return;
-      onSelectRun(item.run_id, item.instrument);
+      onSelectRun(item.run_id, item.instrument, item.timestamp, item.final_decision);
     },
     [onSelectRun],
   );

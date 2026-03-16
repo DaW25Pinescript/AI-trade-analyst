@@ -29,3 +29,10 @@ class OHLCVResponse(ResponseMeta):
     timeframe: str
     candles: list[Candle]
     candle_count: int
+
+
+class TimeframesResponse(BaseModel):
+    """GET /market-data/{instrument}/timeframes response (PR-CHART-2 §4.2)."""
+
+    instrument: str
+    available_timeframes: list[str]
