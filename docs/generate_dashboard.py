@@ -235,7 +235,7 @@ def parse_progress_file(filepath: Path, docs_root: Path) -> ProjectDashboard:
     content = filepath.read_text(encoding="utf-8")
     dash = ProjectDashboard(progress_source_path=relative_path(filepath, docs_root))
 
-    # --- Frontmatter ---
+    # --- Frontmatter or inline metadata ---
     meta = parse_frontmatter(content)
     dash.project = meta.get("project", dash.project)
     dash.repo = meta.get("repo", dash.repo)
@@ -247,53 +247,77 @@ def parse_progress_file(filepath: Path, docs_root: Path) -> ProjectDashboard:
         if vals:
             dash.latest_test_count = max(int(v) for v in vals)
 
-    # --- Phase Status Overview ---
+    def inline_meta(label: str) -> str:
+        m = re.search(rf"\*\*{re.escape(label)}:\*\*\s*(.+)", content)
+        return clean_text(m.group(1)) if m else ""
+
+    dash.repo = dash.repo or inline_meta("Repo")
+    dash.last_updated = dash.last_updated or inline_meta("Last updated")
+    dash.current_phase = dash.current_phase or inline_meta("Current phase")
+    dash.planning_horizon = dash.planning_horizon or inline_meta("Planning horizon")
+
+    # --- Preferred: explicit phase table ---
     section = extract_section(content, "Phase Status Overview")
     order = 0
     for row in parse_table_rows(section):
         if len(row) < 4:
             continue
         tests = int(row[3]) if row[3].isdigit() else None
-        dash.phases.append(Phase(
-            name=row[0], description=row[1],
-            status=parse_status(row[2]), tests=tests, order=order,
-        ))
+        dash.phases.append(Phase(name=row[0], description=row[1], status=parse_status(row[2]), tests=tests, order=order))
         order += 1
         if tests and tests > dash.latest_test_count:
             dash.latest_test_count = tests
 
-    # Fallback test count from body text
-    if not dash.latest_test_count:
-        counts = [int(x.replace(",", "")) for x in re.findall(r"(\d[\d,]{1,6})\s*tests", content, re.I)]
-        dash.latest_test_count = max(counts) if counts else 0
+    # --- Fallback: current canonical progress file uses Phase Index + Roadmap ---
+    if not dash.phases:
+        completed_line = inline_meta("Completed named phases")
+        seen = set()
+        if completed_line:
+            for raw in [x.strip(" .") for x in completed_line.split(",") if x.strip()]:
+                name = clean_text(raw)
+                if name and name not in seen:
+                    dash.phases.append(Phase(name=name, description="Completed phase", status="complete", order=order))
+                    seen.add(name)
+                    order += 1
+        current_phase = inline_meta("Current phase")
+        if current_phase:
+            name = clean_text(current_phase.split(".")[0])
+            if name and name not in seen:
+                dash.phases.append(Phase(name=name, description=current_phase, status="active", order=order))
+                seen.add(name)
+                order += 1
 
     # --- Recent Activity ---
     for row in parse_table_rows(extract_section(content, "Recent Activity")):
         if len(row) >= 3:
-            dash.activities.append(ActivityEntry(
-                date=row[0], phase=row[1], activity=row[2],
-                pr_issue=row[3] if len(row) > 3 else "",
-            ))
+            dash.activities.append(ActivityEntry(date=row[0], phase=row[1], activity=row[2], pr_issue=row[3] if len(row) > 3 else ""))
 
     # --- Roadmap ---
-    for row in parse_table_rows(extract_section(content, "Roadmap")):
+    roadmap_rows = parse_table_rows(extract_section(content, "Roadmap"))
+    for row in roadmap_rows:
         if len(row) >= 5:
             try:
                 priority = int(row[0])
             except ValueError:
                 priority = 99
-            dash.roadmap.append(RoadmapItem(
-                priority=priority, phase=row[1], description=row[2],
-                status=parse_status(row[3]), depends_on=row[4],
-            ))
+            dash.roadmap.append(RoadmapItem(priority=priority, phase=row[1], description=row[2], status=parse_status(row[3]), depends_on=row[4]))
+
+    # Fallback phase enrichment from roadmap when no explicit table exists
+    if roadmap_rows:
+        existing = {p.name for p in dash.phases}
+        for row in roadmap_rows:
+            if len(row) < 5:
+                continue
+            name = row[1]
+            if name not in existing:
+                dash.phases.append(Phase(name=name, description=row[2], status=parse_status(row[3]), order=order))
+                existing.add(name)
+                order += 1
 
     # --- Technical Debt Register ---
     for row in parse_table_rows(extract_section(content, "Technical Debt Register")):
         if len(row) >= 5:
-            dash.debt.append(DebtItem(
-                id=row[0], item=row[1], location=row[2],
-                status=row[3].lower().strip(), severity=row[4].lower().strip(),
-            ))
+            dash.debt.append(DebtItem(id=row[0], item=row[1], location=row[2], status=row[3].lower().strip(), severity=row[4].lower().strip()))
 
     # --- Risk Register ---
     for row in parse_table_rows(extract_section(content, "Risk Register")):
@@ -302,10 +326,15 @@ def parse_progress_file(filepath: Path, docs_root: Path) -> ProjectDashboard:
 
     # --- Test History ---
     for row in parse_table_rows(extract_section(content, "Test History")):
-        if len(row) >= 3 and row[1].isdigit():
-            dash.test_history.append(TestHistoryEntry(
-                phase=row[0], count=int(row[1]), description=row[2],
-            ))
+        if len(row) >= 3:
+            num = re.sub(r"[^0-9]", "", row[1])
+            if num:
+                dash.test_history.append(TestHistoryEntry(phase=row[0], count=int(num), description=row[2]))
+
+    # Fallback latest test count from body text
+    if not dash.latest_test_count:
+        counts = [int(x.replace(",", "")) for x in re.findall(r"(\d[\d,]{1,6})\s+tests", content, re.I)]
+        dash.latest_test_count = max(counts) if counts else 0
 
     return dash
 
@@ -744,14 +773,16 @@ renderSpecFilters(); renderSpecs();
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="AI Trade Analyst — Dashboard Generator v2")
-    parser.add_argument("--folder", "-f", required=True, help="Root docs folder to scan")
+    parser.add_argument("--folder", "-f", required=True, help="Docs folder or repo root to scan")
     parser.add_argument("--output", "-o", default="dashboard.html")
     args = parser.parse_args()
 
-    folder = Path(args.folder)
+    folder = Path(args.folder).resolve()
     if not folder.exists() or not folder.is_dir():
         print(f"[ERROR] Folder not found or not a directory: {folder}")
         return 1
+    if folder.name.lower() != "docs" and (folder / "docs").is_dir():
+        folder = (folder / "docs").resolve()
 
     # Find progress file
     progress_files = sorted(

@@ -68,7 +68,7 @@ def check_pyyaml() -> bool:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AI Trade Analyst Dashboard Server v2")
     parser.add_argument("--port", type=int, default=9090)
-    parser.add_argument("--folder", type=str, default="", help="Optional docs folder override")
+    parser.add_argument("--folder", type=str, default="", help="Optional docs folder or repo root override")
     return parser.parse_args()
 
 
@@ -76,6 +76,8 @@ def main() -> int:
     args = parse_args()
     cwd = Path.cwd()
     docs_root = Path(args.folder).resolve() if args.folder else locate_docs_folder(cwd)
+    if docs_root and docs_root.name.lower() != "docs" and (docs_root / "docs").is_dir():
+        docs_root = (docs_root / "docs").resolve()
     generator_path = locate_generator_script(cwd)
 
     if docs_root is None:
