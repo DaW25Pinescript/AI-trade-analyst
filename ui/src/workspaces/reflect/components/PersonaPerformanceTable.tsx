@@ -4,7 +4,8 @@
 // Null metrics display as "—". Below-threshold shows welcoming message.
 // ---------------------------------------------------------------------------
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { LoadingSkeleton } from "@shared/components/feedback/LoadingSkeleton";
 import { EmptyState } from "@shared/components/feedback/EmptyState";
 import { ErrorState } from "@shared/components/feedback/ErrorState";
@@ -17,10 +18,20 @@ import {
 export function PersonaPerformanceTable() {
   const { data, isLoading, isError, error, refetch } =
     usePersonaPerformance();
+  const navigate = useNavigate();
 
   const viewModel = useMemo(
     () => (data ? normalizePersonaPerformance(data) : null),
     [data],
+  );
+
+  const handleRowClick = useCallback(
+    (p: PersonaViewModel) => {
+      if (p.navigableEntityId) {
+        navigate(`/ops?entity_id=${encodeURIComponent(p.navigableEntityId)}&mode=detail`);
+      }
+    },
+    [navigate],
   );
 
   if (isLoading) return <LoadingSkeleton rows={5} />;
@@ -73,7 +84,9 @@ export function PersonaPerformanceTable() {
             {viewModel.personas.map((p: PersonaViewModel) => (
               <tr
                 key={p.persona}
-                className={`border-b border-gray-800 ${p.flagged ? "text-amber-300" : "text-gray-300"}`}
+                className={`border-b border-gray-800 ${p.flagged ? "text-amber-300" : "text-gray-300"} ${p.navigableEntityId ? "cursor-pointer hover:bg-gray-800/50" : ""}`}
+                onClick={p.navigableEntityId ? () => handleRowClick(p) : undefined}
+                data-testid={`persona-row-${p.persona}`}
               >
                 <td className="px-3 py-2 font-medium">
                   {p.flagged ? `⚠ ${p.persona}` : p.persona}

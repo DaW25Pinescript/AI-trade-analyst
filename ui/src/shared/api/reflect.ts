@@ -6,6 +6,24 @@
 import { apiFetch, type ApiResult } from "./client";
 import type { ResponseMeta } from "./ops";
 
+// ---- Suggestion types (PR-REFLECT-3) ----
+
+export type SuggestionEvidence = {
+  metric_name: "override_rate" | "no_trade_rate";
+  metric_value: number;
+  threshold: number;
+  sample_size: number;
+};
+
+export type Suggestion = {
+  rule_id: "OVERRIDE_FREQ_HIGH" | "NO_TRADE_CONCENTRATION";
+  severity: "warning";
+  category: "persona" | "pattern";
+  target: string;
+  message: string;
+  evidence: SuggestionEvidence;
+};
+
 // ---- Persona Performance types ----
 
 export type PersonaStats = {
@@ -19,6 +37,7 @@ export type PersonaStats = {
   stance_alignment: number | null;
   avg_confidence: number | null;
   flagged: boolean;
+  navigable_entity_id: string | null;
 };
 
 export type ScanBounds = {
@@ -33,6 +52,7 @@ export type PersonaPerformanceResponse = ResponseMeta & {
   threshold_met: boolean;
   scan_bounds: ScanBounds;
   stats: PersonaStats[];
+  suggestions?: Suggestion[];
 };
 
 // ---- Pattern Summary types ----
@@ -56,6 +76,7 @@ export type PatternSummaryResponse = ResponseMeta & {
   threshold: number;
   scan_bounds: ScanBounds;
   buckets: PatternBucket[];
+  suggestions?: Suggestion[];
 };
 
 // ---- Run Bundle types ----

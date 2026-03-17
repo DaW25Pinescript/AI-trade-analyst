@@ -171,7 +171,7 @@ export function AgentDetailSidebar({
           <p className="text-sm text-red-400">
             {detailQuery.error?.message?.includes("not found") ||
             detailQuery.error?.message?.includes("ENTITY_NOT_FOUND")
-              ? "Entity not found"
+              ? "Entity not found \u2014 it may no longer be in the active roster."
               : "Detail unavailable"}
           </p>
           <p className="mt-1 text-xs text-gray-500">

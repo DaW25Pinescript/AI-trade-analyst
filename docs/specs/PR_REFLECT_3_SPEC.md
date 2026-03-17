@@ -1,7 +1,7 @@
 # AI Trade Analyst — PR-REFLECT-3: Integration Bridge + Rules-Based Suggestions v0 Spec
 
 **Revision History:** Version 1.2 — Post-Second Gate Review
-**Status:** ⏳ Spec draft locked — implementation blocked on §8 Step 2 field-name verification
+**Status:** ✅ Complete — implementation shipped 17 March 2026
 **Date:** 17 March 2026
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Branch:** `pr-reflect-3-integration`
@@ -91,14 +91,13 @@ After PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, and PR-CHART-2, the majo
 
 ## 4. Response Fields Used by This Phase
 
-The field names below are **provisional placeholders** sourced from PR-REFLECT-1 spec §6.2–6.3. **Implementation is blocked** until §8 Step 2 verifies these names against the current `ai_analyst/api/models/reflect.py` source and §13 records the verified names. If any name differs, the spec tables below must be amended before coding begins.
+The field names below are **confirmed** against `ai_analyst/api/models/reflect.py` (§13.1 diagnostic, 17 March 2026).
 
-### 4.1 PersonaStats fields (provisional)
+### 4.1 PersonaStats fields (confirmed)
 
-| Field (provisional) | Type | Used for |
-|---------------------|------|----------|
-| `persona_id` | `string` | row identity, mapping source |
-| `display_name` | `string` | suggestion message text |
+| Field | Type | Used for |
+|-------|------|----------|
+| `persona` | `string` | row identity, mapping source, suggestion message text (humanised via `humanise_persona()`) |
 | `participation_count` | `number` | eligibility gate, evidence |
 | `override_count` | `number` | trigger evidence |
 | `override_rate` | `number \| null` | rule input |
@@ -129,8 +128,8 @@ The backend is the source of truth for row navigability.
 
 | Outcome | Condition | How `navigable_entity_id` is set | Frontend navigation target |
 |---------|-----------|----------------------------------|---------------------------|
-| **A: Direct match** | Agent Ops selector uses the same string as Reflect `persona_id` | Set to `persona_id` (identity copy) | `entity_id={navigable_entity_id}` |
-| **B: Mapping required** | Agent Ops selector uses a different identifier | Computed via profile registry lookup; null when no mapping | `entity_id={navigable_entity_id}` |
+| ~~**A: Direct match**~~ | ~~Agent Ops selector uses the same string as Reflect `persona`~~ | ~~STRUCK — identifiers differ~~ | — |
+| **B: Mapping required** ✅ | Agent Ops uses `persona_` prefix | `f"persona_{persona}"` — deterministic, collision-free | `entity_id={navigable_entity_id}` |
 
 ### Deterministic mapping rule
 
@@ -695,7 +694,7 @@ PR-REFLECT-3 is complete when:
 | PR-REFLECT-1 | Aggregation endpoints | ✅ Done |
 | PR-REFLECT-2 | Reflect frontend | ✅ Done |
 | PR-CHART-2 | Run context overlay + multi-TF | ✅ Done |
-| **PR-REFLECT-3** | **Integration + suggestions v0** | **⏳ Spec draft locked** |
+| **PR-REFLECT-3** | **Integration + suggestions v0** | **✅ Done** |
 
 ---
 

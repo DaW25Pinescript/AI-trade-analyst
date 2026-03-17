@@ -9,6 +9,7 @@ import type {
   PatternSummaryResponse,
   PatternBucket,
   RunBundleResponse,
+  Suggestion,
 } from "@shared/api/reflect";
 import type { RunBrowserItem } from "@shared/api/runs";
 
@@ -49,6 +50,7 @@ export interface PersonaViewModel {
   stanceAlignment: string;
   avgConfidence: string;
   flagged: boolean;
+  navigableEntityId: string | null;
 }
 
 export interface PersonaPerformanceViewModel {
@@ -72,6 +74,7 @@ export function normalizePersonaPerformance(
       stanceAlignment: formatPct(s.stance_alignment),
       avgConfidence: formatDecimal2(s.avg_confidence),
       flagged: s.flagged,
+      navigableEntityId: s.navigable_entity_id ?? null,
     }),
   );
 
@@ -259,6 +262,67 @@ export function normalizeRunBundle(
       usageJson: response.artifact_status.usage_json,
     },
   };
+}
+
+// ---- Suggestion normalization (PR-REFLECT-3) ----
+
+const VALID_RULE_IDS = new Set(["OVERRIDE_FREQ_HIGH", "NO_TRADE_CONCENTRATION"]);
+
+export interface SuggestionViewModel {
+  ruleId: string;
+  severity: string;
+  category: string;
+  target: string;
+  message: string;
+  evidenceTooltip: string;
+}
+
+function isValidSuggestion(s: unknown): s is Suggestion {
+  if (typeof s !== "object" || s == null) return false;
+  const obj = s as Record<string, unknown>;
+  if (typeof obj.rule_id !== "string" || !VALID_RULE_IDS.has(obj.rule_id)) return false;
+  if (typeof obj.message !== "string") return false;
+  if (typeof obj.target !== "string") return false;
+  if (typeof obj.category !== "string") return false;
+  if (typeof obj.severity !== "string") return false;
+  if (typeof obj.evidence !== "object" || obj.evidence == null) return false;
+  const ev = obj.evidence as Record<string, unknown>;
+  if (typeof ev.metric_name !== "string") return false;
+  if (typeof ev.metric_value !== "number") return false;
+  if (typeof ev.threshold !== "number") return false;
+  if (typeof ev.sample_size !== "number") return false;
+  return true;
+}
+
+function formatEvidenceTooltip(evidence: Suggestion["evidence"]): string {
+  return `${evidence.metric_name}: ${(evidence.metric_value * 100).toFixed(0)}%, threshold: ${(evidence.threshold * 100).toFixed(0)}%, sample: ${evidence.sample_size}`;
+}
+
+export function normalizeSuggestions(raw: unknown[] | undefined): SuggestionViewModel[] {
+  if (!Array.isArray(raw)) return [];
+  const valid: SuggestionViewModel[] = [];
+  for (const item of raw) {
+    if (isValidSuggestion(item)) {
+      valid.push({
+        ruleId: item.rule_id,
+        severity: item.severity,
+        category: item.category,
+        target: item.target,
+        message: item.message,
+        evidenceTooltip: formatEvidenceTooltip(item.evidence),
+      });
+    } else {
+      console.warn("Dropping malformed suggestion item:", item);
+    }
+  }
+  return valid;
+}
+
+export function mergeSuggestions(
+  personaSuggestions: SuggestionViewModel[],
+  patternSuggestions: SuggestionViewModel[],
+): SuggestionViewModel[] {
+  return [...personaSuggestions, ...patternSuggestions];
 }
 
 // ---- Run list item adapter (thin formatter for useRuns output) ----

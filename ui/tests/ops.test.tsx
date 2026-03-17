@@ -1425,3 +1425,130 @@ describe("AgentOpsPage — Detail sidebar (PR-OPS-5b)", () => {
     expect(screen.getByTestId("run-mode-view")).toBeInTheDocument();
   });
 });
+
+// ===== PR-REFLECT-3: URL PARAM CONSUMPTION =====
+
+describe("AgentOpsPage — URL param consumption (PR-REFLECT-3)", () => {
+  beforeEach(() => {
+    mockFetchRoster.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: makeRoster(),
+    });
+    mockFetchHealth.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: makeHealth(),
+    });
+    mockFetchDetail.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: makeDetail("persona_default_analyst", "persona"),
+    });
+  });
+
+  function renderWithParams(path: string) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const router = createMemoryRouter(
+      [{ path: "/ops", element: <AgentOpsPage /> }],
+      { initialEntries: [path] },
+    );
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("consumes entity_id+mode=detail and selects entity", async () => {
+    renderWithParams("/ops?entity_id=persona_default_analyst&mode=detail");
+
+    // Wait for the detail sidebar to appear (entity was consumed from URL params)
+    // Desktop + mobile sidebars both render
+    await screen.findAllByTestId("agent-detail-sidebar");
+    const sidebars = screen.getAllByTestId("agent-detail-sidebar");
+    expect(sidebars.length).toBeGreaterThan(0);
+  });
+
+  it("zero-param initialises to default state", async () => {
+    renderWithParams("/ops");
+    await screen.findByText("Agent Operations");
+
+    // No detail sidebar with zero params
+    expect(screen.queryByTestId("agent-detail-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("mode=detail without entity shows no sidebar", async () => {
+    renderWithParams("/ops?mode=detail");
+    await screen.findByText("Agent Operations");
+
+    // No entity selected = no sidebar
+    expect(screen.queryByTestId("agent-detail-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("entity_id without mode is ignored", async () => {
+    renderWithParams("/ops?entity_id=persona_default_analyst");
+    await screen.findByText("Agent Operations");
+
+    // entity_id alone is ignored per spec
+    expect(screen.queryByTestId("agent-detail-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("empty string entity_id treated as absent", async () => {
+    renderWithParams("/ops?entity_id=&mode=detail");
+    await screen.findByText("Agent Operations");
+
+    // Empty entity_id = absent → no entity selected
+    expect(screen.queryByTestId("agent-detail-sidebar")).not.toBeInTheDocument();
+  });
+});
+
+// ===== PR-REFLECT-3: C-6 MODE CHANGE CLEARS RUN STATE =====
+
+describe("AgentOpsPage — C-6 run state clear on mode change", () => {
+  beforeEach(() => {
+    mockFetchRoster.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: makeRoster(),
+    });
+    mockFetchHealth.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: makeHealth(),
+    });
+  });
+
+  it("switching from Run to Org clears run mode view on return", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const router = createMemoryRouter(
+      [{ path: "/ops", element: <AgentOpsPage /> }],
+      { initialEntries: ["/ops"] },
+    );
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("Agent Operations");
+
+    // Switch to Run mode
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(screen.getByTestId("run-mode-view")).toBeInTheDocument();
+
+    // Switch to Org mode
+    await userEvent.click(screen.getByRole("button", { name: "Org" }));
+    expect(screen.queryByTestId("run-mode-view")).not.toBeInTheDocument();
+
+    // Switch back to Run mode — should be clean (no selected run)
+    await userEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(screen.getByTestId("run-mode-view")).toBeInTheDocument();
+    // No trace panel should be visible (selectedRunId was cleared)
+    expect(screen.queryByTestId("trace-panel")).not.toBeInTheDocument();
+  });
+});

@@ -1,4 +1,4 @@
-"""Reflect aggregation API response models (PR-REFLECT-1)."""
+"""Reflect aggregation API response models (PR-REFLECT-1, PR-REFLECT-3)."""
 
 from __future__ import annotations
 
@@ -18,6 +18,22 @@ class ScanBounds(BaseModel):
     skipped_runs: int
 
 
+class SuggestionEvidence(BaseModel):
+    metric_name: Literal["override_rate", "no_trade_rate"]
+    metric_value: float
+    threshold: float
+    sample_size: int
+
+
+class Suggestion(BaseModel):
+    rule_id: Literal["OVERRIDE_FREQ_HIGH", "NO_TRADE_CONCENTRATION"]
+    severity: Literal["warning"] = "warning"
+    category: Literal["persona", "pattern"]
+    target: str
+    message: str
+    evidence: SuggestionEvidence
+
+
 class PersonaStats(BaseModel):
     persona: str
     participation_count: int
@@ -29,6 +45,7 @@ class PersonaStats(BaseModel):
     stance_alignment: Optional[float] = None
     avg_confidence: Optional[float] = None
     flagged: bool = False
+    navigable_entity_id: Optional[str] = None
 
 
 class PersonaPerformanceResponse(ResponseMeta):
@@ -36,6 +53,7 @@ class PersonaPerformanceResponse(ResponseMeta):
     threshold_met: bool
     scan_bounds: ScanBounds
     stats: list[PersonaStats]
+    suggestions: list[Suggestion] = Field(default_factory=list)
 
 
 class VerdictCount(BaseModel):
@@ -57,6 +75,7 @@ class PatternSummaryResponse(ResponseMeta):
     threshold: int = 10
     scan_bounds: ScanBounds
     buckets: list[PatternBucket]
+    suggestions: list[Suggestion] = Field(default_factory=list)
 
 
 class ArtifactStatus(BaseModel):

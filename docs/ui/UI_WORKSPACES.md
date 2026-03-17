@@ -544,26 +544,26 @@ The following endpoints exist and remain available for future exposure but are n
 
 ---
 
-## 10b. Workspace — Reflect (Implemented — PR-REFLECT-2)
+## 10b. Workspace — Reflect (Implemented — PR-REFLECT-3)
 
 ### 10b.1 Purpose
 
-The Reflect workspace is the AI system's **self-evaluation lab**. It provides cross-run persona performance analysis, pattern distribution summaries, and individual run deep-dives via artifact bundles.
+The Reflect workspace is the AI system's **self-evaluation lab**. It provides cross-run persona performance analysis, pattern distribution summaries, rules-based advisory suggestions, and individual run deep-dives via artifact bundles.
 
 ### 10b.2 Implementation status
 
-**Fully implemented** (PR-REFLECT-2, 16 March 2026). Contract: `docs/specs/PR_REFLECT_2_SPEC.md`. Frontend: `ui/src/workspaces/reflect/`.
+**Fully implemented** (PR-REFLECT-3, 17 March 2026). Contract: `docs/specs/PR_REFLECT_3_SPEC.md`. Frontend: `ui/src/workspaces/reflect/`.
 
 ### 10b.3 Backend basis
 
-- `GET /reflect/persona-performance` — per-persona participation/override/alignment/confidence aggregation
-- `GET /reflect/pattern-summary` — instrument × session verdict distribution buckets
+- `GET /reflect/persona-performance` — per-persona participation/override/alignment/confidence aggregation + suggestions v0 + `navigable_entity_id`
+- `GET /reflect/pattern-summary` — instrument × session verdict distribution buckets + suggestions v0
 - `GET /reflect/run/{run_id}` — run artifact bundle (run_record, usage, artifact status)
 - `GET /runs/` — shared run browser index (reused from PR-RUN-1 via `useRuns` hook)
 
 ### 10b.4 Two internal tabs
 
-- **Overview tab** (default) — persona performance table + pattern summary table consuming aggregation endpoints
+- **Overview tab** (default) — SuggestionPanel (advisory, above tables) + persona performance table + pattern summary table
 - **Runs tab** — paginated run history list + inline run detail panel for inspecting individual bundles
 
 ### 10b.5 Key UX states
@@ -573,9 +573,24 @@ The Reflect workspace is the AI system's **self-evaluation lab**. It provides cr
 - Stale + populated: coexist — stale banner above populated table
 - Bundle 404: "Run not found" with reselection guidance
 - Flagged items: amber text + "⚠ " prefix on persona/instrument name
+- Suggestions: advisory-only SuggestionPanel with two rules (OVERRIDE_FREQ_HIGH, NO_TRADE_CONCENTRATION)
 - No filter controls in v1 (deferred to PR-REFLECT-2a)
 
-### 10b.6 Route
+### 10b.6 Cross-workspace navigation (PR-REFLECT-3)
+
+- **Persona row click** → navigates to `#/ops?entity_id={navigable_entity_id}&mode=detail`
+- `navigable_entity_id = f"persona_{persona}")` — computed backend-side
+- Rows with null `navigable_entity_id` are non-clickable
+- Mouse-click only in v0 (keyboard activation deferred as tech debt)
+
+### 10b.7 Agent Ops param consumption (PR-REFLECT-3)
+
+- Agent Ops consumes `entity_id` and `mode` search params on mount
+- `mode=detail` + `entity_id` → opens Detail mode with entity preselected
+- Params cleared via `navigate("/ops", { replace: true })` after consumption
+- Bookmarks after consume preserve only base `#/ops` state
+
+### 10b.8 Route
 
 `#/reflect` — same level as `#/ops`, `#/journal`, etc. in the hash router.
 

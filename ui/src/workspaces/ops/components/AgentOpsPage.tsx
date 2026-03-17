@@ -12,7 +12,8 @@
 //   - roster failure (error — workspace-level block)
 // ---------------------------------------------------------------------------
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAgentRoster, useAgentHealth, useTimeframes } from "@shared/hooks";
 import { PanelShell } from "@shared/components/layout";
 import { LoadingSkeleton, ErrorState } from "@shared/components/feedback";
@@ -57,6 +58,37 @@ export function AgentOpsPage() {
   const [selectedRunTimestamp, setSelectedRunTimestamp] = useState<string | null>(null);
   const [selectedRunVerdict, setSelectedRunVerdict] = useState<string | null>(null);
   const [selectedTimeframe, setSelectedTimeframe] = useState<string | null>(null);
+
+  // URL param consumption (PR-REFLECT-3 §6.12)
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const paramsConsumed = useRef(false);
+
+  useEffect(() => {
+    if (paramsConsumed.current) return;
+    const entityId = searchParams.get("entity_id") || "";
+    const modeParam = searchParams.get("mode") || "";
+
+    if (modeParam === "detail" && entityId) {
+      setMode("org");
+      setSelectedId(entityId);
+      paramsConsumed.current = true;
+      navigate("/ops", { replace: true });
+    } else if (modeParam === "detail") {
+      // mode=detail with no entity — enter detail mode, no entity selected
+      setMode("org");
+      paramsConsumed.current = true;
+      navigate("/ops", { replace: true });
+    } else if (entityId && !modeParam) {
+      // entity_id without mode — ignore per spec §6.12
+      paramsConsumed.current = true;
+      navigate("/ops", { replace: true });
+    } else if (searchParams.toString()) {
+      // Unknown params — clear
+      paramsConsumed.current = true;
+      navigate("/ops", { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Timeframe discovery for the selected instrument (PR-CHART-2)
   const tfQuery = useTimeframes(selectedInstrument);
@@ -135,9 +167,14 @@ export function AgentOpsPage() {
   }, []);
 
   const handleModeChange = useCallback((newMode: OpsMode) => {
+    if (mode === "run" && newMode !== "run") {
+      setSelectedRunId(null);
+      setSelectedInstrument(null);
+      setSelectedRunTimestamp(null);
+      setSelectedRunVerdict(null);
+    }
     setMode(newMode);
-    // Selection preserved across mode switch per §7.4
-  }, []);
+  }, [mode]);
 
   const handleSelectRun = useCallback((
     runId: string | null,

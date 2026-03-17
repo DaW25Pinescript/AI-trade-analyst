@@ -14,6 +14,7 @@ import { normalizeRunForReflect } from "../adapters/reflectAdapter";
 import { PersonaPerformanceTable } from "./PersonaPerformanceTable";
 import { PatternSummaryTable } from "./PatternSummaryTable";
 import { RunDetailView } from "./RunDetailView";
+import { SuggestionPanel } from "./SuggestionPanel";
 
 type Tab = "overview" | "runs";
 
@@ -72,6 +73,7 @@ export function ReflectPage() {
 function OverviewTab() {
   return (
     <div className="space-y-8" data-testid="overview-tab">
+      <SuggestionPanel />
       <section>
         <h3 className="mb-3 text-sm font-medium text-gray-400">
           Persona Performance
