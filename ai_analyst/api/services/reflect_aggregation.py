@@ -18,6 +18,11 @@ from ai_analyst.api.models.reflect import (
     ScanBounds,
     VerdictCount,
 )
+from ai_analyst.api.services.suggestion_engine import (
+    compute_navigable_entity_id,
+    generate_pattern_suggestions,
+    generate_persona_suggestions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -272,9 +277,11 @@ def get_persona_performance(
             stance_alignment=stance_alignment,
             avg_confidence=avg_conf,
             flagged=flagged,
+            navigable_entity_id=compute_navigable_entity_id(persona),
         ))
 
     stats.sort(key=lambda s: s.persona)
+    suggestions = generate_persona_suggestions(stats)
     return PersonaPerformanceResponse(
         version=_CONTRACT_VERSION,
         generated_at=datetime.now(timezone.utc).isoformat(),
@@ -284,6 +291,7 @@ def get_persona_performance(
         threshold=_THRESHOLD,
         scan_bounds=bounds,
         stats=stats,
+        suggestions=suggestions,
     )
 
 
@@ -344,6 +352,7 @@ def get_pattern_summary(
             flagged=flagged,
         ))
 
+    suggestions = generate_pattern_suggestions(out)
     return PatternSummaryResponse(
         version=_CONTRACT_VERSION,
         generated_at=datetime.now(timezone.utc).isoformat(),
@@ -352,4 +361,5 @@ def get_pattern_summary(
         threshold=_THRESHOLD,
         scan_bounds=bounds,
         buckets=out,
+        suggestions=suggestions,
     )

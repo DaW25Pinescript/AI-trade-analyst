@@ -1,7 +1,7 @@
 # AI Trade Analyst — PR-REFLECT-3: Integration Bridge + Rules-Based Suggestions v0 Spec
 
 **Revision History:** Version 1.2 — Post-Second Gate Review
-**Status:** ⏳ Spec draft locked — implementation blocked on §8 Step 2 field-name verification
+**Status:** ✅ Complete — implementation shipped 17 March 2026
 **Date:** 17 March 2026
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Branch:** `pr-reflect-3-integration`
@@ -91,14 +91,13 @@ After PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, and PR-CHART-2, the majo
 
 ## 4. Response Fields Used by This Phase
 
-The field names below are **provisional placeholders** sourced from PR-REFLECT-1 spec §6.2–6.3. **Implementation is blocked** until §8 Step 2 verifies these names against the current `ai_analyst/api/models/reflect.py` source and §13 records the verified names. If any name differs, the spec tables below must be amended before coding begins.
+The field names below are **confirmed** against `ai_analyst/api/models/reflect.py` (§13.1 diagnostic, 17 March 2026).
 
-### 4.1 PersonaStats fields (provisional)
+### 4.1 PersonaStats fields (confirmed)
 
-| Field (provisional) | Type | Used for |
-|---------------------|------|----------|
-| `persona_id` | `string` | row identity, mapping source |
-| `display_name` | `string` | suggestion message text |
+| Field | Type | Used for |
+|-------|------|----------|
+| `persona` | `string` | row identity, mapping source, suggestion message text (humanised via `humanise_persona()`) |
 | `participation_count` | `number` | eligibility gate, evidence |
 | `override_count` | `number` | trigger evidence |
 | `override_rate` | `number \| null` | rule input |
@@ -129,8 +128,8 @@ The backend is the source of truth for row navigability.
 
 | Outcome | Condition | How `navigable_entity_id` is set | Frontend navigation target |
 |---------|-----------|----------------------------------|---------------------------|
-| **A: Direct match** | Agent Ops selector uses the same string as Reflect `persona_id` | Set to `persona_id` (identity copy) | `entity_id={navigable_entity_id}` |
-| **B: Mapping required** | Agent Ops selector uses a different identifier | Computed via profile registry lookup; null when no mapping | `entity_id={navigable_entity_id}` |
+| ~~**A: Direct match**~~ | ~~Agent Ops selector uses the same string as Reflect `persona`~~ | ~~STRUCK — identifiers differ~~ | — |
+| **B: Mapping required** ✅ | Agent Ops uses `persona_` prefix | `f"persona_{persona}"` — deterministic, collision-free | `entity_id={navigable_entity_id}` |
 
 ### Deterministic mapping rule
 
@@ -695,34 +694,254 @@ PR-REFLECT-3 is complete when:
 | PR-REFLECT-1 | Aggregation endpoints | ✅ Done |
 | PR-REFLECT-2 | Reflect frontend | ✅ Done |
 | PR-CHART-2 | Run context overlay + multi-TF | ✅ Done |
-| **PR-REFLECT-3** | **Integration + suggestions v0** | **⏳ Spec draft locked** |
+| **PR-REFLECT-3** | **Integration + suggestions v0** | **✅ Done** |
 
 ---
 
 ## 13. Diagnostic Findings
 
-*To be populated after running §8.*
+*Populated by §8 diagnostic run — 17 March 2026.*
 
-**Required contents:**
-- Exact field-name verification from `reflect.py` for `persona_id` and `display_name`
-- Outcome A or B resolution
-- Completed mapping table with sample values
-- Shipped `threshold_met` derivation rule with source line reference
-- Exact URL param mechanism used
-- Proof that consume-and-clear uses router replace (if not feasible, implementation is blocked per §6.12)
-- Entity-not-found state status: existing or newly required
-- Tooltip primitive: reusable component exists or new one needed (estimated scope)
-- Strict-key assertion audit results (backend and frontend)
-- `no_trade_count` derivation path confirmed, including no-NO_TRADE-entry case (§6.8)
-- Reflect row interaction test impact
-- C-1 through C-6 audit results with method used
-- §6.14 state-audit results with per-surface evidence
-- Shared-component edits: each named with the enumerated surface it serves
-- Malformed suggestion frontend test: confirmed testable against realistic bad payloads
-- Binary `system_architecture.md` decision: update required (with reason) or explicitly not required (with reason) — do not leave conditional
-- Non-Phase-8 findings logged only
-- Final patch set with line deltas
-- Test count deltas
+### 13.1 Field-name verification (§8 Step 2)
+
+**Source:** `ai_analyst/api/models/reflect.py` lines 21–31
+
+| Spec §4.1 provisional name | Actual field in `PersonaStats` | Match? | Action |
+|----------------------------|-------------------------------|--------|--------|
+| `persona_id` | `persona` (str, line 22) | **NO** | Rename spec field to `persona` |
+| `display_name` | **Does not exist** | **NO** | Backend uses `persona` as both grouping key and display text. Spec must substitute `persona` for `display_name` in message templates. |
+| `participation_count` | `participation_count` (int, line 23) | ✅ | — |
+| `override_count` | `override_count` (int, line 27) | ✅ | — |
+| `override_rate` | `override_rate` (Optional[float], line 28) | ✅ | — |
+| `flagged` | `flagged` (bool, line 31) | ✅ | — |
+
+**PatternBucket fields** (lines 46–53): All match spec §4.2 exactly — `instrument`, `session`, `run_count`, `threshold_met`, `verdict_distribution`, `no_trade_rate`, `flagged`.
+
+**Frontend type mirror** (`ui/src/shared/api/reflect.ts` lines 11–22): Matches backend model. Field is `persona: string`, not `persona_id`.
+
+**Correction required before coding:** §4.1 must change `persona_id` → `persona` and strike `display_name` (use `persona` in templates instead). The OVERRIDE_FREQ_HIGH template becomes: `"{persona} was overridden in {override_count} of {participation_count} recent runs (override rate {override_rate_pct}%) — consider reviewing its analysis focus or prompt configuration"`
+
+### 13.2 Outcome A vs B resolution (§8 Step 3)
+
+**OUTCOME B — mapping required.**
+
+**Evidence:**
+- Reflect backend grouping key: `PersonaStats.persona` populated via `_persona_key()` → values are bare `PersonaType` enum strings (from `ai_analyst/models/persona.py`): `"default_analyst"`, `"risk_officer"`, `"prosecutor"`, `"ict_purist"`, `"skeptical_quant"`
+- Agent Ops entity IDs: defined in `ai_analyst/api/services/ops_roster.py` with `"persona_"` prefix: `"persona_default_analyst"`, `"persona_risk_officer"`, `"persona_prosecutor"`, `"persona_ict_purist"`, `"persona_skeptical_quant"`, plus `"persona_technical_structure"`, `"persona_execution_timing"`
+
+**Mapping table:**
+
+| Source field (Reflect `persona`) | Transform | Destination field (Agent Ops `id`) | Sample values | Collision possible? |
+|----------------------------------|-----------|-------------------------------------|---------------|---------------------|
+| `"default_analyst"` | prepend `"persona_"` | `"persona_default_analyst"` | Reflect: `"default_analyst"` → Ops: `"persona_default_analyst"` | No |
+| `"ict_purist"` | prepend `"persona_"` | `"persona_ict_purist"` | Reflect: `"ict_purist"` → Ops: `"persona_ict_purist"` | No |
+| `"risk_officer"` | prepend `"persona_"` | `"persona_risk_officer"` | Reflect: `"risk_officer"` → Ops: `"persona_risk_officer"` | No |
+| `"prosecutor"` | prepend `"persona_"` | `"persona_prosecutor"` | Reflect: `"prosecutor"` → Ops: `"persona_prosecutor"` | No |
+| `"skeptical_quant"` | prepend `"persona_"` | `"persona_skeptical_quant"` | Reflect: `"skeptical_quant"` → Ops: `"persona_skeptical_quant"` | No |
+
+**Transform rule:** `navigable_entity_id = f"persona_{persona}"` — deterministic, collision-free.
+
+**Tie-break:** Not needed. Each PersonaType maps to exactly one ops roster ID. Logged as tech debt in case future persona aliasing creates ambiguity.
+
+### 13.3 `threshold_met` derivation rule (§8 Step 1)
+
+**PersonaPerformanceResponse:**
+- `reflect_aggregation.py` line 171: `if len(runs) < _THRESHOLD:` → returns `threshold_met=False` (line 177)
+- `reflect_aggregation.py` line 283: `threshold_met=True` (reached only when `len(runs) >= _THRESHOLD`)
+- `_THRESHOLD = 10` (line 27)
+
+**PatternBucket:**
+- `reflect_aggregation.py` line 313: `if len(items) < _THRESHOLD:` → `threshold_met=False` (line 318)
+- `reflect_aggregation.py` line 338: `threshold_met=True` (reached only when `len(items) >= _THRESHOLD`)
+
+**Verified rule:** `threshold_met == True` ⟹ `run_count >= 10` ⟹ `run_count > 0`. This guarantees no division-by-zero when computing rates. **Locked as contract.**
+
+### 13.4 `no_trade_count` derivation path (§8 Step 1)
+
+**Source:** `reflect_aggregation.py` lines 325–341
+
+1. `verdicts: dict[str, int] = defaultdict(int)` — accumulates verdict counts from runs
+2. Line 327: `v = str(run["arbiter"].get("verdict") or "UNKNOWN").upper()` → verdict string
+3. Line 330: `no_trade = verdicts.get("NO_TRADE", 0)` — if no NO_TRADE entry, defaults to 0
+4. Line 331: `no_trade_rate = no_trade / len(items)` — always safe since `len(items) >= _THRESHOLD >= 10`
+
+**Confirmed derivation for suggestion engine:**
+- Extract `no_trade_count` from `verdict_distribution` array: sum `count` where `verdict == "NO_TRADE"`
+- `verdict_distribution` present with no `NO_TRADE` entry → `no_trade_count = 0` → `no_trade_rate = 0` → rule does not fire ✓
+- `verdict_distribution` is null → suggestion suppressed (backend model declares `list[VerdictCount]` not Optional; null would only occur from malformed external data — treated same as null per spec) ✓
+- Structurally malformed `verdict_distribution` → treated same as null, suggestion suppressed ✓
+
+### 13.5 URL param mechanism (§8 Step 4)
+
+**Router:** `createHashRouter` from `react-router-dom ^6.28.0` (`ui/src/app/router.tsx` line 7)
+
+**Existing precedent:** `AnalysisRunPage.tsx` (line 28) already uses `useSearchParams()` with hash-based URLs: `#/analysis?asset=SYMBOL`
+
+**Mechanism:**
+1. `useSearchParams()` reads params from hash URL — confirmed working with `createHashRouter`
+2. `useNavigate()` returns navigate function
+3. `navigate("/ops", { replace: true })` replaces current history entry — equivalent to `router.replace()`
+4. `<Navigate to="/triage" replace />` already used in router config (line 20) — confirms `replace` support
+
+**Router-native replace: FEASIBLE.** Implementation is **not blocked** per §6.12.
+
+**`URLSearchParams.get()` returns first value when duplicates exist** — satisfies AC-37/38 natively.
+
+### 13.6 Entity-not-found state (§8 Step 5)
+
+**Existing:** `AgentDetailSidebar.tsx` lines 169–181 already handles entity-not-found errors. When `detailQuery.isError` is true, it checks for `"not found"` / `"ENTITY_NOT_FOUND"` in the error message and renders `"Entity not found"` with error detail text.
+
+**Minor update required:** Spec §6.12 requires the message `"Entity not found — it may no longer be in the active roster."` The existing handler shows only `"Entity not found"`. A one-line text change is needed. No structural or layout change required.
+
+### 13.7 Tooltip primitive (§8 Step 5)
+
+**Audit:** Searched `ui/src/` for `tooltip`, `Tooltip`, radix, shadcn, headless-ui. Found only `DataStateBadge` using native HTML `title` attribute (line 28).
+
+**Result:** No reusable tooltip component exists. Two options:
+1. Use native HTML `title` attribute for evidence display (zero scope, but limited formatting)
+2. Create a minimal `<Tooltip>` component (~30 lines) for richer evidence display
+
+**Recommendation:** Use native `title` attribute for v0 (fixed text format: "metric_name: value, threshold: threshold, sample: sample_size"). Log custom tooltip as enhancement debt. This avoids UI-component scope creep.
+
+### 13.8 Strict-key assertion audit (§8 Step 1)
+
+**Backend tests** (`tests/test_reflect_endpoints.py`): Assert specific field values (e.g., `assert data["threshold_met"] is False`) but do NOT assert exhaustive key sets. Additive fields like `suggestions[]` will not cause test failures. Pydantic models do not use `model_config = ConfigDict(extra="forbid")`.
+
+**Frontend types** (`ui/src/shared/api/reflect.ts`): TypeScript types are structural — extra fields from JSON responses are silently accepted. No runtime schema validation or strict-key guards.
+
+**Frontend adapter** (`reflectAdapter.ts`): Pure destructuring — picks known fields, ignores extras. Adding `suggestions[]` to responses will not break existing adapter functions.
+
+**Frontend tests** (`ui/tests/reflect.test.tsx`): Fixture factories use spread overrides (`...overrides`) — extra fields pass through without assertion failures.
+
+**Conclusion:** No strict-key rejection on either side. Additive `suggestions[]` and `navigable_entity_id` fields are safe.
+
+### 13.9 Reflect row interaction test impact (§8 Step 5)
+
+**Current state:** `PersonaPerformanceTable` renders rows as `<tr>` elements. Tests assert text content (`screen.getByText("default_analyst")`) and row count, but no tests assert click handlers or navigation behavior on persona rows.
+
+**Impact:** Making rows clickable (mouse-click-only per AC-70) will require:
+- Adding `onClick` handlers to navigable persona `<tr>` elements
+- Adding pointer/hover affordance CSS for navigable rows
+- No existing test breakage expected — tests don't assert that rows are non-interactive
+- New tests needed: row click triggers navigation, null navigable_entity_id row is non-clickable
+
+### 13.10 Malformed suggestion frontend testability (§8 Step 5)
+
+**Confirmed testable.** The adapter pattern (pure function in → view model out) supports direct unit testing against arbitrary payloads:
+- Missing fields: pass `{ rule_id: "OVERRIDE_FREQ_HIGH" }` (no message, no evidence)
+- Wrong types: pass `{ rule_id: 123, severity: null }`
+- Unknown rule_id: pass `{ rule_id: "UNKNOWN_RULE", ... }`
+- Empty array: pass `[]`
+- Non-array: pass `"not an array"`
+
+Vitest + existing test infrastructure fully supports this. No new test tooling needed.
+
+### 13.11 Chart ↔ Trace coherence C-1 through C-6 (§8 Step 6)
+
+| ID | Condition | Method | Observed | Pass/Fail |
+|----|-----------|--------|----------|-----------|
+| C-1 | Run selected → both update | Code inspection: `AgentOpsPage.tsx` lines 142–152 sets `selectedRunId` + `selectedInstrument` + `selectedRunTimestamp` + `selectedRunVerdict`. Chart receives timestamp/verdict props (line 301–302); Trace receives runId (line 310). | Both surfaces receive updated props on run selection. | **PASS** |
+| C-2 | Run cleared → both clean | Code inspection: `handleSelectRun(null)` sets all to null. Chart: `selectedRunTimestamp=null` → `useMarkerState` returns `{ type: "no-run" }` → markers cleared (line 286). Trace: `selectedRunId=null` → `RunTracePanel` not rendered (line 310 conditional). | Both surfaces reset. | **PASS** |
+| C-3 | Run no longer on disk | Code inspection: `RunTracePanel` line 32–44 handles query error with `ErrorState`. Chart: if candle data unavailable, shows error/empty state. | Graceful degradation, no crash. | **PASS** |
+| C-4 | Instrument mismatch | Code inspection: Chart `instrument` prop comes from `selectedInstrument` which is set from the run's instrument on row click (line 149). Chart always renders for the run's instrument. If OHLCV unavailable, chart shows `chart-empty` or `chart-error` state. | Chart switches to run's instrument; unavailable yields no-data state. | **PASS** |
+| C-5 | Rapid run changes | Code inspection: React `useState` setter batching. Each `handleSelectRun` call sets state synchronously. React renders with latest state. | Last selection wins (React guarantees). | **PASS** |
+| C-6 | Leave Run mode, return → cleared | Code inspection: `handleModeChange` (line 137–140) calls `setMode(newMode)` only — does NOT clear `selectedRunId`, `selectedInstrument`, `selectedRunTimestamp`, `selectedRunVerdict`. | **Selected run persists across mode switches.** | **FAIL** |
+
+**C-6 fix required:** `handleModeChange` must clear `selectedRunId`, `selectedInstrument`, `selectedRunTimestamp`, and `selectedRunVerdict` when the new mode is not `"run"`, or unconditionally when entering Run mode. Per spec §6.13: "C-6 is fixed. Preservation is not allowed."
+
+**Proposed fix (AgentOpsPage.tsx line 137–140):**
+```typescript
+const handleModeChange = useCallback((newMode: OpsMode) => {
+  if (mode === "run" && newMode !== "run") {
+    setSelectedRunId(null);
+    setSelectedInstrument(null);
+    setSelectedRunTimestamp(null);
+    setSelectedRunVerdict(null);
+  }
+  setMode(newMode);
+}, [mode]);
+```
+
+### 13.12 Phase 8 state audit (§8 Step 7)
+
+| Surface | Loading | Empty | Error | Stale | Evidence |
+|---------|---------|-------|-------|-------|----------|
+| Run Browser | ✅ `run-browser-loading` | ✅ `run-browser-empty` | ✅ `run-browser-error` | N/A | `RunBrowserPanel.tsx` lines 82–116 |
+| Chart: TF discovery | ✅ `tf-loading` | ✅ `tf-no-timeframes` | ✅ `tf-discovery-failed` | N/A | `AgentOpsPage.tsx` lines 284–298 |
+| Chart: candle fetch | ✅ `chart-loading` | ✅ `chart-empty` | ✅ `chart-error` | N/A | `CandlestickChart.tsx` lines 317–367 |
+| Chart: run marker | N/A | ✅ `no-run` → markers cleared | N/A | N/A | `CandlestickChart.tsx` line 286 |
+| Reflect: persona perf | ✅ | ✅ | ✅ | ✅ | Already shipped (PR-REFLECT-2) |
+| Reflect: pattern summary | ✅ | ✅ | ✅ | ✅ | Already shipped (PR-REFLECT-2) |
+| Reflect: run detail | ✅ | ✅ | ✅ | ✅ | Already shipped (PR-REFLECT-2) |
+| Reflect: suggestions | — | — | — | — | New (§6.10 governs) |
+
+**All enumerated surfaces have full state coverage.** No blocking gaps. The only new surface (SuggestionPanel) will be implemented per §6.10.
+
+### 13.13 Baseline test counts (§8 Step 8)
+
+**Backend:**
+- 155 tests collected across all Python test files
+- 6 test files fail to collect due to missing `pydantic` in test environment (pre-existing environment issue, not code defect)
+- Of collectable tests: 152 passed, 3 pre-existing failures in `test_import_stability.py` (unrelated to reflect)
+
+**Frontend:**
+- 381 tests total (10 test files)
+- 376 passed, 5 pre-existing failures in `journey.test.tsx` (unrelated to reflect/ops)
+
+### 13.14 Shared-component edits
+
+| Shared component | Enumerated surface it serves | Edit type |
+|------------------|------------------------------|-----------|
+| `ui/src/shared/api/reflect.ts` (types) | Reflect: suggestions panel | Add `Suggestion` type, extend `PersonaPerformanceResponse` + `PatternSummaryResponse` with `suggestions[]`, extend `PersonaStats` with `navigable_entity_id` |
+| `reflectAdapter.ts` | Reflect: suggestions panel | Add suggestion normalization + malformed-item filter |
+| None other planned | — | — |
+
+### 13.15 `system_architecture.md` decision
+
+**Not required — file does not exist.** `docs/system_architecture.md` is not present in the repository. Creating it would constitute a new documentation artifact not required by any prior PR. The cross-workspace navigation pattern (Reflect → Agent Ops deep-link) is documented in this spec and will be captured in `UI_WORKSPACES.md` per §14. If `system_architecture.md` is created in a future PR, the deep-link pattern should be added then.
+
+### 13.16 Non-Phase-8 findings (logged only)
+
+1. Backend test environment missing `pydantic` dependency — 6 test files fail to collect. Not a code defect; environment setup issue. Not in scope.
+2. `test_import_stability.py` has 3 pre-existing failures (MRO import, MDO scheduler). Not in scope.
+3. Frontend `journey.test.tsx` has 5 pre-existing failures (freeze-error). Not in scope.
+
+### 13.17 Smallest patch set (§8 Step 9)
+
+**Files to create:**
+
+| File | Purpose | Est. lines |
+|------|---------|------------|
+| `ai_analyst/api/services/suggestion_engine.py` | Pure function: rules-based suggestion computation | ~100 |
+| `ui/src/workspaces/reflect/components/SuggestionPanel.tsx` | Suggestion rendering component | ~80 |
+| `ui/tests/suggestion.test.tsx` | Frontend suggestion tests | ~150 |
+| `tests/test_suggestion_engine.py` | Backend suggestion engine unit tests | ~120 |
+| `docs/ui/UI_WORKSPACES.md` | Cross-workspace navigation documentation | ~40 |
+
+**Files to modify:**
+
+| File | Change | Est. delta |
+|------|--------|------------|
+| `ai_analyst/api/models/reflect.py` | Add `Suggestion` model, `navigable_entity_id` to `PersonaStats`, `suggestions` to responses | +25 |
+| `ai_analyst/api/services/reflect_aggregation.py` | Call suggestion engine, compute `navigable_entity_id` | +20 |
+| `ui/src/shared/api/reflect.ts` | Add `Suggestion` type, extend response/stats types | +15 |
+| `ui/src/workspaces/reflect/adapters/reflectAdapter.ts` | Add suggestion normalization + malformed-item filtering | +40 |
+| `ui/src/workspaces/reflect/components/ReflectPage.tsx` | Import + render `SuggestionPanel` | +10 |
+| `ui/src/workspaces/reflect/components/PersonaPerformanceTable.tsx` | Add row click handler + navigation affordance | +25 |
+| `ui/src/workspaces/ops/components/AgentOpsPage.tsx` | URL param consumption + clear; C-6 fix; entity-not-found state | +45 |
+| `ui/src/workspaces/ops/components/AgentDetailSidebar.tsx` | Update entity-not-found message text | +1 |
+| `ui/tests/reflect.test.tsx` | Extend with suggestion + navigation tests | +60 |
+| `docs/specs/PR_REFLECT_3_SPEC.md` | Finalize status, field names, outcome | +0 (edits) |
+| `docs/AI_TradeAnalyst_Progress.md` | Add PR-REFLECT-3 entry | +5 |
+| `docs/PHASE_8_Roadmap_Spec.md` | Update PR-REFLECT-3 status | +3 |
+| `docs/repo_map.md` | Add new files | +5 |
+| `docs/technical_debt.md` | Outcome B mapping debt, mouse-click-only debt, tooltip enhancement debt | +10 |
+
+**Total estimated:** ~5 new files (~490 lines), ~14 modified files (~273 lines delta)
+
+**Outcome A vs B impact:** Outcome B adds ~5 lines to `reflect_aggregation.py` for the `f"persona_{persona}"` transform. Negligible delta difference. No Outcome A path exists since identifiers confirmed different.
+
+**Scope flags:** None. All changes within enumerated scope.
 
 **Post-diagnostic spec update:** Once §13 is populated with verified field names and Outcome A/B resolution:
 1. Update §4 field names from "provisional" to "confirmed"

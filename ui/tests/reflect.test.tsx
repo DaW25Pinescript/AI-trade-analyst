@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PersonaPerformanceResponse, PatternSummaryResponse, RunBundleResponse } from "../src/shared/api/reflect";
 import type { RunBrowserResponse } from "../src/shared/api/runs";
@@ -48,7 +49,10 @@ import {
   normalizePatternSummary,
   normalizeRunBundle,
   normalizeRunForReflect,
+  normalizeSuggestions,
+  mergeSuggestions,
 } from "../src/workspaces/reflect/adapters/reflectAdapter";
+import { SuggestionPanel } from "../src/workspaces/reflect/components/SuggestionPanel";
 
 // ---- Test helpers ----
 
@@ -57,7 +61,9 @@ function renderWithQuery(element: React.ReactElement) {
     defaultOptions: { queries: { retry: false } },
   });
   return render(
-    <QueryClientProvider client={queryClient}>{element}</QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>{element}</QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -91,6 +97,7 @@ function makePersonaPerformanceResponse(
         stance_alignment: 0.75,
         avg_confidence: 0.82,
         flagged: false,
+        navigable_entity_id: "persona_default_analyst",
       },
       {
         persona: "risk_challenger",
@@ -103,6 +110,7 @@ function makePersonaPerformanceResponse(
         stance_alignment: null,
         avg_confidence: null,
         flagged: true,
+        navigable_entity_id: "persona_risk_challenger",
       },
     ],
     ...overrides,
@@ -262,13 +270,13 @@ describe("reflectAdapter", () => {
             persona: "p1", participation_count: 10, skip_count: 0,
             fail_count: 0, participation_rate: 1.0, override_count: 0,
             override_rate: null, stance_alignment: null, avg_confidence: null,
-            flagged: false,
+            flagged: false, navigable_entity_id: "persona_p1",
           },
           {
             persona: "p2", participation_count: 8, skip_count: 1,
             fail_count: 1, participation_rate: 0.8, override_count: 0,
             override_rate: null, stance_alignment: null, avg_confidence: null,
-            flagged: false,
+            flagged: false, navigable_entity_id: "persona_p2",
           },
         ],
       });
@@ -480,7 +488,7 @@ describe("PersonaPerformanceTable", () => {
             persona: "p1", participation_count: 10, skip_count: 0,
             fail_count: 0, participation_rate: 1.0, override_count: 0,
             override_rate: null, stance_alignment: null, avg_confidence: null,
-            flagged: false,
+            flagged: false, navigable_entity_id: "persona_p1",
           },
         ],
       }),
@@ -985,5 +993,310 @@ describe("API fetch functions (AC-35)", () => {
   it("fetchRunBundle is callable", async () => {
     const { fetchRunBundle } = await import("../src/shared/api/reflect");
     expect(typeof fetchRunBundle).toBe("function");
+  });
+});
+
+// ===== PR-REFLECT-3: SUGGESTION ADAPTER TESTS =====
+
+describe("normalizeSuggestions", () => {
+  const validSuggestion = {
+    rule_id: "OVERRIDE_FREQ_HIGH",
+    severity: "warning",
+    category: "persona",
+    target: "Default Analyst",
+    message: "Default Analyst was overridden...",
+    evidence: {
+      metric_name: "override_rate",
+      metric_value: 0.6,
+      threshold: 0.5,
+      sample_size: 20,
+    },
+  };
+
+  it("normalizes valid suggestion items", () => {
+    const result = normalizeSuggestions([validSuggestion]);
+    expect(result).toHaveLength(1);
+    expect(result[0].ruleId).toBe("OVERRIDE_FREQ_HIGH");
+    expect(result[0].message).toBe("Default Analyst was overridden...");
+  });
+
+  it("drops items missing required fields", () => {
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = normalizeSuggestions([{ rule_id: "OVERRIDE_FREQ_HIGH" }]);
+    expect(result).toHaveLength(0);
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it("drops items with unknown rule_id", () => {
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = normalizeSuggestions([
+      { ...validSuggestion, rule_id: "UNKNOWN_RULE" },
+    ]);
+    expect(result).toHaveLength(0);
+    consoleSpy.mockRestore();
+  });
+
+  it("returns empty array for undefined input", () => {
+    expect(normalizeSuggestions(undefined)).toHaveLength(0);
+  });
+
+  it("returns empty array for non-array input", () => {
+    expect(normalizeSuggestions("not an array" as unknown as undefined)).toHaveLength(0);
+  });
+
+  it("formats evidence tooltip correctly", () => {
+    const result = normalizeSuggestions([validSuggestion]);
+    expect(result[0].evidenceTooltip).toBe("override_rate: 60%, threshold: 50%, sample: 20");
+  });
+});
+
+describe("mergeSuggestions", () => {
+  const personaSuggestion = {
+    ruleId: "OVERRIDE_FREQ_HIGH",
+    severity: "warning",
+    category: "persona",
+    target: "Default Analyst",
+    message: "test persona msg",
+    evidenceTooltip: "test",
+  };
+  const patternSuggestion = {
+    ruleId: "NO_TRADE_CONCENTRATION",
+    severity: "warning",
+    category: "pattern",
+    target: "XAUUSD × NY",
+    message: "test pattern msg",
+    evidenceTooltip: "test",
+  };
+
+  it("puts persona suggestions first, pattern second", () => {
+    const result = mergeSuggestions([personaSuggestion], [patternSuggestion]);
+    expect(result).toHaveLength(2);
+    expect(result[0].category).toBe("persona");
+    expect(result[1].category).toBe("pattern");
+  });
+
+  it("returns empty when both empty", () => {
+    expect(mergeSuggestions([], [])).toHaveLength(0);
+  });
+});
+
+// ===== PR-REFLECT-3: SUGGESTION PANEL COMPONENT TESTS =====
+
+describe("SuggestionPanel", () => {
+  it("renders suggestions when present", async () => {
+    const suggestions = [
+      {
+        rule_id: "OVERRIDE_FREQ_HIGH",
+        severity: "warning",
+        category: "persona",
+        target: "Default Analyst",
+        message: "Default Analyst was overridden in 12 of 20 recent runs",
+        evidence: { metric_name: "override_rate", metric_value: 0.6, threshold: 0.5, sample_size: 20 },
+      },
+    ];
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePersonaPerformanceResponse({ suggestions }),
+    });
+    mockFetchPatternSummary.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePatternSummaryResponse(),
+    });
+
+    renderWithQuery(<SuggestionPanel />);
+    const panel = await screen.findByTestId("suggestion-panel");
+    expect(panel).toBeInTheDocument();
+    expect(screen.getByText(/Default Analyst was overridden/)).toBeInTheDocument();
+  });
+
+  it("is hidden when no suggestions", async () => {
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePersonaPerformanceResponse({ suggestions: [] }),
+    });
+    mockFetchPatternSummary.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePatternSummaryResponse({ suggestions: [] }),
+    });
+
+    renderWithQuery(<SuggestionPanel />);
+    // Wait for queries to settle
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.queryByTestId("suggestion-panel")).not.toBeInTheDocument();
+  });
+
+  it("shows partial-results warning when one source errors", async () => {
+    const suggestions = [
+      {
+        rule_id: "OVERRIDE_FREQ_HIGH",
+        severity: "warning",
+        category: "persona",
+        target: "Test",
+        message: "Test msg",
+        evidence: { metric_name: "override_rate", metric_value: 0.7, threshold: 0.5, sample_size: 15 },
+      },
+    ];
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePersonaPerformanceResponse({ suggestions }),
+    });
+    mockFetchPatternSummary.mockResolvedValue({
+      ok: false, status: 500, detail: "error",
+    });
+
+    renderWithQuery(<SuggestionPanel />);
+    const warning = await screen.findByTestId("suggestion-partial-warning");
+    expect(warning).toBeInTheDocument();
+    expect(warning.textContent).toContain("partial results");
+  });
+
+  it("is hidden when both endpoints error", async () => {
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: false, status: 500, detail: "error",
+    });
+    mockFetchPatternSummary.mockResolvedValue({
+      ok: false, status: 500, detail: "error",
+    });
+
+    renderWithQuery(<SuggestionPanel />);
+    // Wait a tick for queries to settle
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.queryByTestId("suggestion-panel")).not.toBeInTheDocument();
+  });
+
+  it("has evidence tooltip on suggestion items", async () => {
+    const suggestions = [
+      {
+        rule_id: "OVERRIDE_FREQ_HIGH",
+        severity: "warning",
+        category: "persona",
+        target: "Test",
+        message: "Test msg",
+        evidence: { metric_name: "override_rate", metric_value: 0.6, threshold: 0.5, sample_size: 20 },
+      },
+    ];
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePersonaPerformanceResponse({ suggestions }),
+    });
+    mockFetchPatternSummary.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePatternSummaryResponse(),
+    });
+
+    renderWithQuery(<SuggestionPanel />);
+    const item = await screen.findByTestId("suggestion-item");
+    expect(item.getAttribute("title")).toContain("override_rate: 60%");
+  });
+
+  it("below-threshold personas emit no suggestion", async () => {
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePersonaPerformanceResponse({ suggestions: [] }),
+    });
+    mockFetchPatternSummary.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePatternSummaryResponse({ suggestions: [] }),
+    });
+
+    renderWithQuery(<SuggestionPanel />);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.queryByTestId("suggestion-panel")).not.toBeInTheDocument();
+  });
+
+  it("no partial-results warning when both succeed with suggestions", async () => {
+    const personaSuggestions = [
+      {
+        rule_id: "OVERRIDE_FREQ_HIGH",
+        severity: "warning",
+        category: "persona",
+        target: "Test",
+        message: "Test msg",
+        evidence: { metric_name: "override_rate", metric_value: 0.6, threshold: 0.5, sample_size: 20 },
+      },
+    ];
+    const patternSuggestions = [
+      {
+        rule_id: "NO_TRADE_CONCENTRATION",
+        severity: "warning",
+        category: "pattern",
+        target: "XAUUSD × NY",
+        message: "Pattern msg",
+        evidence: { metric_name: "no_trade_rate", metric_value: 0.9, threshold: 0.8, sample_size: 15 },
+      },
+    ];
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePersonaPerformanceResponse({ suggestions: personaSuggestions }),
+    });
+    mockFetchPatternSummary.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePatternSummaryResponse({ suggestions: patternSuggestions }),
+    });
+
+    renderWithQuery(<SuggestionPanel />);
+    await screen.findByTestId("suggestion-panel");
+    expect(screen.queryByTestId("suggestion-partial-warning")).not.toBeInTheDocument();
+  });
+});
+
+// ===== PR-REFLECT-3: PERSONA ROW NAVIGATION TESTS =====
+
+describe("PersonaPerformanceTable — row navigation", () => {
+  it("navigable row has pointer cursor class", async () => {
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePersonaPerformanceResponse(),
+    });
+    renderWithQuery(<PersonaPerformanceTable />);
+
+    const row = await screen.findByTestId("persona-row-default_analyst");
+    expect(row.className).toContain("cursor-pointer");
+  });
+
+  it("non-navigable row has no pointer cursor", async () => {
+    mockFetchPersonaPerformance.mockResolvedValue({
+      ok: true, status: 200,
+      data: makePersonaPerformanceResponse({
+        stats: [
+          {
+            persona: "orphan", participation_count: 10, skip_count: 0,
+            fail_count: 0, participation_rate: 1.0, override_count: 0,
+            override_rate: null, stance_alignment: null, avg_confidence: null,
+            flagged: false, navigable_entity_id: null,
+          },
+        ],
+      }),
+    });
+    renderWithQuery(<PersonaPerformanceTable />);
+
+    const row = await screen.findByTestId("persona-row-orphan");
+    expect(row.className).not.toContain("cursor-pointer");
+  });
+});
+
+// ===== PR-REFLECT-3: ADAPTER — navigableEntityId =====
+
+describe("normalizePersonaPerformance — navigableEntityId", () => {
+  it("passes navigable_entity_id through as navigableEntityId", () => {
+    const response = makePersonaPerformanceResponse();
+    const vm = normalizePersonaPerformance(response);
+    expect(vm.personas[0].navigableEntityId).toBe("persona_default_analyst");
+  });
+
+  it("handles null navigable_entity_id", () => {
+    const response = makePersonaPerformanceResponse({
+      stats: [
+        {
+          persona: "test", participation_count: 5, skip_count: 0,
+          fail_count: 0, participation_rate: 1.0, override_count: 0,
+          override_rate: null, stance_alignment: null, avg_confidence: null,
+          flagged: false, navigable_entity_id: null,
+        },
+      ],
+    });
+    const vm = normalizePersonaPerformance(response);
+    expect(vm.personas[0].navigableEntityId).toBeNull();
   });
 });

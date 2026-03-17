@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { RunBrowserResponse } from "../src/shared/api/runs";
 
@@ -171,9 +172,11 @@ function renderOpsPage() {
   });
 
   render(
-    <QueryClientProvider client={qc}>
-      <AgentOpsPage />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <AgentOpsPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 

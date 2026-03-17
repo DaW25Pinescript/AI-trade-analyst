@@ -148,7 +148,7 @@ Frontend:
 | 3 | PR-CHART-2 | Run context overlay + multi-timeframe charts | ✅ Done | PR-CHART-1 ✅ | Week 3 |
 | 4 | PR-REFLECT-1 | Persona performance + pattern summary endpoints | ✅ Done | PR-RUN-1 (needs run history) | Week 4 |
 | 5 | PR-REFLECT-2 | Reflective dashboard frontend | ✅ Done | PR-REFLECT-1 ✅ | Week 5 |
-| 6 | PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | 📋 Planned | PR-CHART-2, PR-REFLECT-2 | Week 6 |
+| 6 | PR-REFLECT-3 | Integration + rules-based suggestions v0 (two rules, advisory only) | ✅ Done | PR-CHART-2, PR-REFLECT-2 | Week 6 |
 | — | Chart indicators overlay | Pine Script-style indicators on candlestick charts | 💭 Concept | PR-CHART-2 | Future |
 | — | ML-based pattern detection | Statistical models replacing rules-based suggestions | 💭 Concept | PR-REFLECT-2 + run volume | Future |
 | — | Control-Plane Actions | Agent start/stop/retry in Ops workspace | 💭 Concept | Phase 7 complete | Future |
