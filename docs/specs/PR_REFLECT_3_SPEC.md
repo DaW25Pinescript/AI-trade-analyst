@@ -790,9 +790,9 @@ PR-REFLECT-3 is complete when:
 
 ### 13.6 Entity-not-found state (§8 Step 5)
 
-**Existing:** Agent Ops Detail uses `AgentDetailSidebar` (shown when `selectedId !== null && mode !== "run"`, line 162). The sidebar renders entity details from roster data but has **no entity-not-found fallback** — it assumes selectedId always maps to a roster entry.
+**Existing:** `AgentDetailSidebar.tsx` lines 169–181 already handles entity-not-found errors. When `detailQuery.isError` is true, it checks for `"not found"` / `"ENTITY_NOT_FOUND"` in the error message and renders `"Entity not found"` with error detail text.
 
-**Required:** New text-only not-found state inside the existing detail sidebar shell. Estimated: ~8 lines of JSX. Reuses existing `AgentDetailSidebar` container; no layout change.
+**Minor update required:** Spec §6.12 requires the message `"Entity not found — it may no longer be in the active roster."` The existing handler shows only `"Entity not found"`. A one-line text change is needed. No structural or layout change required.
 
 ### 13.7 Tooltip primitive (§8 Step 5)
 
@@ -930,7 +930,7 @@ const handleModeChange = useCallback((newMode: OpsMode) => {
 | `ui/src/workspaces/reflect/components/ReflectPage.tsx` | Import + render `SuggestionPanel` | +10 |
 | `ui/src/workspaces/reflect/components/PersonaPerformanceTable.tsx` | Add row click handler + navigation affordance | +25 |
 | `ui/src/workspaces/ops/components/AgentOpsPage.tsx` | URL param consumption + clear; C-6 fix; entity-not-found state | +45 |
-| `ui/src/workspaces/ops/components/AgentDetailSidebar.tsx` | Entity-not-found fallback state | +10 |
+| `ui/src/workspaces/ops/components/AgentDetailSidebar.tsx` | Update entity-not-found message text | +1 |
 | `ui/tests/reflect.test.tsx` | Extend with suggestion + navigation tests | +60 |
 | `docs/specs/PR_REFLECT_3_SPEC.md` | Finalize status, field names, outcome | +0 (edits) |
 | `docs/AI_TradeAnalyst_Progress.md` | Add PR-REFLECT-3 entry | +5 |
