@@ -535,6 +535,19 @@ def project_trace(
             ArtifactRef(artifact_type="usage_log", artifact_key="usage.jsonl")
         )
 
+    # Compute finished_at from started_at + duration_ms
+    started_at = raw.get("timestamp")
+    finished_at = None
+    duration_ms = raw.get("duration_ms")
+    if started_at and duration_ms is not None:
+        try:
+            from datetime import timedelta
+            start_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+            end_dt = start_dt + timedelta(milliseconds=duration_ms)
+            finished_at = end_dt.isoformat().replace("+00:00", "Z")
+        except (ValueError, TypeError):
+            pass
+
     return AgentTraceResponse(
         version=_CONTRACT_VERSION,
         generated_at=datetime.now(timezone.utc).isoformat(),
@@ -544,8 +557,8 @@ def project_trace(
         run_status=run_status,
         instrument=request.get("instrument"),
         session=request.get("session"),
-        started_at=raw.get("timestamp"),
-        finished_at=None,
+        started_at=started_at,
+        finished_at=finished_at,
         summary=trace_summary,
         stages=stages,
         participants=participants,

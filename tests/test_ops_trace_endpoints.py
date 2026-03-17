@@ -158,8 +158,8 @@ class TestTraceOrdering:
 
     def test_stage_keys_present_and_nonempty(self, trace_dict):
         for s in trace_dict["stages"]:
-            assert s["stage_key"]
-            assert isinstance(s["stage_key"], str)
+            assert s["stage"]
+            assert isinstance(s["stage"], str)
 
     def test_known_stage_vocabulary(self, trace_dict):
         known = {
@@ -167,7 +167,7 @@ class TestTraceOrdering:
             "analyst_execution", "arbiter", "logging",
         }
         for s in trace_dict["stages"]:
-            assert s["stage_key"] in known, f"Unknown stage: {s['stage_key']}"
+            assert s["stage"] in known, f"Unknown stage: {s['stage']}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -781,3 +781,119 @@ class TestTraceEdgeAlias:
     def test_construct_with_alias(self):
         edge = TraceEdge(**{"from": "x", "to": "y", "type": "override"})
         assert edge.from_ == "x"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Stage name alias — stage_key serializes as "stage" in JSON
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestTraceStageAlias:
+    """TraceStage.stage_key serializes as 'stage' in JSON (like TraceEdge.from_)."""
+
+    def test_stage_alias_in_json(self):
+        stage = TraceStage(
+            stage_key="validate_input", stage_index=1,
+            status="completed", participant_ids=[],
+        )
+        d = stage.model_dump(by_alias=True)
+        assert "stage" in d, "stage_key should serialize as 'stage' with by_alias=True"
+        assert "stage_key" not in d
+
+    def test_stage_key_field_accessible(self):
+        stage = TraceStage(
+            stage_key="arbiter", stage_index=4,
+            status="completed", participant_ids=[],
+        )
+        assert stage.stage_key == "arbiter"
+
+    def test_construct_with_alias(self):
+        stage = TraceStage(
+            **{"stage": "logging", "stage_index": 5,
+               "status": "completed", "participant_ids": []},
+        )
+        assert stage.stage_key == "logging"
+
+    def test_full_trace_stages_use_stage_alias(self, trace_dict):
+        """End-to-end: serialized trace response uses 'stage' not 'stage_key'."""
+        for s in trace_dict["stages"]:
+            assert "stage" in s, "Serialized stage should have 'stage' field"
+            assert "stage_key" not in s, "Serialized stage should NOT have 'stage_key'"
+            assert s["stage"], "Stage name must be non-empty"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# finished_at computation from timestamp + duration_ms
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestFinishedAtComputation:
+    """finished_at is computed from started_at + duration_ms."""
+
+    def test_finished_at_present_when_duration_available(self, trace_response):
+        """Sample fixture has timestamp and duration_ms — finished_at should be set."""
+        assert trace_response.finished_at is not None
+
+    def test_finished_at_computed_correctly(self, trace_response):
+        """finished_at = started_at + duration_ms."""
+        from datetime import datetime, timedelta
+        start = datetime.fromisoformat(
+            trace_response.started_at.replace("Z", "+00:00")
+        )
+        end = datetime.fromisoformat(
+            trace_response.finished_at.replace("Z", "+00:00")
+        )
+        # Sample fixture: duration_ms = 18200
+        expected_delta = timedelta(milliseconds=18200)
+        assert end - start == expected_delta
+
+    def test_finished_at_none_when_no_duration(self, tmp_path):
+        """If duration_ms is absent, finished_at should be None."""
+        run_record = {
+            "run_id": "run_no_dur",
+            "timestamp": "2026-03-14T11:00:00Z",
+            "request": {"instrument": "XAUUSD", "session": "NY",
+                        "timeframes": ["H4"], "smoke_mode": False},
+            "stages": [{"stage": "validate_input", "status": "ok"}],
+            "analysts": [],
+            "analysts_skipped": [],
+            "analysts_failed": [],
+            "arbiter": {"ran": False},
+            "artifacts": {},
+            "usage_summary": {},
+            "warnings": [],
+            "errors": [],
+        }
+        rr_path = tmp_path / "run_record.json"
+        rr_path.write_text(json.dumps(run_record))
+        resp = project_trace("run_no_dur", rr_path, Path("/nonexistent"))
+        assert resp.started_at == "2026-03-14T11:00:00Z"
+        assert resp.finished_at is None
+
+    def test_finished_at_none_when_no_timestamp(self, tmp_path):
+        """If timestamp is absent, finished_at should be None."""
+        run_record = {
+            "run_id": "run_no_ts",
+            "duration_ms": 5000,
+            "request": {"instrument": "XAUUSD", "session": "NY",
+                        "timeframes": ["H4"], "smoke_mode": False},
+            "stages": [{"stage": "validate_input", "status": "ok"}],
+            "analysts": [],
+            "analysts_skipped": [],
+            "analysts_failed": [],
+            "arbiter": {"ran": False},
+            "artifacts": {},
+            "usage_summary": {},
+            "warnings": [],
+            "errors": [],
+        }
+        rr_path = tmp_path / "run_record.json"
+        rr_path.write_text(json.dumps(run_record))
+        resp = project_trace("run_no_ts", rr_path, Path("/nonexistent"))
+        assert resp.started_at is None
+        assert resp.finished_at is None
+
+    def test_instrument_and_session_projected(self, trace_response):
+        """instrument and session are projected from request block."""
+        assert trace_response.instrument == "XAUUSD"
+        assert trace_response.session == "NY"
