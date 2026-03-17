@@ -699,22 +699,50 @@ async def save_journey_draft(payload: dict):
 
 @router.post("/journey/decision")
 async def save_journey_decision(payload: dict):
-    """Save final journey decision payload to app/data/journeys/decisions/."""
-    journey_id = payload.get("journey_id")
-    if not journey_id:
-        return {"success": False, "error": "Missing journey_id"}
+    """Save final journey decision payload to app/data/journeys/decisions/.
 
-    payload["decided_at"] = payload.get("decided_at") or _now_iso()
+    Accepts ``snapshot_id`` as the canonical identifier.  Falls back to
+    ``journey_id`` for backward compatibility only.
+    """
+    snapshot_id = payload.get("snapshot_id") or payload.get("journey_id")
+    if not snapshot_id:
+        return {"success": False, "error": "Missing snapshot_id"}
 
-    path = _DECISIONS_DIR / f"{journey_id}.json"
-    ok = _write_json(path, payload)
+    saved_at = _now_iso()
+
+    # Derive verdict from bootstrap_summary with explicit precedence:
+    #   arbiter_decision → arbiter_bias → "unknown"
+    bootstrap = payload.get("bootstrap_summary") or {}
+    verdict = (
+        bootstrap.get("arbiter_decision")
+        or bootstrap.get("arbiter_bias")
+        or "unknown"
+    )
+
+    # Build the canonical DecisionSnapshot-compatible record.
+    record = {
+        "snapshot_id": snapshot_id,
+        "instrument": payload.get("instrument"),
+        "saved_at": saved_at,
+        "journey_status": "frozen",
+        "verdict": verdict,
+        "user_decision": payload.get("decision"),
+        # Preserve full payload for audit / future use.
+        "thesis": payload.get("thesis"),
+        "conviction": payload.get("conviction"),
+        "notes": payload.get("notes"),
+        "bootstrap_summary": bootstrap,
+    }
+
+    path = _DECISIONS_DIR / f"{snapshot_id}.json"
+    ok = _write_json(path, record)
     if not ok:
         return {"success": False, "error": "Failed to save decision"}
 
     return {
         "success": True,
-        "journey_id": journey_id,
-        "saved_at": payload["decided_at"],
+        "snapshot_id": snapshot_id,
+        "saved_at": saved_at,
     }
 
 
@@ -769,3 +797,92 @@ async def list_review_entries():
 
     entries.sort(key=lambda x: x.get("logged_at", ""), reverse=True)
     return entries
+
+
+# ── Journal & Review read endpoints (Post-Phase-8 repair) ────────────────────
+#
+# These match the frontend contract in journalApi.ts:
+#   GET /journal/decisions → { records: DecisionSnapshot[] }
+#   GET /review/records    → { records: ReviewRecord[] }
+#
+# Source: _DECISIONS_DIR for both.  Review additionally checks _RESULTS_DIR
+# for result linkage (has_result flag).
+#
+# Malformed files are silently skipped (_load_json returns None with warning).
+# Empty/missing directory returns { records: [] } — not an error.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _read_decision_snapshot(data: dict) -> dict | None:
+    """Extract DecisionSnapshot fields from a stored decision record.
+
+    Returns None if snapshot_id is missing (minimum required field).
+    """
+    snapshot_id = data.get("snapshot_id")
+    if not snapshot_id:
+        logger.warning("Decision record missing snapshot_id, skipping: %s", data)
+        return None
+    return {
+        "snapshot_id": snapshot_id,
+        "instrument": data.get("instrument"),
+        "saved_at": data.get("saved_at", ""),
+        "journey_status": data.get("journey_status", "frozen"),
+        "verdict": data.get("verdict", "unknown"),
+        "user_decision": data.get("user_decision"),
+    }
+
+
+@router.get("/journal/decisions")
+async def list_journal_decisions():
+    """List frozen decision snapshots sorted by saved_at descending.
+
+    Returns { records: DecisionSnapshot[] }.
+    Empty directory or missing directory returns { records: [] }.
+    Malformed files are skipped with a logged warning.
+    """
+    if not _DECISIONS_DIR.exists():
+        return {"records": []}
+
+    records: list[dict] = []
+    for path in _DECISIONS_DIR.glob("*.json"):
+        data = _load_json(path)
+        if data is None:
+            continue
+        snapshot = _read_decision_snapshot(data)
+        if snapshot is not None:
+            records.append(snapshot)
+
+    records.sort(key=lambda r: r.get("saved_at", ""), reverse=True)
+    return {"records": records}
+
+
+@router.get("/review/records")
+async def list_review_records():
+    """List decision snapshots with result linkage, sorted by saved_at descending.
+
+    Returns { records: ReviewRecord[] } where ReviewRecord is
+    DecisionSnapshot + { has_result: bool }.
+
+    has_result is true when a matching result file exists in _RESULTS_DIR.
+    Empty directory or missing directory returns { records: [] }.
+    Malformed files are skipped with a logged warning.
+    """
+    if not _DECISIONS_DIR.exists():
+        return {"records": []}
+
+    records: list[dict] = []
+    for path in _DECISIONS_DIR.glob("*.json"):
+        data = _load_json(path)
+        if data is None:
+            continue
+        snapshot = _read_decision_snapshot(data)
+        if snapshot is None:
+            continue
+        # Check for matching result file
+        snapshot_id = snapshot["snapshot_id"]
+        result_path = _RESULTS_DIR / f"{snapshot_id}.json"
+        snapshot["has_result"] = result_path.exists()
+        records.append(snapshot)
+
+    records.sort(key=lambda r: r.get("saved_at", ""), reverse=True)
+    return {"records": records}

@@ -39,6 +39,8 @@ export default defineConfig({
       "/e2e": "http://localhost:8000",
       "/plugins": "http://localhost:8000",
       "/ops": "http://localhost:8000",
+      "/reflect": "http://localhost:8000",
+      "/market-data": "http://localhost:8000",
     },
   },
 });
