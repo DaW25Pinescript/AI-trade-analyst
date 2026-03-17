@@ -43,7 +43,7 @@ jobs:
         run: pip install pip-audit && pip-audit -r ai_analyst/requirements.txt
 
       - name: Run analyst tests with coverage
-        run: pytest --cov=ai_analyst --cov-report=term-missing --cov-fail-under=70 -q ai_analyst/tests
+        run: pytest --cov=ai_analyst --cov-report=term-missing --cov-fail-under=70 -q ai_analyst/tests tests/
 
   mro-tests:
     name: Macro Risk Officer tests (pytest)
