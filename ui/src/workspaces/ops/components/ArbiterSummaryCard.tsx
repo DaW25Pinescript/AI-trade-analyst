@@ -10,6 +10,8 @@ export interface ArbiterSummaryCardProps {
 }
 
 export function ArbiterSummaryCard({ arbiter }: ArbiterSummaryCardProps) {
+  if (!arbiter) return null;
+
   return (
     <section
       className="rounded-lg border border-purple-800/40 bg-purple-950/20 p-4"
@@ -25,12 +27,12 @@ export function ArbiterSummaryCard({ arbiter }: ArbiterSummaryCardProps) {
             Verdict
           </span>
           <span className="text-sm font-semibold text-gray-200 uppercase">
-            {arbiter.verdict}
+            {arbiter.verdict ?? "—"}
           </span>
         </div>
 
         {/* Confidence */}
-        {arbiter.confidence !== null && (
+        {arbiter.confidence != null && (
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium uppercase tracking-wider text-gray-500 w-24 shrink-0">
               Confidence

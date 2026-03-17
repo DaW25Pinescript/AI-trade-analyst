@@ -30,26 +30,29 @@ export function TraceEdgeList({ edges }: TraceEdgeListProps) {
       </h4>
       <div className="space-y-1">
         {edges.map((edge, idx) => {
-          const style = EDGE_TYPE_STYLES[edge.type] ?? {
-            label: edge.type.toUpperCase(),
+          const edgeType = edge.type ?? "unknown";
+          const edgeFrom = edge.from ?? "unknown";
+          const edgeTo = edge.to ?? "unknown";
+          const style = EDGE_TYPE_STYLES[edgeType] ?? {
+            label: edgeType.toUpperCase(),
             className: "text-gray-400",
           };
           return (
             <div
-              key={`${edge.from}-${edge.to}-${idx}`}
+              key={`${edgeFrom}-${edgeTo}-${idx}`}
               className="flex items-center gap-2 rounded border border-gray-800/40 bg-gray-900/40 px-3 py-1.5"
-              data-testid={`trace-edge-${edge.from}-${edge.to}`}
+              data-testid={`trace-edge-${edgeFrom}-${edgeTo}`}
               title={edge.summary ?? undefined}
             >
               <span className="text-xs text-gray-300 font-medium truncate">
-                {edge.from}
+                {edgeFrom}
               </span>
               <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider ${style.className}`}>
                 {style.label}
               </span>
               <span className="text-[10px] text-gray-600">&rarr;</span>
               <span className="text-xs text-gray-300 font-medium truncate">
-                {edge.to}
+                {edgeTo}
               </span>
             </div>
           );

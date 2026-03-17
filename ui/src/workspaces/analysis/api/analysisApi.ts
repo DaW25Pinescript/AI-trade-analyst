@@ -47,6 +47,9 @@ export async function submitAnalysis(
       method: "POST",
       body: formData,
       // No Content-Type header — browser sets multipart boundary automatically
+      ...(import.meta.env.VITE_API_KEY
+        ? { headers: { "X-API-Key": import.meta.env.VITE_API_KEY } }
+        : {}),
     });
   } catch (networkError: unknown) {
     const message =
@@ -76,7 +79,12 @@ export async function fetchRunUsage(
   try {
     response = await fetch(`/runs/${encodeURIComponent(runId)}/usage`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(import.meta.env.VITE_API_KEY
+          ? { "X-API-Key": import.meta.env.VITE_API_KEY }
+          : {}),
+      },
     });
   } catch (networkError: unknown) {
     const message =

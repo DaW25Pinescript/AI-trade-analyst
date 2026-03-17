@@ -29,18 +29,19 @@ const STATUS_STYLES: Record<string, { dot: string; text: string }> = {
   },
 };
 
-function formatDuration(ms: number | null): string {
-  if (ms === null) return "—";
+function formatDuration(ms: number | null | undefined): string {
+  if (ms == null) return "—";
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function formatStageName(stage: string): string {
+function formatStageName(stage: string | undefined | null): string {
+  if (!stage) return "UNKNOWN";
   return stage.replace(/_/g, " ").toUpperCase();
 }
 
 export function TraceStageTimeline({ stages, isPartial }: TraceStageTimelineProps) {
-  const sorted = [...stages].sort((a, b) => a.order - b.order);
+  const sorted = [...stages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   return (
     <section data-testid="trace-stage-timeline">
@@ -49,12 +50,14 @@ export function TraceStageTimeline({ stages, isPartial }: TraceStageTimelineProp
       </h4>
       <div className="space-y-1">
         {sorted.map((stage, idx) => {
-          const style = STATUS_STYLES[stage.status] ?? STATUS_STYLES.skipped;
+          const status = stage.status ?? "skipped";
+          const style = STATUS_STYLES[status] ?? STATUS_STYLES.skipped;
+          const stageKey = stage.stage ?? `stage-${idx}`;
           return (
             <div
-              key={stage.stage}
+              key={stageKey}
               className="flex items-center gap-3 rounded border border-gray-800/40 bg-gray-900/40 px-3 py-2"
-              data-testid={`trace-stage-${stage.stage}`}
+              data-testid={`trace-stage-${stageKey}`}
             >
               {/* Order index */}
               <span className="w-5 shrink-0 text-center text-[10px] font-bold text-gray-600">
@@ -70,7 +73,7 @@ export function TraceStageTimeline({ stages, isPartial }: TraceStageTimelineProp
               </span>
               {/* Status label */}
               <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider ${style.text}`}>
-                {stage.status}
+                {status}
               </span>
               {/* Duration */}
               <span className="w-16 shrink-0 text-right text-xs text-gray-500">

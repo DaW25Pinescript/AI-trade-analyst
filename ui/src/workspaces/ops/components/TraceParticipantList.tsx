@@ -25,25 +25,29 @@ export function TraceParticipantList({ participants }: TraceParticipantListProps
         Participants
       </h4>
       <div className="space-y-2">
-        {participants.map((p) => {
-          const style = STATUS_STYLES[p.participation_status] ?? STATUS_STYLES.skipped;
-          const c = p.contribution;
+        {participants.map((p, idx) => {
+          const status = p.participation_status ?? "skipped";
+          const style = STATUS_STYLES[status] ?? STATUS_STYLES.skipped;
+          const c = p.contribution ?? {};
+          const entityKey = p.entity_id ?? `participant-${idx}`;
 
           return (
             <div
-              key={p.entity_id}
+              key={entityKey}
               className="rounded border border-gray-800/40 bg-gray-900/40 p-3"
-              data-testid={`participant-${p.entity_id}`}
+              data-testid={`participant-${entityKey}`}
             >
               {/* Header row */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-sm font-semibold text-gray-200 truncate">
-                    {p.display_name}
+                    {p.display_name ?? entityKey}
                   </span>
-                  <span className="text-[10px] text-gray-500 uppercase">
-                    {p.role}
-                  </span>
+                  {p.role && (
+                    <span className="text-[10px] text-gray-500 uppercase">
+                      {p.role}
+                    </span>
+                  )}
                 </div>
                 <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider ${style.className}`}>
                   {style.label}
@@ -56,7 +60,7 @@ export function TraceParticipantList({ participants }: TraceParticipantListProps
                   <p className="text-xs text-gray-400">{c.summary}</p>
                 )}
                 <div className="flex flex-wrap gap-3">
-                  {c.stance !== null && (
+                  {c.stance != null && (
                     <span className="text-[10px] text-gray-500">
                       Stance:{" "}
                       <span className="font-medium text-gray-300 uppercase">
@@ -64,7 +68,7 @@ export function TraceParticipantList({ participants }: TraceParticipantListProps
                       </span>
                     </span>
                   )}
-                  {c.confidence !== null && (
+                  {c.confidence != null && (
                     <span className="text-[10px] text-gray-500">
                       Confidence:{" "}
                       <span className="font-medium text-gray-300">
@@ -73,7 +77,7 @@ export function TraceParticipantList({ participants }: TraceParticipantListProps
                     </span>
                   )}
                   {c.was_overridden && (
-                    <span className="text-[10px] font-bold uppercase text-amber-400" data-testid={`override-${p.entity_id}`}>
+                    <span className="text-[10px] font-bold uppercase text-amber-400" data-testid={`override-${entityKey}`}>
                       Overridden
                     </span>
                   )}

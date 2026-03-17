@@ -48,7 +48,13 @@ export function RunTracePanel({ runId }: RunTracePanelProps) {
   if (!trace) return null;
 
   const isStale = trace.data_state === "stale";
-  const isPartial = trace.stages.some(
+  const stages = trace.stages ?? [];
+  const participants = trace.participants ?? [];
+  const edges = trace.edges ?? [];
+  const artifacts = trace.artifacts ?? [];
+  const timeframes = trace.summary?.timeframes ?? [];
+
+  const isPartial = stages.some(
     (s) => s.status === "running" || s.status === "pending",
   );
 
@@ -76,21 +82,23 @@ export function RunTracePanel({ runId }: RunTracePanelProps) {
               Instrument
             </span>
             <p className="text-sm font-semibold text-gray-200">
-              {trace.summary.instrument}
+              {trace.summary?.instrument ?? "—"}
             </p>
           </div>
           <div>
             <span className="text-[10px] font-medium uppercase tracking-wider text-gray-600">
               Session
             </span>
-            <p className="text-sm text-gray-300">{trace.summary.session}</p>
+            <p className="text-sm text-gray-300">
+              {trace.summary?.session ?? "—"}
+            </p>
           </div>
           <div>
             <span className="text-[10px] font-medium uppercase tracking-wider text-gray-600">
               Duration
             </span>
             <p className="text-sm text-gray-300">
-              {formatDuration(trace.summary.duration_ms)}
+              {formatDuration(trace.summary?.duration_ms ?? null)}
             </p>
           </div>
           <div>
@@ -113,7 +121,7 @@ export function RunTracePanel({ runId }: RunTracePanelProps) {
 
         {/* Trace summary — verdict and confidence */}
         <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-gray-800/40 pt-3">
-          {trace.summary.final_verdict && (
+          {trace.summary?.final_verdict && (
             <div>
               <span className="text-[10px] font-medium uppercase tracking-wider text-gray-600">
                 Final Verdict
@@ -123,7 +131,7 @@ export function RunTracePanel({ runId }: RunTracePanelProps) {
               </p>
             </div>
           )}
-          {trace.summary.final_confidence !== null && (
+          {trace.summary?.final_confidence != null && (
             <div>
               <span className="text-[10px] font-medium uppercase tracking-wider text-gray-600">
                 Confidence
@@ -133,17 +141,17 @@ export function RunTracePanel({ runId }: RunTracePanelProps) {
               </p>
             </div>
           )}
-          {trace.summary.timeframes.length > 0 && (
+          {timeframes.length > 0 && (
             <div>
               <span className="text-[10px] font-medium uppercase tracking-wider text-gray-600">
                 Timeframes
               </span>
               <p className="text-sm text-gray-300">
-                {trace.summary.timeframes.join(", ")}
+                {timeframes.join(", ")}
               </p>
             </div>
           )}
-          {trace.summary.completed_at && (
+          {trace.summary?.completed_at && (
             <div>
               <span className="text-[10px] font-medium uppercase tracking-wider text-gray-600">
                 Completed
@@ -157,13 +165,17 @@ export function RunTracePanel({ runId }: RunTracePanelProps) {
       </div>
 
       {/* Stage timeline */}
-      <TraceStageTimeline stages={trace.stages} isPartial={isPartial} />
+      {stages.length > 0 && (
+        <TraceStageTimeline stages={stages} isPartial={isPartial} />
+      )}
 
       {/* Participants */}
-      <TraceParticipantList participants={trace.participants} />
+      {participants.length > 0 && (
+        <TraceParticipantList participants={participants} />
+      )}
 
       {/* Trace edges */}
-      <TraceEdgeList edges={trace.edges} />
+      {edges.length > 0 && <TraceEdgeList edges={edges} />}
 
       {/* Arbiter summary — null → hidden per §11.5 */}
       {trace.arbiter_summary && (
@@ -171,13 +183,13 @@ export function RunTracePanel({ runId }: RunTracePanelProps) {
       )}
 
       {/* Artifact references */}
-      {trace.artifacts.length > 0 && (
+      {artifacts.length > 0 && (
         <section data-testid="trace-artifacts">
           <h4 className="mb-2 text-xs font-bold uppercase tracking-widest text-gray-500">
             Artifacts
           </h4>
           <div className="flex flex-wrap gap-1.5">
-            {trace.artifacts.map((a) => (
+            {artifacts.map((a) => (
               <span
                 key={a.path}
                 className="rounded bg-gray-800/60 px-2 py-0.5 text-[10px] text-gray-400"
