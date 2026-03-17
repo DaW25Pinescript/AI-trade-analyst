@@ -15,8 +15,9 @@
 //   source_ticket_id, enable_deliberation, triage_mode, smoke_mode
 // ---------------------------------------------------------------------------
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { PanelShell } from "@shared/components/layout";
+import { useWatchlistTriage } from "@shared/hooks/useWatchlistTriage";
 import type { AnalysisSubmission } from "../types";
 
 export interface SubmissionPanelProps {
@@ -43,6 +44,17 @@ export function SubmissionPanel({
   onSubmit,
   lastSubmission,
 }: SubmissionPanelProps) {
+  // Instrument list from watchlist triage
+  const { data: triageData, isLoading: instrumentsLoading } = useWatchlistTriage();
+  const instruments = useMemo(
+    () =>
+      triageData?.items
+        ?.map((item) => item.symbol)
+        .filter(Boolean)
+        .sort() ?? [],
+    [triageData],
+  );
+
   // Form state — use last submission values if read-only, else initial values
   const [instrument, setInstrument] = useState(
     lastSubmission?.instrument ?? initialInstrument ?? "",
@@ -191,15 +203,20 @@ export function SubmissionPanel({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className={labelClass}>Instrument</label>
-            <input
-              type="text"
+            <select
               value={instrument}
               onChange={(e) => setInstrument(e.target.value)}
-              disabled={readOnly}
-              placeholder="e.g. XAUUSD"
+              disabled={readOnly || instrumentsLoading}
               className={inputClass}
               data-testid="input-instrument"
-            />
+            >
+              <option value="">
+                {instrumentsLoading ? "Loading instruments…" : "Select instrument"}
+              </option>
+              {instruments.map((sym) => (
+                <option key={sym} value={sym}>{sym}</option>
+              ))}
+            </select>
             {errors.instrument && (
               <p className="mt-1 text-xs text-red-400" data-testid="error-instrument">
                 {errors.instrument}
