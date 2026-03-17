@@ -520,33 +520,158 @@ async def run_triage(request: Request):
 # ── GET /journey/{asset}/bootstrap ────────────────────────────────────────────
 
 
-@router.get("/journey/{asset}/bootstrap")
-async def journey_bootstrap(asset: str):
-    """Read bootstrap payload for a journey entry screen."""
-    output_path = _ANALYST_OUTPUT / f"{asset}_multi_analyst_output.json"
-    explain_path = _ANALYST_OUTPUT / f"{asset}_multi_analyst_explainability.json"
+def _find_latest_triage_file(asset: str) -> Path | None:
+    """Find the most recent triage output file for an asset.
 
-    multi_output = _load_json(output_path)
-    if multi_output is None:
-        return {"data_state": "unavailable", "instrument": asset}
+    Triage writes files as: multi_analyst_output_{SYMBOL}_{TIMESTAMP}Z.json
+    Sorted reverse so first match is the latest.
+    """
+    if not _ANALYST_OUTPUT.exists():
+        return None
+    candidates = sorted(
+        _ANALYST_OUTPUT.glob(f"multi_analyst_output_{asset}_*.json"),
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
 
-    explain_block = _load_json(explain_path)
 
-    # Determine data_state
-    generated_at = multi_output.get("as_of_utc")
-    if explain_block is None:
-        data_state = "partial"
-    elif _is_stale(generated_at):
+def _load_final_verdict(run_id: str) -> dict | None:
+    """Load the final_verdict.json from a run's output directory."""
+    run_dir = _PROJECT_ROOT / "ai_analyst" / "output" / "runs" / run_id
+    return _load_json(run_dir / "final_verdict.json")
+
+
+def _load_run_record(run_id: str) -> dict | None:
+    """Load the run_record.json from a run's output directory."""
+    run_dir = _PROJECT_ROOT / "ai_analyst" / "output" / "runs" / run_id
+    return _load_json(run_dir / "run_record.json")
+
+
+def _build_bootstrap_response(
+    asset: str,
+    triage: dict,
+    verdict: dict | None,
+    run_record: dict | None,
+) -> dict:
+    """Transform raw triage + run artifacts into the UI bootstrap contract.
+
+    UI expects: data_state, instrument, generated_at, structure_digest,
+    analyst_verdict, arbiter_decision, explanation, reasoning_summary.
+    """
+    generated_at = triage.get("generated_at") or triage.get("as_of_utc")
+
+    if _is_stale(generated_at):
         data_state = "stale"
+    elif verdict is None:
+        data_state = "partial"
     else:
         data_state = "live"
+
+    # analyst_verdict — summarise from verdict or triage fallback
+    if verdict:
+        analyst_verdict = {
+            "verdict": verdict.get("final_bias", "neutral"),
+            "confidence": (
+                "high" if verdict.get("overall_confidence", 0) >= 0.7
+                else "moderate" if verdict.get("overall_confidence", 0) >= 0.4
+                else "low"
+            ),
+        }
+    else:
+        analyst_verdict = {
+            "verdict": triage.get("bias", "neutral"),
+            "confidence": triage.get("confidence", "low"),
+        }
+
+    # arbiter_decision — map directly from FinalVerdict fields
+    if verdict:
+        arbiter_decision = {
+            "final_bias": verdict.get("final_bias"),
+            "decision": verdict.get("decision"),
+            "overall_confidence": verdict.get("overall_confidence"),
+            "analyst_agreement_pct": verdict.get("analyst_agreement_pct"),
+            "risk_override_applied": verdict.get("risk_override_applied", False),
+            "arbiter_notes": verdict.get("arbiter_notes", ""),
+            "no_trade_conditions": verdict.get("no_trade_conditions", []),
+            "approved_setups": [
+                {
+                    "type": s.get("type", "unknown"),
+                    "entry_zone": s.get("entry_zone", ""),
+                    "stop": s.get("stop", ""),
+                    "targets": s.get("targets", []),
+                    "rr_estimate": s.get("rr_estimate", 0),
+                    "confidence": s.get("confidence", 0),
+                }
+                for s in verdict.get("approved_setups", [])
+            ],
+        }
+    else:
+        arbiter_decision = {}
+
+    # structure_digest — summary from run_record if available
+    structure_digest: dict = {}
+    if run_record:
+        arbiter_info = run_record.get("arbiter") or {}
+        if arbiter_info.get("verdict"):
+            structure_digest["trend"] = arbiter_info["verdict"]
+        if run_record.get("request"):
+            structure_digest["timeframes"] = run_record["request"].get("timeframes")
+
+    # explanation — from verdict audit_log or arbiter_notes
+    explanation: dict = {}
+    if verdict:
+        audit = verdict.get("audit_log") or {}
+        if audit:
+            explanation["analysts_received"] = audit.get("analysts_received")
+            explanation["analysts_valid"] = audit.get("analysts_valid")
+            explanation["htf_consensus"] = audit.get("htf_consensus")
+            explanation["setup_consensus"] = audit.get("setup_consensus")
+        if verdict.get("overlay_was_provided"):
+            explanation["overlay_provided"] = True
+        if verdict.get("indicator_dependency_notes"):
+            explanation["indicator_notes"] = verdict["indicator_dependency_notes"]
+
+    # reasoning_summary — arbiter notes
+    reasoning_summary = None
+    if verdict:
+        reasoning_summary = verdict.get("arbiter_notes") or None
+    elif triage.get("rationale_summary"):
+        reasoning_summary = triage["rationale_summary"]
 
     return {
         "data_state": data_state,
         "instrument": asset,
-        "multi_output": multi_output,
-        "explainability": explain_block,
+        "generated_at": generated_at,
+        "structure_digest": structure_digest,
+        "analyst_verdict": analyst_verdict,
+        "arbiter_decision": arbiter_decision,
+        "explanation": explanation,
+        "reasoning_summary": reasoning_summary,
     }
+
+
+@router.get("/journey/{asset}/bootstrap")
+async def journey_bootstrap(asset: str):
+    """Read bootstrap payload for a journey entry screen.
+
+    Locates the latest triage output file for the asset, then loads
+    the full FinalVerdict from the corresponding run directory to
+    build the UI-contract bootstrap response.
+    """
+    triage_path = _find_latest_triage_file(asset)
+    if triage_path is None:
+        return {"data_state": "unavailable", "instrument": asset}
+
+    triage = _load_json(triage_path)
+    if triage is None:
+        return {"data_state": "unavailable", "instrument": asset}
+
+    # Load full run artifacts if run_id is available
+    run_id = triage.get("run_id")
+    verdict = _load_final_verdict(run_id) if run_id else None
+    run_record = _load_run_record(run_id) if run_id else None
+
+    return _build_bootstrap_response(asset, triage, verdict, run_record)
 
 
 @router.post("/journey/draft")
