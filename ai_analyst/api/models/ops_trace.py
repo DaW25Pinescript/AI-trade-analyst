@@ -30,7 +30,9 @@ class TraceSummary(BaseModel):
 class TraceStage(BaseModel):
     """Single pipeline stage in execution order (§6.6)."""
 
-    stage_key: str
+    model_config = ConfigDict(populate_by_name=True)
+
+    stage_key: str = Field(alias="stage")
     stage_index: int
     status: Literal["completed", "failed", "skipped"]
     duration_ms: Optional[int] = None
