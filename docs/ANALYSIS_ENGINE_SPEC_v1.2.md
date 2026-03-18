@@ -1252,7 +1252,90 @@ All 45 acceptance criteria pass. Existing test count maintained with no regressi
 
 ## 20. Diagnostic Findings
 
-To be populated after running the pre-code diagnostic protocol (Section 16).
+**Populated:** 2026-03-18 — Pre-code diagnostic protocol (Section 16) complete.
+
+### Step 1 — Pipeline Audit
+
+Pipeline: `ai_analyst/graph/pipeline.py` → `build_analysis_graph()`
+```
+validate_input → {macro_context ∥ chart_setup} → chart_lenses
+  → [deliberation?] → [overlay_delta?] → run_arbiter → pinekraft_bridge → log_and_emit → END
+```
+
+Key files: `pipeline.py`, `analyst_nodes.py`, `arbiter_node.py`, `chart_analysis_nodes.py`, `state.py`, `execution_router.py`, `api/main.py`.
+
+Findings:
+- Pipeline is chart-image-driven (base64 screenshots), NOT OHLCV-driven
+- Arbiter is LLM-based (`arbiter_node.py` calls `acompletion_metered`) — no deterministic governance
+- No lens engine, evidence snapshot, or structured deterministic analysis exists
+- Existing "lens" concept (`LensConfig`, `lens_loader.py`) is prompt fragments, not computation
+
+### Step 2 — Normalisation Layer Audit
+
+- `ai_analyst/api/services/market_data_read.py` → `read_ohlcv()` loads CSV, projects to `Candle(timestamp, open, high, low, close, volume)`
+- Data state classification: live/stale/unavailable
+- **Gap:** No NaN handling, no bar-count validation, no schema contract for lens input. Thin adapter needed.
+
+### Step 3 — Baseline Test Count
+
+```
+573 passed, 0 failed (ai_analyst/tests/, excluding test_obs_p2_events.py)
+8 pre-existing failures: test_obs_p2_events.py (ModuleNotFoundError: apscheduler — MDO dependency)
+```
+
+Regression baseline: **573 green**.
+
+### Step 4 — Legacy Arbiter & Personas
+
+**`analyst/arbiter.py`**: Deterministic `compute_consensus()` (priority-ordered: hard no-trade → blocked → alignment → mixed → conditional). Categorical confidence. LLM for synthesis only (skipped on hard no-trade). Useful pattern reference for P3 but different data types.
+
+**`analyst/personas.py`**: Two personas (technical_structure, execution_timing). Consume `StructureDigest` (ICT-focused). Output `PersonaVerdict` with categorical verdict/confidence. No evidence_used, no counterpoints, no what_would_change_my_mind, no dot-path citations. Completely different model from spec.
+
+### Step 5 — LLM Routing
+
+`config/llm_routing.yaml`: **MISSING** (only example exists).
+
+Roster from example: default_analyst, risk_officer, prosecutor, ict_purist — all `claude_sonnet` profile.
+
+Model profiles: `claude_sonnet` (claude-sonnet-4-6, worker tier), `claude_opus` (claude-opus-4-6, heavy tier).
+
+Task routing: analyst_reasoning and arbiter_decision use profile registry; chart tasks hardcoded to sonnet.
+
+### Step 6 — Smallest Patch Set (P1)
+
+| PR | New Files | Modified Files | Est. Lines |
+|---|---|---|---|
+| PR-AE-1 | `lenses/__init__.py`, `lenses/base.py`, `lenses/structure.py`, `tests/test_lens_structure.py` | None | ~435 |
+| PR-AE-2 | `lenses/trend.py`, `lenses/momentum.py`, `tests/test_lens_trend.py`, `tests/test_lens_momentum.py` | None | ~540 |
+| PR-AE-3 | `lenses/registry.py`, `core/snapshot_builder.py`, `models/evidence_snapshot.py`, `tests/test_snapshot_builder.py` | None | ~520 |
+| **P1 Total** | **12 new files** | **0 modified** | **~1,495** |
+
+### Step 7 — AC Gap Table (P1: AC-1 through AC-10)
+
+| AC | Description | Status |
+|---|---|---|
+| AC-1 | Structure Lens valid schema | FAIL — no lens exists |
+| AC-2 | Trend Lens valid schema | FAIL — no lens exists |
+| AC-3 | Momentum Lens valid schema | FAIL — no lens exists |
+| AC-4 | Failed lens produces clean failure | FAIL — no LensOutput contract |
+| AC-5 | Snapshot namespaces under lenses.* | FAIL — no snapshot builder |
+| AC-6 | Failed lens in meta.failed_lenses | FAIL — no snapshot meta |
+| AC-7 | Inactive lens in meta.inactive_lenses | FAIL — no lens registry |
+| AC-8 | alignment_score + conflict_score computed | FAIL — no derived signals |
+| AC-9 | snapshot_id unique per run | FAIL — no snapshot_id |
+| AC-10 | All existing tests green | PASS — 573 green |
+
+**Summary: 1/10 passing. 9 ACs require new code — all additive, no modifications to existing files.**
+
+### Open Unknowns Resolution
+
+| Unknown | Resolution |
+|---|---|
+| `config/llm_routing.yaml` deployed? | MISSING — example only. 4 personas, all claude_sonnet. |
+| Normalisation layer exists? | Partial — `read_ohlcv()` exists, needs thin adapter. |
+| Legacy arbiter reusable? | Reference only — different data types. |
+| `analyst_nodes.py` coupling | Complement, not replace. |
+| `ExecutionRouter` status | Live. Impacts PR-AE-10 replay. |
 
 ---
 
