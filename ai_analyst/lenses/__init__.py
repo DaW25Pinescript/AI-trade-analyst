@@ -5,6 +5,8 @@ No interpretation, no opinion — compute and emit.
 """
 
 from .base import LensBase, LensOutput
+from .momentum import MomentumLens
 from .structure import StructureLens
+from .trend import TrendLens
 
-__all__ = ["LensBase", "LensOutput", "StructureLens"]
+__all__ = ["LensBase", "LensOutput", "MomentumLens", "StructureLens", "TrendLens"]
