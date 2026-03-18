@@ -1,0 +1,16 @@
+{
+  "snapshot_id": "XAUUSD-1773745623936",
+  "instrument": "XAUUSD",
+  "saved_at": "2026-03-17T11:07:03.944973+00:00",
+  "journey_status": "frozen",
+  "verdict": "unknown",
+  "user_decision": "ENTER_LONG",
+  "thesis": "Demo",
+  "conviction": "Medium",
+  "notes": "Demo",
+  "bootstrap_summary": {
+    "arbiter_bias": null,
+    "arbiter_decision": null,
+    "analyst_verdict": "neutral"
+  }
+}

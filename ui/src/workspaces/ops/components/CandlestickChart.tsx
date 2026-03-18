@@ -313,84 +313,40 @@ export function CandlestickChart({
     return null;
   }
 
-  // Loading
-  if (query.isLoading) {
-    return (
-      <div
-        className="rounded-lg border border-gray-700/40 bg-gray-900/40 p-4"
-        data-testid="chart-loading"
-      >
-        <LoadingSkeleton rows={3} />
-      </div>
-    );
-  }
-
-  // Error — failure-tolerant: show error banner, don't block trace
-  if (query.isError) {
-    return (
-      <div
-        className="rounded-lg border border-gray-700/40 bg-gray-900/40 p-3"
-        data-testid="chart-panel"
-      >
-        {/* Timeframe tabs still render even on chart fetch failure (per-tab failure) */}
-        <TimeframeTabs
-          availableTimeframes={availableTimeframes}
-          selectedTimeframe={activeTf}
-          onSelect={handleTabClick}
-        />
-        <div
-          className="rounded border border-amber-800/40 bg-amber-950/20 px-4 py-3 mt-2"
-          data-testid="chart-error"
-        >
-          <p className="text-xs text-amber-400">
-            Unable to load chart data for this timeframe.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
+  // Determine display state — chart container is ALWAYS rendered
+  // so the chart creation useEffect fires on first mount.
+  const isLoading = query.isLoading;
+  const isError = query.isError;
   const data = query.data;
-
-  // Empty candles
-  if (!data || !Array.isArray(data.candles) || data.candles.length === 0) {
-    return (
-      <div
-        className="rounded-lg border border-gray-700/40 bg-gray-900/40 px-4 py-3"
-        data-testid="chart-empty"
-      >
-        <p className="text-xs text-gray-500">
-          No candle data available for {instrument} {activeTf}
-        </p>
-      </div>
-    );
-  }
+  const hasCandles = data && Array.isArray(data.candles) && data.candles.length > 0;
 
   return (
     <div
       className="rounded-lg border border-gray-700/40 bg-gray-900/40 p-3"
       data-testid="chart-panel"
     >
-      {/* Header */}
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-300">
-          {instrument} {activeTf}
-        </span>
-        <div className="flex items-center gap-2">
-          {/* Verdict annotation */}
-          {markerState.type === "aligned" && markerState.verdict && (
-            <VerdictBadge verdict={markerState.verdict} />
-          )}
-          {data.data_state === "stale" && (
-            <span className="text-[10px] text-amber-500" data-testid="chart-stale-badge">
-              Stale data
-            </span>
-          )}
-          <span className="text-[10px] text-gray-600">
-            {data.candle_count} candles
+      {/* Header — shown when we have data */}
+      {hasCandles && (
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-300">
+            {instrument} {activeTf}
           </span>
+          <div className="flex items-center gap-2">
+            {/* Verdict annotation */}
+            {markerState.type === "aligned" && markerState.verdict && (
+              <VerdictBadge verdict={markerState.verdict} />
+            )}
+            {data.data_state === "stale" && (
+              <span className="text-[10px] text-amber-500" data-testid="chart-stale-badge">
+                Stale data
+              </span>
+            )}
+            <span className="text-[10px] text-gray-600">
+              {data.candle_count} candles
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Timeframe tabs */}
       <TimeframeTabs
@@ -411,8 +367,40 @@ export function CandlestickChart({
         </p>
       )}
 
-      {/* Chart container */}
-      <div ref={containerRef} data-testid="chart-container" />
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="py-2" data-testid="chart-loading">
+          <LoadingSkeleton rows={3} />
+        </div>
+      )}
+
+      {/* Error overlay */}
+      {isError && !isLoading && (
+        <div
+          className="rounded border border-amber-800/40 bg-amber-950/20 px-4 py-3 mt-2"
+          data-testid="chart-error"
+        >
+          <p className="text-xs text-amber-400">
+            Unable to load chart data for this timeframe.
+          </p>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && !isError && !hasCandles && (
+        <p className="text-xs text-gray-500 py-2" data-testid="chart-empty">
+          No candle data available for {instrument} {activeTf}
+        </p>
+      )}
+
+      {/* Chart container — ALWAYS in DOM so useEffect can create the chart.
+          Uses min-height to guarantee non-zero dimensions for lightweight-charts. */}
+      <div
+        ref={containerRef}
+        className="mt-2"
+        style={{ minHeight: hasCandles || isLoading ? 300 : 0 }}
+        data-testid="chart-container"
+      />
     </div>
   );
 }

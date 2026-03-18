@@ -106,6 +106,12 @@ call :ensure_frontend_deps
 if errorlevel 1 goto :fail
 
 REM =====================================================
+REM ENSURE MARKET DATA (seed fixtures on first run)
+REM =====================================================
+
+call :ensure_market_data
+
+REM =====================================================
 REM START PROXY
 REM =====================================================
 
@@ -568,6 +574,51 @@ if exist "%ENV_FILE%" (
 echo Propagating API key to frontend...
 echo VITE_API_KEY=%AI_ANALYST_API_KEY%> "%ENV_FILE%"
 echo Frontend env updated: ui\.env.local
+
+exit /b 0
+
+
+REM =====================================================
+REM ENSURE MARKET DATA (first-run fixture seeding)
+REM
+REM Charts require OHLCV hot packages on disk. On first
+REM run, seed synthetic fixture data for all registered
+REM instruments so charts render immediately. No network
+REM required — uses instrument registry base prices.
+REM
+REM Skips if hot packages directory already exists.
+REM To regenerate: delete market_data\packages\latest\
+REM =====================================================
+
+:ensure_market_data
+
+if exist "%ROOT%\market_data\packages\latest" (
+    echo Market data hot packages found.
+    exit /b 0
+)
+
+echo.
+echo Seeding market data fixtures for charts...
+echo This only runs once — generates synthetic OHLCV candle data
+echo for all registered instruments so charts work immediately.
+echo.
+
+for %%I in (EURUSD GBPUSD XAGUSD XAUUSD XPTUSD) do (
+    echo   Seeding %%I...
+    "%VENV_PY%" -m market_data_officer.run_feed --instrument %%I --fixture
+)
+
+echo.
+
+if exist "%ROOT%\market_data\packages\latest" (
+    echo Market data seeded successfully.
+) else (
+    echo WARNING: Market data seeding may have failed.
+    echo          Charts may not display. You can retry manually:
+    echo          .venv\Scripts\python -m market_data_officer.run_feed --instrument XAUUSD --fixture
+)
+
+echo.
 
 exit /b 0
 
