@@ -38,9 +38,9 @@
     "lens_family": "structure",
     "parameters": {
       "lookback_bars": {
-        "current": 190,
+        "current": 250,
         "min": 100,
-        "max": 220,
+        "max": 300,
         "step": 10,
         "mutable": true,
         "description": "Bars of price history analysed. Higher = smoother, more durable structure levels"
@@ -48,7 +48,7 @@
       "pivot_window": {
         "current": 9,
         "min": 5,
-        "max": 10,
+        "max": 14,
         "step": 1,
         "mutable": true,
         "description": "Bars on each side of a swing point for pivot detection. Higher = fewer but more significant swings",

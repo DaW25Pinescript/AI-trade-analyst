@@ -1,14 +1,14 @@
 {
-  "session_id": "structure_medium_20260319_095649",
-  "started_utc": "2026-03-19T09:56:49.769714+00:00",
+  "session_id": "structure_medium_20260319_101806",
+  "started_utc": "2026-03-19T10:18:06.238712+00:00",
   "target_instance": "structure_medium",
   "train_date_range": {
     "start": "2024-04-01",
     "end": "2025-12-31"
   },
   "seed_params": {
-    "lookback_bars": 140,
-    "pivot_window": 6
+    "lookback_bars": 190,
+    "pivot_window": 9
   },
   "eval_config_hash": "5da97fd212c6b15dc8b8d70a9d009c2f94869034ed9f5280ffe59521bc19d5a3",
   "harness_version": "v1.0",
