@@ -4,7 +4,15 @@
     "description": "Evaluator configuration — read-only, agent must not modify",
     "instrument": "XAUUSD",
     "timeframe": "1H",
-    "notes": "ATR-scaled scoring makes thresholds portable across volatility regimes"
+    "notes": "ATR-scaled scoring makes thresholds portable across volatility regimes. yFinance limits 1H data to ~730 days, so date ranges are adjusted from original spec (2020-2025) to available data."
+  },
+  "train_date_range": {
+    "start": "2024-04-01",
+    "end": "2025-12-31"
+  },
+  "validation_date_range": {
+    "start": "2026-01-01",
+    "end": "2026-12-31"
   },
   "structure_short": {
     "instance_id": "structure_short",

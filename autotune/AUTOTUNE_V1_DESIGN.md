@@ -1,8 +1,25 @@
 # AutoTune v1 — Locked Design Summary
 
 **Generated:** 2026-03-19
-**Status:** Design phase complete for Phase A1 (structure_short) and Phase A2 (structure_medium)
-**Next step:** Implementation scoping / Claude Code prompt
+**Status:** Implementation complete — Phase A1 harness build
+**Implementation date:** 2026-03-19
+**Baseline accuracy (structure_short):** 0.356 (train split 2024-04-01 to 2025-12-31)
+
+---
+
+## Implementation Notes
+
+### Data Availability Deviation
+yFinance limits 1H data to ~730 days. Original spec requested 2020-01-01 to 2025-12-31.
+Actual available range: 2024-03-19 to 2026-03-19 (~11,400 bars from GC=F).
+- **Train split:** 2024-04-01 to 2025-12-31
+- **Validation split:** 2026-01-01 to 2026-12-31
+
+### Shim Feasibility: Outcome A (Subclass Override)
+The production `StructureLens._detect_swings()` converts `swing_sensitivity` enum to int via `_SENSITIVITY_WINDOW.get(sensitivity, 5)`. The shim subclasses `StructureLens` and overrides `_detect_swings()` to accept a numeric `_pivot_window_override` from config. No monkeypatching. Continuous pivot_window search is fully supported.
+
+### ATR Implementation
+The `ta` library failed to install in the build environment. ATR is implemented manually using Wilder's smoothed moving average formula (period 14). Verified against known values in tests.
 
 ---
 
@@ -19,7 +36,7 @@
 - Lenses are deterministic Python functions with typed LensOutput contracts
 - AutoTune wraps existing production lenses — does not modify them
 - Production config uses `swing_sensitivity` enum; AutoTune manifest exposes `pivot_window` as numeric
-- Harness owns the enum→int translation layer
+- Harness owns the enum→int translation layer via `AutoTuneStructureLens` shim
 
 ### Instances
 | Property | structure_short | structure_medium |
@@ -38,6 +55,12 @@
 - **Unresolved:** neither threshold crossed — excluded from accuracy denominator
 - **Primary metric:** accuracy = confirmed / (confirmed + invalidated)
 - **Secondary metric:** resolve_rate = (confirmed + invalidated) / total_calls
+- **Sequential scan:** bar-by-bar, invalidation checked before confirmation (same-bar → INVALIDATED)
+
+### Acceptance Policy (3 conditions, all required)
+1. `candidate.accuracy > baseline.accuracy` (strict — ties rejected)
+2. `candidate.resolve_rate >= 0.70`
+3. `candidate.resolved_calls >= 0.80 × baseline.resolved_calls`
 
 ### Iteration Rules
 - One parameter change per iteration
@@ -49,27 +72,21 @@
 ### File Governance
 | File | Agent access | Purpose |
 |---|---|---|
-| `instance_manifest.json` | Read/write | Current best parameters + inline bounds |
+| `instance_manifest.json` | Via runner CLI only | Current best parameters + inline bounds |
 | `eval_config.json` | Read-only | Evaluator settings (horizon, ATR, stepping) |
-| `eval.py` | Read-only | Windowed evaluator code |
+| `evaluator.py` | Read-only | Windowed evaluator code |
 | `data_loader.py` | Read-only | Historical data fetcher |
 | `run.py` | Read-only | Orchestrator |
 | `program.md` | Read-only | Agent skill instructions |
-| `seed_manifest.json` | Read-only | Snapshot of initial params (written once at session start) |
+| `sessions/*/active/seed_manifest.json` | Read-only | Snapshot of initial params |
 | `logs/experiment_log.jsonl` | Append-only | Full iteration history |
-
-### Overfitting Strategy (for implementation)
-- Train/test split: e.g., 2020–2024 for tuning, 2025–2026 held out
-- Agent sees training accuracy only
-- Human reviews validation accuracy
-- Early stopping if training improves but validation degrades
 
 ---
 
 ## Phased Build Order
 
-### Phase A1 — structure_short (first)
-Tune structure_short in isolation. Prove the loop works.
+### Phase A1 — structure_short (COMPLETE)
+Tune structure_short in isolation. Harness loop proven.
 
 ### Phase A2 — structure_medium
 Tune structure_medium in isolation. Confirm both instances produce meaningfully different behavior.
@@ -89,18 +106,13 @@ Support authoring new deterministic lenses. Register, tune, compare using the sa
 
 | File | Description |
 |---|---|
-| `eval_config.json` | Read-only evaluator configuration |
+| `eval_config.json` | Read-only evaluator configuration with train/validation date ranges |
 | `instance_manifest.json` | Agent-editable parameter manifest with inline bounds |
-| `experiment_log_schema.json` | Schema + examples for the JSONL experiment log |
-| This file | Locked design summary |
-
----
-
-## Open for Implementation Phase
-
-- Train/test date split: exact years to lock
-- Data loader: yFinance pull + local cache format (parquet vs CSV)
-- `program.md` content: agent skill instructions
-- `run.py` orchestration: CLI interface, session management
-- Harness shim: where exactly to inject pivot_window bypass
-- Wall-clock budget: target iterations per session
+| `experiment_log_schema.json` | Schema reference for the JSONL experiment log |
+| `evaluator.py` | Windowed evaluator — ATR-scaled, sequential scan, deterministic |
+| `data_loader.py` | yFinance data fetcher with parquet caching |
+| `run.py` | Runner/orchestrator with acceptance policy and session management |
+| `shims/structure_shim.py` | Outcome A pivot_window shim (subclass override) |
+| `program.md` | Agent skill file for future optimization agent |
+| `tests/` | Test suite covering evaluator, runner, acceptance policy |
+| This file | Design summary |
