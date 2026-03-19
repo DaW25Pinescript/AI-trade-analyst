@@ -38,7 +38,7 @@
     "lens_family": "structure",
     "parameters": {
       "lookback_bars": {
-        "current": 140,
+        "current": 190,
         "min": 100,
         "max": 220,
         "step": 10,
@@ -46,7 +46,7 @@
         "description": "Bars of price history analysed. Higher = smoother, more durable structure levels"
       },
       "pivot_window": {
-        "current": 6,
+        "current": 9,
         "min": 5,
         "max": 10,
         "step": 1,
