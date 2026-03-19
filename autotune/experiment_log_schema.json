@@ -1,0 +1,207 @@
+{
+  "meta": {
+    "version": "v1.0",
+    "description": "Schema for experiment_log.jsonl — append-only, one JSON object per line, one line per iteration",
+    "file_path": "logs/experiment_log.jsonl",
+    "notes": "This file defines the schema. The actual log is append-only JSONL in logs/"
+  },
+  "schema": {
+    "experiment_id": {
+      "type": "string",
+      "format": "auto-incrementing padded integer",
+      "example": "EXP-0001",
+      "description": "Unique experiment identifier, monotonically increasing"
+    },
+    "instance_id": {
+      "type": "string",
+      "enum": ["structure_short", "structure_medium"],
+      "description": "Which lens instance was being tuned"
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "ISO 8601",
+      "description": "When this iteration completed"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Groups iterations within one tuning session for resumability"
+    },
+    "iteration": {
+      "type": "integer",
+      "description": "1-indexed iteration number within this session"
+    },
+    "change": {
+      "parameter": {
+        "type": "string",
+        "description": "Which parameter was changed (e.g. 'lookback_bars', 'pivot_window')"
+      },
+      "old_value": {
+        "type": "number",
+        "description": "Value before this iteration"
+      },
+      "new_value": {
+        "type": "number",
+        "description": "Value proposed for this iteration"
+      }
+    },
+    "params_snapshot": {
+      "type": "object",
+      "description": "Full parameter state used for this evaluation run (all params, not just the changed one)",
+      "example": {
+        "lookback_bars": 60,
+        "pivot_window": 3
+      }
+    },
+    "metrics": {
+      "total_calls": {
+        "type": "integer",
+        "description": "Total bullish + bearish calls issued (excluding ranging)"
+      },
+      "confirmed": {
+        "type": "integer",
+        "description": "Calls where price confirmed in predicted direction within horizon"
+      },
+      "invalidated": {
+        "type": "integer",
+        "description": "Calls where price moved against prediction within horizon"
+      },
+      "unresolved": {
+        "type": "integer",
+        "description": "Calls where neither threshold was crossed within horizon"
+      },
+      "accuracy": {
+        "type": "float",
+        "description": "confirmed / (confirmed + invalidated). Unresolved excluded from denominator.",
+        "range": "0.0–1.0"
+      },
+      "resolve_rate": {
+        "type": "float",
+        "description": "(confirmed + invalidated) / total_calls. How often the scorer reached a verdict.",
+        "range": "0.0–1.0"
+      }
+    },
+    "diagnostics": {
+      "ranging_calls": {
+        "type": "integer",
+        "description": "How many times the lens called 'ranging' (excluded from primary score)"
+      },
+      "ranging_pct": {
+        "type": "float",
+        "description": "ranging_calls / (total_calls + ranging_calls)"
+      },
+      "bullish_calls": {
+        "type": "integer",
+        "description": "Total bullish direction calls"
+      },
+      "bearish_calls": {
+        "type": "integer",
+        "description": "Total bearish direction calls"
+      },
+      "mean_atr_at_call": {
+        "type": "float",
+        "description": "Average ATR(14) value across all scored calls, for regime context"
+      },
+      "data_range": {
+        "type": "string",
+        "description": "Date range of the evaluation window, e.g. '2020-01-01 to 2024-12-31'"
+      }
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["accepted", "rejected"],
+      "description": "Did this iteration improve accuracy? accepted = manifest updated, rejected = reverted"
+    },
+    "accuracy_before": {
+      "type": "float",
+      "description": "Accuracy of the previous best configuration (baseline for comparison)"
+    },
+    "accuracy_after": {
+      "type": "float",
+      "description": "Accuracy of the proposed configuration"
+    },
+    "accuracy_delta": {
+      "type": "float",
+      "description": "accuracy_after - accuracy_before. Positive = improvement."
+    },
+    "agent_reasoning": {
+      "type": "string",
+      "description": "Brief agent note on why this change was proposed (optional but recommended)"
+    }
+  },
+  "example_entries": [
+    {
+      "experiment_id": "EXP-0001",
+      "instance_id": "structure_short",
+      "timestamp_utc": "2026-03-20T14:32:00Z",
+      "session_id": "session-001",
+      "iteration": 1,
+      "change": {
+        "parameter": "lookback_bars",
+        "old_value": 60,
+        "new_value": 55
+      },
+      "params_snapshot": {
+        "lookback_bars": 55,
+        "pivot_window": 3
+      },
+      "metrics": {
+        "total_calls": 1842,
+        "confirmed": 978,
+        "invalidated": 714,
+        "unresolved": 150,
+        "accuracy": 0.578,
+        "resolve_rate": 0.919
+      },
+      "diagnostics": {
+        "ranging_calls": 623,
+        "ranging_pct": 0.253,
+        "bullish_calls": 1012,
+        "bearish_calls": 830,
+        "mean_atr_at_call": 18.45,
+        "data_range": "2020-01-01 to 2024-12-31"
+      },
+      "decision": "accepted",
+      "accuracy_before": 0.561,
+      "accuracy_after": 0.578,
+      "accuracy_delta": 0.017,
+      "agent_reasoning": "Reducing lookback from 60 to 55 to test whether more reactive structure detection improves short-horizon confirmation rate"
+    },
+    {
+      "experiment_id": "EXP-0002",
+      "instance_id": "structure_short",
+      "timestamp_utc": "2026-03-20T14:35:12Z",
+      "session_id": "session-001",
+      "iteration": 2,
+      "change": {
+        "parameter": "pivot_window",
+        "old_value": 3,
+        "new_value": 4
+      },
+      "params_snapshot": {
+        "lookback_bars": 55,
+        "pivot_window": 4
+      },
+      "metrics": {
+        "total_calls": 1687,
+        "confirmed": 876,
+        "invalidated": 672,
+        "unresolved": 139,
+        "accuracy": 0.566,
+        "resolve_rate": 0.918
+      },
+      "diagnostics": {
+        "ranging_calls": 778,
+        "ranging_pct": 0.316,
+        "bullish_calls": 923,
+        "bearish_calls": 764,
+        "mean_atr_at_call": 18.52,
+        "data_range": "2020-01-01 to 2024-12-31"
+      },
+      "decision": "rejected",
+      "accuracy_before": 0.578,
+      "accuracy_after": 0.566,
+      "accuracy_delta": -0.012,
+      "agent_reasoning": "Testing wider pivot window to see if fewer but stronger swing points improve accuracy. Result: accuracy dropped, also note increased ranging percentage suggesting the lens became less decisive."
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "meta": {
+    "version": "v1.0",
+    "description": "Agent-editable parameter manifest — overwrites to best-so-far each accepted iteration",
+    "rules": [
+      "Agent may only modify 'current' values within declared min/max bounds",
+      "Agent must respect 'step' granularity",
+      "Agent must not add, remove, or rename parameters",
+      "Agent must not change min, max, step, or mutable fields",
+      "One parameter change per iteration"
+    ]
+  },
+  "structure_short": {
+    "instance_id": "structure_short",
+    "lens_family": "structure",
+    "parameters": {
+      "lookback_bars": {
+        "current": 60,
+        "min": 40,
+        "max": 100,
+        "step": 5,
+        "mutable": true,
+        "description": "Bars of price history analysed. Lower = more reactive to recent structure"
+      },
+      "pivot_window": {
+        "current": 3,
+        "min": 2,
+        "max": 6,
+        "step": 1,
+        "mutable": true,
+        "description": "Bars on each side of a swing point for pivot detection. Lower = more swing points, more reactive",
+        "production_mapping": "Replaces swing_sensitivity enum at harness level. Production values: low=3, medium=5, high=8"
+      }
+    }
+  },
+  "structure_medium": {
+    "instance_id": "structure_medium",
+    "lens_family": "structure",
+    "parameters": {
+      "lookback_bars": {
+        "current": 140,
+        "min": 100,
+        "max": 220,
+        "step": 10,
+        "mutable": true,
+        "description": "Bars of price history analysed. Higher = smoother, more durable structure levels"
+      },
+      "pivot_window": {
+        "current": 6,
+        "min": 5,
+        "max": 10,
+        "step": 1,
+        "mutable": true,
+        "description": "Bars on each side of a swing point for pivot detection. Higher = fewer but more significant swings",
+        "production_mapping": "Replaces swing_sensitivity enum at harness level. Production values: low=3, medium=5, high=8"
+      }
+    }
+  }
+}

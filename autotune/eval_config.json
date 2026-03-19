@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "version": "v1.0",
+    "description": "Evaluator configuration — read-only, agent must not modify",
+    "instrument": "XAUUSD",
+    "timeframe": "1H",
+    "notes": "ATR-scaled scoring makes thresholds portable across volatility regimes"
+  },
+  "structure_short": {
+    "instance_id": "structure_short",
+    "lens_family": "structure",
+    "instrument": "XAUUSD",
+    "timeframe": "1H",
+    "horizon_bars": 4,
+    "step_bars": 4,
+    "sampling_mode": "non_overlapping",
+    "atr_period": 14,
+    "confirmation_atr_mult": 0.25,
+    "invalidation_atr_mult": 0.25,
+    "scored_directions": ["bullish", "bearish"],
+    "excluded_directions": ["ranging"],
+    "outcome_classes": {
+      "confirmed": "price moved >= confirmation_atr_mult * ATR in predicted direction within horizon",
+      "invalidated": "price moved >= invalidation_atr_mult * ATR against predicted direction within horizon",
+      "unresolved": "neither threshold crossed within horizon"
+    }
+  },
+  "structure_medium": {
+    "instance_id": "structure_medium",
+    "lens_family": "structure",
+    "instrument": "XAUUSD",
+    "timeframe": "1H",
+    "horizon_bars": 12,
+    "step_bars": 12,
+    "sampling_mode": "non_overlapping",
+    "atr_period": 14,
+    "confirmation_atr_mult": 0.25,
+    "invalidation_atr_mult": 0.25,
+    "scored_directions": ["bullish", "bearish"],
+    "excluded_directions": ["ranging"],
+    "outcome_classes": {
+      "confirmed": "price moved >= confirmation_atr_mult * ATR in predicted direction within horizon",
+      "invalidated": "price moved >= invalidation_atr_mult * ATR against predicted direction within horizon",
+      "unresolved": "neither threshold crossed within horizon"
+    }
+  }
+}
