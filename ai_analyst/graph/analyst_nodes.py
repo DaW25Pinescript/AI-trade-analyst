@@ -461,3 +461,91 @@ async def deliberation_node(state: GraphState) -> GraphState:
 
     state["deliberation_outputs"] = delib_outputs
     return state
+
+
+# ---------------------------------------------------------------------------
+# Analysis Engine path (PR-AE-5) — additive only
+# ---------------------------------------------------------------------------
+
+from ..core.engine_analyst_runner import EngineAnalystRunResult, run_engine_analyst
+from ..models.engine_output import AnalysisEngineOutput
+from ..models.persona_contract import (
+    DEFAULT_ANALYST_CONTRACT,
+    RISK_OFFICER_CONTRACT,
+)
+from ..core.persona_validators import ValidationResult
+
+
+async def engine_analyst_node(state: GraphState) -> GraphState:
+    """Run Analysis Engine personas against the evidence snapshot.
+
+    Reads ``evidence_snapshot`` and ``evidence_run_status`` from state,
+    runs both DEFAULT_ANALYST and RISK_OFFICER in parallel, and writes
+    ``engine_outputs`` and ``engine_validator_results``.
+
+    On per-persona failure: logs warning, skips failed persona.
+    Requires at least one valid result.
+    Does not modify any legacy state fields.
+    """
+    snapshot = state.get("evidence_snapshot")
+    if snapshot is None:
+        raise RuntimeError("engine_analyst_node: evidence_snapshot is missing from state")
+
+    run_status = state.get("evidence_run_status")
+    if run_status is None:
+        raise RuntimeError("engine_analyst_node: evidence_run_status is missing from state")
+
+    # Use ground_truth.run_id if available, otherwise generate one
+    ground_truth = state.get("ground_truth")
+    run_id = ground_truth.run_id if ground_truth else "engine-unknown"
+
+    macro_context = state.get("macro_context")
+    # Convert MacroContext to dict if it's a pydantic model
+    macro_dict = None
+    if macro_context is not None:
+        if hasattr(macro_context, "model_dump"):
+            macro_dict = macro_context.model_dump()
+        elif isinstance(macro_context, dict):
+            macro_dict = macro_context
+
+    contracts = [DEFAULT_ANALYST_CONTRACT, RISK_OFFICER_CONTRACT]
+
+    tasks = [
+        run_engine_analyst(
+            persona_contract=contract,
+            snapshot=snapshot,
+            run_status=run_status,
+            run_id=run_id,
+            macro_context=macro_dict,
+        )
+        for contract in contracts
+    ]
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    engine_outputs: list[AnalysisEngineOutput] = []
+    engine_validator_results: list[list[ValidationResult]] = []
+
+    for i, result in enumerate(results):
+        persona = contracts[i].persona_id.value
+        if isinstance(result, EngineAnalystRunResult):
+            engine_outputs.append(result.output)
+            engine_validator_results.append(result.validator_results)
+            logger.info(
+                "[engine_analyst_node] %s succeeded: action=%s confidence=%s",
+                persona, result.output.recommended_action, result.output.confidence,
+            )
+        else:
+            logger.warning(
+                "[engine_analyst_node] %s failed: %s",
+                persona, str(result)[:300],
+            )
+
+    if not engine_outputs:
+        raise RuntimeError(
+            "engine_analyst_node: all personas failed, no valid engine outputs"
+        )
+
+    state["engine_outputs"] = engine_outputs
+    state["engine_validator_results"] = engine_validator_results
+    return state

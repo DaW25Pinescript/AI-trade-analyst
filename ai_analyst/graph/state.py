@@ -1,8 +1,10 @@
-from typing import TypedDict, Optional
+from typing import Literal, TypedDict, Optional
 from ..models.ground_truth import GroundTruthPacket
 from ..models.lens_config import LensConfig
 from ..models.analyst_output import AnalystOutput, OverlayDeltaReport
 from ..models.arbiter_output import FinalVerdict
+from ..models.engine_output import AnalysisEngineOutput
+from ..core.persona_validators import ValidationResult
 
 # Runtime import — LangGraph resolves TypedDict annotations via get_type_hints()
 # at StateGraph construction time, so MacroContext must be importable at runtime.
@@ -33,3 +35,8 @@ class GraphState(TypedDict):
     _stage_trace: Optional[list]                    # ordered list of stage trace dicts
     _analyst_results: Optional[list]                # per-analyst result/skip/fail records
     _arbiter_meta: Optional[dict]                   # arbiter model/provider/duration_ms
+    # Analysis Engine path (PR-AE-5) — additive only
+    evidence_snapshot: Optional[dict]                                                   # plain dict evidence snapshot
+    evidence_run_status: Optional[Literal["SUCCESS", "DEGRADED", "FAILED"]]            # snapshot build status
+    engine_outputs: Optional[list[AnalysisEngineOutput]]                                # engine persona outputs
+    engine_validator_results: Optional[list[list[ValidationResult]]]                    # per-persona validator results
