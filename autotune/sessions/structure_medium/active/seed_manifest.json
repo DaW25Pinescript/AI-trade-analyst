@@ -1,0 +1,23 @@
+{
+  "instance_id": "structure_medium",
+  "lens_family": "structure",
+  "parameters": {
+    "lookback_bars": {
+      "current": 140,
+      "min": 100,
+      "max": 220,
+      "step": 10,
+      "mutable": true,
+      "description": "Bars of price history analysed. Higher = smoother, more durable structure levels"
+    },
+    "pivot_window": {
+      "current": 6,
+      "min": 5,
+      "max": 10,
+      "step": 1,
+      "mutable": true,
+      "description": "Bars on each side of a swing point for pivot detection. Higher = fewer but more significant swings",
+      "production_mapping": "Replaces swing_sensitivity enum at harness level. Production values: low=3, medium=5, high=8"
+    }
+  }
+}
