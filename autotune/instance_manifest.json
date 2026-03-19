@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "v1.0",
-    "description": "Agent-editable parameter manifest — overwrites to best-so-far each accepted iteration",
+    "description": "Agent-editable parameter manifest \u2014 overwrites to best-so-far each accepted iteration",
     "rules": [
       "Agent may only modify 'current' values within declared min/max bounds",
       "Agent must respect 'step' granularity",
@@ -15,7 +15,7 @@
     "lens_family": "structure",
     "parameters": {
       "lookback_bars": {
-        "current": 60,
+        "current": 80,
         "min": 40,
         "max": 100,
         "step": 5,
@@ -23,7 +23,7 @@
         "description": "Bars of price history analysed. Lower = more reactive to recent structure"
       },
       "pivot_window": {
-        "current": 3,
+        "current": 2,
         "min": 2,
         "max": 6,
         "step": 1,

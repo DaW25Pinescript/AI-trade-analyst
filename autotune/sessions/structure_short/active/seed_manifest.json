@@ -1,0 +1,23 @@
+{
+  "instance_id": "structure_short",
+  "lens_family": "structure",
+  "parameters": {
+    "lookback_bars": {
+      "current": 60,
+      "min": 40,
+      "max": 100,
+      "step": 5,
+      "mutable": true,
+      "description": "Bars of price history analysed. Lower = more reactive to recent structure"
+    },
+    "pivot_window": {
+      "current": 3,
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "mutable": true,
+      "description": "Bars on each side of a swing point for pivot detection. Lower = more swing points, more reactive",
+      "production_mapping": "Replaces swing_sensitivity enum at harness level. Production values: low=3, medium=5, high=8"
+    }
+  }
+}
