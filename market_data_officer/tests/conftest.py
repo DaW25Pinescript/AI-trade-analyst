@@ -204,10 +204,11 @@ def stale_packages_dir(hot_packages_dir):
     manifest["as_of_utc"] = three_hours_ago.strftime("%Y-%m-%dT%H:%M:%SZ")
     manifest_path.write_text(json.dumps(manifest, indent=2))
 
-    # Also make the 1m CSV data stale by shifting timestamps back
-    csv_path = hot_packages_dir / "EURUSD_1m_latest.csv"
-    df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
-    df.index = df.index - timedelta(hours=3)
-    df.to_csv(csv_path)
+    # Make ALL CSV data stale by shifting timestamps back
+    # (staleness check uses highest-resolution available TF, not just 1m)
+    for csv_file in hot_packages_dir.glob("EURUSD_*_latest.csv"):
+        df = pd.read_csv(csv_file, index_col=0, parse_dates=True)
+        df.index = df.index - timedelta(hours=3)
+        df.to_csv(csv_file)
 
     return hot_packages_dir

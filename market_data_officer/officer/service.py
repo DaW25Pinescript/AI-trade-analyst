@@ -26,7 +26,7 @@ from .contracts import (
     StructureRegime,
 )
 from .features import compute_core_features
-from .loader import EXPECTED_TIMEFRAMES, PACKAGES_DIR, load_all_timeframes, load_manifest
+from .loader import EXPECTED_TIMEFRAMES, PACKAGES_DIR, get_expected_timeframes, load_all_timeframes, load_manifest
 from .quality import check_package_quality
 from .summarizer import build_state_summary
 from market_data_officer.structure.reader import load_structure_summary, structure_is_available
@@ -113,6 +113,18 @@ def _build_timeframe_rows(df: pd.DataFrame) -> list:
             "volume": float(row["volume"]),
         })
     return rows
+
+
+def _get_canonical_tf(instrument: str, timeframes_data: dict[str, pd.DataFrame]) -> str:
+    """Return highest-resolution timeframe that has data.
+
+    FX: typically "5m"
+    Metals: typically "15m"
+    """
+    for tf in ("5m", "15m", "1h", "4h", "1d"):
+        if tf in timeframes_data and not timeframes_data[tf].empty:
+            return tf
+    return "1d"  # absolute fallback
 
 
 def _assemble_regime(packets: dict[str, dict]) -> StructureRegime | None:
@@ -322,8 +334,8 @@ def build_market_packet(
                 instrument=instrument,
                 as_of_utc=as_of_utc,
                 source={
-                    "vendor": "dukascopy",
-                    "canonical_tf": "1m",
+                    "vendor": "unknown",
+                    "canonical_tf": "1d",
                     "quality": "unverified",
                 },
                 timeframes={},
@@ -360,7 +372,17 @@ def build_market_packet(
                 structure=StructureBlock.unavailable(),
             )
     else:
-        quality_block = check_package_quality(instrument, packages_dir, now_utc)
+        # Load all timeframes first — needed for both quality and packet
+        timeframes_data = load_all_timeframes(instrument, packages_dir)
+        _using_pricestore = bool(timeframes_data) and os.getenv("TDP_DATA_DIR", "")
+
+        if _using_pricestore:
+            quality_block = check_package_quality(
+                instrument, packages_dir, now_utc, timeframes_data=timeframes_data,
+            )
+        else:
+            quality_block = check_package_quality(instrument, packages_dir, now_utc)
+
         try:
             manifest = load_manifest(instrument, packages_dir)
             manifest_vendors = manifest.get("vendors", ["dukascopy"])
@@ -381,13 +403,23 @@ def build_market_packet(
         data_quality = "validated"
         source_quality = "validated"
 
-    # Load all timeframes
-    timeframes_data = load_all_timeframes(instrument, packages_dir)
+    # Load timeframes if not already loaded above (unverified path)
+    if "timeframes_data" not in dir():
+        timeframes_data = load_all_timeframes(instrument, packages_dir)
 
-    # Build timeframe section for packet
+    # Build timeframe section for packet — use per-instrument expected TFs
+    expected_tfs = get_expected_timeframes(instrument)
     timeframes_packet: Dict[str, dict] = {}
-    for tf in EXPECTED_TIMEFRAMES:
+    for tf in expected_tfs:
         if tf in timeframes_data:
+            df = timeframes_data[tf]
+            timeframes_packet[tf] = {
+                "count": len(df),
+                "rows": _build_timeframe_rows(df),
+            }
+    # Also include any legacy TFs present but not in expected (backward compat)
+    for tf in timeframes_data:
+        if tf not in timeframes_packet:
             df = timeframes_data[tf]
             timeframes_packet[tf] = {
                 "count": len(df),
@@ -421,18 +453,25 @@ def build_market_packet(
     else:
         structure_block = StructureBlock.unavailable()
 
-    # Derive vendor label from manifest provenance
-    vendor_label = (
-        manifest_vendors[0] if len(manifest_vendors) == 1
-        else "+".join(manifest_vendors)
-    )
+    # Vendor label: PriceStore path reflects adapter source, CSV path uses manifest
+    _using_pricestore = "timeframes_data" in dir() and os.getenv("TDP_DATA_DIR", "")
+    if _using_pricestore:
+        vendor_label = "pricestore"
+    else:
+        vendor_label = (
+            manifest_vendors[0] if len(manifest_vendors) == 1
+            else "+".join(manifest_vendors)
+        )
+
+    # Dynamic canonical_tf — highest-resolution TF with data
+    canonical_tf = _get_canonical_tf(instrument, timeframes_data)
 
     return MarketPacketV2(
         instrument=instrument,
         as_of_utc=as_of_utc,
         source={
             "vendor": vendor_label,
-            "canonical_tf": "1m",
+            "canonical_tf": canonical_tf,
             "quality": source_quality,
         },
         timeframes=timeframes_packet,

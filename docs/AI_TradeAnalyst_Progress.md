@@ -1,7 +1,7 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 17 March 2026 (PR-REFLECT-3 complete — Phase 8 complete)
+**Last updated:** 26 March 2026 (MacroContext UI backlog note added)
 **Review date:** 10 March 2026
 **Current phase:** Phase 8 — Complete (PR-REFLECT-3: suggestions v0, cross-workspace navigation, coherence fixes)
 **Planning horizon:** Next 5–7 weeks
@@ -36,6 +36,7 @@
 
 | Date | Phase | Activity |
 |------|-------|----------|
+| 26 Mar 2026 | Backlog | MacroContext UI workspace backlog note recorded. Concept preserved, not committed to roadmap. See Section 9. |
 | 17 Mar 2026 | PR-REFLECT-3 | Integration bridge + suggestions v0: rules-based advisory suggestions (OVERRIDE_FREQ_HIGH, NO_TRADE_CONCENTRATION), SuggestionPanel on Reflect Overview, persona row → Agent Ops Detail navigation via `navigable_entity_id`, URL param consumption with router replace, C-6 coherence fix (clear run state on mode change), entity-not-found message update. +35 backend tests (489 total), +25 frontend tests (406 total). Phase 8 complete. |
 | 16 Mar 2026 | PR-CHART-2 | Run context overlay + multi-timeframe charts shipped: data-driven TF tabs (from TF discovery endpoint), run-time candle markers via `createSeriesMarkers`, verdict annotation with §4.4 normalization, 10 UI states per §5.3, TF discovery endpoint (`GET /market-data/{instrument}/timeframes`). +20 frontend tests (381 total), +11 backend tests (454 total) |
 | 16 Mar 2026 | PR-REFLECT-2 | Reflect workspace frontend shipped: `#/reflect` route, Overview tab (persona performance + pattern summary tables), Runs tab (run history + inline bundle detail). +55 frontend tests (361 total) |
@@ -73,6 +74,7 @@
 | — | ML Pattern Detection | Statistical models replacing rules-based suggestions | 💭 Concept | PR-REFLECT-2 + run volume |
 | — | Control-Plane Actions | Agent start/stop/retry in Ops workspace | 💭 Concept | Phase 7 complete |
 | — | Live Push Updates | SSE/WebSocket for real-time health and trace updates | 💭 Concept | Phase 7 complete |
+| — | MacroContext Workspace | Macro lane visibility — global state, per-instrument cards, sentiment feed | 💭 Backlog | Macro engine Phase 1 outputs |
 
 ---
 
@@ -137,7 +139,7 @@ Delivered PR-UI-2 — the Triage Board MVP with real backend data rendering, sha
 
 ### Previous increment — PR-UI-1: React App Shell (13 Mar 2026)
 
-Delivered PR-UI-1 — the React + TypeScript + Tailwind app shell in `ui/`. Includes Vite build tooling, hash-based routing for all workspaces, typed API client layer (`apiFetch<T>`) with mixed error-detail preservation per UI_CONTRACT.md §11, typed triage endpoint functions (`fetchWatchlistTriage`, `triggerTriage`) matching §9.5, TanStack Query scaffolding, Vite proxy config for backend API, Tailwind styling, and Vitest smoke tests. All routes render placeholder pages (no blank pages). Default route redirects to `#/triage`. Build passes, typecheck clean, 5 smoke tests green. Repo-shape locked: `ui/src/shared/` for cross-workspace code, `ui/src/workspaces/<name>/` for workspace-specific code. Coexists with legacy `app/` — no backend modifications.
+Delivered PR-UI-1 — the React + TypeScript + Tailwind app shell in `ui/`. Includes Vite build tooling, hash-based routing for all workspaces, typed API client layer (`apiFetch<T>`) with mixed error-detail preservation per UI_CONTRACT.md §11, typed triage endpoint functions (`fetchWatchlistTriage`, `triggerTriage`) matching §9.5, TanStack Query scaffolding, Vite proxy config for backend API, Tailwind styling, and Vitest smoke tests. All routes render placeholder pages (no blank pages). Default route redirects to `#/triage`. Build passes, typecheck clean, 5 smoke tests green. Repo-shape locked: `ui/src/shared/` for cross-workspace code, `ui/src/workspaces/<n>/` for workspace-specific code. Coexists with legacy `app/` — no backend modifications.
 
 ### Previous increment — UI Re-Entry Governance (13 Mar 2026)
 
@@ -170,7 +172,7 @@ Reopened UI implementation lane. Locked React + TypeScript + Tailwind as forward
 - Wireframes produced and locked for: Triage Board (3 iterations), Journey Studio (2 iterations), Analysis Run (3 iterations with 4-state lifecycle grid).
 - Component Design System produced with four columns (Trust/Freshness Indicators, Action Buttons, Information Panels, State Labels) plus four Composition Patterns (trust strip, execution stack, conditional rail, post-action lock).
 - All design artifacts are contract-faithful — every element maps to `UI_CONTRACT.md` sections 6, 7, 9–12 and `UI_WORKSPACES.md` sections 5–7.
-- Phased exposure plan defined: Phase 3A (Triage Board, Journey Studio, Journal & Review, Analysis Run cleanup), Phase 3B (Feeder, Ops, Analytics, optional streaming), Phase 3C (Chart Evidence, Run Artifact Inspector).
+- Phased exposure plan defined: Phase 3A (Triage Board, Journey Studio, Journal & Review, Analysis Run cleanup), Phase 3B (Feeder, Analytics, optional streaming), Phase 3C (Chart Evidence, Run Artifact Inspector).
 
 ### Previous increment — UI Phase 2 UI contract (12 Mar 2026)
 
@@ -181,7 +183,7 @@ Reopened UI implementation lane. Locked React + TypeScript + Tailwind as forward
 ### Previous increment — UI Phase 1 backend capability audit (12 Mar 2026)
 
 - Completed a repo-grounded backend-to-UI capability audit and published `docs/ui/UI_BACKEND_AUDIT.md`.
-- Inventory includes live FastAPI routes, request/response model shapes, runtime execution modes (sync vs SSE), artifact surfaces, and current `/app` usage coverage.
+- Inventory includes live FastAPI routes, request/response model shapes, runtime execution modes (sync vs SSE), artifact surfaces, and current `/app/` usage coverage.
 - Audit explicitly maps active-used vs active-unused capabilities to guide follow-on `UI_CONTRACT` and `UI_WORKSPACES` documentation phases.
 
 ### Previous increment — AI Analyst dev diagnostics (11 Mar 2026)
@@ -321,24 +323,10 @@ Phase-closure counts should be read as **phase-gate numbers**, not as a single a
 From repo docs and current structure, the meaningful remaining work is concentrated in:
 
 1. **Observability and seam visibility** — ✅ **Phase 2 Complete** (12 March 2026)
-   - Observability Phase 1 shipped run records and stdout summaries.
-   - Observability Phase 2 shipped 16 structured event codes across MDO scheduler, feeder, triage, graph.
-   - Agent Ops trace endpoint (Phase 7) projects run-level observability to the UI.
 2. **Packaging and import stability** — ✅ **Complete** (TD-3, 12 March 2026)
-   - 27 `sys.path.insert` calls removed; `pyproject.toml` fixed; `pip install -e .` works in clean venv.
-   - 16 import stability tests added (TD-11 resolved).
 3. **Cleanup and consistency** — ✅ **Complete** (13 March 2026)
-   - Async-marker cleanup done (30 markers removed).
-   - TD-5 (enum centralisation) and TD-9 (unused vars) resolved.
-   - Doc consolidation complete.
 4. **UI implementation** — ✅ **Core product lane complete** (14 March 2026), **Agent Ops complete** (15 March 2026)
-   - Phase 6: Triage Board, Journey Studio, Analysis Run, Journal & Review — all shipped.
-   - Phase 7: Agent Ops Org/Health/Run modes + Detail sidebar — all shipped.
-   - Forward stack: React + TypeScript + Tailwind.
-   - Phase 3B remainder (Feeder, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
-5. **Future runtime-lane convergence**
-   - The split between analyst, graph, MDO, and legacy lanes still shapes long-term architecture cleanup.
-   - Now lower priority — observability, packaging, and cleanup are all done.
+5. **Future runtime-lane convergence** — lower priority now that observability, packaging, and cleanup are done.
 
 ---
 
@@ -379,14 +367,6 @@ The repo has multiple moving lanes (analyst pipeline, graph orchestration, MDO f
 #### Objective
 Remove the `sys.path.insert` wiring footgun and establish proper packaging discipline.
 
-#### Context
-The technical debt register flags TD-3 as the main prerequisite for multi-environment stability and contributor onboarding. This is the structural wiring fix that makes everything downstream safer.
-
-#### Deliverables
-- Replace `sys.path.insert` usage with proper packaging (`pyproject.toml` / editable install).
-- Add import-path stability tests (TD-11 resolves as a follow-on).
-- Validate that the repo works cleanly in fresh environments without manual path manipulation.
-
 #### Done criteria
 - The repo is less environment-sensitive.
 - New contributors can set up and run without discovering import-path quirks.
@@ -399,39 +379,13 @@ The technical debt register flags TD-3 as the main prerequisite for multi-enviro
 #### Objective
 Close small friction items that reduce drift and improve contributor experience, without expanding into architecture surgery.
 
-#### Deliverables
-- Resolve pending async-marker cleanup (4 files).
-- Execute TD-5 (enum centralisation) and TD-9 (unused vars) as micro-PRs.
-- Reconcile duplicate phase summaries across docs.
-- Update `docs/specs/README.md` and docs indexes.
-- Keep the technical debt register current.
-
-#### Done criteria
-- New contributors can identify current phase and next implementation target in under 5 minutes.
-- There is no ambiguity about which progress document is authoritative.
-- TD-5 and TD-9 are closed.
-
 ---
 
 ### Priority D — UI Phase 3A Implementation (✅ complete)
 
-#### Objective
-Build the Phase 3A core product workspaces using the locked design artifacts.
-
 #### Status
-**Complete.** All Phase 3A core product workspaces shipped (13–14 March 2026):
-- PR-UI-1: React app shell (5 tests)
-- PR-UI-2: Triage Board MVP (30 tests)
-- PR-UI-3: Shared component extraction (66 tests)
-- PR-UI-4: Journey Studio MVP (132 tests)
-- PR-UI-5: Analysis Run MVP (201 tests)
-- PR-UI-6: Journal & Review MVP (243 tests)
-
-Agent Ops read-side stack also complete (Phase 7, 15 March 2026):
-- PR-OPS-1/2/3: Contract, backend, workspace shell
-- PR-OPS-4a/4b: Trace + detail backend endpoints (197 backend tests)
-- PR-OPS-5a/5b: Frontend wiring — Org/Health/Run modes + detail sidebar (63 frontend tests)
-
+**Complete.** All Phase 3A core product workspaces shipped (13–14 March 2026).
+Agent Ops read-side stack also complete (Phase 7, 15 March 2026).
 Phase 3B remainder (Feeder, Analytics, streaming) and Phase 3C (Chart Evidence, Run Artifact Inspector) remain fenced.
 
 ---
@@ -441,17 +395,9 @@ Phase 3B remainder (Feeder, Analytics, streaming) and Phase 3C (Chart Evidence, 
 #### Objective
 Reduce the architectural split between runtime lanes and address broader convergence only after observability, packaging, and cleanup are stronger.
 
-#### Deliverables
-- Revisit duplicated orchestration (TD-4) and mixed data-shape handling (TD-8) when seam confidence is stronger.
-- Treat Chart Evidence and Run Artifact Inspector as Phase 3C post-foundation UI extensions.
-- Address runtime-lane convergence (analyst, graph, MDO, legacy) as a deliberate architecture phase, not a side-effect of other work.
-
-#### Done criteria
-- Future cleanup and UI extension work can happen against stronger contracts and better CI coverage.
-
 #### Future architecture direction (post-foundation)
 
-**Future Design Direction — Reflective Intelligence Layer:** Human-governed review and policy-refinement architecture built on run-record audit trails. Intended to use Agent Ops observability and Journal & Review artifacts to surface recurring weaknesses, generate bounded hypotheses, and propose reversible policy changes for human approval. Becomes viable once the repo has stable run artifacts, Agent Ops observability surfaces, Journal & Review readback, and sufficient historical run volume. Not part of current UI re-entry implementation scope. Design note: `docs/design-notes/reflective_intelligence_layer.md`.
+**Future Design Direction — Reflective Intelligence Layer:** Human-governed review and policy-refinement architecture built on run-record audit trails. Becomes viable once the repo has stable run artifacts, Agent Ops observability surfaces, Journal & Review readback, and sufficient historical run volume. Not part of current UI re-entry implementation scope. Design note: `docs/design-notes/reflective_intelligence_layer.md`.
 
 ---
 
@@ -459,35 +405,15 @@ Reduce the architectural split between runtime lanes and address broader converg
 
 ### Completed (Weeks 1–4, 13–15 March 2026)
 
-- **PR-UI-1** (React app shell) ✅
-- **PR-UI-2** (Triage Board MVP) ✅
-- **PR-UI-3** (Shared component extraction) ✅
-- **PR-OPS-1** (Agent Ops contract spec) ✅
-- **PR-UI-4** (Journey Studio MVP) ✅
-- **PR-UI-5** (Analysis Run MVP) ✅
-- **PR-UI-6** (Journal & Review MVP) ✅ — Phase 6 complete
-- **PR-OPS-2** (Agent Ops roster + health backend) ✅
-- **PR-OPS-3** (Agent Ops workspace shell) ✅
-- **PR-OPS-4a/4b** (Agent trace + detail backend) ✅
-- **PR-OPS-5a/5b** (Agent Ops frontend wiring) ✅ — Phase 7 complete
+- **PR-UI-1** through **PR-UI-6** (Phase 6 complete) ✅
+- **PR-OPS-1** through **PR-OPS-5b** (Phase 7 complete) ✅
 
 ### Forward (Weeks 5–8, Phase 8: Charts + Reflective Intelligence)
 
-Prioritisation complete (15 March 2026). Two capability tracks running in parallel after Run Browser:
-
-**Week 5 (Week 1 of Phase 8): Run Browser**
-- PR-RUN-1: `GET /runs/` endpoint + RunBrowserPanel frontend — replaces paste-field run selector
-
-**Weeks 6–7 (Weeks 2–3): Live Candlestick Charts**
-- PR-CHART-1: OHLCV data endpoint + `lightweight-charts` candlestick component
-- PR-CHART-2: Run context overlay + multi-timeframe support
-
-**Weeks 7–8 (Weeks 4–5): Reflective Intelligence v1**
-- PR-REFLECT-1: Persona performance + pattern summary aggregation endpoints
-- PR-REFLECT-2: Reflective dashboard frontend — performance tables + anomaly highlighting
-
-**Week 9 (Week 6): Integration + Suggestions v0**
-- PR-REFLECT-3: Chart ↔ run integration, rules-based parameter suggestions
+**Week 5:** PR-RUN-1 ✅  
+**Weeks 6–7:** PR-CHART-1 ✅, PR-CHART-2  
+**Weeks 7–8:** PR-REFLECT-1 ✅, PR-REFLECT-2 ✅  
+**Week 9:** PR-REFLECT-3  
 
 Full plan: `docs/PHASE_8_PLAN.md`
 
@@ -495,110 +421,113 @@ Full plan: `docs/PHASE_8_PLAN.md`
 
 ## 5) Risks to Manage
 
-- ~~**Observability gap risk:**~~ **Resolved** — Obs Phase 1 + Phase 2 complete. Agent Ops trace endpoint ships run-level visibility to the UI.
-- ~~**Packaging fragility risk:**~~ **Resolved** — TD-3 complete (12 March 2026). All `sys.path.insert` calls removed; `pip install -e .` is the canonical install path.
-- ~~**Contract drift risk:**~~ **Mitigated** — 12 PRs shipped against `UI_CONTRACT.md` and `AGENT_OPS_CONTRACT.md` without contract drift. Governance rules held.
-- ~~**Design-implementation drift risk:**~~ **Mitigated** — all Phase 3A wireframes implemented faithfully across PR-UI-1 through PR-UI-6.
+- ~~**Observability gap risk:**~~ **Resolved**
+- ~~**Packaging fragility risk:**~~ **Resolved**
+- ~~**Contract drift risk:**~~ **Mitigated**
+- ~~**Design-implementation drift risk:**~~ **Mitigated**
 - **UI split risk:** Journey and legacy workflow surfaces diverge further if compatibility boundaries are not documented clearly.
 - **Seam blind-spot risk:** broad unit coverage may still miss cross-module orchestration and integration regressions.
-- ~~**Cleanup drift risk:**~~ **Resolved** — cleanup tranche complete (13 March 2026).
+- ~~**Cleanup drift risk:**~~ **Resolved**
 - **Scope-creep risk:** future extensions such as Chart Evidence or Run Artifact Inspector could jump ahead of prioritisation.
-- ~~**Run discovery gap:**~~ **Resolved** — PR-RUN-1 complete (15 March 2026). `GET /runs/` endpoint + RunBrowserPanel. Operators can browse, filter, and click-to-load runs. Paste-field retained as fallback.
+- ~~**Run discovery gap:**~~ **Resolved** — PR-RUN-1 complete.
 - **MDO collection errors:** 3 MDO scheduler test files fail collection due to missing `apscheduler` dependency — masks ~250 tests in CI.
-- **Pre-existing test failures:** 61 backend failures (code-vs-test drift, not new regressions) and 5 frontend journey freeze-error failures remain unchanged across Phase 8.
+- **Pre-existing test failures:** 61 backend failures and 5 frontend journey freeze-error failures remain unchanged.
 
 ---
 
 ## 6) Immediate Next Actions (Concrete)
 
-1. ~~CI Seam Hardening~~ — ✅ Complete (10 March 2026).
-2. ~~LLM Routing Centralisation~~ — ✅ Complete (11 March 2026).
-3. ~~Observability Phase 1~~ — ✅ Complete (11 March 2026). Run record + stdout summary shipped. 668 tests.
-4. ~~UI Phase 1 — Backend Capability Audit~~ — ✅ Complete (12 March 2026). `docs/ui/UI_BACKEND_AUDIT.md`.
-5. ~~UI Phase 2 — UI Contract~~ — ✅ Complete (12 March 2026). `docs/ui/UI_CONTRACT.md` promoted to **Active**.
-6. ~~UI Phase 3A — Workspace Blueprint + Visual Design~~ — ✅ Complete (12 March 2026). `UI_WORKSPACES.md`, `DESIGN_NOTES.md`, `VISUAL_APPENDIX.md`, wireframes, and component design system all locked.
-7. ~~Observability Phase 2~~ — ✅ Complete (12 March 2026). Diagnostic + implementation shipped. 16 structured event codes across MDO scheduler, feeder, triage, graph. 18 new tests. Spec: `docs/specs/observability_phase_2.md`.
-8. ~~TD-3 — packaging/import-path stability~~ — ✅ Complete (12 March 2026). 27 sys.path.insert calls removed, pyproject.toml fixed, 16 import stability tests added. Spec: `docs/specs/td3_packaging_import_stability.md`.
-9. ~~Cleanup tranche~~ — ✅ Complete (13 March 2026). Async markers cleaned, TD-5 enum centralisation resolved, TD-9 unused vars resolved, doc consolidation complete.
-10. ~~Runtime-hardening sequence~~ — ✅ Complete. Obs P2, TD-3, and cleanup tranche all closed.
-11. ~~**UI + Agent Ops implementation lane**~~ — ✅ Complete (15 March 2026). PR-UI-1 through PR-UI-6 (Phase 6 core product lane) and PR-OPS-1 through PR-OPS-5b (Phase 7 Agent Ops read-side stack) all shipped. 197 backend tests + 63 frontend tests. All spec ACs verified.
-12. Core product workflow lane is now complete end-to-end: Triage Board → Journey Studio → Analysis Run → Journal & Review.
-13. Agent Ops operator trust surface is now complete: Org mode → Health mode → Run mode → Detail sidebar, all wired to four backend endpoints.
-14. Keep **Chart Evidence Workspace** and **Run Artifact Inspector** in the post-foundation extension lane (Phase 3C).
-15. ~~**Next decision:** evaluate Phase 8 candidates~~ — ✅ PR-RUN-1 Run Browser complete (15 March 2026). `GET /runs/` endpoint + RunBrowserPanel. 239 backend + 77 frontend ops tests.
-16. ~~**Next:** PR-CHART-1 (OHLCV data-seam + candlestick chart)~~ — ✅ Complete (16 March 2026). Outcome A confirmed. `GET /market-data/{instrument}/ohlcv` + CandlestickChart in Run mode. 432 backend + 301 frontend tests.
-17. ~~**Next:** PR-REFLECT-1 (aggregation endpoints)~~ — ✅ Complete (16 March 2026). Three Reflect backend endpoints shipped. +11 backend tests.
-18. ~~**Next:** PR-REFLECT-2 (Reflect workspace frontend)~~ — ✅ Complete (16 March 2026). `#/reflect` route with Overview tab (persona performance + pattern summary tables) and Runs tab (run history + inline bundle detail). +55 frontend tests (361 total).
+1–18. (All previous actions complete — see Recent Activity above.)
 19. **Next:** PR-REFLECT-2a (filter controls for Reflect), PR-CHART-2 (run context overlay + multi-timeframe chart), PR-REFLECT-3 (suggestions + influence).
 
 ---
 
 ## 7) Decision Gate Before "Production-Ready" Claim
 
-Most of the earlier production-readiness gate has now been satisfied.
-
-**Already satisfied:**
-- Operational scheduler running with observable health.
-- Market-hours behavior and stale-data handling tested and deterministic.
-- Critical API guardrails tested and enforced.
-- `call_llm()` safeguards and resilience coverage shipped.
-- Single canonical progress/status document maintained.
-
-**Remaining gate — now closed (CI Seam Hardening, 10 March 2026):**
-- ✅ Important Python integration seams are CI-gated where intended — `mdo-tests` (644 tests) and `root-python-tests` (139 tests) jobs added.
-- ✅ At least one orchestration integration path is green in CI — `test_multi_analyst_integration.py` (make_packet → digest → personas → arbitrate → output) runs in `root-python-tests`.
-
 **The production-readiness gate is now satisfied.**
 
-The current execution gate is no longer production-readiness; runtime hardening (observability, packaging, developer/operator confidence) and UI buildout (Phase 6 core product lane + Phase 7 Agent Ops) are both complete. The repo is between active phases.
+The current execution gate is no longer production-readiness; runtime hardening and UI buildout are both complete. The repo is between active phases.
 
 ---
 
 ## 8) Technical Debt Register
 
-Findings from the senior architect audit conducted after Operationalise Phase 2 closure (644 tests, 10 March 2026). Items are severity-ranked and tagged with recommended resolution timing.
-
 ### Critical — resolve in next named phase or as micro-PR
 
 | # | Item | Location | Risk | Resolution timing |
 |---|------|----------|------|-------------------|
-| TD-1 | `assert` used for runtime contract enforcement | `analyst/arbiter.py` | Silent contract violation under `-O` flag; invalid state reaches downstream decision logic | **✅ Resolved — 10 March 2026** |
-| TD-2 | `call_llm()` lacks timeout, retry, circuit-breaker | `analyst/analyst.py`, LLM call path | Stalled upstream call blocks processing; unstable tail latency; failure amplification | **✅ Resolved — 10 March 2026** — timeout (60s), retry (2 max, exponential backoff), failure mapping to `RuntimeError`. |
-| TD-3 | `sys.path.insert` used as dependency wiring | Multiple core modules | Environment-dependent import resolution; deployment instability; shadowing risk | **✅ Resolved — 12 March 2026** — 27 path hacks removed, pyproject.toml fixed, all packages installable via `pip install -e .`, 16 import stability tests added |
+| TD-1 | `assert` used for runtime contract enforcement | `analyst/arbiter.py` | Silent contract violation under `-O` flag | **✅ Resolved — 10 March 2026** |
+| TD-2 | `call_llm()` lacks timeout, retry, circuit-breaker | `analyst/analyst.py` | Stalled upstream call blocks processing | **✅ Resolved — 10 March 2026** |
+| TD-3 | `sys.path.insert` used as dependency wiring | Multiple core modules | Environment-dependent import resolution | **✅ Resolved — 12 March 2026** |
 
 ### Maintenance — resolve opportunistically or as named cleanup
 
 | # | Item | Location | Risk | Resolution timing |
 |---|------|----------|------|-------------------|
-| TD-4 | Orchestration duplication (single vs multi-analyst) | `analyst/service.py`, `analyst/multi_analyst_service.py` | Parallel pipelines with drift risk; lifecycle changes must be made in two places | **Named cleanup** — extract shared orchestration steps into common helper; pick up after seam confidence improves |
-| TD-5 | Magic-string enum duplication | `analyst/analyst.py`, `analyst/personas.py`, `analyst/arbiter.py` | Verdict/confidence/alignment enums hand-maintained in multiple modules; drift and inconsistent validation | **✅ Resolved — 13 March 2026** — canonical source `analyst/enums.py`; 5 duplicated definitions removed from 4 modules |
-| TD-6 | `build_market_packet()` God-function | `market_data_officer/officer/service.py` | Trust policy, quality, feature extraction, serialization, and logging in one function; hard to test in isolation | **Future cleanup** — decompose when packet assembly needs to evolve; not blocking current work |
-| TD-7 | `build_market_packet()` eager loading + `iterrows()` | `market_data_officer/officer/service.py` | O(total_rows) Python loop per request; CPU/memory pressure scales with instrument count | **Future optimisation** — current scale (5 instruments, 4–6 TFs) is within tolerance; revisit when concurrency or instrument count grows |
-| TD-8 | Mixed data-shape handling in `classify_fvg_context` | `analyst/pre_filter.py` | `hasattr`/`get` branches for object vs dict payloads; weak upstream contracts | **Resolves with runtime lane convergence** — architectural, not a standalone cleanup |
-| TD-13 | Agent Ops run selector paste-field only | `ui/src/workspaces/ops/` | Operator friction; no browse/search for run artifacts | **✅ Resolved — 15 March 2026** — PR-RUN-1 shipped `GET /runs/` + RunBrowserPanel. Paste-field retained as fallback. |
-| TD-14 | Reflect artifact richness gap | `ai_analyst/api/services/reflect_aggregation.py` | `run_record.json` analyst entries omit stance/confidence/override; reflect metrics rely on optional audit-log enrichment | **Open** — consider enriched analyst metadata in future observability phase |
-| TD-9 | ~~Unused variables in `build_market_packet()`~~ | `market_data_officer/officer/service.py` | ~~`is_provisional`, `quality_label`, `quality_flags`, `struct_kwargs` assigned but unused~~ | ✅ **Resolved** (13 March 2026) — all four dead locals removed in PR-3 |
+| TD-4 | Orchestration duplication (single vs multi-analyst) | `analyst/service.py`, `analyst/multi_analyst_service.py` | Parallel pipelines with drift risk | **Named cleanup** |
+| TD-5 | Magic-string enum duplication | Multiple analyst modules | Drift and inconsistent validation | **✅ Resolved — 13 March 2026** |
+| TD-6 | `build_market_packet()` God-function | `market_data_officer/officer/service.py` | Hard to test in isolation | **Future cleanup** |
+| TD-7 | `build_market_packet()` eager loading + `iterrows()` | `market_data_officer/officer/service.py` | CPU/memory pressure at scale | **Future optimisation** |
+| TD-8 | Mixed data-shape handling in `classify_fvg_context` | `analyst/pre_filter.py` | Weak upstream contracts | **Resolves with runtime lane convergence** |
+| TD-13 | Agent Ops run selector paste-field only | `ui/src/workspaces/ops/` | Operator friction | **✅ Resolved — 15 March 2026** |
+| TD-14 | Reflect artifact richness gap | `ai_analyst/api/services/reflect_aggregation.py` | reflect metrics rely on optional audit-log enrichment | **Open** |
+| TD-9 | Unused variables in `build_market_packet()` | `market_data_officer/officer/service.py` | Dead locals | **✅ Resolved — 13 March 2026** |
 
-### Documentation / testing gaps — address as part of related phases
+### Documentation / testing gaps
 
 | # | Item | Location | Risk | Resolution timing |
 |---|------|----------|------|-------------------|
-| TD-10 | LLM failure modes under-tested | Test suites for analyst path | Tests previously mocked `call_llm` but did not exercise timeout, malformed response, or retry behavior | **✅ Resolved — 10 March 2026** — resilience coverage landed alongside TD-2 closure |
-| TD-11 | No import-path stability tests | No coverage for `sys.path.insert` patterns | Path mutation normalised in tests; packaging regressions not actively caught | **✅ Resolved — 12 March 2026** — 16 import stability tests in `tests/test_import_stability.py` including negative packaging test (AC-12) |
-| TD-12 | Cross-module architecture contracts undocumented | Core service boundaries | Ownership of policy decisions, fallback semantics, scaling expectations embedded in code flow | **Future documentation** — address when runtime lanes converge or during next architecture review |
+| TD-10 | LLM failure modes under-tested | Test suites for analyst path | Retry/timeout behavior untested | **✅ Resolved — 10 March 2026** |
+| TD-11 | No import-path stability tests | No coverage for `sys.path.insert` patterns | Packaging regressions not caught | **✅ Resolved — 12 March 2026** |
+| TD-12 | Cross-module architecture contracts undocumented | Core service boundaries | Policy decisions embedded in code flow | **Future documentation** |
 
 ### Resolution sequence
 
-1. **Resolved:** TD-1, TD-2, TD-3, TD-5, TD-10, and TD-11 are closed.
-2. **Completed:** CI Seam Hardening (10 March 2026) — production-readiness gate satisfied.
-3. **Completed:** TD-3 Packaging/Import Stability (12 March 2026) — 27 sys.path.insert calls removed, pyproject.toml fixed, editable install working, 16 import stability tests.
-3. **Completed:** Observability Phase 2 (12 March 2026) — cross-lane runtime visibility.
-4. **Completed:** TD-3 (12 March 2026) — packaging/import stability.
-5. **Completed:** Cleanup tranche (13 March 2026) — async markers, doc consolidation, TD-5, TD-9.
-6. **Completed:** UI Phase 3A Implementation (14 March 2026) — PR-UI-1 through PR-UI-6 shipped. Phase 6 core product lane complete.
-7. **Completed:** Phase 7 Agent Ops (15 March 2026) — PR-OPS-4a/4b (backend trace+detail) + PR-OPS-5a/5b (frontend wiring). 197 backend + 63 frontend tests.
-8. **Completed:** PR-RUN-1 Run Browser (15 March 2026) — `GET /runs/` endpoint + RunBrowserPanel frontend. 239 backend + 77 frontend ops tests. TD-13 resolved.
-9. **Completed:** PR-CHART-1 (16 March 2026) — OHLCV data-seam + CandlestickChart. +39 backend / +9 frontend tests.
-10. **Completed:** PR-REFLECT-1 (16 March 2026) — 3 Reflect endpoints. +11 backend tests.
-11. **Completed:** PR-REFLECT-2 (16 March 2026) — Reflect workspace frontend. +55 frontend tests.
-12. **Later named cleanup work:** TD-4 (orchestration duplication), TD-6/TD-7 (packet assembly), TD-8 (data-shape convergence), TD-12 (architecture docs), TD-14 (reflect artifact richness gap).
+1. **Resolved:** TD-1, TD-2, TD-3, TD-5, TD-9, TD-10, TD-11, TD-13.
+2. **Later named cleanup:** TD-4, TD-6, TD-7, TD-8, TD-12, TD-14.
+
+---
+
+## 9) Future UI Backlog
+
+### MacroContext Workspace — UI Visibility for Macro Lane Outputs
+
+**Status:** Backlog intent only — not an active roadmap phase
+**Recorded:** 2026-03-26
+
+**Purpose:**
+Make macro lane outputs visible and auditable to the user, not only
+to Arbiter gating logic. Without a display layer, macro analysis is
+invisible — which weakens inspectability, trust, and the ability to
+tune or debug the engine.
+
+**Candidate views (design intent, not committed structure):**
+- Global macro state overview
+- Per-instrument macro context cards
+- Curated sentiment and news feed
+
+**Dependency:**
+This does not begin until the macro engine produces stable,
+structured outputs. It is explicitly downstream of macro engine
+Phase 1 (FeatureTransformer + global baseline state) and likely
+Phase 2+ (country/instrument scoring). No implementation work
+begins before those outputs exist and are stable.
+
+**Constraint:**
+The UI must consume existing macro contracts as they are defined
+when the engine is built. UI assumptions must not drive premature
+macro architecture commitments. Transport mechanism, schema names,
+object shapes, and exact panel structure are all undecided and
+must not be locked by this note.
+
+**What is NOT decided here:**
+- Transport mechanism (e.g. polling, push, direct read)
+- Exact schema or object names
+- Exact workspace structure or panel layout
+- Phase number in the roadmap
+
+**What IS decided here:**
+The concept is worth building. Macro outputs should be
+human-visible and auditable, not only machine-readable by the
+Arbiter. Record this now so the idea is not lost when the macro
+engine reaches Phase 1 completion.
