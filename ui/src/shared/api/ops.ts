@@ -99,74 +99,85 @@ export type AgentHealthSnapshotResponse = ResponseMeta & {
 // ---- Trace types (§6) ----
 
 export type TraceSummary = {
-  instrument: string;
-  session: string;
-  timeframes: string[];
-  duration_ms: number | null;
-  completed_at: string | null;
-  final_verdict: string | null;
-  final_confidence: number | null;
+  entity_count: number;
+  stage_count: number;
+  arbiter_override: boolean;
+  final_bias: "bullish" | "bearish" | "neutral" | null;
+  final_decision: string | null;
 };
 
 export type TraceStage = {
   stage: string;
-  status: string;
-  order: number;
+  stage_index: number;
+  status: "completed" | "failed" | "skipped";
   duration_ms: number | null;
+  participant_ids: string[];
 };
 
 export type ParticipantContribution = {
-  summary: string;
-  stance: string | null;
+  stance: "bullish" | "bearish" | "neutral" | "abstain" | null;
   confidence: number | null;
+  role: string;
+  summary: string;
   was_overridden: boolean;
   override_reason: string | null;
 };
 
 export type TraceParticipant = {
   entity_id: string;
+  entity_type: "persona" | "officer" | "arbiter" | "subsystem";
   display_name: string;
-  role: string;
-  participation_status: "active" | "skipped" | "failed";
+  department: DepartmentKey | null;
+  participated: boolean;
   contribution: ParticipantContribution;
+  status: "completed" | "failed" | "skipped";
 };
+
+export type TraceEdgeType =
+  | "considered_by_arbiter"
+  | "skipped_before_arbiter"
+  | "failed_before_arbiter"
+  | "override";
 
 export type TraceEdge = {
   from: string;
   to: string;
-  type:
-    | "supports"
-    | "challenges"
-    | "feeds"
-    | "synthesizes"
-    | "overrides"
-    | "degraded_dependency"
-    | "recovered_dependency";
+  type: TraceEdgeType;
+  stage_index: number | null;
   summary: string | null;
 };
 
 export type ArbiterTraceSummary = {
-  verdict: string;
-  confidence: number | null;
-  method: string | null;
+  entity_id: string;
   override_applied: boolean;
+  override_type: string | null;
+  override_count: number;
+  overridden_entity_ids: string[];
+  synthesis_approach: string | null;
+  final_bias: "bullish" | "bearish" | "neutral" | null;
+  confidence: number | null;
   dissent_summary: string | null;
+  summary: string;
 };
 
 export type ArtifactRef = {
-  name: string;
-  path: string;
-  type: string;
+  artifact_type: string;
+  artifact_key: string;
 };
 
 export type AgentTraceResponse = ResponseMeta & {
   run_id: string;
+  run_status: "completed" | "failed" | "partial";
+  instrument: string | null;
+  session: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   summary: TraceSummary;
   stages: TraceStage[];
   participants: TraceParticipant[];
-  edges: TraceEdge[];
+  trace_edges: TraceEdge[];
   arbiter_summary: ArbiterTraceSummary | null;
-  artifacts: ArtifactRef[];
+  artifact_refs: ArtifactRef[];
 };
 
 // ---- Detail types (§7) ----

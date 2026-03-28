@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // TraceParticipantList — participant cards per PR_OPS_5_SPEC §11.2.
-// Shows entity_type, participation_status, and available contribution fields.
+// Shows entity_type, status, and available contribution fields.
 // Renders what is present — does not fabricate missing fields.
 // ---------------------------------------------------------------------------
 
@@ -11,7 +11,7 @@ export interface TraceParticipantListProps {
 }
 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
-  active: { label: "ACTIVE", className: "text-teal-400" },
+  completed: { label: "COMPLETED", className: "text-teal-400" },
   skipped: { label: "SKIPPED", className: "text-gray-500" },
   failed: { label: "FAILED", className: "text-red-400" },
 };
@@ -26,7 +26,7 @@ export function TraceParticipantList({ participants }: TraceParticipantListProps
       </h4>
       <div className="space-y-2">
         {participants.map((p, idx) => {
-          const status = p.participation_status ?? "skipped";
+          const status = p.status ?? "skipped";
           const style = STATUS_STYLES[status] ?? STATUS_STYLES.skipped;
           const c = p.contribution ?? {};
           const entityKey = p.entity_id ?? `participant-${idx}`;
@@ -43,9 +43,9 @@ export function TraceParticipantList({ participants }: TraceParticipantListProps
                   <span className="text-sm font-semibold text-gray-200 truncate">
                     {p.display_name ?? entityKey}
                   </span>
-                  {p.role && (
+                  {p.contribution?.role && (
                     <span className="text-[10px] text-gray-500 uppercase">
-                      {p.role}
+                      {p.contribution.role}
                     </span>
                   )}
                 </div>

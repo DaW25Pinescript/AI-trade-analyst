@@ -277,29 +277,35 @@ function makeTrace(overrides?: Partial<AgentTraceResponse>): AgentTraceResponse 
     generated_at: "2026-03-15T10:00:00Z",
     data_state: "live",
     run_id: "run-001",
+    run_status: "completed",
+    instrument: "EURUSD",
+    session: "session-001",
+    started_at: "2026-03-15T09:54:55Z",
+    finished_at: "2026-03-15T09:55:00Z",
     summary: {
-      instrument: "EURUSD",
-      session: "session-001",
-      timeframes: ["1H", "4H"],
-      duration_ms: 5432,
-      completed_at: "2026-03-15T09:55:00Z",
-      final_verdict: "bullish",
-      final_confidence: 0.82,
+      entity_count: 2,
+      stage_count: 5,
+      arbiter_override: true,
+      final_bias: "bullish",
+      final_decision: "Bullish bias confirmed by arbiter.",
     },
     stages: [
-      { stage: "validate_input", status: "completed", order: 0, duration_ms: 100 },
-      { stage: "macro_context", status: "completed", order: 1, duration_ms: 800 },
-      { stage: "analyst_execution", status: "completed", order: 2, duration_ms: 3000 },
-      { stage: "arbiter", status: "completed", order: 3, duration_ms: 500 },
-      { stage: "logging", status: "completed", order: 4, duration_ms: 32 },
+      { stage: "validate_input", status: "completed", stage_index: 0, duration_ms: 100, participant_ids: [] },
+      { stage: "macro_context", status: "completed", stage_index: 1, duration_ms: 800, participant_ids: [] },
+      { stage: "analyst_execution", status: "completed", stage_index: 2, duration_ms: 3000, participant_ids: ["default-analyst", "risk-challenger"] },
+      { stage: "arbiter", status: "completed", stage_index: 3, duration_ms: 500, participant_ids: ["arbiter"] },
+      { stage: "logging", status: "completed", stage_index: 4, duration_ms: 32, participant_ids: [] },
     ],
     participants: [
       {
         entity_id: "default-analyst",
+        entity_type: "persona",
         display_name: "DEFAULT ANALYST",
-        role: "Senior Analyst",
-        participation_status: "active",
+        department: null,
+        participated: true,
+        status: "completed",
         contribution: {
+          role: "Senior Analyst",
           summary: "Bullish bias detected",
           stance: "bullish",
           confidence: 0.85,
@@ -309,10 +315,13 @@ function makeTrace(overrides?: Partial<AgentTraceResponse>): AgentTraceResponse 
       },
       {
         entity_id: "risk-challenger",
+        entity_type: "persona",
         display_name: "RISK CHALLENGER",
-        role: "Risk Challenger",
-        participation_status: "active",
+        department: null,
+        participated: true,
+        status: "completed",
         contribution: {
+          role: "Risk Challenger",
           summary: "Challenged bias",
           stance: "bearish",
           confidence: 0.6,
@@ -321,19 +330,24 @@ function makeTrace(overrides?: Partial<AgentTraceResponse>): AgentTraceResponse 
         },
       },
     ],
-    edges: [
-      { from: "default-analyst", to: "arbiter", type: "supports", summary: "Supports verdict" },
-      { from: "risk-challenger", to: "arbiter", type: "challenges", summary: null },
+    trace_edges: [
+      { from: "default-analyst", to: "arbiter", type: "considered_by_arbiter", stage_index: 3, summary: null },
+      { from: "risk-challenger", to: "arbiter", type: "considered_by_arbiter", stage_index: 3, summary: null },
     ],
     arbiter_summary: {
-      verdict: "bullish",
-      confidence: 0.82,
-      method: "weighted_synthesis",
+      entity_id: "arbiter",
       override_applied: true,
+      override_type: "bias_override",
+      override_count: 1,
+      overridden_entity_ids: ["risk-challenger"],
+      synthesis_approach: "weighted_synthesis",
+      final_bias: "bullish",
+      confidence: 0.82,
       dissent_summary: "Risk challenger dissented with bearish view",
+      summary: "Bullish consensus reached; risk challenger overridden.",
     },
-    artifacts: [
-      { name: "run_record.json", path: "runs/run-001/run_record.json", type: "record" },
+    artifact_refs: [
+      { artifact_type: "run_record", artifact_key: "runs/run-001/run_record.json" },
     ],
     ...overrides,
   };
@@ -984,7 +998,7 @@ describe("AgentOpsPage — Run mode (PR-OPS-5b)", () => {
     expect(tracePanel).toBeInTheDocument();
   });
 
-  it("renders trace summary fields (instrument, verdict, confidence)", async () => {
+  it("renders trace summary fields (instrument, bias, decision)", async () => {
     setupReady();
     mockFetchTrace.mockResolvedValue({ ok: true, data: makeTrace(), status: 200 });
 
@@ -998,8 +1012,8 @@ describe("AgentOpsPage — Run mode (PR-OPS-5b)", () => {
 
     const header = await screen.findByTestId("run-header");
     expect(within(header).getByText("EURUSD")).toBeInTheDocument();
-    expect(within(header).getByText("bullish")).toBeInTheDocument();
-    expect(within(header).getByText("82%")).toBeInTheDocument();
+    expect(within(header).getAllByText(/bullish/i).length).toBeGreaterThan(0);
+    expect(within(header).getByText(/Bullish bias confirmed/i)).toBeInTheDocument();
   });
 
   it("renders stage timeline with all stages", async () => {
@@ -1096,13 +1110,14 @@ describe("AgentOpsPage — Run mode (PR-OPS-5b)", () => {
     expect(screen.queryByTestId("arbiter-summary-card")).not.toBeInTheDocument();
   });
 
-  it("shows partial run indicator when stages are pending/running", async () => {
+  it("shows partial run indicator when run_status is partial", async () => {
     setupReady();
     const trace = makeTrace({
+      run_status: "partial",
       stages: [
-        { stage: "validate_input", status: "completed", order: 0, duration_ms: 100 },
-        { stage: "macro_context", status: "running", order: 1, duration_ms: null },
-        { stage: "analyst_execution", status: "pending", order: 2, duration_ms: null },
+        { stage: "validate_input", status: "completed", stage_index: 0, duration_ms: 100, participant_ids: [] },
+        { stage: "macro_context", status: "skipped", stage_index: 1, duration_ms: null, participant_ids: [] },
+        { stage: "analyst_execution", status: "failed", stage_index: 2, duration_ms: null, participant_ids: [] },
       ],
     });
     mockFetchTrace.mockResolvedValue({ ok: true, data: trace, status: 200 });
@@ -1189,7 +1204,7 @@ describe("AgentOpsPage — Run mode (PR-OPS-5b)", () => {
 
     const artifacts = await screen.findByTestId("trace-artifacts");
     expect(artifacts).toBeInTheDocument();
-    expect(screen.getByText("run_record.json")).toBeInTheDocument();
+    expect(screen.getByText("run_record")).toBeInTheDocument();
   });
 });
 

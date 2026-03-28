@@ -897,3 +897,218 @@ class TestFinishedAtComputation:
         """instrument and session are projected from request block."""
         assert trace_response.instrument == "XAUUSD"
         assert trace_response.session == "NY"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AC-17 — Route-level contract snapshot
+# Verifies exact serialized JSON field names at top-level and all nested types.
+# Catches alias drift, field renames, null/default omission, and deprecated keys.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture()
+def _contract_trace() -> AgentTraceResponse:
+    """Fully populated AgentTraceResponse for contract shape verification."""
+    return AgentTraceResponse(
+        version="1",
+        generated_at="2026-03-28T12:00:00Z",
+        data_state="live",
+        source_of_truth="run_record",
+        run_id="run_contract_test",
+        run_status="completed",
+        instrument="XAUUSD",
+        session="NY",
+        started_at="2026-03-28T11:00:00Z",
+        finished_at="2026-03-28T11:00:18Z",
+        summary=TraceSummary(
+            entity_count=3,
+            stage_count=2,
+            arbiter_override=False,
+            final_bias="bullish",
+            final_decision="Bullish bias; proceed with entry.",
+        ),
+        stages=[
+            TraceStage(
+                stage_key="persona_analysis",
+                stage_index=1,
+                status="completed",
+                duration_ms=9000,
+                participant_ids=["persona_default_analyst"],
+            ),
+            TraceStage(
+                stage_key="arbiter",
+                stage_index=2,
+                status="completed",
+                duration_ms=4000,
+                participant_ids=["arbiter"],
+            ),
+        ],
+        participants=[
+            TraceParticipant(
+                entity_id="persona_default_analyst",
+                entity_type="persona",
+                display_name="Default Analyst",
+                department=None,
+                participated=True,
+                contribution=ParticipantContribution(
+                    stance="bullish",
+                    confidence=0.72,
+                    role="analyst",
+                    summary="Strong ICT setup on H4.",
+                    was_overridden=False,
+                    override_reason=None,
+                ),
+                status="completed",
+            ),
+        ],
+        trace_edges=[
+            TraceEdge(
+                from_="persona_default_analyst",
+                to="arbiter",
+                type="considered_by_arbiter",
+                stage_index=2,
+                summary=None,
+            ),
+        ],
+        arbiter_summary=ArbiterTraceSummary(
+            entity_id="arbiter",
+            override_applied=False,
+            override_type=None,
+            override_count=0,
+            overridden_entity_ids=[],
+            synthesis_approach="majority",
+            final_bias="bullish",
+            confidence=0.72,
+            dissent_summary=None,
+            summary="Consensus: bullish bias.",
+        ),
+        artifact_refs=[
+            ArtifactRef(artifact_type="analysis_output", artifact_key="run_contract_test/analysis.json"),
+        ],
+    )
+
+
+class TestRouteContractSnapshot:
+    """AC-17: route-level contract — exact JSON field names, aliases applied, no deprecated keys."""
+
+    def _get_body(self, client, contract_trace: AgentTraceResponse) -> dict:
+        with patch(
+            "ai_analyst.api.routers.ops.project_trace",
+            return_value=contract_trace,
+        ):
+            resp = client.get("/runs/run_contract_test/agent-trace")
+        assert resp.status_code == 200
+        return resp.json()
+
+    def test_top_level_field_names(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        expected = {
+            "version", "generated_at", "data_state", "source_of_truth",
+            "run_id", "run_status", "instrument", "session",
+            "started_at", "finished_at",
+            "summary", "stages", "participants", "trace_edges",
+            "arbiter_summary", "artifact_refs",
+        }
+        assert expected.issubset(body.keys()), (
+            f"Missing top-level keys: {expected - body.keys()}"
+        )
+
+    def test_deprecated_top_level_keys_absent(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        deprecated = {"edges", "artifacts"}
+        present = deprecated & body.keys()
+        assert not present, f"Deprecated top-level keys present: {present}"
+
+    def test_trace_summary_field_names(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        summary = body["summary"]
+        expected = {"entity_count", "stage_count", "arbiter_override", "final_bias", "final_decision"}
+        assert expected.issubset(summary.keys()), (
+            f"Missing TraceSummary keys: {expected - summary.keys()}"
+        )
+
+    def test_deprecated_summary_keys_absent(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        summary = body["summary"]
+        deprecated = {"instrument", "session", "timeframes", "duration_ms",
+                      "completed_at", "final_verdict", "final_confidence"}
+        present = deprecated & summary.keys()
+        assert not present, f"Deprecated TraceSummary keys present: {present}"
+
+    def test_trace_stage_field_names(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        stage = body["stages"][0]
+        expected = {"stage", "stage_index", "status", "duration_ms", "participant_ids"}
+        assert expected.issubset(stage.keys()), (
+            f"Missing TraceStage keys: {expected - stage.keys()}"
+        )
+        assert "stage_key" not in stage, "stage_key must not appear (alias should apply)"
+        assert "order" not in stage, "deprecated 'order' key must not appear"
+
+    def test_trace_participant_field_names(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        p = body["participants"][0]
+        expected = {"entity_id", "entity_type", "display_name", "participated", "contribution", "status"}
+        assert expected.issubset(p.keys()), (
+            f"Missing TraceParticipant keys: {expected - p.keys()}"
+        )
+        assert "participation_status" not in p, "deprecated 'participation_status' must not appear"
+
+    def test_participant_contribution_field_names(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        contrib = body["participants"][0]["contribution"]
+        expected = {"stance", "confidence", "role", "summary", "was_overridden", "override_reason"}
+        assert expected.issubset(contrib.keys()), (
+            f"Missing ParticipantContribution keys: {expected - contrib.keys()}"
+        )
+
+    def test_trace_edge_field_names_and_alias(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        edge = body["trace_edges"][0]
+        assert "from" in edge, "TraceEdge.from_ must serialize as 'from'"
+        assert "from_" not in edge, "Raw 'from_' must not appear in JSON"
+        assert "to" in edge
+        assert "type" in edge
+
+    def test_trace_edge_type_vocabulary(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        valid_types = {"considered_by_arbiter", "skipped_before_arbiter",
+                       "failed_before_arbiter", "override"}
+        for edge in body["trace_edges"]:
+            assert edge["type"] in valid_types, (
+                f"Unexpected edge type '{edge['type']}' — must be run-scoped vocabulary"
+            )
+
+    def test_arbiter_summary_field_names(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        arb = body["arbiter_summary"]
+        assert arb is not None
+        expected = {"entity_id", "override_applied", "override_type", "override_count",
+                    "overridden_entity_ids", "synthesis_approach", "final_bias",
+                    "confidence", "dissent_summary", "summary"}
+        assert expected.issubset(arb.keys()), (
+            f"Missing ArbiterTraceSummary keys: {expected - arb.keys()}"
+        )
+        assert "verdict" not in arb, "deprecated 'verdict' must not appear"
+        assert "method" not in arb, "deprecated 'method' must not appear"
+
+    def test_artifact_ref_field_names(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        ref = body["artifact_refs"][0]
+        assert "artifact_type" in ref
+        assert "artifact_key" in ref
+        assert "name" not in ref, "deprecated 'name' must not appear"
+        assert "path" not in ref, "deprecated 'path' must not appear"
+        assert "type" not in ref, "deprecated 'type' must not appear"
+
+    def test_run_status_enum_values(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        assert body["run_status"] in ("completed", "failed", "partial")
+
+    def test_participant_status_enum_values(self, client, _contract_trace):
+        body = self._get_body(client, _contract_trace)
+        valid = {"completed", "failed", "skipped"}
+        for p in body["participants"]:
+            assert p["status"] in valid, (
+                f"Unexpected participant status '{p['status']}' — must be completed|failed|skipped"
+            )

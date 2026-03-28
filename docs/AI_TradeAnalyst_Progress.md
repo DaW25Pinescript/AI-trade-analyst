@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 26 March 2026 (MacroContext UI backlog note added)
+**Last updated:** 28 March 2026 (Audit Tranche 1 complete — contract alignment repair)
 **Review date:** 10 March 2026
-**Current phase:** Phase 8 — Complete (PR-REFLECT-3: suggestions v0, cross-workspace navigation, coherence fixes)
+**Current phase:** Audit Tranche 1 — Complete. Phase 8 complete. Next: Audit Tranche 2 (trust + coupling repair)
 **Planning horizon:** Next 5–7 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -20,14 +20,14 @@
 
 ## Phase Index (at-a-glance)
 
-- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, PR-CHART-2, PR-REFLECT-3.
-- **Current phase:** Phase 8 — Complete. PR-REFLECT-3 shipped: suggestions v0 (two rules, advisory only), cross-workspace navigation (Reflect persona rows → Agent Ops Detail), URL param consumption with router replace, C-6 coherence fix. +35 backend tests, +25 frontend tests.
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, PR-CHART-2, PR-REFLECT-3, **Audit Tranche 1**.
+- **Current phase:** Audit Tranche 1 — Complete. Contract alignment repair (Findings 1, 2, 3 from zero-trust audit): frontend types, contract doc, and 5 trace components aligned to backend serialized API response. +14 backend contract tests. Zero regression.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on six read-only projection endpoints (roster, health, trace, detail, run browser, market data). Now accepts deep-link params from Reflect workspace.
-- **Backend test count update:** Full backend collection: tests/ lane: 489 passed, 1 failed (pre-existing MDO scheduler import). +35 new tests for suggestion engine (PR-REFLECT-3).
-- **Frontend test count update:** Full frontend regression after PR-REFLECT-3: 406 total (401 passing, 5 pre-existing journey failures unchanged). +25 new tests for suggestions, navigation, URL param consumption, C-6.
-- **Frontend test count:** 406 total (401 passing, 5 pre-existing journey failures).
-- **Next actions:** Phase 8 complete — evaluate Phase 9 candidates: PR-REFLECT-2a (filter controls), Chart Indicators, ML Pattern Detection.
+- **Backend test count update:** 509 passed, 3 failed (pre-existing). +13 new tests in `TestRouteContractSnapshot` (AC-17 route-level contract test).
+- **Frontend test count update:** 406 total (389 passing, 17 pre-existing failures — includes `reflect.test.tsx` TS type regressions and journey failures). Trace surface fully aligned; zero new failures introduced by Audit T1.
+- **Frontend test count:** 406 total (389 passing, 17 pre-existing failures).
+- **Next actions:** Audit Tranche 2 (trust + coupling repair, Findings 4–12) — spec to be drafted. Then evaluate Phase 9 candidates.
 - **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6), Agent Ops read-side stack (Phase 7), Run Browser (PR-RUN-1), OHLCV Chart (PR-CHART-1/2), and Reflect workspace (PR-REFLECT-1/2/3) are all complete.
 
 ---
@@ -36,6 +36,7 @@
 
 | Date | Phase | Activity |
 |------|-------|----------|
+| 28 Mar 2026 | Audit Tranche 1 | Contract alignment repair complete. Frontend `AgentTraceResponse` types, all 5 trace components, test fixtures, and `AGENT_OPS_CONTRACT.md` §6 aligned to backend serialized API response. Partial-run detection fixed (`run_status === "partial"`). Edge type vocabulary corrected (run-scoped, not roster). Contract-mismatch guard added. +14 backend contract tests (`TestRouteContractSnapshot`). Backend: 509/3. Frontend: 389/17 (no regression). |
 | 26 Mar 2026 | Backlog | MacroContext UI workspace backlog note recorded. Concept preserved, not committed to roadmap. See Section 9. |
 | 17 Mar 2026 | PR-REFLECT-3 | Integration bridge + suggestions v0: rules-based advisory suggestions (OVERRIDE_FREQ_HIGH, NO_TRADE_CONCENTRATION), SuggestionPanel on Reflect Overview, persona row → Agent Ops Detail navigation via `navigable_entity_id`, URL param consumption with router replace, C-6 coherence fix (clear run state on mode change), entity-not-found message update. +35 backend tests (489 total), +25 frontend tests (406 total). Phase 8 complete. |
 | 16 Mar 2026 | PR-CHART-2 | Run context overlay + multi-timeframe charts shipped: data-driven TF tabs (from TF discovery endpoint), run-time candle markers via `createSeriesMarkers`, verdict annotation with §4.4 normalization, 10 UI states per §5.3, TF discovery endpoint (`GET /market-data/{instrument}/timeframes`). +20 frontend tests (381 total), +11 backend tests (454 total) |

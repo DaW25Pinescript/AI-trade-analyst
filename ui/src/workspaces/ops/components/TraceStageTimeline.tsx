@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // TraceStageTimeline — ordered stage timeline per PR_OPS_5_SPEC §11.1.
-// Stages ordered by stage.order (ascending). Status-aware. Duration shown.
+// Stages ordered by stage.stage_index (ascending). Status-aware. Duration shown.
 // ---------------------------------------------------------------------------
 
 import type { TraceStage } from "@shared/api/ops";
@@ -41,7 +41,7 @@ function formatStageName(stage: string | undefined | null): string {
 }
 
 export function TraceStageTimeline({ stages, isPartial }: TraceStageTimelineProps) {
-  const sorted = [...stages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const sorted = [...stages].sort((a, b) => (a.stage_index ?? 0) - (b.stage_index ?? 0));
 
   return (
     <section data-testid="trace-stage-timeline">

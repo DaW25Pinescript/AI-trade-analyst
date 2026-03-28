@@ -341,9 +341,11 @@ All HTTP errors use `OpsErrorEnvelope`.
 
 ## 6. `GET /runs/{run_id}/agent-trace` (PR-OPS-4a)
 
+> **Canonical source:** the backend serialized JSON payload (`AgentTraceResponse.model_dump(by_alias=True)`). All field names, enums, and nesting here reflect the live API response. Updated: Audit Tranche 1 (2026-03-28).
+
 ### 6.1 Purpose
 
-Run-level agent trace for a specific analysis run. Projects participation, lineage, stage ordering, and arbiter verdict from existing run artifacts.
+Run-level agent trace for a specific analysis run. Projects participation, lineage, stage ordering, and arbiter synthesis from existing run artifacts.
 
 ### 6.2 Backend source
 
@@ -358,97 +360,143 @@ When the audit log is unavailable, the response degrades to `data_state: "stale"
 ```typescript
 type AgentTraceResponse = ResponseMeta & {
   run_id: string;
+  run_status: "completed" | "failed" | "partial";
+  instrument: string | null;
+  session: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   summary: TraceSummary;
   stages: TraceStage[];
   participants: TraceParticipant[];
-  edges: TraceEdge[];
+  trace_edges: TraceEdge[];            // NB: "trace_edges", not "edges"
   arbiter_summary: ArbiterTraceSummary | null;
-  artifacts: ArtifactRef[];
+  artifact_refs: ArtifactRef[];        // NB: "artifact_refs", not "artifacts"
 };
 ```
 
-### 6.4 TraceSummary
+`ResponseMeta` contributes: `version`, `generated_at`, `data_state`, `source_of_truth`.
+
+### 6.4 ArtifactRef
+
+```typescript
+type ArtifactRef = {
+  artifact_type: string;    // e.g. "run_record", "analysis_output"
+  artifact_key: string;     // storage key, e.g. "runs/run-001/run_record.json"
+};
+```
+
+### 6.5 TraceSummary
+
+Compact overview. `instrument` and `session` are top-level on `AgentTraceResponse`, not inside `TraceSummary`.
 
 ```typescript
 type TraceSummary = {
-  instrument: string;
-  session: string;
-  timeframes: string[];
-  duration_ms: number | null;
-  completed_at: string | null;
-  final_verdict: string | null;
-  final_confidence: number | null;
+  entity_count: number;
+  stage_count: number;
+  arbiter_override: boolean;
+  final_bias: "bullish" | "bearish" | "neutral" | null;
+  final_decision: string | null;
 };
 ```
 
-### 6.5 TraceStage
+### 6.6 TraceStage
+
+Stages are returned in ascending `stage_index` order.
 
 ```typescript
 type TraceStage = {
-  stage: string;
-  status: string;
-  order: number;
+  stage: string;                              // stage name (alias of stage_key)
+  stage_index: number;                        // execution order (0-based)
+  status: "completed" | "failed" | "skipped";
   duration_ms: number | null;
+  participant_ids: string[];
 };
 ```
 
 Stage vocabulary (locked): `validate_input`, `macro_context`, `chart_setup`, `analyst_execution`, `arbiter`, `logging`.
 
-### 6.6 TraceParticipant
+### 6.7 TraceParticipant and ParticipantContribution
 
 ```typescript
 type TraceParticipant = {
   entity_id: string;
+  entity_type: "persona" | "officer" | "arbiter" | "subsystem";
   display_name: string;
-  role: string;
-  participation_status: "active" | "skipped" | "failed";
+  department: DepartmentKey | null;
+  participated: boolean;
   contribution: ParticipantContribution;
+  status: "completed" | "failed" | "skipped";  // NB: not "participation_status"
 };
 
 type ParticipantContribution = {
-  summary: string;          // max 500 chars
-  stance: string | null;
+  stance: "bullish" | "bearish" | "neutral" | "abstain" | null;
   confidence: number | null;
+  role: string;                     // moved inside contribution
+  summary: string;                  // max 500 chars
   was_overridden: boolean;
-  override_reason: string | null;  // max 300 chars
+  override_reason: string | null;   // max 300 chars
 };
 ```
 
-### 6.7 TraceEdge
+### 6.8 TraceEdge
+
+Run-scoped edge types only. These describe what happened in the run, not static roster relationships.
 
 ```typescript
+type TraceEdgeType =
+  | "considered_by_arbiter"
+  | "skipped_before_arbiter"
+  | "failed_before_arbiter"
+  | "override";
+
 type TraceEdge = {
-  from: string;
+  from: string;          // serialized alias of from_ (Python reserved word)
   to: string;
-  type: "supports" | "challenges" | "feeds" | "synthesizes" | "overrides"
-        | "degraded_dependency" | "recovered_dependency";
+  type: TraceEdgeType;
+  stage_index: number | null;
   summary: string | null;  // max 300 chars
 };
 ```
 
-### 6.8 ArbiterTraceSummary
+**Do not mix with roster relationship types** (`supports`, `challenges`, `feeds`, etc.) — those appear only on the `/ops/agent-roster` endpoint.
+
+### 6.9 ArbiterTraceSummary
 
 ```typescript
 type ArbiterTraceSummary = {
-  verdict: string;
-  confidence: number | null;
-  method: string | null;
+  entity_id: string;
   override_applied: boolean;
+  override_type: string | null;
+  override_count: number;
+  overridden_entity_ids: string[];
+  synthesis_approach: string | null;
+  final_bias: "bullish" | "bearish" | "neutral" | null;
+  confidence: number | null;
   dissent_summary: string | null;  // max 500 chars
+  summary: string;                 // max 500 chars — NB: not "verdict"
 };
 ```
 
-### 6.9 Bounded payload limits
+### 6.10 Partial-run detection
+
+```typescript
+const isPartial = trace.run_status === "partial";
+```
+
+Use the top-level `run_status` field. Stage statuses are `completed | failed | skipped` — `"running"` and `"pending"` never appear.
+
+### 6.11 Bounded payload limits
 
 | Field | Limit |
 |-------|-------|
 | `contribution.summary` | ≤ 500 chars |
 | `contribution.override_reason` | ≤ 300 chars |
-| `edge.summary` | ≤ 300 chars |
+| `trace_edges[].summary` | ≤ 300 chars |
 | `arbiter_summary.dissent_summary` | ≤ 500 chars |
-| `edges` array | ≤ 50 entries |
+| `arbiter_summary.summary` | ≤ 500 chars |
+| `trace_edges` array | ≤ 50 entries |
 
-### 6.10 Error responses
+### 6.12 Error responses
 
 | HTTP status | `error` code | When |
 |------------|-------------|------|

@@ -11,13 +11,10 @@ export interface TraceEdgeListProps {
 }
 
 const EDGE_TYPE_STYLES: Record<string, { label: string; className: string }> = {
-  supports: { label: "SUPPORTS", className: "text-teal-400" },
-  challenges: { label: "CHALLENGES", className: "text-amber-400" },
-  feeds: { label: "FEEDS", className: "text-cyan-400" },
-  synthesizes: { label: "SYNTHESIZES", className: "text-purple-400" },
-  overrides: { label: "OVERRIDES", className: "text-red-400" },
-  degraded_dependency: { label: "DEGRADED DEP", className: "text-amber-500" },
-  recovered_dependency: { label: "RECOVERED DEP", className: "text-teal-500" },
+  considered_by_arbiter:  { label: "CONSIDERED",  className: "text-teal-400" },
+  skipped_before_arbiter: { label: "SKIPPED",     className: "text-gray-500" },
+  failed_before_arbiter:  { label: "FAILED",      className: "text-red-400" },
+  override:               { label: "OVERRIDE",    className: "text-amber-400" },
 };
 
 export function TraceEdgeList({ edges }: TraceEdgeListProps) {

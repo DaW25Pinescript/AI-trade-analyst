@@ -21,14 +21,24 @@ export function ArbiterSummaryCard({ arbiter }: ArbiterSummaryCardProps) {
         Arbiter Summary
       </h4>
       <div className="space-y-2">
-        {/* Verdict */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium uppercase tracking-wider text-gray-500 w-24 shrink-0">
-            Verdict
+        {/* Final bias */}
+        {arbiter.final_bias && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium uppercase tracking-wider text-gray-500 w-24 shrink-0">
+              Final Bias
+            </span>
+            <span className="text-sm font-semibold text-gray-200 uppercase">
+              {arbiter.final_bias}
+            </span>
+          </div>
+        )}
+
+        {/* Summary */}
+        <div className="flex items-start gap-3">
+          <span className="text-xs font-medium uppercase tracking-wider text-gray-500 w-24 shrink-0 pt-0.5">
+            Summary
           </span>
-          <span className="text-sm font-semibold text-gray-200 uppercase">
-            {arbiter.verdict ?? "—"}
-          </span>
+          <span className="text-sm text-gray-300">{arbiter.summary}</span>
         </div>
 
         {/* Confidence */}
@@ -43,13 +53,13 @@ export function ArbiterSummaryCard({ arbiter }: ArbiterSummaryCardProps) {
           </div>
         )}
 
-        {/* Method */}
-        {arbiter.method && (
+        {/* Synthesis approach */}
+        {arbiter.synthesis_approach && (
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium uppercase tracking-wider text-gray-500 w-24 shrink-0">
-              Method
+              Approach
             </span>
-            <span className="text-sm text-gray-300">{arbiter.method}</span>
+            <span className="text-sm text-gray-300">{arbiter.synthesis_approach}</span>
           </div>
         )}
 
@@ -60,7 +70,7 @@ export function ArbiterSummaryCard({ arbiter }: ArbiterSummaryCardProps) {
           </span>
           {arbiter.override_applied ? (
             <span className="text-sm font-bold text-amber-400 uppercase" data-testid="arbiter-override-applied">
-              Yes
+              Yes ({arbiter.override_count})
             </span>
           ) : (
             <span className="text-sm text-gray-500">No</span>
