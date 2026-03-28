@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 28 March 2026 (Audit Tranche 2 complete — projection core module decoupling)
+**Last updated:** 28 March 2026 (Audit Tranche 3 complete — trust integrity metadata)
 **Review date:** 10 March 2026
-**Current phase:** Audit Tranche 2 — Complete. Next: Audit Tranche 3 (trust integrity, Findings 4–6)
+**Current phase:** Audit Tranche 3 — Complete. Next: evaluate Phase 9 candidates.
 **Planning horizon:** Next 5–7 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -20,13 +20,13 @@
 
 ## Phase Index (at-a-glance)
 
-- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, PR-CHART-2, PR-REFLECT-3, **Audit Tranche 1**, **Audit Tranche 2**.
-- **Current phase:** Audit Tranche 2 — Complete. Projection core module decoupling (Findings 7, 8): 3 new public roster APIs, private constant coupling eliminated from trace + detail, centralized persona mapping with behavior correction. 523 backend tests, zero new failures.
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, PR-CHART-2, PR-REFLECT-3, **Audit Tranche 1**, **Audit Tranche 2**, **Audit Tranche 3**.
+- **Current phase:** Audit Tranche 3 — Complete. Trust integrity metadata (Findings 4, 5, 6): `evidence_basis` on health items, `evidence_class` on trace participant contributions, `projection_quality` + `missing_fields` on trace response. Governing rule: "do not claim more than the artifacts prove." 559 backend tests, zero new failures.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on six read-only projection endpoints (roster, health, trace, detail, run browser, market data). Now accepts deep-link params from Reflect workspace.
-- **Backend test count update:** 523 passed, 3 failed (pre-existing). +14 new tests (33 new public roster API tests net of removed helpers).
-- **Frontend test count:** 406 total (389 passing, 17 pre-existing failures). No changes in Audit T2 (backend-only).
-- **Next actions:** Audit Tranche 3 (trust integrity, Findings 4, 5, 6) — spec to be drafted. Then evaluate Phase 9 candidates.
+- **Backend test count update:** 559 passed, 3 failed (pre-existing). +36 new tests (T3 health + trace provenance tests).
+- **Frontend test count:** 406 total (389 passing, 17 pre-existing failures). ops.test.tsx: 69/69 passing. No regressions introduced by T3.
+- **Next actions:** Evaluate Phase 9 candidates (Analysis Engine continuation, MacroLens, or new feature lane).
 - **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6), Agent Ops read-side stack (Phase 7), Run Browser (PR-RUN-1), OHLCV Chart (PR-CHART-1/2), and Reflect workspace (PR-REFLECT-1/2/3) are all complete.
 
 ---
@@ -35,6 +35,7 @@
 
 | Date | Phase | Activity |
 |------|-------|----------|
+| 28 Mar 2026 | Audit Tranche 3 | Trust integrity metadata complete. Added `evidence_basis` to `AgentHealthItem` (`"runtime_event"` for feeder/scheduler when data present, `"none"` when absent, `"derived_proxy"` for officers + governance). Added `evidence_class` to `ParticipantContribution` (`"heuristic"` when audit log present, `"default"` when absent). Added `projection_quality` + `missing_fields` to `AgentTraceResponse`. Frontend types updated (additive optional fields). `AGENT_OPS_CONTRACT.md` §5.5, §6.3a, §6.7a updated. 36 new backend tests. Backend: 559/3 (no new failures). Frontend ops surface: 69/69 passing. Governing rule: "do not claim more than the artifacts prove." |
 | 28 Mar 2026 | Audit Tranche 2 | Projection core module decoupling complete. 3 new public roster APIs (`get_entity_lookup`, `get_relationships`, `persona_to_roster_id`). Private constant coupling eliminated from `ops_trace.py` + `ops_detail.py`. Centralized persona mapping corrects blind-prefix bug for non-persona roster IDs. 14 AC tests + 19 invariant tests added. Before/after output comparison: trace identical (except timestamp), detail identical for all 3 test entities. Backend: 523/3 (no new failures). Frontend: unchanged. |
 | 28 Mar 2026 | Audit Tranche 1 | Contract alignment repair complete. Frontend `AgentTraceResponse` types, all 5 trace components, test fixtures, and `AGENT_OPS_CONTRACT.md` §6 aligned to backend serialized API response. Partial-run detection fixed (`run_status === "partial"`). Edge type vocabulary corrected (run-scoped, not roster). Contract-mismatch guard added. +14 backend contract tests (`TestRouteContractSnapshot`). Backend: 509/3. Frontend: 389/17 (no regression). |
 | 26 Mar 2026 | Backlog | MacroContext UI workspace backlog note recorded. Concept preserved, not committed to roadmap. See Section 9. |
@@ -94,7 +95,17 @@ The repository is in a **strong implementation state**:
 - Phase-gate test progression now reaches **677 tests green** at Security/API Hardening closure, with zero regressions reported.
 
 
-### Latest increment — PR-CHART-1: OHLCV Data Seam + Candlestick Chart (16 Mar 2026)
+### Latest increment — Audit Tranche 3: Trust Integrity Metadata (28 Mar 2026)
+
+Delivered Audit Tranche 3 — evidence provenance metadata across the health and trace operator surfaces. Governing rule: "do not claim more than the artifacts prove." Three findings closed:
+
+**Finding 4 — Override attribution honesty:** Added `evidence_class: "heuristic" | "default"` to `ParticipantContribution`. When audit log is present, all participants receive `"heuristic"` (override assessment is inferred, not artifact-proven). When absent, `"default"`. The override detection logic itself is unchanged — only the provenance label is added.
+
+**Finding 5 — Health evidence provenance:** Added `evidence_basis: "runtime_event" | "derived_proxy" | "none"` to `AgentHealthItem`. Assignment: `feeder_ingest`/`mdo_scheduler` → `"runtime_event"` when feeder data is available, `"none"` when `feeder_ingested_at is None` (no runtime event observed); `market_data_officer`/`macro_risk_officer` → `"derived_proxy"`; `arbiter`/`governance_synthesis` → `"derived_proxy"` (when feeder_context present); all default entities → `"none"`. Health_state values are unchanged — `evidence_basis` is purely additive.
+
+**Finding 6 — Projection quality metadata:** Added `projection_quality: "partial" | "heuristic"` and `missing_fields: list[str]` to `AgentTraceResponse`. When audit log is absent: `"partial"` + `["analyst_stances", "confidence_scores", "override_attribution"]`. When present: `"heuristic"` + `["explicit_override_metadata"]`. Frontend types updated as optional additive fields. `AGENT_OPS_CONTRACT.md` §5.5, §6.3a, §6.7a updated. +36 new deterministic tests. Backend: 559 passed, 3 failed (pre-existing). Frontend ops surface: 69/69 passing, no regressions. All 22 ACs verified ✅.
+
+### Previous increment — PR-CHART-1: OHLCV Data Seam + Candlestick Chart (16 Mar 2026)
 
 Delivered PR-CHART-1 — OHLCV data-seam validation (Outcome A confirmed: seam exists and is clean) + `GET /market-data/{instrument}/ohlcv` endpoint + CandlestickChart component embedded in Run mode. Diagnostic confirmed MDO persists OHLCV as CSV files in `market_data/packages/latest/`, readable via `loader.load_timeframe()` with zero scheduler coupling. New backend: market data read service (projects DataFrame rows to epoch-second Candles with malformed-row tolerance and deterministic data_state derivation), Pydantic models (Candle + OHLCVResponse with flat ResponseMeta pattern), market_data router with error semantics (404 INSTRUMENT_NOT_FOUND / TIMEFRAME_NOT_FOUND, 422 INVALID_PARAMS, 200 with empty candles for valid-but-empty store). New frontend: `fetchOHLCV()` typed API client, `useMarketData` TanStack Query hook (60s stale time), `CandlestickChart` component with candlestick + volume histogram via lightweight-charts, loading/error/empty/stale states, failure-tolerant embedding in Run mode (chart error does not block trace rendering). `RunBrowserPanel` updated to pass instrument alongside runId. `AgentOpsPage` updated to embed chart panel between browser and trace. 39 new backend tests (432 total), 9 new frontend tests (301 total). All 37 implementation ACs (AC-1 through AC-37) verified ✅. Zero regressions. Default timeframe: 4h (confirmed persisted for all instruments).
 
@@ -250,7 +261,7 @@ You are no longer proving feasibility, building runtime behavior, or standing up
 | Phase 8 — PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | ✅ Complete |
 | Audit Tranche 1 | Contract alignment repair — frontend types, contract doc, 5 trace components, +14 backend tests — 509/3 | ✅ Complete |
 | Audit Tranche 2 | Projection core module decoupling — 3 public roster APIs, coupling elimination, persona mapping correction — 523/3 | ✅ Complete |
-| Audit Tranche 3 | Trust integrity (Findings 4, 5, 6) | 💭 Planned — spec after T2 closes |
+| Audit Tranche 3 | Trust integrity — evidence_basis (health), evidence_class + projection_quality (trace), governing rule enforcement — +36 backend tests, 559/3 | ✅ Complete |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
 
 ---

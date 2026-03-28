@@ -82,6 +82,8 @@ export type HealthState =
   | "unavailable"
   | "recovered";
 
+export type EvidenceBasis = "runtime_event" | "derived_proxy" | "none";
+
 export type AgentHealthItem = {
   entity_id: string;
   run_state: RunState;
@@ -90,6 +92,7 @@ export type AgentHealthItem = {
   last_run_id?: string;
   health_summary?: string;
   recent_event_summary?: string;
+  evidence_basis?: EvidenceBasis;
 };
 
 export type AgentHealthSnapshotResponse = ResponseMeta & {
@@ -114,6 +117,8 @@ export type TraceStage = {
   participant_ids: string[];
 };
 
+export type EvidenceClass = "artifact" | "heuristic" | "default";
+
 export type ParticipantContribution = {
   stance: "bullish" | "bearish" | "neutral" | "abstain" | null;
   confidence: number | null;
@@ -121,6 +126,7 @@ export type ParticipantContribution = {
   summary: string;
   was_overridden: boolean;
   override_reason: string | null;
+  evidence_class?: EvidenceClass;
 };
 
 export type TraceParticipant = {
@@ -165,6 +171,9 @@ export type ArtifactRef = {
   artifact_key: string;
 };
 
+// v1 contract: "full" reserved for future pipeline work, not emitted in v1
+export type ProjectionQuality = "partial" | "heuristic";
+
 export type AgentTraceResponse = ResponseMeta & {
   run_id: string;
   run_status: "completed" | "failed" | "partial";
@@ -178,6 +187,8 @@ export type AgentTraceResponse = ResponseMeta & {
   trace_edges: TraceEdge[];
   arbiter_summary: ArbiterTraceSummary | null;
   artifact_refs: ArtifactRef[];
+  projection_quality?: ProjectionQuality;
+  missing_fields?: string[];
 };
 
 // ---- Detail types (§7) ----

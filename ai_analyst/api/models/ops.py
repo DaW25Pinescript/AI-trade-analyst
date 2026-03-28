@@ -108,6 +108,9 @@ RunState = Literal["idle", "running", "completed", "failed"]
 HealthState = Literal["live", "stale", "degraded", "unavailable", "recovered"]
 
 
+EvidenceBasis = Literal["runtime_event", "derived_proxy", "none"]
+
+
 class AgentHealthItem(BaseModel):
     """Per-entity health snapshot (§5.5)."""
 
@@ -118,6 +121,7 @@ class AgentHealthItem(BaseModel):
     last_run_id: Optional[str] = None
     health_summary: Optional[str] = None
     recent_event_summary: Optional[str] = None
+    evidence_basis: EvidenceBasis = "none"
 
 
 class AgentHealthSnapshotResponse(ResponseMeta):

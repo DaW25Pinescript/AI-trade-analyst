@@ -1112,3 +1112,192 @@ class TestRouteContractSnapshot:
             assert p["status"] in valid, (
                 f"Unexpected participant status '{p['status']}' — must be completed|failed|skipped"
             )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# T3 — Trust integrity: evidence_class, projection_quality, missing_fields
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestEvidenceClassModel:
+    """AC-3: evidence_class field exists on ParticipantContribution model."""
+
+    def test_evidence_class_field_exists(self):
+        schema = ParticipantContribution.model_json_schema()
+        assert "evidence_class" in schema.get("properties", {})
+
+    def test_evidence_class_default_is_default(self):
+        contrib = ParticipantContribution(
+            role="analyst",
+            summary="test",
+            was_overridden=False,
+        )
+        assert contrib.evidence_class == "default"
+
+    def test_evidence_class_accepts_all_values(self):
+        for val in ("artifact", "heuristic", "default"):
+            c = ParticipantContribution(
+                role="analyst",
+                summary="test",
+                was_overridden=False,
+                evidence_class=val,
+            )
+            assert c.evidence_class == val
+
+
+class TestProjectionQualityModel:
+    """AC-11: projection_quality and missing_fields fields on AgentTraceResponse."""
+
+    def test_projection_quality_field_exists(self):
+        schema = AgentTraceResponse.model_json_schema()
+        assert "projection_quality" in schema.get("properties", {})
+
+    def test_missing_fields_field_exists(self):
+        schema = AgentTraceResponse.model_json_schema()
+        assert "missing_fields" in schema.get("properties", {})
+
+    def test_projection_quality_default_is_partial(self):
+        from ai_analyst.api.models.ops import ResponseMeta
+        from ai_analyst.api.models.ops_trace import TraceSummary
+        resp = AgentTraceResponse(
+            version="2026.03",
+            generated_at="2026-03-28T00:00:00Z",
+            data_state="live",
+            run_id="test",
+            run_status="completed",
+            summary=TraceSummary(
+                entity_count=0,
+                stage_count=0,
+                arbiter_override=False,
+            ),
+            stages=[],
+            participants=[],
+            trace_edges=[],
+            artifact_refs=[],
+        )
+        assert resp.projection_quality == "partial"
+        assert resp.missing_fields == []
+
+
+class TestEvidenceClassWithAudit:
+    """AC-1, AC-13: evidence_class is 'heuristic' for all participants when audit log present."""
+
+    def test_all_participants_have_heuristic_evidence_class(self, trace_response):
+        """AC-1: audit log present → all participants get evidence_class 'heuristic'."""
+        assert len(trace_response.participants) > 0, "fixture must have participants"
+        for p in trace_response.participants:
+            assert p.contribution.evidence_class == "heuristic", (
+                f"Participant {p.entity_id!r} has evidence_class "
+                f"{p.contribution.evidence_class!r}, expected 'heuristic'"
+            )
+
+    def test_evidence_class_heuristic_in_serialized_output(self, trace_dict):
+        """AC-1: evidence_class 'heuristic' present in serialized JSON."""
+        for p in trace_dict["participants"]:
+            assert p["contribution"]["evidence_class"] == "heuristic", (
+                f"Participant {p['entity_id']!r} serialized evidence_class="
+                f"{p['contribution']['evidence_class']!r}"
+            )
+
+    def test_override_logic_unchanged(self, trace_response):
+        """AC-13: was_overridden and override_reason are not modified by evidence_class addition."""
+        for p in trace_response.participants:
+            assert isinstance(p.contribution.was_overridden, bool)
+            if p.contribution.was_overridden:
+                assert p.contribution.override_reason is not None
+
+
+class TestEvidenceClassWithoutAudit:
+    """AC-2: evidence_class is 'default' when audit log absent."""
+
+    def test_all_participants_have_default_evidence_class(self, trace_response_no_audit):
+        """AC-2: no audit log → all participants get evidence_class 'default'."""
+        assert len(trace_response_no_audit.participants) > 0
+        for p in trace_response_no_audit.participants:
+            assert p.contribution.evidence_class == "default", (
+                f"Participant {p.entity_id!r} has evidence_class "
+                f"{p.contribution.evidence_class!r}, expected 'default'"
+            )
+
+
+class TestProjectionQualityWithAudit:
+    """AC-9: projection_quality='heuristic' + missing_fields=['explicit_override_metadata'] when audit present."""
+
+    def test_projection_quality_is_heuristic(self, trace_response):
+        assert trace_response.projection_quality == "heuristic"
+
+    def test_missing_fields_contains_override_metadata(self, trace_response):
+        assert "explicit_override_metadata" in trace_response.missing_fields
+
+    def test_missing_fields_does_not_contain_stances(self, trace_response):
+        """Audit log present — stances are available, not in missing_fields."""
+        assert "analyst_stances" not in trace_response.missing_fields
+        assert "confidence_scores" not in trace_response.missing_fields
+        assert "override_attribution" not in trace_response.missing_fields
+
+    def test_projection_quality_serialized(self, trace_dict):
+        assert trace_dict["projection_quality"] == "heuristic"
+        assert "explicit_override_metadata" in trace_dict["missing_fields"]
+
+
+class TestProjectionQualityWithoutAudit:
+    """AC-10: projection_quality='partial' + missing_fields has the three keys when audit absent."""
+
+    def test_projection_quality_is_partial(self, trace_response_no_audit):
+        assert trace_response_no_audit.projection_quality == "partial"
+
+    def test_missing_fields_contains_three_keys(self, trace_response_no_audit):
+        missing = trace_response_no_audit.missing_fields
+        assert "analyst_stances" in missing
+        assert "confidence_scores" in missing
+        assert "override_attribution" in missing
+
+    def test_missing_fields_does_not_contain_override_metadata(self, trace_response_no_audit):
+        assert "explicit_override_metadata" not in trace_response_no_audit.missing_fields
+
+    def test_data_state_derivation_unchanged(self, trace_response_no_audit):
+        """AC-14: data_state derivation is unchanged — no audit log → 'stale'."""
+        assert trace_response_no_audit.data_state == "stale"
+
+
+class TestGoverningRuleRouteLevel:
+    """AC-20: route-level governing rule test — 'do not claim more than artifacts prove'."""
+
+    def _get_trace_body(self, client, run_record_path, audit_log_path=None):
+        run_id = SAMPLE_RUN_ID
+        # Pre-compute the result BEFORE patching to avoid recursive mock call
+        precomputed = project_trace(
+            run_id=run_id,
+            run_record_path=run_record_path,
+            audit_log_path=audit_log_path,
+        )
+        with patch("ai_analyst.api.routers.ops.project_trace") as mock_pt:
+            mock_pt.return_value = precomputed
+            resp = client.get(f"/runs/{run_id}/agent-trace")
+        return resp.json()
+
+    def test_audit_present_has_heuristic_quality_and_evidence_class(self, client):
+        """AC-20: audit-log-present trace → projection_quality='heuristic', all evidence_class='heuristic'."""
+        body = self._get_trace_body(
+            client,
+            run_record_path=SAMPLE_RUN_RECORD,
+            audit_log_path=SAMPLE_AUDIT_LOG,
+        )
+        assert body["projection_quality"] == "heuristic"
+        for p in body["participants"]:
+            assert p["contribution"]["evidence_class"] == "heuristic", (
+                f"Participant {p['entity_id']!r}: evidence_class={p['contribution']['evidence_class']!r}"
+            )
+
+    def test_audit_absent_has_partial_quality_and_default_evidence_class(self, client):
+        """AC-20: audit-log-absent trace → projection_quality='partial', all evidence_class='default'."""
+        body = self._get_trace_body(
+            client,
+            run_record_path=SAMPLE_RUN_RECORD,
+            audit_log_path=Path("/nonexistent/audit.jsonl"),
+        )
+        assert body["projection_quality"] == "partial"
+        for p in body["participants"]:
+            assert p["contribution"]["evidence_class"] == "default", (
+                f"Participant {p['entity_id']!r}: evidence_class={p['contribution']['evidence_class']!r}"
+            )

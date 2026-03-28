@@ -817,3 +817,195 @@ class TestPersonaToRosterId:
         """Output is always a str regardless of input."""
         for case in ["default_analyst", "arbiter", "unknown_xyz", ""]:
             assert isinstance(self.fn(case), str)
+
+
+# ── Health evidence_basis tests (T3 — AC-4 through AC-8, AC-12, AC-22) ───────
+
+
+class TestHealthEvidenceBasisModel:
+    """AC-8: evidence_basis field exists on AgentHealthItem model."""
+
+    def test_evidence_basis_field_exists(self):
+        from ai_analyst.api.models.ops import AgentHealthItem
+        schema = AgentHealthItem.model_json_schema()
+        assert "evidence_basis" in schema.get("properties", {}), (
+            "evidence_basis field not found on AgentHealthItem"
+        )
+
+    def test_evidence_basis_default_is_none(self):
+        from ai_analyst.api.models.ops import AgentHealthItem
+        item = AgentHealthItem(
+            entity_id="test",
+            run_state="idle",
+            health_state="unavailable",
+        )
+        assert item.evidence_basis == "none"
+
+    def test_evidence_basis_accepts_all_values(self):
+        from ai_analyst.api.models.ops import AgentHealthItem
+        for val in ("runtime_event", "derived_proxy", "none"):
+            item = AgentHealthItem(
+                entity_id="test",
+                run_state="idle",
+                health_state="unavailable",
+                evidence_basis=val,
+            )
+            assert item.evidence_basis == val
+
+
+class TestHealthEvidenceBasisProjection:
+    """AC-4 through AC-7, AC-12: evidence_basis on projected health items."""
+
+    def _project(self, **kwargs):
+        from ai_analyst.api.services.ops_health import project_health
+        return project_health(FakeAppState(**kwargs))
+
+    def _get_item(self, response, entity_id):
+        for item in response.entities:
+            if item.entity_id == entity_id:
+                return item
+        return None
+
+    # AC-7: default entities have evidence_basis "none"
+    def test_default_entities_have_none_basis(self):
+        """AC-7: persona entities with no observability get evidence_basis 'none'."""
+        response = self._project()
+        item = self._get_item(response, "persona_default_analyst")
+        assert item is not None
+        assert item.evidence_basis == "none"
+
+    # AC-7: feeder_ingest unavailable branch → "none" (Option B)
+    def test_feeder_ingest_unavailable_has_none_basis(self):
+        """AC-7: feeder_ingest with no data gets evidence_basis 'none'."""
+        response = self._project()
+        item = self._get_item(response, "feeder_ingest")
+        assert item is not None
+        assert item.health_state == "unavailable"
+        assert item.evidence_basis == "none"
+
+    # AC-7: mdo_scheduler unavailable branch → "none" (Option B)
+    def test_mdo_scheduler_unavailable_has_none_basis(self):
+        """AC-7: mdo_scheduler with no data gets evidence_basis 'none'."""
+        response = self._project()
+        item = self._get_item(response, "mdo_scheduler")
+        assert item is not None
+        assert item.health_state == "unavailable"
+        assert item.evidence_basis == "none"
+
+    # AC-4: feeder_ingest runtime_event when data present
+    def test_feeder_ingest_runtime_event_when_live(self):
+        """AC-4: feeder_ingest with fresh data gets evidence_basis 'runtime_event'."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        response = self._project(
+            feeder_ingested_at=now,
+            feeder_payload_meta={"status": "ok", "source_health": {}},
+        )
+        item = self._get_item(response, "feeder_ingest")
+        assert item is not None
+        assert item.evidence_basis == "runtime_event"
+
+    # AC-4: mdo_scheduler runtime_event when data present
+    def test_mdo_scheduler_runtime_event_when_live(self):
+        """AC-4: mdo_scheduler with fresh data gets evidence_basis 'runtime_event'."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        response = self._project(
+            feeder_ingested_at=now,
+            feeder_payload_meta={"status": "ok", "source_health": {}},
+        )
+        item = self._get_item(response, "mdo_scheduler")
+        assert item is not None
+        assert item.evidence_basis == "runtime_event"
+
+    # AC-5: officers are derived_proxy
+    def test_market_data_officer_derived_proxy(self):
+        """AC-5: market_data_officer gets evidence_basis 'derived_proxy'."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        response = self._project(
+            feeder_ingested_at=now,
+            feeder_payload_meta={"status": "ok", "source_health": {}},
+        )
+        item = self._get_item(response, "market_data_officer")
+        assert item is not None
+        assert item.evidence_basis == "derived_proxy"
+
+    def test_macro_risk_officer_derived_proxy(self):
+        """AC-5: macro_risk_officer gets evidence_basis 'derived_proxy'."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        response = self._project(
+            feeder_ingested_at=now,
+            feeder_payload_meta={"status": "ok", "source_health": {}},
+        )
+        item = self._get_item(response, "macro_risk_officer")
+        assert item is not None
+        assert item.evidence_basis == "derived_proxy"
+
+    # AC-6: governance derived_proxy when feeder_context present
+    def test_arbiter_derived_proxy_with_context(self):
+        """AC-6: arbiter gets evidence_basis 'derived_proxy' when feeder_context exists."""
+        response = self._project(feeder_context={"macro": "data"})
+        item = self._get_item(response, "arbiter")
+        assert item is not None
+        assert item.evidence_basis == "derived_proxy"
+
+    def test_governance_synthesis_derived_proxy_with_context(self):
+        """AC-6: governance_synthesis gets evidence_basis 'derived_proxy' when feeder_context exists."""
+        response = self._project(feeder_context={"macro": "data"})
+        item = self._get_item(response, "governance_synthesis")
+        assert item is not None
+        assert item.evidence_basis == "derived_proxy"
+
+    # AC-12: health_state values unchanged by evidence_basis additions
+    def test_health_state_not_changed_by_evidence_basis(self):
+        """AC-12: adding evidence_basis does not change existing health_state values."""
+        response = self._project(feeder_context={"macro": "data"})
+        arbiter = self._get_item(response, "arbiter")
+        assert arbiter is not None
+        assert arbiter.health_state == "live", (
+            "Governance entity health_state must remain 'live' when feeder_context exists"
+        )
+        gov_synth = self._get_item(response, "governance_synthesis")
+        assert gov_synth is not None
+        assert gov_synth.health_state == "live"
+
+
+class TestHealthEvidenceBasisRoute:
+    """AC-22: evidence_basis appears in serialized health response."""
+
+    def test_evidence_basis_in_serialized_response(self, client):
+        """AC-22: route-level test — evidence_basis present in JSON response."""
+        resp = client.get("/ops/agent-health")
+        assert resp.status_code == 200
+        data = resp.json()
+        entities = data.get("entities", [])
+        assert len(entities) > 0
+        # All entities must have evidence_basis in serialized response
+        for entity in entities:
+            assert "evidence_basis" in entity, (
+                f"evidence_basis missing from entity {entity.get('entity_id')!r}"
+            )
+
+    def test_evidence_basis_values_valid(self, client):
+        """AC-22: evidence_basis values are within the allowed enum."""
+        valid = {"runtime_event", "derived_proxy", "none"}
+        resp = client.get("/ops/agent-health")
+        data = resp.json()
+        for entity in data.get("entities", []):
+            assert entity["evidence_basis"] in valid, (
+                f"Invalid evidence_basis {entity['evidence_basis']!r} "
+                f"for entity {entity['entity_id']!r}"
+            )
+
+    def test_default_entities_have_none_in_route(self, client):
+        """AC-22: persona entities have evidence_basis 'none' in route response."""
+        resp = client.get("/ops/agent-health")
+        data = resp.json()
+        for entity in data.get("entities", []):
+            if entity["entity_id"].startswith("persona_"):
+                assert entity["evidence_basis"] == "none", (
+                    f"Persona {entity['entity_id']!r} has "
+                    f"evidence_basis={entity['evidence_basis']!r}, expected 'none'"
+                )

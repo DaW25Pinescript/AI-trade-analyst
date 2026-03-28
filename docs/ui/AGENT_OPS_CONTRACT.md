@@ -255,6 +255,7 @@ type AgentHealthItem = {
   last_run_id?: string;
   health_summary?: string;
   recent_event_summary?: string;
+  evidence_basis?: "runtime_event" | "derived_proxy" | "none";
 };
 ```
 
@@ -269,6 +270,17 @@ type AgentHealthItem = {
 | `last_run_id` | `string` | no | Most recent known run ID |
 | `health_summary` | `string` | no | Short human-readable health description for card or detail panel |
 | `recent_event_summary` | `string` | no | Recent event description for activity ribbon or detail panel |
+| `evidence_basis` | `"runtime_event" \| "derived_proxy" \| "none"` | no | How the `health_state` was determined. Default `"none"` |
+
+**`evidence_basis` semantics (Audit Tranche 3):**
+
+| Value | Meaning | Entities |
+|-------|---------|----------|
+| `"runtime_event"` | Health derived from actual runtime signals (feeder ingestion, scheduler execution) — data present | `feeder_ingest`, `mdo_scheduler` (when data available) |
+| `"derived_proxy"` | Health mirrored from another entity's evidence or inferred from context presence | `market_data_officer` (mirrors mdo_scheduler), `macro_risk_officer` (mirrors feeder_ingest), `arbiter` + `governance_synthesis` (feeder_context present) |
+| `"none"` | No observability evidence — entity gets default health, or subsystem unavailable branch | All personas, any entity without evidence signals, `feeder_ingest`/`mdo_scheduler` when data absent |
+
+`health_state` values are **not changed** by `evidence_basis` — governance entities remain `"live"` when feeder_context exists. The `evidence_basis` field communicates provenance; the operator decides what to do with it.
 
 ### 5.6 `run_state` and `health_state` are separate dimensions
 
@@ -341,7 +353,7 @@ All HTTP errors use `OpsErrorEnvelope`.
 
 ## 6. `GET /runs/{run_id}/agent-trace` (PR-OPS-4a)
 
-> **Canonical source:** the backend serialized JSON payload (`AgentTraceResponse.model_dump(by_alias=True)`). All field names, enums, and nesting here reflect the live API response. Updated: Audit Tranche 1 (2026-03-28).
+> **Canonical source:** the backend serialized JSON payload (`AgentTraceResponse.model_dump(by_alias=True)`). All field names, enums, and nesting here reflect the live API response. Updated: Audit Tranche 3 (2026-03-28).
 
 ### 6.1 Purpose
 
@@ -371,10 +383,36 @@ type AgentTraceResponse = ResponseMeta & {
   trace_edges: TraceEdge[];            // NB: "trace_edges", not "edges"
   arbiter_summary: ArbiterTraceSummary | null;
   artifact_refs: ArtifactRef[];        // NB: "artifact_refs", not "artifacts"
+  projection_quality?: "partial" | "heuristic";   // v1 only — see §6.3a
+  missing_fields?: string[];                       // field categories lacking direct evidence
 };
 ```
 
 `ResponseMeta` contributes: `version`, `generated_at`, `data_state`, `source_of_truth`.
+
+### 6.3a Projection quality metadata (Audit Tranche 3)
+
+`projection_quality` and `missing_fields` encode how much of the trace is directly evidenced by run artifacts vs inferred by read-side heuristics.
+
+**`projection_quality` values (v1):**
+
+| Value | Meaning | Condition |
+|-------|---------|-----------|
+| `"heuristic"` | Audit log present; override-assessment fields are heuristic-derived | Audit log present (always in v1) |
+| `"partial"` | Audit log absent — key enrichment fields unavailable | No audit log |
+
+`"full"` is **reserved** for future pipeline work (explicit per-analyst override metadata). It is not emitted in v1 and will be added to this contract when reachable.
+
+**`missing_fields` vocabulary (locked for v1):**
+
+| Key | Gap type | Meaning | When included |
+|-----|----------|---------|---------------|
+| `"analyst_stances"` | Unavailable | Per-analyst stance data absent | Audit log absent |
+| `"confidence_scores"` | Unavailable | Per-analyst confidence absent | Audit log absent |
+| `"override_attribution"` | Unavailable | Override assessment absent | Audit log absent |
+| `"explicit_override_metadata"` | Not artifact-evidenced | Override attribution present but heuristic-derived | Audit log present (always in v1) |
+
+Default values: `projection_quality: "partial"`, `missing_fields: []`.
 
 ### 6.4 ArtifactRef
 
@@ -435,8 +473,23 @@ type ParticipantContribution = {
   summary: string;                  // max 500 chars
   was_overridden: boolean;
   override_reason: string | null;   // max 300 chars
+  evidence_class?: "artifact" | "heuristic" | "default";  // see §6.7a
 };
 ```
+
+### 6.7a `evidence_class` on ParticipantContribution (Audit Tranche 3)
+
+`evidence_class` labels the provenance of the **override-assessment subfields** (`was_overridden`, `override_reason`). It does not describe the provenance of `stance`/`confidence`/`summary`.
+
+| Value | Meaning | When used |
+|-------|---------|-----------|
+| `"artifact"` | Override claim directly evidenced by run artifacts | Reserved — not emitted in v1 |
+| `"heuristic"` | Override claim inferred by read-side heuristic (risk_override_applied + stance + NO_TRADE) | Audit log present — applies to ALL participants, both overridden and non-overridden |
+| `"default"` | No evidence to assess — field carries default value | No audit log |
+
+**Why `"heuristic"` even when `was_overridden: false`:** The absence of override is also an inference. The heuristic fires when `stance` is directional and arbiter said `NO_TRADE`. Not meeting that condition does not prove the analyst wasn't overridden — it means the heuristic didn't fire. Until the pipeline produces explicit override records, both positive and negative assessments are heuristic.
+
+Default value: `"default"`.
 
 ### 6.8 TraceEdge
 

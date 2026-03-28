@@ -349,6 +349,8 @@ function makeTrace(overrides?: Partial<AgentTraceResponse>): AgentTraceResponse 
     artifact_refs: [
       { artifact_type: "run_record", artifact_key: "runs/run-001/run_record.json" },
     ],
+    projection_quality: "heuristic",
+    missing_fields: ["explicit_override_metadata"],
     ...overrides,
   };
 }

@@ -44,6 +44,7 @@ def _feeder_health_item(
             run_state="idle",
             health_state="unavailable",
             health_summary="No feeder payload ingested yet",
+            evidence_basis="none",
         )
 
     now = datetime.now(timezone.utc)
@@ -70,6 +71,7 @@ def _feeder_health_item(
         last_active_at=feeder_ingested_at.isoformat(),
         health_summary=summary,
         recent_event_summary=f"Last ingest: {source_status}",
+        evidence_basis="runtime_event",
     )
 
 
@@ -88,6 +90,7 @@ def _mdo_scheduler_health_item(
             run_state="idle",
             health_state="unavailable",
             health_summary="No scheduler data available",
+            evidence_basis="none",
         )
 
     now = datetime.now(timezone.utc)
@@ -100,6 +103,7 @@ def _mdo_scheduler_health_item(
             health_state="stale",
             last_active_at=feeder_ingested_at.isoformat(),
             health_summary=f"Scheduler data is {int(age_seconds)}s old (stale)",
+            evidence_basis="runtime_event",
         )
 
     return AgentHealthItem(
@@ -108,6 +112,7 @@ def _mdo_scheduler_health_item(
         health_state="live",
         last_active_at=feeder_ingested_at.isoformat(),
         health_summary="Scheduler operating normally",
+        evidence_basis="runtime_event",
     )
 
 
@@ -118,6 +123,7 @@ def _default_health_item(entity_id: str) -> AgentHealthItem:
         run_state="idle",
         health_state="unavailable",
         health_summary="No health signals available",
+        evidence_basis="none",
     )
 
 
@@ -164,6 +170,7 @@ def project_health(app_state: Any) -> AgentHealthSnapshotResponse:
         health_state=mdo_health.health_state,
         last_active_at=mdo_health.last_active_at,
         health_summary="Mirrors MDO scheduler status",
+        evidence_basis="derived_proxy",
     )
 
     # Macro Risk Officer — mirrors feeder ingest health
@@ -174,6 +181,7 @@ def project_health(app_state: Any) -> AgentHealthSnapshotResponse:
         health_state=fi_health.health_state,
         last_active_at=fi_health.last_active_at,
         health_summary="Mirrors feeder ingest status",
+        evidence_basis="derived_proxy",
     )
 
     # Macro context provides evidence for governance entities
@@ -183,12 +191,14 @@ def project_health(app_state: Any) -> AgentHealthSnapshotResponse:
             run_state="idle",
             health_state="live",
             health_summary="Arbiter available with macro context",
+            evidence_basis="derived_proxy",
         )
         evidence_items["governance_synthesis"] = AgentHealthItem(
             entity_id="governance_synthesis",
             run_state="idle",
             health_state="live",
             health_summary="Governance synthesis pipeline ready",
+            evidence_basis="derived_proxy",
         )
 
     # Assemble: every roster entity gets a health item

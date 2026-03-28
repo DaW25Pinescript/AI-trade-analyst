@@ -223,6 +223,11 @@ def project_trace(
     if has_audit:
         audit_verdict = audit_entry.get("final_verdict", {})
 
+    # Override-assessment evidence class: heuristic when audit log present,
+    # default when absent — applies to ALL participants (absence of override
+    # is also inferred, not proven).
+    contrib_evidence_class = "heuristic" if has_audit else "default"
+
     participants: list[TraceParticipant] = []
 
     # Successful analysts
@@ -273,6 +278,7 @@ def project_trace(
                 summary=summary,
                 was_overridden=was_overridden,
                 override_reason=override_reason,
+                evidence_class=contrib_evidence_class,
             ),
             status="completed",
         ))
@@ -292,6 +298,7 @@ def project_trace(
                 role=agent.type if agent else "analyst",
                 summary=_truncate(reason, _MAX_SUMMARY_LEN),
                 was_overridden=False,
+                evidence_class=contrib_evidence_class,
             ),
             status="skipped",
         ))
@@ -311,6 +318,7 @@ def project_trace(
                 role=agent.type if agent else "analyst",
                 summary=_truncate(reason, _MAX_SUMMARY_LEN),
                 was_overridden=False,
+                evidence_class=contrib_evidence_class,
             ),
             status="failed",
         ))
@@ -341,6 +349,7 @@ def project_trace(
                 role="arbiter",
                 summary=arbiter_summary_text,
                 was_overridden=False,
+                evidence_class=contrib_evidence_class,
             ),
             status="completed",
         ))
@@ -489,6 +498,19 @@ def project_trace(
         except (ValueError, TypeError):
             pass
 
+    # Compute projection quality and missing fields
+    # "full" is reserved for future pipeline work — not reachable in v1
+    if not has_audit:
+        projection_quality = "partial"
+        missing_fields: list[str] = [
+            "analyst_stances",
+            "confidence_scores",
+            "override_attribution",
+        ]
+    else:
+        projection_quality = "heuristic"
+        missing_fields = ["explicit_override_metadata"]
+
     return AgentTraceResponse(
         version=_CONTRACT_VERSION,
         generated_at=datetime.now(timezone.utc).isoformat(),
@@ -506,4 +528,6 @@ def project_trace(
         trace_edges=edges,
         arbiter_summary=arbiter_trace_summary,
         artifact_refs=artifact_refs,
+        projection_quality=projection_quality,
+        missing_fields=missing_fields,
     )

@@ -39,6 +39,9 @@ class TraceStage(BaseModel):
     participant_ids: list[str]
 
 
+EvidenceClass = Literal["artifact", "heuristic", "default"]
+
+
 class ParticipantContribution(BaseModel):
     """Per-participant contribution details (§6.7)."""
 
@@ -48,6 +51,7 @@ class ParticipantContribution(BaseModel):
     summary: str = Field(max_length=500)
     was_overridden: bool
     override_reason: Optional[str] = Field(default=None, max_length=300)
+    evidence_class: EvidenceClass = "default"
 
 
 class TraceParticipant(BaseModel):
@@ -111,6 +115,9 @@ class ArtifactRef(BaseModel):
 # ── Top-level response (§6.4) ───────────────────────────────────────────────
 
 
+ProjectionQuality = Literal["partial", "heuristic"]
+
+
 class AgentTraceResponse(ResponseMeta):
     """GET /runs/{run_id}/agent-trace response (§6.4).
 
@@ -129,3 +136,5 @@ class AgentTraceResponse(ResponseMeta):
     trace_edges: list[TraceEdge]
     arbiter_summary: Optional[ArbiterTraceSummary] = None
     artifact_refs: list[ArtifactRef]
+    projection_quality: ProjectionQuality = "partial"
+    missing_fields: list[str] = Field(default_factory=list)
