@@ -39,7 +39,7 @@
 - No resilience / scale work (Findings 9, 10, 11) — Tranche 4
 - No changes to roster data shape, entity definitions, or relationship definitions
 - No SQLite or database layer introduced
-- No new top-level module
+- No new top-level module; prefer adding APIs to `ops_roster.py`. Any new helper file inside `ai_analyst/api/services/` must be flagged and justified before proceeding
 
 ---
 
@@ -107,6 +107,11 @@ def get_entity_lookup() -> dict[str, AgentSummary]:
     Callers use this for bulk lookups (trace projection) or single-entity
     lookups (detail projection). The dict is rebuilt on each call — 
     callers may cache locally if performance matters.
+    
+    The returned dict is a fresh object (safe to discard). The AgentSummary
+    values are the original objects, not defensive copies — callers must
+    treat them as read-only. This is acceptable because AgentSummary objects
+    are Pydantic models used read-only inside projection services.
     """
     lookup: dict[str, AgentSummary] = {}
     for agent in _GOVERNANCE_LAYER:
@@ -231,7 +236,7 @@ The test import `from ai_analyst.api.services.ops_detail import _build_dependenc
 | AC-7 | Negative: no local entity lookup | `ops_trace.py` does not define `_get_roster_lookup`. `ops_detail.py` does not define `_get_roster_entity` | ⏳ Pending |
 | AC-8 | Trace regression | All existing trace tests pass. `project_trace()` output is contract-equivalent for the same fixture inputs (same field values, same ordering where contract-relevant, no contract-visible regressions) | ⏳ Pending |
 | AC-9 | Detail regression | All existing detail tests pass. `project_detail()` output is contract-equivalent for the same entity IDs, except where the centralized persona mapping intentionally corrects blind-prefix behavior for non-persona roster IDs (e.g., `"arbiter"` no longer becomes `"persona_arbiter"`). Diagnostics must confirm this correction and prove no existing test relies on the blind-prefix behavior | ⏳ Pending |
-| AC-10 | Health unaffected | `ops_health.py` imports unchanged. All health tests pass | ⏳ Pending |
+| AC-10 | Health unaffected | No changes to `ops_health.py`; all health tests pass unchanged | ⏳ Pending |
 | AC-11 | Persona mapping invariants | Invariant tests cover: already-valid roster ID passthrough, bare persona name → prefixed, unknown name passthrough, all known persona names map correctly | ⏳ Pending |
 | AC-12 | Entity lookup completeness | Test asserts `set(get_entity_lookup().keys()) == get_all_roster_ids()` | ⏳ Pending |
 | AC-13 | Relationships copy safety | Test asserts `get_relationships() is not get_relationships()` (different list object) and `len(get_relationships()) == len(expected)` | ⏳ Pending |
@@ -297,9 +302,9 @@ for eid in sorted(ids):
 "
 ```
 
-**Expected:** 12 entities (2 governance + 2 officer + 3 tech analysis + 3 risk challenge + 1 review governance + 2 infra health — adjusted from diagnostic if different).
+**Expected:** The command returns the current canonical roster ID set. Record exact count and full ID list — use this result as the baseline for `get_entity_lookup()` completeness assertions (AC-12).
 
-**Report:** Entity count and full ID list. The new `get_entity_lookup()` must return exactly this set.
+**Report:** Entity count and full sorted ID list. Do not hardcode a count assumption — the diagnostic discovers the truth.
 
 ### Step 6: Test the behavioral difference in persona mapping
 
@@ -331,7 +336,38 @@ for tc in test_cases:
 
 **Report:** Full diff table. Confirm no existing detail test relies on blind-prefix behavior for these cases.
 
-### Step 7: Report smallest patch set
+### Step 7: Capture pre-refactor outputs for before/after comparison
+
+```bash
+python -c "
+import json
+from ai_analyst.api.services.ops_trace import project_trace
+from pathlib import Path
+
+# Use the same fixture as trace tests
+fixture_dir = Path('tests/fixtures')
+rr = fixture_dir / 'sample_run_record.json'
+al = fixture_dir / 'sample_audit_log.jsonl'
+
+if rr.exists():
+    result = project_trace('test_run_001', run_record_path=rr, audit_log_path=al if al.exists() else None)
+    payload = json.loads(result.model_dump_json(by_alias=True))
+    # Write to temp file for post-refactor diff
+    Path('/tmp/trace_before.json').write_text(json.dumps(payload, indent=2, sort_keys=True))
+    print('Trace output captured to /tmp/trace_before.json')
+    print(f'  run_id: {payload.get(\"run_id\")}')
+    print(f'  participants: {len(payload.get(\"participants\", []))}')
+    print(f'  trace_edges: {len(payload.get(\"trace_edges\", []))}')
+else:
+    print('No fixture found - skip')
+"
+```
+
+**Expected:** Captures a representative trace output snapshot. After the refactor, rerun the same command to `/tmp/trace_after.json` and diff. The only permitted differences are from the persona mapping correction (if it surfaces in this fixture). Any other diff is a regression.
+
+**Report:** Confirm capture succeeded. Note participant count and edge count for later comparison.
+
+### Step 8: Report smallest patch set
 
 **Report:** Files, one-line description, estimated line delta per file.
 
@@ -341,7 +377,7 @@ for tc in test_cases:
 
 ### 9.1 General rule
 
-This is a structural refactor, not a behavior change. The observable output of `project_trace()` and `project_detail()` must not change for any input. The only behavioral correction is `persona_to_roster_id` — detail's blind-prefix behavior is a latent bug that this tranche fixes by adopting trace's richer logic. The diagnostic must confirm no existing test relies on the blind-prefix behavior.
+This is a structural refactor with one bounded behavior correction. The observable output of `project_trace()` and `project_detail()` must be contract-equivalent to pre-refactor output for all inputs. The only permitted difference is the `persona_to_roster_id` correction: cases where a bare artifact name is already a valid roster ID (non-persona entities like arbiter, officers, subsystems) now resolve canonically instead of being blindly prefixed. For actual persona names, output is identical. The diagnostic must confirm no existing test relies on the blind-prefix behavior, and the before/after output comparison (Step 7) must show no unexpected diffs.
 
 ### 9.1b Implementation Sequence
 
@@ -386,7 +422,7 @@ This is a structural refactor, not a behavior change. The observable output of `
 - No frontend changes
 - No contract doc changes
 - No observability trust fixes
-- No SQLite, no new top-level module
+- No SQLite, no new top-level module; any new helper file inside the package must be flagged and justified
 
 ---
 
@@ -445,10 +481,11 @@ before changing any code:
 4. Run baseline backend test suite — report exact counts
 5. Verify roster entity count and full ID list
 6. Test behavioral difference in persona mapping — divergence table
-7. Propose smallest patch set: files, one-line description, estimated line delta
+7. Capture pre-refactor trace/detail outputs for before/after comparison
+8. Propose smallest patch set: files, one-line description, estimated line delta
 
 Hard constraints:
-- Observable output of project_trace() and project_detail() must not change for any existing fixture inputs (except the persona mapping behavior correction)
+- Observable output of project_trace() and project_detail() must be contract-equivalent to pre-refactor output. Only permitted difference: persona mapping correction for non-persona roster IDs (bare name already a valid roster ID → returned unchanged instead of blindly prefixed)
 - Private constants stay private inside ops_roster.py — do not expose, rename, or restructure them
 - The centralized persona_to_roster_id must use trace's richer logic (check existing ID, then prefix) — not detail's blind-prefix behavior
 - No frontend changes, no contract doc changes
@@ -461,7 +498,7 @@ patch set is approved.
 On completion, close the spec and update docs per Workflow E:
 1. `docs/specs/PR_AUDIT_T2_PROJECTION_CORE_SPEC.md` — mark ✅ Complete, flip all AC cells,
    populate §13 Diagnostic Findings with: private import list, persona mapping divergence table,
-   entity count, test import list, any surprises
+   entity count, test import list, before/after output comparison result, any surprises
 2. `docs/AI_TradeAnalyst_Progress.md` — dashboard-aware update per Workflow E.2:
    update header (current phase), add Recent Activity row for Audit T2,
    update Phase Status Overview, update Phase Index, add test count row,
