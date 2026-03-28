@@ -28,7 +28,7 @@ from ai_analyst.api.models.ops_trace import (
     TraceParticipant,
     TraceStage,
 )
-from ai_analyst.api.services.ops_roster import get_all_roster_ids
+from ai_analyst.api.services.ops_roster import get_entity_lookup, persona_to_roster_id
 
 logger = logging.getLogger(__name__)
 
@@ -41,65 +41,6 @@ _MAX_OVERRIDE_REASON_LEN = 300
 _MAX_DISSENT_SUMMARY_LEN = 500
 _MAX_EDGE_SUMMARY_LEN = 300
 _MAX_TRACE_EDGES = 50
-
-# ── Persona ID mapping ─────────────────────────────────────────────────────
-# run_record.json stores bare persona names (e.g. "default_analyst")
-# Roster uses "persona_{name}" convention. Map here, not in pipeline.
-
-_ROSTER_LOOKUP: Optional[dict[str, dict]] = None
-
-
-def _get_roster_lookup() -> dict[str, dict]:
-    """Lazily build a lookup from roster entity definitions."""
-    global _ROSTER_LOOKUP
-    if _ROSTER_LOOKUP is not None:
-        return _ROSTER_LOOKUP
-
-    from ai_analyst.api.services.ops_roster import (
-        _GOVERNANCE_LAYER,
-        _OFFICER_LAYER,
-        _DEPARTMENTS,
-    )
-
-    lookup: dict[str, dict] = {}
-    for agent in _GOVERNANCE_LAYER:
-        lookup[agent.id] = {
-            "display_name": agent.display_name,
-            "type": agent.type,
-            "department": agent.department,
-        }
-    for agent in _OFFICER_LAYER:
-        lookup[agent.id] = {
-            "display_name": agent.display_name,
-            "type": agent.type,
-            "department": agent.department,
-        }
-    for agents in _DEPARTMENTS.values():
-        for agent in agents:
-            lookup[agent.id] = {
-                "display_name": agent.display_name,
-                "type": agent.type,
-                "department": agent.department,
-            }
-    _ROSTER_LOOKUP = lookup
-    return lookup
-
-
-def _persona_to_roster_id(bare_name: str) -> str:
-    """Map a bare persona name from run_record to roster ID.
-
-    e.g. "default_analyst" -> "persona_default_analyst"
-    """
-    roster = _get_roster_lookup()
-    # Already a roster ID?
-    if bare_name in roster:
-        return bare_name
-    # Try persona_ prefix
-    prefixed = f"persona_{bare_name}"
-    if prefixed in roster:
-        return prefixed
-    # Return as-is — caller handles unknown IDs
-    return bare_name
 
 
 def _truncate(text: Optional[str], max_len: int) -> str:
@@ -219,7 +160,7 @@ def project_trace(
     has_audit = audit_entry is not None
     data_state = "live" if has_audit else "stale"
 
-    roster = _get_roster_lookup()
+    roster = get_entity_lookup()
     request = raw.get("request", {})
 
     # ── Determine run_status ────────────────────────────────────────────
@@ -240,7 +181,7 @@ def project_trace(
 
     # Analyst participant IDs for the analyst_execution stage
     analyst_participant_ids = [
-        _persona_to_roster_id(a["persona"]) for a in analysts_ran
+        persona_to_roster_id(a["persona"]) for a in analysts_ran
     ]
 
     stages: list[TraceStage] = []
@@ -286,8 +227,8 @@ def project_trace(
 
     # Successful analysts
     for i, analyst in enumerate(analysts_ran):
-        entity_id = _persona_to_roster_id(analyst["persona"])
-        roster_info = roster.get(entity_id, {})
+        entity_id = persona_to_roster_id(analyst["persona"])
+        agent = roster.get(entity_id)
 
         # Enrich from audit log if available
         stance = None
@@ -321,14 +262,14 @@ def project_trace(
 
         participants.append(TraceParticipant(
             entity_id=entity_id,
-            entity_type=roster_info.get("type", "persona"),
-            display_name=roster_info.get("display_name", analyst["persona"].upper()),
-            department=roster_info.get("department"),
+            entity_type=agent.type if agent else "persona",
+            display_name=agent.display_name if agent else analyst["persona"].upper(),
+            department=agent.department if agent else None,
             participated=True,
             contribution=ParticipantContribution(
                 stance=stance,
                 confidence=confidence,
-                role=roster_info.get("type", "analyst"),
+                role=agent.type if agent else "analyst",
                 summary=summary,
                 was_overridden=was_overridden,
                 override_reason=override_reason,
@@ -338,17 +279,17 @@ def project_trace(
 
     # Skipped analysts
     for analyst in analysts_skipped:
-        entity_id = _persona_to_roster_id(analyst["persona"])
-        roster_info = roster.get(entity_id, {})
+        entity_id = persona_to_roster_id(analyst["persona"])
+        agent = roster.get(entity_id)
         reason = analyst.get("reason", "Skipped")
         participants.append(TraceParticipant(
             entity_id=entity_id,
-            entity_type=roster_info.get("type", "persona"),
-            display_name=roster_info.get("display_name", analyst["persona"].upper()),
-            department=roster_info.get("department"),
+            entity_type=agent.type if agent else "persona",
+            display_name=agent.display_name if agent else analyst["persona"].upper(),
+            department=agent.department if agent else None,
             participated=False,
             contribution=ParticipantContribution(
-                role=roster_info.get("type", "analyst"),
+                role=agent.type if agent else "analyst",
                 summary=_truncate(reason, _MAX_SUMMARY_LEN),
                 was_overridden=False,
             ),
@@ -357,17 +298,17 @@ def project_trace(
 
     # Failed analysts
     for analyst in analysts_failed:
-        entity_id = _persona_to_roster_id(analyst["persona"])
-        roster_info = roster.get(entity_id, {})
+        entity_id = persona_to_roster_id(analyst["persona"])
+        agent = roster.get(entity_id)
         reason = analyst.get("reason", "Failed")
         participants.append(TraceParticipant(
             entity_id=entity_id,
-            entity_type=roster_info.get("type", "persona"),
-            display_name=roster_info.get("display_name", analyst["persona"].upper()),
-            department=roster_info.get("department"),
+            entity_type=agent.type if agent else "persona",
+            display_name=agent.display_name if agent else analyst["persona"].upper(),
+            department=agent.department if agent else None,
             participated=False,
             contribution=ParticipantContribution(
-                role=roster_info.get("type", "analyst"),
+                role=agent.type if agent else "analyst",
                 summary=_truncate(reason, _MAX_SUMMARY_LEN),
                 was_overridden=False,
             ),
@@ -376,7 +317,7 @@ def project_trace(
 
     # Arbiter as participant (if ran)
     if arbiter_block.get("ran", False):
-        arbiter_roster = roster.get("arbiter", {})
+        arbiter_agent = roster.get("arbiter")
         arbiter_bias = None
         arbiter_conf = arbiter_block.get("confidence")
         arbiter_summary_text = f"Verdict: {arbiter_block.get('verdict', 'unknown')}"
@@ -391,8 +332,8 @@ def project_trace(
         participants.append(TraceParticipant(
             entity_id="arbiter",
             entity_type="arbiter",
-            display_name=arbiter_roster.get("display_name", "ARBITER"),
-            department=arbiter_roster.get("department"),
+            display_name=arbiter_agent.display_name if arbiter_agent else "ARBITER",
+            department=arbiter_agent.department if arbiter_agent else None,
             participated=True,
             contribution=ParticipantContribution(
                 stance=arbiter_bias,
@@ -410,7 +351,7 @@ def project_trace(
     # Ran analysts → arbiter: considered_by_arbiter
     if arbiter_block.get("ran", False):
         for analyst in analysts_ran:
-            entity_id = _persona_to_roster_id(analyst["persona"])
+            entity_id = persona_to_roster_id(analyst["persona"])
             edges.append(TraceEdge(
                 from_=entity_id,
                 to="arbiter",
@@ -419,7 +360,7 @@ def project_trace(
 
     # Skipped analysts: skipped_before_arbiter
     for analyst in analysts_skipped:
-        entity_id = _persona_to_roster_id(analyst["persona"])
+        entity_id = persona_to_roster_id(analyst["persona"])
         edges.append(TraceEdge(
             from_=entity_id,
             to="arbiter",
@@ -429,7 +370,7 @@ def project_trace(
 
     # Failed analysts: failed_before_arbiter
     for analyst in analysts_failed:
-        entity_id = _persona_to_roster_id(analyst["persona"])
+        entity_id = persona_to_roster_id(analyst["persona"])
         edges.append(TraceEdge(
             from_=entity_id,
             to="arbiter",

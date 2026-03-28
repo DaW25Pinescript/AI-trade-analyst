@@ -276,6 +276,54 @@ def get_all_roster_ids() -> set[str]:
     return ids
 
 
+def get_entity_lookup() -> dict[str, AgentSummary]:
+    """Return all roster entities keyed by entity ID.
+
+    Callers use this for bulk lookups (trace projection) or single-entity
+    lookups (detail projection). The dict is rebuilt on each call —
+    callers may cache locally if performance matters.
+
+    The returned dict is a fresh object (safe to discard). The AgentSummary
+    values are the original objects, not defensive copies — callers must
+    treat them as read-only.
+    """
+    lookup: dict[str, AgentSummary] = {}
+    for agent in _GOVERNANCE_LAYER:
+        lookup[agent.id] = agent
+    for agent in _OFFICER_LAYER:
+        lookup[agent.id] = agent
+    for agents in _DEPARTMENTS.values():
+        for agent in agents:
+            lookup[agent.id] = agent
+    return lookup
+
+
+def get_relationships() -> list[EntityRelationship]:
+    """Return all roster entity relationships.
+
+    Returns a copy to prevent callers from mutating the internal list.
+    """
+    return list(_RELATIONSHIPS)
+
+
+def persona_to_roster_id(bare_name: str) -> str:
+    """Map a bare persona name from run artifacts to roster entity ID.
+
+    e.g. "default_analyst" -> "persona_default_analyst"
+
+    If bare_name is already a valid roster ID, returns it unchanged.
+    If persona_{bare_name} is a valid roster ID, returns the prefixed form.
+    Otherwise returns bare_name as-is (caller handles unknown IDs).
+    """
+    roster_ids = get_all_roster_ids()
+    if bare_name in roster_ids:
+        return bare_name
+    prefixed = f"persona_{bare_name}"
+    if prefixed in roster_ids:
+        return prefixed
+    return bare_name
+
+
 # ── Public projection function ───────────────────────────────────────────────
 
 

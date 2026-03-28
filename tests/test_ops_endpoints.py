@@ -700,3 +700,120 @@ class TestDepartmentKeyEnum:
     def test_string_value(self):
         assert DepartmentKey.TECHNICAL_ANALYSIS == "TECHNICAL_ANALYSIS"
         assert DepartmentKey.TECHNICAL_ANALYSIS.value == "TECHNICAL_ANALYSIS"
+
+
+# ── Public roster read API tests (AC-11, AC-12, AC-13) ───────────────────────
+
+
+class TestGetEntityLookup:
+    """Tests for get_entity_lookup() public API (AC-1, AC-12)."""
+
+    def setup_method(self):
+        from ai_analyst.api.services.ops_roster import (
+            get_all_roster_ids,
+            get_entity_lookup,
+        )
+        self.get_entity_lookup = get_entity_lookup
+        self.get_all_roster_ids = get_all_roster_ids
+
+    def test_returns_all_roster_entities(self):
+        """AC-12: keys exactly match get_all_roster_ids()."""
+        lookup = self.get_entity_lookup()
+        assert set(lookup.keys()) == self.get_all_roster_ids()
+
+    def test_values_are_agent_summary(self):
+        """AC-1: values are AgentSummary objects."""
+        lookup = self.get_entity_lookup()
+        for entity_id, agent in lookup.items():
+            assert isinstance(agent, AgentSummary), (
+                f"{entity_id!r} mapped to {type(agent)!r}, expected AgentSummary"
+            )
+
+    def test_keys_match_agent_ids(self):
+        """Each key equals the agent's own id field."""
+        lookup = self.get_entity_lookup()
+        for entity_id, agent in lookup.items():
+            assert agent.id == entity_id
+
+    def test_returns_fresh_dict_each_call(self):
+        """AC-1: dict is rebuilt on each call (mutation-safe)."""
+        a = self.get_entity_lookup()
+        b = self.get_entity_lookup()
+        assert a is not b
+
+
+class TestGetRelationships:
+    """Tests for get_relationships() public API (AC-2, AC-13)."""
+
+    def setup_method(self):
+        from ai_analyst.api.services.ops_roster import get_relationships
+        self.get_relationships = get_relationships
+
+    def test_returns_list_of_entity_relationships(self):
+        """AC-2: all items are EntityRelationship instances."""
+        rels = self.get_relationships()
+        assert isinstance(rels, list)
+        for rel in rels:
+            assert isinstance(rel, EntityRelationship)
+
+    def test_returns_copy(self):
+        """AC-13: different list object on each call (mutation-safe)."""
+        a = self.get_relationships()
+        b = self.get_relationships()
+        assert a is not b
+
+    def test_consistent_length(self):
+        """AC-13: length is consistent across calls."""
+        assert len(self.get_relationships()) == len(self.get_relationships())
+
+    def test_nonempty(self):
+        """Roster must have at least one relationship."""
+        assert len(self.get_relationships()) > 0
+
+
+class TestPersonaToRosterId:
+    """Invariant tests for persona_to_roster_id() (AC-3, AC-11)."""
+
+    def setup_method(self):
+        from ai_analyst.api.services.ops_roster import (
+            get_all_roster_ids,
+            persona_to_roster_id,
+        )
+        self.fn = persona_to_roster_id
+        self.roster_ids = get_all_roster_ids()
+
+    def test_bare_persona_name_gets_prefixed(self):
+        """AC-3: bare persona name maps to prefixed roster ID."""
+        assert self.fn("default_analyst") == "persona_default_analyst"
+
+    def test_already_valid_roster_id_unchanged(self):
+        """AC-3: bare name that is already a roster ID is returned unchanged."""
+        assert self.fn("arbiter") == "arbiter"
+
+    def test_unknown_name_passthrough(self):
+        """AC-3: unknown bare name is returned as-is."""
+        assert self.fn("unknown_xyz") == "unknown_xyz"
+
+    def test_all_known_persona_names_map_correctly(self):
+        """AC-11: every persona_* roster ID maps from its bare form."""
+        persona_ids = {eid for eid in self.roster_ids if eid.startswith("persona_")}
+        for pid in persona_ids:
+            bare = pid[len("persona_"):]
+            result = self.fn(bare)
+            assert result == pid, (
+                f"persona_to_roster_id({bare!r}) returned {result!r}, expected {pid!r}"
+            )
+
+    def test_non_persona_roster_ids_pass_through(self):
+        """AC-11: non-persona roster IDs (arbiter, officers, subsystems) return unchanged."""
+        non_persona_ids = {eid for eid in self.roster_ids if not eid.startswith("persona_")}
+        for eid in non_persona_ids:
+            result = self.fn(eid)
+            assert result == eid, (
+                f"persona_to_roster_id({eid!r}) returned {result!r}, expected {eid!r}"
+            )
+
+    def test_result_is_always_string(self):
+        """Output is always a str regardless of input."""
+        for case in ["default_analyst", "arbiter", "unknown_xyz", ""]:
+            assert isinstance(self.fn(case), str)

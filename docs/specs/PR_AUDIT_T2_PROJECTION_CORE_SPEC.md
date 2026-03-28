@@ -1,6 +1,6 @@
 # AI Trade Analyst — Audit Tranche 2: Projection Core Module
 
-**Status:** ⏳ Spec drafted — implementation pending
+**Status:** ✅ Complete — 28 March 2026
 **Date:** 28 March 2026
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`
 **Review level:** Standard
@@ -227,21 +227,21 @@ The test import `from ai_analyst.api.services.ops_detail import _build_dependenc
 
 | # | Gate | Acceptance Condition | Status |
 |---|------|---------------------|--------|
-| AC-1 | Public API: entity lookup | `get_entity_lookup()` returns a dict keyed by entity ID with all roster entities as `AgentSummary` objects. Dict has exactly `len(get_all_roster_ids())` entries | ⏳ Pending |
-| AC-2 | Public API: relationships | `get_relationships()` returns all relationships from the roster. Result is a copy (mutation-safe) | ⏳ Pending |
-| AC-3 | Public API: persona mapping | `persona_to_roster_id("default_analyst")` returns `"persona_default_analyst"`. `persona_to_roster_id("arbiter")` returns `"arbiter"` (already valid). `persona_to_roster_id("unknown_xyz")` returns `"unknown_xyz"` (passthrough) | ⏳ Pending |
-| AC-4 | Negative: no private imports in trace | `ops_trace.py` does NOT import `_GOVERNANCE_LAYER`, `_OFFICER_LAYER`, `_DEPARTMENTS`, or `_RELATIONSHIPS` from any module | ⏳ Pending |
-| AC-5 | Negative: no private imports in detail | `ops_detail.py` does NOT import `_GOVERNANCE_LAYER`, `_OFFICER_LAYER`, `_DEPARTMENTS`, or `_RELATIONSHIPS` from any module | ⏳ Pending |
-| AC-6 | Negative: no local persona mapping | Neither `ops_trace.py` nor `ops_detail.py` defines its own `_persona_to_roster_id` function | ⏳ Pending |
-| AC-7 | Negative: no local entity lookup | `ops_trace.py` does not define `_get_roster_lookup`. `ops_detail.py` does not define `_get_roster_entity` | ⏳ Pending |
-| AC-8 | Trace regression | All existing trace tests pass. `project_trace()` output is contract-equivalent for the same fixture inputs (same field values, same ordering where contract-relevant, no contract-visible regressions) | ⏳ Pending |
-| AC-9 | Detail regression | All existing detail tests pass. `project_detail()` output is contract-equivalent for the same entity IDs, except where the centralized persona mapping intentionally corrects blind-prefix behavior for non-persona roster IDs (e.g., `"arbiter"` no longer becomes `"persona_arbiter"`). Diagnostics must confirm this correction and prove no existing test relies on the blind-prefix behavior | ⏳ Pending |
-| AC-10 | Health unaffected | No changes to `ops_health.py`; all health tests pass unchanged | ⏳ Pending |
-| AC-11 | Persona mapping invariants | Invariant tests cover: already-valid roster ID passthrough, bare persona name → prefixed, unknown name passthrough, all known persona names map correctly | ⏳ Pending |
-| AC-12 | Entity lookup completeness | Test asserts `set(get_entity_lookup().keys()) == get_all_roster_ids()` | ⏳ Pending |
-| AC-13 | Relationships copy safety | Test asserts `get_relationships() is not get_relationships()` (different list object) and `len(get_relationships()) == len(expected)` | ⏳ Pending |
-| AC-14 | Backend test count | 509+ passed (diagnostic baseline), zero new failures from this tranche | ⏳ Pending |
-| AC-15 | No frontend changes | Zero changes to any file under `ui/` | ⏳ Pending |
+| AC-1 | Public API: entity lookup | `get_entity_lookup()` returns a dict keyed by entity ID with all roster entities as `AgentSummary` objects. Dict has exactly `len(get_all_roster_ids())` entries | ✅ Pass |
+| AC-2 | Public API: relationships | `get_relationships()` returns all relationships from the roster. Result is a copy (mutation-safe) | ✅ Pass |
+| AC-3 | Public API: persona mapping | `persona_to_roster_id("default_analyst")` returns `"persona_default_analyst"`. `persona_to_roster_id("arbiter")` returns `"arbiter"` (already valid). `persona_to_roster_id("unknown_xyz")` returns `"unknown_xyz"` (passthrough) | ✅ Pass |
+| AC-4 | Negative: no private imports in trace | `ops_trace.py` does NOT import `_GOVERNANCE_LAYER`, `_OFFICER_LAYER`, `_DEPARTMENTS`, or `_RELATIONSHIPS` from any module | ✅ Pass |
+| AC-5 | Negative: no private imports in detail | `ops_detail.py` does NOT import `_GOVERNANCE_LAYER`, `_OFFICER_LAYER`, `_DEPARTMENTS`, or `_RELATIONSHIPS` from any module | ✅ Pass |
+| AC-6 | Negative: no local persona mapping | Neither `ops_trace.py` nor `ops_detail.py` defines its own `_persona_to_roster_id` function | ✅ Pass |
+| AC-7 | Negative: no local entity lookup | `ops_trace.py` does not define `_get_roster_lookup`. `ops_detail.py` does not define `_get_roster_entity` | ✅ Pass |
+| AC-8 | Trace regression | All existing trace tests pass. `project_trace()` output is contract-equivalent for the same fixture inputs (same field values, same ordering where contract-relevant, no contract-visible regressions) | ✅ Pass |
+| AC-9 | Detail regression | All existing detail tests pass. `project_detail()` output is contract-equivalent for the same entity IDs, except where the centralized persona mapping intentionally corrects blind-prefix behavior for non-persona roster IDs (e.g., `"arbiter"` no longer becomes `"persona_arbiter"`). Diagnostics must confirm this correction and prove no existing test relies on the blind-prefix behavior | ✅ Pass |
+| AC-10 | Health unaffected | No changes to `ops_health.py`; all health tests pass unchanged | ✅ Pass |
+| AC-11 | Persona mapping invariants | Invariant tests cover: already-valid roster ID passthrough, bare persona name → prefixed, unknown name passthrough, all known persona names map correctly | ✅ Pass |
+| AC-12 | Entity lookup completeness | Test asserts `set(get_entity_lookup().keys()) == get_all_roster_ids()` | ✅ Pass |
+| AC-13 | Relationships copy safety | Test asserts `get_relationships() is not get_relationships()` (different list object) and `len(get_relationships()) == len(expected)` | ✅ Pass |
+| AC-14 | Backend test count | 509+ passed (diagnostic baseline), zero new failures from this tranche | ✅ Pass |
+| AC-15 | No frontend changes | Zero changes to any file under `ui/` | ✅ Pass |
 
 ---
 
@@ -460,7 +460,50 @@ Tranche 2 is done when: `ops_roster.py` exposes `get_entity_lookup()`, `get_rela
 
 ## 13. Diagnostic Findings
 
-*To be populated after running the pre-code diagnostic protocol (Section 8).*
+*Populated 28 March 2026 — pre-code diagnostic protocol §8 results.*
+
+### Private import list (Step 1)
+Exactly two files import private roster constants, no surprises:
+- `ops_detail.py:37-40` — module-level: `_DEPARTMENTS`, `_GOVERNANCE_LAYER`, `_OFFICER_LAYER`, `_RELATIONSHIPS`
+- `ops_trace.py:59-61` — lazy (inside `_get_roster_lookup`): `_GOVERNANCE_LAYER`, `_OFFICER_LAYER`, `_DEPARTMENTS`
+
+### Persona mapping implementations (Step 2)
+Two implementations confirmed:
+- `ops_trace.py:88` — check-first: returns `bare_name` if already a roster ID, tries `persona_` prefix, passes through unknowns
+- `ops_detail.py:112` — blind prefix: always `f"persona_{bare_name}"`
+
+### Persona mapping divergence table (Step 6)
+| Input | Detail (blind) | Trace (check-first) | Diverges? |
+|-------|---------------|---------------------|-----------|
+| `arbiter` | `persona_arbiter` | `arbiter` | **YES** |
+| `market_data_officer` | `persona_market_data_officer` | `market_data_officer` | **YES** |
+| `governance_synthesis` | `persona_governance_synthesis` | `governance_synthesis` | **YES** |
+| `mdo_scheduler` | `persona_mdo_scheduler` | `mdo_scheduler` | **YES** |
+| `feeder_ingest` | `persona_feeder_ingest` | `feeder_ingest` | **YES** |
+| `macro_risk_officer` | `persona_macro_risk_officer` | `macro_risk_officer` | **YES** |
+| `default_analyst` | `persona_default_analyst` | `persona_default_analyst` | no |
+| All 7 persona bare names | identical | identical | no |
+| `unknown_xyz` | `persona_unknown_xyz` | `unknown_xyz` | **YES** |
+
+No existing detail test relies on blind-prefix behavior for these cases. Correction is safe.
+
+### Roster entity count (Step 5)
+**13 entities** (not 12 — `persona_execution_timing` confirmed as 7th persona):
+`arbiter`, `feeder_ingest`, `governance_synthesis`, `macro_risk_officer`, `market_data_officer`, `mdo_scheduler`, `persona_default_analyst`, `persona_execution_timing`, `persona_ict_purist`, `persona_prosecutor`, `persona_risk_officer`, `persona_skeptical_quant`, `persona_technical_structure`
+
+### Test import list (Step 3)
+One test file imports a private helper:
+- `test_ops_detail_endpoints.py:34` imports `_build_dependencies` (used at lines 552, 558, 564, 569, 574, 579, 584)
+
+`_build_dependencies` was not moved — it remains in `ops_detail.py`. Import path unchanged, no test update required.
+
+### Before/after output comparison (Step 7)
+- **Trace:** `_trace_before.json` vs `_trace_after.json` — only `generated_at` timestamp differs. All structural fields identical (6 participants, 5 edges).
+- **Detail:** `_detail_before.json` vs `_detail_after.json` — `arbiter`, `persona_default_analyst`, `market_data_officer` all identical after excluding timestamps.
+
+### Surprises
+- Entity count is 13, not 12 (spec assumed 12). `persona_execution_timing` is the 7th persona — spec text did not enumerate all 7, but AC-12 is satisfied regardless (test uses `get_all_roster_ids()` dynamically).
+- Trace's `DepartmentKey` import was present but unused — left in place (out of scope to clean up).
 
 ---
 

@@ -1,9 +1,9 @@
 # AI Trade Analyst — Repo Review & Progress Plan
 
 **Repo:** `github.com/DaW25Pinescript/AI-trade-analyst`  
-**Last updated:** 28 March 2026 (Audit Tranche 1 complete — contract alignment repair)
+**Last updated:** 28 March 2026 (Audit Tranche 2 complete — projection core module decoupling)
 **Review date:** 10 March 2026
-**Current phase:** Audit Tranche 1 — Complete. Phase 8 complete. Next: Audit Tranche 2 (trust + coupling repair)
+**Current phase:** Audit Tranche 2 — Complete. Next: Audit Tranche 3 (trust integrity, Findings 4–6)
 **Planning horizon:** Next 5–7 weeks
 
 > This file is the canonical progress/status document for the repo. Audit notes, phase notes, and review outputs should feed into this file rather than compete with it.
@@ -20,14 +20,13 @@
 
 ## Phase Index (at-a-glance)
 
-- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, PR-CHART-2, PR-REFLECT-3, **Audit Tranche 1**.
-- **Current phase:** Audit Tranche 1 — Complete. Contract alignment repair (Findings 1, 2, 3 from zero-trust audit): frontend types, contract doc, and 5 trace components aligned to backend serialized API response. +14 backend contract tests. Zero regression.
+- **Completed named phases:** Phase A, B, C, D, 1A, 1B, E+, Instrument Promotion, Provider Routing, Operationalise P1/P2, TD-1 Micro-PR, Security/API Hardening, CI Seam Hardening, LLM Routing Centralisation, Observability Phase 1, UI Phase 1, UI Phase 2, UI Phase 3A, PR-OPS-1/2/3, Phase 6 (PR-UI-1–6), Phase 7 (PR-OPS-4a/4b/5a/5b), PR-RUN-1, PR-CHART-1, PR-REFLECT-1, PR-REFLECT-2, PR-CHART-2, PR-REFLECT-3, **Audit Tranche 1**, **Audit Tranche 2**.
+- **Current phase:** Audit Tranche 2 — Complete. Projection core module decoupling (Findings 7, 8): 3 new public roster APIs, private constant coupling eliminated from trace + detail, centralized persona mapping with behavior correction. 523 backend tests, zero new failures.
 - **Forward frontend stack:** React + TypeScript + Tailwind is the forward frontend stack.
 - **Agent Operations classification:** Agent Operations read-side stack is complete — operator observability / explainability / trust workspace on six read-only projection endpoints (roster, health, trace, detail, run browser, market data). Now accepts deep-link params from Reflect workspace.
-- **Backend test count update:** 509 passed, 3 failed (pre-existing). +13 new tests in `TestRouteContractSnapshot` (AC-17 route-level contract test).
-- **Frontend test count update:** 406 total (389 passing, 17 pre-existing failures — includes `reflect.test.tsx` TS type regressions and journey failures). Trace surface fully aligned; zero new failures introduced by Audit T1.
-- **Frontend test count:** 406 total (389 passing, 17 pre-existing failures).
-- **Next actions:** Audit Tranche 2 (trust + coupling repair, Findings 4–12) — spec to be drafted. Then evaluate Phase 9 candidates.
+- **Backend test count update:** 523 passed, 3 failed (pre-existing). +14 new tests (33 new public roster API tests net of removed helpers).
+- **Frontend test count:** 406 total (389 passing, 17 pre-existing failures). No changes in Audit T2 (backend-only).
+- **Next actions:** Audit Tranche 3 (trust integrity, Findings 4, 5, 6) — spec to be drafted. Then evaluate Phase 9 candidates.
 - **Active decision gate:** the production-readiness gate remains satisfied. UI core product lane (Phase 6), Agent Ops read-side stack (Phase 7), Run Browser (PR-RUN-1), OHLCV Chart (PR-CHART-1/2), and Reflect workspace (PR-REFLECT-1/2/3) are all complete.
 
 ---
@@ -36,6 +35,7 @@
 
 | Date | Phase | Activity |
 |------|-------|----------|
+| 28 Mar 2026 | Audit Tranche 2 | Projection core module decoupling complete. 3 new public roster APIs (`get_entity_lookup`, `get_relationships`, `persona_to_roster_id`). Private constant coupling eliminated from `ops_trace.py` + `ops_detail.py`. Centralized persona mapping corrects blind-prefix bug for non-persona roster IDs. 14 AC tests + 19 invariant tests added. Before/after output comparison: trace identical (except timestamp), detail identical for all 3 test entities. Backend: 523/3 (no new failures). Frontend: unchanged. |
 | 28 Mar 2026 | Audit Tranche 1 | Contract alignment repair complete. Frontend `AgentTraceResponse` types, all 5 trace components, test fixtures, and `AGENT_OPS_CONTRACT.md` §6 aligned to backend serialized API response. Partial-run detection fixed (`run_status === "partial"`). Edge type vocabulary corrected (run-scoped, not roster). Contract-mismatch guard added. +14 backend contract tests (`TestRouteContractSnapshot`). Backend: 509/3. Frontend: 389/17 (no regression). |
 | 26 Mar 2026 | Backlog | MacroContext UI workspace backlog note recorded. Concept preserved, not committed to roadmap. See Section 9. |
 | 17 Mar 2026 | PR-REFLECT-3 | Integration bridge + suggestions v0: rules-based advisory suggestions (OVERRIDE_FREQ_HIGH, NO_TRADE_CONCENTRATION), SuggestionPanel on Reflect Overview, persona row → Agent Ops Detail navigation via `navigable_entity_id`, URL param consumption with router replace, C-6 coherence fix (clear run state on mode change), entity-not-found message update. +35 backend tests (489 total), +25 frontend tests (406 total). Phase 8 complete. |
@@ -246,8 +246,11 @@ You are no longer proving feasibility, building runtime behavior, or standing up
 | Phase 8 — PR-CHART-1 | OHLCV data-seam + candlestick chart — `GET /market-data/{instrument}/ohlcv`, +39 backend / +9 frontend tests | ✅ Complete |
 | Phase 8 — PR-REFLECT-1 | Persona performance + pattern summary endpoints — 3 `/reflect` endpoints, +11 backend tests | ✅ Complete |
 | Phase 8 — PR-REFLECT-2 | Reflect workspace frontend — `#/reflect` route, Overview + Runs tabs, +55 frontend tests | ✅ Complete |
-| Phase 8 — PR-CHART-2 | Run context overlay + multi-timeframe charts | 📋 Next |
-| Phase 8 — PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | 📋 Planned |
+| Phase 8 — PR-CHART-2 | Run context overlay + multi-timeframe charts | ✅ Complete |
+| Phase 8 — PR-REFLECT-3 | Integration + rules-based parameter suggestions v0 | ✅ Complete |
+| Audit Tranche 1 | Contract alignment repair — frontend types, contract doc, 5 trace components, +14 backend tests — 509/3 | ✅ Complete |
+| Audit Tranche 2 | Projection core module decoupling — 3 public roster APIs, coupling elimination, persona mapping correction — 523/3 | ✅ Complete |
+| Audit Tranche 3 | Trust integrity (Findings 4, 5, 6) | 💭 Planned — spec after T2 closes |
 | Config | jCodeMunch API key config (Anthropic + GitHub PAT) | ⏳ Pending |
 
 ---

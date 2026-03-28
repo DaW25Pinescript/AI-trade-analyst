@@ -34,11 +34,10 @@ from ai_analyst.api.models.ops_detail import (
 )
 from ai_analyst.api.services.ops_profile_registry import get_entity_profile
 from ai_analyst.api.services.ops_roster import (
-    _DEPARTMENTS,
-    _GOVERNANCE_LAYER,
-    _OFFICER_LAYER,
-    _RELATIONSHIPS,
     get_all_roster_ids,
+    get_entity_lookup,
+    get_relationships,
+    persona_to_roster_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,28 +59,14 @@ class DetailProjectionError(Exception):
 # ── Internal helpers ────────────────────────────────────────────────────────
 
 
-def _get_roster_entity(entity_id: str) -> dict | None:
-    """Look up a roster AgentSummary by entity_id, return as dict or None."""
-    for agent in _GOVERNANCE_LAYER:
-        if agent.id == entity_id:
-            return agent
-    for agent in _OFFICER_LAYER:
-        if agent.id == entity_id:
-            return agent
-    for agents in _DEPARTMENTS.values():
-        for agent in agents:
-            if agent.id == entity_id:
-                return agent
-    return None
-
-
 def _build_dependencies(entity_id: str) -> list[EntityDependency]:
     """Derive upstream/downstream dependencies from roster relationships."""
+    roster = get_entity_lookup()
     deps: list[EntityDependency] = []
-    for rel in _RELATIONSHIPS:
+    for rel in get_relationships():
         if rel.from_ == entity_id:
             # This entity feeds/supports/challenges the target → downstream
-            target = _get_roster_entity(rel.to)
+            target = roster.get(rel.to)
             if target:
                 deps.append(EntityDependency(
                     entity_id=rel.to,
@@ -91,7 +76,7 @@ def _build_dependencies(entity_id: str) -> list[EntityDependency]:
                 ))
         elif rel.to == entity_id:
             # Something feeds/supports/challenges this entity → upstream
-            source = _get_roster_entity(rel.from_)
+            source = roster.get(rel.from_)
             if source:
                 deps.append(EntityDependency(
                     entity_id=rel.from_,
@@ -107,11 +92,6 @@ def _truncate(text: str, max_len: int) -> str:
     if len(text) <= max_len:
         return text
     return text[: max_len - 1] + "…"
-
-
-def _persona_to_roster_id(bare_name: str) -> str:
-    """Map a bare persona name to its roster entity ID."""
-    return f"persona_{bare_name}"
 
 
 def _scan_recent_participation(
@@ -218,7 +198,7 @@ def _extract_participation(entity_id: str, rr: dict) -> dict | None:
     analysts = rr.get("analysts", [])
     for analyst in analysts:
         persona = analyst.get("persona", "")
-        roster_id = _persona_to_roster_id(persona)
+        roster_id = persona_to_roster_id(persona)
         if roster_id == entity_id:
             status = analyst.get("status", "unknown")
             return {
@@ -230,7 +210,7 @@ def _extract_participation(entity_id: str, rr: dict) -> dict | None:
     # Check skipped/failed analysts
     for analyst in rr.get("analysts_skipped", []):
         persona = analyst.get("persona", "")
-        if _persona_to_roster_id(persona) == entity_id:
+        if persona_to_roster_id(persona) == entity_id:
             reason = analyst.get("reason", "unknown")
             return {
                 "verdict_direction": None,
@@ -240,7 +220,7 @@ def _extract_participation(entity_id: str, rr: dict) -> dict | None:
 
     for analyst in rr.get("analysts_failed", []):
         persona = analyst.get("persona", "")
-        if _persona_to_roster_id(persona) == entity_id:
+        if persona_to_roster_id(persona) == entity_id:
             reason = analyst.get("reason", "unknown")
             return {
                 "verdict_direction": None,
@@ -302,7 +282,7 @@ def project_detail(
         If entity_id is not found in both roster and profile registry.
     """
     # 1. Roster lookup
-    roster_entity = _get_roster_entity(entity_id)
+    roster_entity = get_entity_lookup().get(entity_id)
     if roster_entity is None:
         raise DetailProjectionError(
             f"Entity '{entity_id}' not found in roster"
